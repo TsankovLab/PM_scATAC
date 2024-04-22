@@ -28,4 +28,8 @@ devtools::install_github("colomemaria/epiAneufinder")
 devtools::install_github('immunogenomics/presto')
 devtools::install_github("GreenleafLab/chromVARmotifs")
 BiocManager::install("scran")
+BiocManager::install ('scuttle')
+BiocManager::install ('edgeR')
+BiocManager::install ('BiocSingular')
+BiocManager::install ('beachmat')
 

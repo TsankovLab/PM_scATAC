@@ -1,3 +1,4 @@
+use UGER # Add this before running R to be able to run cNMF scripts using UGER 
 library (Seurat)
 library (scran)
 set.seed(1234)
@@ -6,7 +7,6 @@ set.seed(1234)
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/'
 dir.create (paste0(projdir,'/Plots/'), recursive =T)
 setwd (projdir)
-
 
 sample_names = c(
     'P1', # p786
@@ -83,22 +83,19 @@ if(length(k_list) > 1)
 	k_list_formatted = shQuote (k_list_formatted)
 	}
 
-system (paste0('chmod +x /ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scrna_pipeline/cnmf_prepare_job.sh'), wait=FALSE) 
-system (paste0('chmod +x /ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scrna_pipeline/cnmf_factorization_parallel.sh'), wait=FALSE)
+system (paste0('chmod +x ../../PM_scATAC/cnmf_prepare_job.sh'), wait=FALSE) 
+system (paste0('chmod +x ../../PM_scATAC/cnmf_factorization_parallel.sh'), wait=FALSE)
 
 # Run cNMF prepare script
-system (paste0('bash ',scrna_pipeline_dir,'cnmf_prepare_job.sh ', projdir,' ', k_list_formatted,' ', nfeat, ' ', cnmf_out, ' ', cores,' ', scrna_pipeline_dir), wait=TRUE)
+system (paste0('bash ','../../PM_scATAC/cnmf_prepare_job.sh ', projdir,' ', k_list_formatted,' ', nfeat, ' ', cnmf_out, ' ', cores), wait=TRUE)
 
 # Submitting cNMF factorization job
-system (paste0 ('qsub -t 1-',cores,' ',scrna_pipeline_dir, 'cnmf_factorization_parallel.sh ', projdir,' ', cnmf_out, ' ', cores))
+system (paste0 ('qsub -t 1-',cores,' ','../../PM_scATAC/cnmf_factorization_parallel.sh ', projdir,' ', cnmf_out, ' ', cores))
 
 
 # Run script to combine K iterations generated in previous script
-if (!file.exists (paste0(cnmf_out,'/cnmf/cnmf.k_selection.png')) | force)
-	{
-	message ('combine cnmf factors')
-	system (paste0('bash ',scrna_pipeline_dir,'cnmf_combine_job.sh ', projdir, ' ',cnmf_out), wait=TRUE)
-	}
+message ('combine cnmf factors')
+system (paste0('bash ','../../PM_scATAC/cnmf_combine_job.sh ', projdir, ' ',cnmf_out), wait=TRUE)
 
 for (i in k_selections)
 	{

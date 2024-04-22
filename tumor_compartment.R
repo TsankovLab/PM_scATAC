@@ -26,7 +26,7 @@ packages = c(
 lapply(packages, require, character.only = TRUE)
 
 ####### ANALYSIS of TUMOR compartment #######
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment'
+projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
 dir.create (paste0(projdir,'/Plots/'), recursive =T)
 setwd (projdir)
 
@@ -68,7 +68,7 @@ sample_names = c(
 
   
 # Load last istance
-if (!file.exists (paste0(projdir,'/Save-ArchR-Project.rds')))
+if (!file.exists ('Save-ArchR-Project.rds'))
    {
     # Fix the fragment file of multiome sample by removing the header 
     #system ('zcat atac_fragments.tsv.gz | grep -v ^\# | bgzip > atac_fragments_fixed.tzv.gz')
@@ -327,7 +327,6 @@ plotPDF (meso_markers, ArchRProj = archp, width=4, name ='MPM_markers_coveragePl
 
 
 ### Compare bins malignants normal ####
-
 # Load fragments
 fragments = unlist (getFragmentsFromProject (
      ArchRProj = archp))
@@ -386,7 +385,6 @@ dev.off()
 
 
 ### Run peak calling on celltype annotation ####
-
 ### Call peaks on celltypes ###
 metaGroupName = 'Clusters'
 archp = addGroupCoverages (
@@ -422,9 +420,7 @@ dev.off()
 
 
 
-
 ### chromVAR analysis ####
-
 archp = addBgdPeaks (archp, force= FALSE)
 archp = addMotifAnnotations (ArchRProj = archp, 
     motifSet = "cisbp", 
@@ -970,7 +966,7 @@ bp = bp + stat_pvalue_manual (stat.test2, remove.bracket=FALSE,
    bracket.nudge.y = 0, hide.ns = TRUE,
     label = "p.adj.signif") 
 
-pdf (paste0 (projdir, 'Plots/Sample_distribution_coexp_TF.pdf'), height = 6,width=24)
+pdf (paste0 ('Plots/Sample_distribution_coexp_TF.pdf'), height = 6,width=24)
 bp
 dev.off()
 
@@ -1008,8 +1004,8 @@ dev.off()
 
 
 
-# Export bigiwg files
-metaGroupName = 'celltype2'
+# Export bigiwg files ####
+metaGroupName = 'Sample2'
 getGroupBW(
   ArchRProj = archp,
   groupBy = metaGroupName,
@@ -1023,12 +1019,98 @@ getGroupBW(
 )
 
 
+maxDist = 250000
+archp = addPeak2GeneLinks(
+    ArchRProj = archp,
+    useMatrix = 'GeneScoreMatrix',
+    reducedDims = "IterativeLSI",
+    maxDist = maxDist
+)
+
+
+p2g = getPeak2GeneLinks(
+    ArchRProj = archp,
+    corCutOff = 0.45,
+    resolution = 1,
+    returnLoops = FALSE
+)
 
 
 
+# # Convert df in Granges add gene Name and correlation
+p2g_corr = .3
+gene = 'WT1'
+p2g$geneName = mcols(metadata(p2g)$geneSet)$name[p2g$idxRNA]
+p2g = p2g[!is.na (p2g$FDR),] # remove NaN correlations (not sure why there are some)
+p2g = p2g[p2g$Correlation > p2g_corr, ]
+p2gGR = metadata (p2g)$peakSet[p2g$idxATAC]
+p2gGR$geneName = p2g$geneName
+p2gGR$correlation = p2g$Correlation
+p2gGR_gene = p2gGR[p2gGR$geneName == gene]
+# Subset peakMatrix by peaks in genomic region 
+if(!any (ls() == 'pSE')) pSE = getMatrixFromProject (archp, useMatrix = 'PeakMatrix')
+pSE = pSE[, rownames(archp)]
+pSEs = subsetByOverlaps (pSE, p2gGR_gene)
 
+# Annotate peaks with peakSet
+metaGroupName2 = 'Sample2'
+ps = getPeakSet (archp)
+ann_peaks = ps[queryHits(findOverlaps (ps, pSEs))]
+peakType = paste(ann_peaks$peakType, paste(ranges(ann_peaks))) 
+pmat = t(assays (pSEs)[[1]])
+all (rownames(archp) == rownames (pmat))
+pmat = as.data.frame (pmat)
+pmat = pmat / archp$ReadsInTSS * 1000
+pmat$metaGroup = as.character(archp@cellColData[,metaGroupName2])
+pmat = aggregate (.~ metaGroup, pmat, sum)
+cell_norm = sapply (pmat$metaGroup, function(x) sum(archp@cellColData[,metaGroupName2] == x))
+pmat = pmat[,-1]
+pmat = pmat / cell_norm
+colnames (pmat) = peakType
+rownames (pmat) = names(cell_norm)
+ha = HeatmapAnnotation (peakType = sapply(peakType, function(x) unlist(strsplit(x,' '))[1]),simple_anno_size = unit(.2, "cm"))
+pdf (paste0('Plots/Peaks_to_',gene,'.pdf'), height=2, width=6)
+Heatmap (pmat, column_title = paste (gene, 'local epigenome -',maxDist),
+  clustering_distance_rows = "euclidean", name = 'coverage', bottom_annotation = ha,
+  cluster_columns=F, row_names_gp = gpar (fontsize = 5),
+  cluster_rows = T, column_names_gp = gpar (fontsize = 3), border=T,
+  col = rev(viridis::magma(100)))
+dev.off()
 
+LE_region = p2gGR_gene[c(1, length(p2gGR_gene))]
+LE_region = GRanges (seqnames = seqnames (LE_region)[1], ranges = IRanges(start = start(LE_region)[1], end=end(LE_region)[2]))
+LE_region_p <- plotBrowserTrack(
+    ArchRProj = archp, 
+    groupBy = metaGroupName2, 
+    region = LE_region, 
+    upstream = 0,
+    downstream = 0,
+    pal = paletteDiscrete(unique(archp@cellColData[,metaGroupName2]), set='rushmore', reverse=T),
+    loops = getPeak2GeneLinks (archp, corCutOff = 0.2,
+      returnLoops = TRUE)[[1]],
+    useGroups= NULL
+)
+plotPDF (LE_region_p, ArchRProj = archp, width=10, height=4)
 
+ann_peaks = ps[queryHits(findOverlaps (ps, pSEs))]
+peakType = paste(ann_peaks$peakType, paste(ranges(ann_peaks)))
+pmat = t(assays (pSEs)[[1]])
+all (rownames(archp) == rownames (pmat))
+pmat = as.data.frame (pmat)
+pmat = pmat / archp$ReadsInTSS * 1000
+
+LE_score = data.frame (LE_score = rowSums (pmat))
+LE_score$metaGroup = as.character(archp@cellColData[, metaGroupName2])[match(rownames(LE_score), archp$cellNames)]
+#LE_score = LE_score[order(-LE_score$LE_score),,drop=F]
+#LE_score$cluster = rownames(LE_score)
+#LE_score$cluster = factor (LE_score$cluster, levels = LE_score$cluster)
+p<-ggplot(data=LE_score, aes(x=metaGroup, y=LE_score)) +
+  geom_boxplot() + theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+pdf (paste0('Plots/local_epigenome_score_',gene,'_barplot.pdf'), 3,5)
+p
+dev.off()
 
 
 
