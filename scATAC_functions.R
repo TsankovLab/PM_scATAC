@@ -1283,3 +1283,39 @@ getMatrixFromProject <- function(
   se
   
 }
+
+
+
+# Calculate hypergeometric test of peaks with motifs
+hyperMotif = function (selected_peaks, motifmatch)
+  {
+  bg_peakSet = rowRanges (motifmatch)
+  bg_peak_motif_mat = assays (motifmatch)[[1]]
+  selected_peaks_idx = queryHits (findOverlaps (bg_peakSet, selected_peaks))
+  all_peaks_w_motif = colSums (bg_peak_motif_mat)
+  selected_peaks_w_motif = colSums (bg_peak_motif_mat[selected_peaks_idx,])
+  
+  # Run hypergeometric test per celltype using the cluster-specific peaks for that celltypes as background
+  hyper_res = list()
+    
+  # Run hypergeometric test per TF
+  message (paste('Run hyper tests for all TFs'))
+  hyper_tf = NULL
+  pb = progress::progress_bar$new(total =  ncol(bg_peak_motif_mat))
+  for (i in 1:ncol(bg_peak_motif_mat))
+    {
+    pb$tick()
+    q = selected_peaks_w_motif[i]
+    m = all_peaks_w_motif[i]
+    n = nrow(bg_peak_motif_mat) - m
+    k = length (selected_peaks)
+    hyper_tf[i] = phyper (q, m, n, k, lower.tail = FALSE, log.p = FALSE)
+    }
+  hyper_res = data.frame (
+      pval = hyper_tf, 
+      padj = p.adjust (hyper_tf, method = 'fdr'),
+      row.names = colnames (bg_peak_motif_mat))
+  hyper_res = hyper_res[order (hyper_res$padj),]
+  return (hyper_res)
+  }
+

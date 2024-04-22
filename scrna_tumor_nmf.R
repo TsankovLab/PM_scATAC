@@ -1,12 +1,16 @@
 use UGER # Add this before running R to be able to run cNMF scripts using UGER 
 library (Seurat)
 library (scran)
+library (ggplot2)
+library (RColorBrewer)
+library(patchwork)
 set.seed(1234)
 
 # Set project dir
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/'
 dir.create (paste0(projdir,'/Plots/'), recursive =T)
 setwd (projdir)
+source ('../../PM_scATAC/useful_functions.R')
 
 sample_names = c(
     'P1', # p786
@@ -32,7 +36,6 @@ srt$sampleID[srt$sampleID == 'MPM_naive_p14'] = 'P14'
 srt = srt[, srt$celltype_simplified == 'Malignant']
 srt = srt[, srt$sampleID %in% sample_names]
 srt = NormalizeData (srt)
-
 sce = SingleCellExperiment (list(counts=srt@assays$RNA@counts, logcounts = srt@assays$RNA@data),
 rowData=rownames(srt)) 
 sce = modelGeneVar(sce)
@@ -42,6 +45,9 @@ sce = sce[!apply(sapply(batchy_genes, function(x) grepl (x, rownames(sce))),1,an
 nfeat = 3000
 vf = getTopHVGs(sce, n=nfeat)
 VariableFeatures (srt) = vf
+srt <- ScaleData(srt)
+srt <- RunPCA(srt)
+srt <- RunUMAP(srt, dims = 1:15)
 
 
   
@@ -92,32 +98,66 @@ system (paste0('bash ','../../PM_scATAC/cnmf_prepare_job.sh ', projdir,' ', k_li
 # Submitting cNMF factorization job
 system (paste0 ('qsub -t 1-',cores,' ','../../PM_scATAC/cnmf_factorization_parallel.sh ', projdir,' ', cnmf_out, ' ', cores))
 
-
 # Run script to combine K iterations generated in previous script
-message ('combine cnmf factors')
-system (paste0('bash ','../../PM_scATAC/cnmf_combine_job.sh ', projdir, ' ',cnmf_out), wait=TRUE)
+system (paste0('bash ','../../PM_scATAC/cnmf_combine_job.sh ', projdir, ' ',cnmf_out), wait=TRUE) # combine cnmf factors
 
-for (i in k_selections)
-	{
-	if (file.exists (paste0(cnmf_out,'/cnmf/cnmf.k_selection.png')) & !file.exists (paste0(projdir, cnmf_out,'/cnmf/cnmf.spectra.k_',i,'.dt_0_3.consensus.txt')) | force)
-		{
-		message ('submit cNMF consensus job')
-		# Make sh file executable
-		system (paste0('chmod +x ',scrna_pipeline_dir,'cnmf_consensus_job.sh'), wait=FALSE)
-		
-		# Run cNMF bash script
-		#system (paste0('qsub -t 1-4 ',scrna_pipeline_dir,'cnmf_prepare_job.sh ', projdir,' ', k_list,' ', k_selection,' ', nfeat, ' ', cnmf_out), wait=FALSE)
-		system (paste0('qsub ',scrna_pipeline_dir,'cnmf_consensus_job.sh ', projdir, ' ', cnmf_out,' ', i), wait=FALSE)
-		}
-	}
+k = 22
+# Run cNMF bash script
+system (paste0('chmod +x ','../../PM_scATAC/cnmf_consensus_job.sh'), wait=FALSE)
+system (paste0('qsub ','../../PM_scATAC/cnmf_consensus_job.sh ', projdir, ' ', cnmf_out,' ', k), wait=FALSE)
 
-if (all (file.exists (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selections,'.dt_0_3.consensus.txt'))))
-	{
-	message ('clean files')	
-	system (paste0('rm -r ', projdir,'CNMF_factorization*'))
-	system (paste0('rm -r ', projdir,'CNMF_consensus*'))
-	system (paste0('rm -r ', projdir, cnmf_out,'/cnmf/cnmf.gene_spectra_tpm*'))
-	system (paste0('rm -r ', projdir, cnmf_out,'/cnmf/cnmf.gene_spectra_score*'))
-	system (paste0('rm -r ', projdir, cnmf_out,'/cnmf/cnmf.clustering*'))
-	system (paste0('rm -r ', projdir, cnmf_out,'/cnmf/cnmf_tmp'))
-	}
+# Read in NMF results ####
+cnmf_spectra = read.table (paste0('cNMF/cNMF_scrna_tumor_5_30_vf3000/cnmf/cnmf.spectra.k_',k,'.dt_0_3.consensus.txt'))
+
+# Assign genes uniquely to cNMF modules based on spectra values
+cnmf_spectra = t(cnmf_spectra)
+max_spectra = apply (cnmf_spectra, 1, which.max)
+
+top_nmf_genes = Inf
+cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
+      {
+      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
+      tmp = tmp[order(-tmp[,1]),,drop=F]
+      head(rownames(tmp),top_nmf_genes)
+      })
+names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
+
+saveRDS (cnmf_spectra_unique, paste0('cnmf_genelist_',k,'.rds'))
+
+srt = ModScoreCor (
+        seurat_obj = srt, 
+        geneset_list = cnmf_spectra_unique, 
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # threshold for fetal_pval2
+        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+
+
+srt$cNMF = 'cNMF'
+ccomp_df = srt@meta.data[,c(names(cnmf_spectra_unique)), drop=FALSE]
+      #ccomp_df = aggregate (ccomp_df, by=as.list(srt_wgcna@meta.data[,metaGroupNames,drop=F]), mean)    
+bp1 = lapply (names(cnmf_spectra_unique), function(x) {
+            ggplot (ccomp_df, aes_string (x= metaGroupNames[3], y= x)) +
+        #geom_violin (trim=TRUE, aes_string (fill = metaGroupNames[3])) +
+        #geom_violin (aes_string(fill = metaGroupNames[3])) +
+        geom_boxplot(width=0.5, color="black", alpha=0.2) +
+        #geom_bar (stats='identity') +
+        #geom_jitter (color="black", size=0.4, alpha=0.9) +
+        theme_classic() + 
+        #scale_fill_manual (values= module_pal) + 
+        ggtitle (paste(x,'mod score')) + 
+        theme (axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))  + NoLegend()
+      })
+
+reductionName = 'umap'
+  umap_df = data.frame (srt[[reductionName]]@cell.embeddings, srt@meta.data[,c(names(cnmf_spectra_unique))])
+  umap_p1 = lapply (names(cnmf_spectra_unique), function(x) ggplot(data = umap_df) + 
+  geom_point (mapping = aes_string (x = colnames(umap_df)[1], y= colnames(umap_df)[2], color = x), size = .1) + 
+  scale_colour_gradientn (colours = rev(brewer.pal (n = 11, name = "RdBu")),limits=c(-max (abs(umap_df[,x])), max (abs(umap_df[,x])))) +
+  ggtitle (x) + 
+  #facet_wrap (as.formula(paste("~", metaGroupNames[3]))) + 
+  theme_classic() +
+  theme_void())
+  
+png (paste0(cnmf_out,'/Plots/cNMF_module_scores_umaps_',k,'.png'),10000,10000,res=300)
+print (wrap_plots (umap_p1))
+dev.off()

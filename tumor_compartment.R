@@ -1113,13 +1113,33 @@ p
 dev.off()
 
 
+# Import cNMF results and intersect with p2g
+k=22
+cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'.rds'))
+
+p2g_cnmf = lapply (cnmf_list, function(x) p2gGR[p2gGR$geneName %in% x])
 
 
+tf_match = getMatches (archp)
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+bg_peakSet = rowRanges (tf_match)
+tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+nmf_TF = lapply (p2g_cnmf, function(x) hyperMotif (
+  selected_peaks = x, 
+  motifmatch = tf_match))
 
+nmf_TF = lapply (nmf_TF, function(x) x[rownames(nmf_TF[[1]]), ])
+nmf_TF_df = do.call (cbind, nmf_TF)
+nmf_TF_df = nmf_TF_df[, grep ('padj', colnames(nmf_TF_df))]
+nmf_TF_df[nmf_TF_df > 0.05] = 1
+nmf_TF_df = -log10(nmf_TF_df)
+nmf_TF_df = nmf_TF_df[rowSums (nmf_TF_df) != 0, ]
 
+TF_ht = Heatmap (nmf_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
 
-
-
+pdf (paste0('Plots/TF_nmf_',k,'_heatmap.pdf'),width = 3,height=15)
+TF_ht
+dev.off()
 
 
 
