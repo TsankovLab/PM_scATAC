@@ -200,30 +200,6 @@ if (!file.exists ('Save-ArchR-Project.rds'))
   }
 
 
-# Load scRNA and check expression of TFs ####
-srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/reproduction2/scRNA/srt_tumor.rds')
-srt$celltype_simplified_mal = as.character (srt$celltype_simplified)
-srt$celltype_simplified_mal[srt$celltype_simplified == 'Malignant'] = paste0(srt$sampleID[srt$celltype_simplified == 'Malignant'], '_', srt$celltype_simplified[srt$celltype_simplified == 'Malignant'])
-# Import P14
-srt_p14 = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/MPM_naive_p14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds')
-srt_p14$celltype_simplified = srt_p14$celltype
-srt = merge (srt, srt_p14)
-srt$sampleID[srt$sampleID == 'MPM_naive_p14'] = 'P14'
-
-# Import normal mesothelium RNA
-projdir_ref = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scRNA_meso/'
-ref = readRDS (paste0(projdir_ref, 'ref.rds'))
-#subsample_ct = 1000
-#ref_bc = lapply (unique(ref$celltype), function(x) sample(colnames(ref)[ref$celltype == x], subsample_ct, replace=T))
-#names (ref_bc) = unique(ref$celltype)
-#cts = c('Mesothelium','Fibroblast')
-#ref = ref[,colnames (ref) %in% unlist(ref_bc[cts])]
-ref = ref[,ref$celltype == 'Mesothelium']
-ref = ref[,ref$lungid %in% c('HU37','HU62')]
-ref$sampleID = ref$lungid
-ref$celltype_simplified = 'Malignant'
-srt = merge (srt, ref)
-
 ### Gene score based analysis ####
 
 # Find DAG ####
@@ -1038,7 +1014,7 @@ p2g = getPeak2GeneLinks(
 
 
 # # Convert df in Granges add gene Name and correlation
-p2g_corr = .3
+p2g_corr = .4
 gene = 'WT1'
 p2g$geneName = mcols(metadata(p2g)$geneSet)$name[p2g$idxRNA]
 p2g = p2g[!is.na (p2g$FDR),] # remove NaN correlations (not sure why there are some)
@@ -1047,6 +1023,7 @@ p2gGR = metadata (p2g)$peakSet[p2g$idxATAC]
 p2gGR$geneName = p2g$geneName
 p2gGR$correlation = p2g$Correlation
 p2gGR_gene = p2gGR[p2gGR$geneName == gene]
+
 # Subset peakMatrix by peaks in genomic region 
 if(!any (ls() == 'pSE')) pSE = getMatrixFromProject (archp, useMatrix = 'PeakMatrix')
 pSE = pSE[, rownames(archp)]
@@ -1114,11 +1091,11 @@ dev.off()
 
 
 # Import cNMF results and intersect with p2g
-k=22
-cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'.rds'))
-
+nfeat=5000
+k=25
+cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
+cnmf_list = lapply (cnmf_list, function(x) head (x,20))
 p2g_cnmf = lapply (cnmf_list, function(x) p2gGR[p2gGR$geneName %in% x])
-
 
 tf_match = getMatches (archp)
 colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
@@ -1134,10 +1111,11 @@ nmf_TF_df = nmf_TF_df[, grep ('padj', colnames(nmf_TF_df))]
 nmf_TF_df[nmf_TF_df > 0.05] = 1
 nmf_TF_df = -log10(nmf_TF_df)
 nmf_TF_df = nmf_TF_df[rowSums (nmf_TF_df) != 0, ]
+nmf_TF_df[sapply(nmf_TF_df, is.infinite)] <- 300
 
 TF_ht = Heatmap (nmf_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
 
-pdf (paste0('Plots/TF_nmf_',k,'_heatmap.pdf'),width = 3,height=15)
+pdf (paste0('Plots/TF_nmf_',k,'_nfeat_',nfeat,'_heatmap.pdf'),width = 3,height=15)
 TF_ht
 dev.off()
 
