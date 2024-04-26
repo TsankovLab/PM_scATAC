@@ -32,9 +32,9 @@ setwd (projdir)
 
 
 #devtools::install_github("immunogenomics/presto") #needed for DAA
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scrna_pipeline/useful_functions.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/projects/meso_prj/meso_ATAC/meso_scATAC_repo/ggplot_aestetics.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scATAC_functions.R')
+source ('../../PM_scATAC/useful_functions.R')
+source ('../../PM_scATAC/ggplot_aestetics.R')
+source ('../../PM_scATAC/scATAC_functions.R')
 
 # Load functions for hub detection
 source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/knnGen.R')
@@ -66,7 +66,10 @@ sample_names = c(
     #'cf_distal'
     )
 
-  
+# Load RNA
+srt = readRDS ('../scrna/scRNA_meso.rds')
+sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
+
 # Load last istance
 if (!file.exists ('Save-ArchR-Project.rds'))
    {
@@ -674,7 +677,7 @@ dev.off()
 # dev.off()
 
 # Plot TF deviation vs genescore and maxDelta  
-actTF_threshold = .3
+actTF_threshold = 0
 # tf_gs_cor = tf_gs_corL[[1]]
 # tf_gs_cor$label = ""
 # tf_gs_cor$label[abs(tf_gs_cor$tf_gs_cor) > actTF_threshold] = rownames (tf_gs_cor)[abs(tf_gs_cor$tf_gs_cor) > actTF_threshold] 
@@ -755,13 +758,139 @@ print (wrap_plots (activator_p))
 dev.off()
 
 
+
+### Use P2G analysis and cNMF from RNA to identify active TF via regulons  ####
+maxDist = 250000
+archp = addPeak2GeneLinks(
+    ArchRProj = archp,
+    useMatrix = 'GeneScoreMatrix',
+    reducedDims = "IterativeLSI",
+    maxDist = maxDist
+)
+
+
+p2g = getPeak2GeneLinks(
+    ArchRProj = archp,
+    corCutOff = 0.45,
+    resolution = 1,
+    returnLoops = FALSE
+)
+
+
+
+# # Convert df in Granges add gene Name and correlation
+p2g_corr = .2
+# gene = 'WT1'
+p2g$geneName = mcols(metadata(p2g)$geneSet)$name[p2g$idxRNA]
+p2g = p2g[!is.na (p2g$FDR),] # remove NaN correlations (not sure why there are some)
+p2g = p2g[p2g$Correlation > p2g_corr, ]
+p2gGR = metadata (p2g)$peakSet[p2g$idxATAC]
+p2gGR$geneName = p2g$geneName
+p2gGR$correlation = p2g$Correlation
+# p2gGR_gene = p2gGR[p2gGR$geneName == gene]
+
+# # Subset peakMatrix by peaks in genomic region 
+# if(!any (ls() == 'pSE')) pSE = getMatrixFromProject (archp, useMatrix = 'PeakMatrix')
+# pSE = pSE[, rownames(archp)]
+# pSEs = subsetByOverlaps (pSE, p2gGR_gene)
+
+# # Annotate peaks with peakSet
+# metaGroupName2 = 'Sample2'
+# ps = getPeakSet (archp)
+# ann_peaks = ps[queryHits(findOverlaps (ps, pSEs))]
+# peakType = paste(ann_peaks$peakType, paste(ranges(ann_peaks))) 
+# pmat = t(assays (pSEs)[[1]])
+# all (rownames(archp) == rownames (pmat))
+# pmat = as.data.frame (pmat)
+# pmat = pmat / archp$ReadsInTSS * 1000
+# pmat$metaGroup = as.character(archp@cellColData[,metaGroupName2])
+# pmat = aggregate (.~ metaGroup, pmat, sum)
+# cell_norm = sapply (pmat$metaGroup, function(x) sum(archp@cellColData[,metaGroupName2] == x))
+# pmat = pmat[,-1]
+# pmat = pmat / cell_norm
+# colnames (pmat) = peakType
+# rownames (pmat) = names(cell_norm)
+# ha = HeatmapAnnotation (peakType = sapply(peakType, function(x) unlist(strsplit(x,' '))[1]),simple_anno_size = unit(.2, "cm"))
+# pdf (paste0('Plots/Peaks_to_',gene,'.pdf'), height=2, width=6)
+# Heatmap (pmat, column_title = paste (gene, 'local epigenome -',maxDist),
+#   clustering_distance_rows = "euclidean", name = 'coverage', bottom_annotation = ha,
+#   cluster_columns=F, row_names_gp = gpar (fontsize = 5),
+#   cluster_rows = T, column_names_gp = gpar (fontsize = 3), border=T,
+#   col = rev(viridis::magma(100)))
+# dev.off()
+
+# LE_region = p2gGR_gene[c(1, length(p2gGR_gene))]
+# LE_region = GRanges (seqnames = seqnames (LE_region)[1], ranges = IRanges(start = start(LE_region)[1], end=end(LE_region)[2]))
+# LE_region_p <- plotBrowserTrack(
+#     ArchRProj = archp, 
+#     groupBy = metaGroupName2, 
+#     region = LE_region, 
+#     upstream = 0,
+#     downstream = 0,
+#     pal = paletteDiscrete(unique(archp@cellColData[,metaGroupName2]), set='rushmore', reverse=T),
+#     loops = getPeak2GeneLinks (archp, corCutOff = 0.2,
+#       returnLoops = TRUE)[[1]],
+#     useGroups= NULL
+# )
+# plotPDF (LE_region_p, ArchRProj = archp, width=10, height=4)
+
+# ann_peaks = ps[queryHits(findOverlaps (ps, pSEs))]
+# peakType = paste(ann_peaks$peakType, paste(ranges(ann_peaks)))
+# pmat = t(assays (pSEs)[[1]])
+# all (rownames(archp) == rownames (pmat))
+# pmat = as.data.frame (pmat)
+# pmat = pmat / archp$ReadsInTSS * 1000
+
+# LE_score = data.frame (LE_score = rowSums (pmat))
+# LE_score$metaGroup = as.character(archp@cellColData[, metaGroupName2])[match(rownames(LE_score), archp$cellNames)]
+# #LE_score = LE_score[order(-LE_score$LE_score),,drop=F]
+# #LE_score$cluster = rownames(LE_score)
+# #LE_score$cluster = factor (LE_score$cluster, levels = LE_score$cluster)
+# p<-ggplot(data=LE_score, aes(x=metaGroup, y=LE_score)) +
+#   geom_boxplot() + theme_bw() + 
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+# pdf (paste0('Plots/local_epigenome_score_',gene,'_barplot.pdf'), 3,5)
+# p
+# dev.off()
+
+
+# Import cNMF results and intersect with p2g
+nfeat=5000
+k=25
+cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
+cnmf_list = lapply (cnmf_list, function(x) head (x,200))
+p2g_cnmf = lapply (cnmf_list, function(x) p2gGR[p2gGR$geneName %in% x])
+
+tf_match = getMatches (archp)
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+bg_peakSet = rowRanges (tf_match)
+tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+nmf_TF = lapply (p2g_cnmf, function(x) hyperMotif (
+  selected_peaks = x, 
+  motifmatch = tf_match))
+
+nmf_TF = lapply (nmf_TF, function(x) x[rownames(nmf_TF[[1]]), ])
+nmf_TF_df = do.call (cbind, nmf_TF)
+nmf_TF_df = nmf_TF_df[, grep ('padj', colnames(nmf_TF_df))]
+nmf_TF_df[nmf_TF_df > 0.05] = 1
+nmf_TF_df = -log10(nmf_TF_df)
+nmf_TF_df = nmf_TF_df[rowSums (nmf_TF_df) != 0, ]
+nmf_TF_df[sapply(nmf_TF_df, is.infinite)] <- 300
+
+TF_ht = Heatmap (nmf_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
+
+pdf (paste0('Plots/TF_nmf_',k,'_nfeat_',nfeat,'_heatmap.pdf'),width = 3,height=15)
+TF_ht
+dev.off()
+
 ### Co-expression of TFs ###
 metaGroupName = 'Sample2'
 if (!any (ls() == 'mSE')) mSE = getMatrixFromProject (archp, useMatrix = 'MotifMatrix', logFile=NULL)
 mSE = mSE[, archp$cellNames]
 all (colnames(mSE) == rownames(archp))
 
-# Subset to only tumor cells
+# Get deviation matrix and subset for relevant TF and aggregate
 archp_meta = as.data.frame (archp@cellColData)
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
@@ -791,13 +920,11 @@ km = kmeans (cor_TF[tf_name,tf_name], centers=9)
 #    col = setNames (km_col, as.character(unique(km$cluster))), border=T))
 
 
-metaGroupNames = 'sampleID'
-srt = srt[,srt$celltype_simplified == 'Malignant']
-ps = as.data.frame (AverageExpression (srt, features = activators, group.by = metaGroupNames)[[1]])
-ps = ps[, colnames(ps) %in% sample_names]
-
-ps_ref = as.data.frame (AverageExpression (ref, features = activators, group.by = metaGroupNames)[[1]])
-ps = cbind (ps, ps_ref[rownames(ps),])
+metaGroupName = 'sampleID'
+DefaultAssay(srt) = 'RNA'
+sample_names_rna = c('P1','P4','P8','P3','P5','P10','P11','P12','P13','P14','HU37','HU62')
+ps = log2(as.data.frame (AverageExpression (srt, features = activators, group.by = metaGroupName)[[1]]) +1)
+ps = ps[, colnames(ps) %in% sample_names_rna]
 
 cor_TF_hm = Heatmap (cor_TF[tf_name,tf_name],
         cluster_rows = T,
@@ -816,7 +943,7 @@ cor_TF_hm = Heatmap (cor_TF[tf_name,tf_name],
         #col = pal_corr1,
         row_names_gp = gpar(fontsize = 0),
         column_names_gp = gpar(fontsize = 0),
-        width=6)
+        width = unit(2, "cm"))
 
 column_split = ifelse (grepl ('normal_pleura', colnames(mMat_agg)), 'Normal','Tumor')
 TF_cluster_hm = Heatmap (t(scale(t(mMat_agg[tf_name,]))),
@@ -830,13 +957,16 @@ TF_cluster_hm = Heatmap (t(scale(t(mMat_agg[tf_name,]))),
         clustering_distance_columns = 'euclidean',
         cluster_columns=T, 
         col = viridis::magma (100),
-        row_names_gp = gpar(fontsize = 5), width = 3,
+        row_names_gp = gpar(fontsize = 5), 
         column_names_gp = gpar(fontsize = 5), 
-        border=F)
+        border=F,
+        width = unit(2, "cm"))
 
-TF_exp_hm = Heatmap (t(scale(t(ps[tf_name,]))),
+#ps_order = ps[tf_name,sarc_order$sampleID]
+column_split_rna = ifelse (grepl ('HU', colnames(ps)), 'Normal','Tumor')
+TF_exp_hm = Heatmap (t(scale(t(ps))),
         #right_annotation=tf_mark,
-#        column_split = column_split,
+        column_split = column_split_rna,
         cluster_rows = F, #km = 4, 
         name = 'expression',
         column_gap = unit(.2, "mm"),
@@ -845,9 +975,27 @@ TF_exp_hm = Heatmap (t(scale(t(ps[tf_name,]))),
         clustering_distance_columns = 'euclidean',
         cluster_columns=T, 
         col = viridis::mako (100),
-        row_names_gp = gpar(fontsize = 5), width = 3,
+        row_names_gp = gpar(fontsize = 5), 
         column_names_gp = gpar(fontsize = 5), 
-        border=F)
+        border=F,
+        width = unit(2, "cm"))
+
+TF_regulons_hm = Heatmap (t(scale(t(nmf_TF_df[tf_name,]))),
+        #right_annotation=tf_mark,
+#        column_split = column_split,
+        cluster_rows = F, #km = 4, 
+        name = 'expression',
+        column_gap = unit(.2, "mm"),
+        row_gap = unit(.2, "mm"),
+        clustering_distance_rows = 'euclidean',
+        clustering_distance_columns = 'euclidean',
+        cluster_columns=T,
+        column_names_rot = 45, 
+        col = viridis::inferno (100),
+        row_names_gp = gpar(fontsize = 5),
+        column_names_gp = gpar(fontsize = 5), 
+        border=F,
+        width = unit(5, "cm"))
 
 # Add deviations from TCGA ATAC bulk
 #tcga_dev = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/TCGA_atac/tcga_meso_atac_deviations_clinical_info.rds')
@@ -871,8 +1019,8 @@ TF_exp_hm = Heatmap (t(scale(t(ps[tf_name,]))),
 #        col = viridis::mako(10),
 #        border=TRUE, width = 2)#, left_annotation=bulk_box_ha)
 
-pdf (paste0 ('Plots/TF_cancer_modules_heatmaps.pdf'), width = 3,height=16)
-draw (TF_cluster_hm + TF_exp_hm, width=c(2,1))
+pdf (paste0 ('Plots/TF_cancer_modules_heatmaps.pdf'), width = 12,height=16)
+draw (TF_cluster_hm + TF_exp_hm)
 dev.off()
 
 
@@ -897,7 +1045,7 @@ png (paste0(projdir,'Plots/coexp_TF_UMAPs.png'),
 wrap_plots (TF_p)
 dev.off()
 
-tf_name2 = unlist(sapply (c('TCF3','CUX2','PLAG2','ONECUT1','PITX2','HOX','YY1','SIX5','HOXB13','HOXD13','HOXA13','HOXC10','MEF2D'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
+tf_name2 = unlist(sapply (c('SOX9','TWIST1','MESP1','NKX2-5'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
 tf_name2 = paste0('z:',tf_name2)
 TF_p = plotEmbedding (
     ArchRProj = archp,
@@ -906,9 +1054,17 @@ TF_p = plotEmbedding (
     useSeqnames='z',
     embedding = "UMAP")
 
+tf_name2 = c('SOX9','TWIST1','MESP1','NKX2-5')
+TF_p2 = plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "GeneScoreMatrix",
+    name = tf_name2, 
+    #useSeqnames='z',
+    embedding = "UMAP")
+
 png (paste0('Plots/coexp_selected_TF_UMAPs.png'),
    width=16800,height=16200, res=300)
-wrap_plots (TF_p)
+wrap_plots (c(TF_p, TF_p2))
 dev.off()
 
 # Show distribution per sample
@@ -977,6 +1133,162 @@ pdf (paste0 ('Plots/Diff_normal_tumor_deviation_var_scatterplot.pdf'),4,height =
 tf_diff_p
 dev.off()
 
+# Make scatterplot of deviation difference and expression difference between normal and tumors
+TF_diff_rna = data.frame (
+  tumor_dev = apply (mMat_agg[,unique(archp$Sample2)[!unique(archp$Sample2) == 'normal_pleura']], 1, median),
+  normal_dev = mMat_agg[,unique(archp$Sample2)[unique(archp$Sample2) == 'normal_pleura']],
+  normal_rna = apply (ps[,c('HU37','HU62')], 1, median),
+  tumor_rna = apply (ps[, !colnames(ps) %in% c('HU37','HU62')], 1, median))
+TF_diff_rna$dev_diff = TF_diff_rna$tumor_dev - TF_diff_rna$normal_dev
+TF_diff_rna$rna_diff = TF_diff_rna$tumor_rna - TF_diff_rna$normal_rna
+diff_line = 0
+TF_diff_rna$label = ifelse (TF_diff_rna$dev_diff > 0 & TF_diff_rna$rna_diff > 0, rownames(TF_diff_rna),'') 
+TF_diff_rna$label_color = TF_diff_rna$label != ''
+TF_diff_rna$color = TF_diff_rna$dev_diff > diff_line & TF_diff_rna$rna_diff > diff_line
+tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, color = label_color, y = rna_diff, label = label), fill='grey') + 
+  geom_point( size = .3, shape = 21, fill='grey') + # Color points based on x value
+  scale_color_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
+  #scale_fill_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
+  geom_vline(xintercept = diff_line, linetype = "dashed", color = "grey44") + # Vertical dashed line
+  geom_hline(yintercept = diff_line, linetype = "dashed", color = "grey44") + # Vertical dashed line
+  gtheme_no_rot + # Use a minimal theme
+#    geom_text_repel(
+#     segment.size=.2,
+#     max.overlaps = 10000,
+# #    point.padding = 0.2, 
+#     size=1#,
+# #   nudge_x = .25,
+# #    nudge_y = .2,
+# #    segment.curvature = -1e-20
+#     ) +
+    xlab ('deviation difference') + 
+    ylab ('RNA difference') + 
+    xlim (c(-0.2, .2)) + 
+    ylim (c(-0.6, .6))
+
+pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot.pdf'),3,height = 2)
+tf_diff_p
+dev.off()
+
+palette_deviation = rev (as.character (paletteer::paletteer_c("grDevices::Rocket",100)))
+palette_expression = rev (as.character(paletteer::paletteer_c("grDevices::Purple-Blue",100)))
+palette_deviation = colorRamp2(c(-.2,-.1,0,.1,.2), c("white",'white','white', "brown",'black'))  
+
+tf_name_selected = TF_diff_rna$label[grepl('.',TF_diff_rna$label)]
+column_split = ifelse (grepl ('normal_pleura', colnames(mMat_agg)), 'Normal','Tumor')
+tf_name_selected = tf_name_selected[order (-TF_diff_rna[tf_name_selected,'tumor_rna'])]
+TF_cluster_selected_hm = Heatmap (mMat_agg[tf_name_selected,],
+        #right_annotation=tf_mark,
+        column_split = column_split,
+        cluster_rows = F, #km = 4, 
+        name = 'z-score\ndeviations',
+        column_gap = unit(.8, "mm"),
+        row_gap = unit(.2, "mm"),
+        clustering_distance_rows = 'euclidean',
+        clustering_distance_columns = 'euclidean',
+        cluster_columns=T, 
+        col = palette_deviation,
+        row_names_gp = gpar(fontsize = 5), 
+        column_names_gp = gpar(fontsize = 5), 
+        border=T,
+        width = unit(2, "cm"))
+
+#ps_order = ps[tf_name,sarc_order$sampleID]
+column_split_rna = ifelse (grepl ('HU', colnames(ps)), 'Normal','Tumor')
+TF_exp_selected_hm = Heatmap (ps[tf_name_selected,],
+        #right_annotation=tf_mark,
+        column_split = column_split_rna,
+        cluster_rows = F, #km = 4, 
+        name = 'expression',
+        column_gap = unit(.5, "mm"),
+        row_gap = unit(.2, "mm"),
+        clustering_distance_rows = 'euclidean',
+        clustering_distance_columns = 'euclidean',
+        cluster_columns=T, 
+        col = palette_expression,
+        row_names_gp = gpar(fontsize = 5), 
+        column_names_gp = gpar(fontsize = 5), 
+        border=T,
+        width = unit(2, "cm"))
+
+pdf (paste0 ('Plots/selected_TF_dev_exp_heatmaps.pdf'), width = 5,height=9)
+draw (TF_cluster_selected_hm + TF_exp_selected_hm)
+dev.off()
+
+
+
+# Make coexpression network for each sample using top TFs deviations
+archp_meta = as.data.frame (archp@cellColData)
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+
+mMat = mMat[tf_name_selected,]
+all (colnames(mMat) == rownames(archp_meta))
+cor_TF_l = list()
+for (sam in unique(archp_meta$Sample2))
+  {
+  cor_TF_l[[sam]] = cor (t(as.matrix(mMat[,archp_meta$Sample2 == sam])))
+  cor_TF_l[[sam]] = Heatmap (cor_TF_l[[sam]], name = sam,
+    row_names_gp = gpar(fontsize = 5),
+    column_names_gp = gpar(fontsize = 5))
+  }
+
+pdf (paste0 ('Plots/selected_TF_dev_corr_heatmaps.pdf'), width = 8,height=9)
+cor_TF_l
+dev.off()
+
+# Take median of all correlations
+# Sample data: list of matrices
+all (colnames(mMat) == rownames(archp_meta))
+cor_TF_l = list()
+for (sam in unique(archp_meta$Sample2)) cor_TF_l[[sam]] = cor (t(as.matrix(mMat[,archp_meta$Sample2 == sam])))
+
+cor_TF <- cor_TF_l[[1]]
+cor_TF[] <- tapply(unlist(cor_TF_l), rep(seq(length(cor_TF_l[[1]])),length(cor_TF_l)), FUN=median)
+
+cor_TF = Heatmap (cor_TF,
+    row_names_gp = gpar(fontsize = 5),
+    column_names_gp = gpar(fontsize = 5))
+
+pdf (paste0 ('Plots/selected_TF_dev_corr_heatmap.pdf'), width = 8,height=9)
+cor_TF
+dev.off()
+ 
+
+# Export selected TFs
+write.csv (tf_name_selected, 'Active_TFs.csv')
+
+
+
+
+
+# Order cells per samples along SOX9 deviation and plot the rest of TF deviations together
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = mMat[tf_name_selected,]
+archp_meta = as.data.frame (archp@cellColData)
+all (colnames(mMat) == rownames(archp_meta))
+
+traj_sample = list()
+for (sam in unique(archp_meta$Sample2))
+    {
+    mMat_ordered_sample = mMat[,archp_meta$Sample2 == sam]
+    mMat_ordered_sample = mMat_ordered_sample[, order(mMat_ordered_sample['MESP1',])]
+    traj_sample[[sam]] = Heatmap (
+      t(scale(t(mMat_ordered_sample))), 
+      col = viridis::plasma(100), 
+      cluster_columns=F,
+      row_names_gp = gpar(fontsize = 4))
+    }
+
+pdf ('Plots/sarc_trajectory_per_sample.pdf', height=10)
+traj_sample
+dev.off()
+
+
+
+
+
 
 
 
@@ -993,133 +1305,6 @@ getGroupBW(
   threads = getArchRThreads(),
   logFile = createLogFile("getGroupBW")
 )
-
-
-maxDist = 250000
-archp = addPeak2GeneLinks(
-    ArchRProj = archp,
-    useMatrix = 'GeneScoreMatrix',
-    reducedDims = "IterativeLSI",
-    maxDist = maxDist
-)
-
-
-p2g = getPeak2GeneLinks(
-    ArchRProj = archp,
-    corCutOff = 0.45,
-    resolution = 1,
-    returnLoops = FALSE
-)
-
-
-
-# # Convert df in Granges add gene Name and correlation
-p2g_corr = .4
-gene = 'WT1'
-p2g$geneName = mcols(metadata(p2g)$geneSet)$name[p2g$idxRNA]
-p2g = p2g[!is.na (p2g$FDR),] # remove NaN correlations (not sure why there are some)
-p2g = p2g[p2g$Correlation > p2g_corr, ]
-p2gGR = metadata (p2g)$peakSet[p2g$idxATAC]
-p2gGR$geneName = p2g$geneName
-p2gGR$correlation = p2g$Correlation
-p2gGR_gene = p2gGR[p2gGR$geneName == gene]
-
-# Subset peakMatrix by peaks in genomic region 
-if(!any (ls() == 'pSE')) pSE = getMatrixFromProject (archp, useMatrix = 'PeakMatrix')
-pSE = pSE[, rownames(archp)]
-pSEs = subsetByOverlaps (pSE, p2gGR_gene)
-
-# Annotate peaks with peakSet
-metaGroupName2 = 'Sample2'
-ps = getPeakSet (archp)
-ann_peaks = ps[queryHits(findOverlaps (ps, pSEs))]
-peakType = paste(ann_peaks$peakType, paste(ranges(ann_peaks))) 
-pmat = t(assays (pSEs)[[1]])
-all (rownames(archp) == rownames (pmat))
-pmat = as.data.frame (pmat)
-pmat = pmat / archp$ReadsInTSS * 1000
-pmat$metaGroup = as.character(archp@cellColData[,metaGroupName2])
-pmat = aggregate (.~ metaGroup, pmat, sum)
-cell_norm = sapply (pmat$metaGroup, function(x) sum(archp@cellColData[,metaGroupName2] == x))
-pmat = pmat[,-1]
-pmat = pmat / cell_norm
-colnames (pmat) = peakType
-rownames (pmat) = names(cell_norm)
-ha = HeatmapAnnotation (peakType = sapply(peakType, function(x) unlist(strsplit(x,' '))[1]),simple_anno_size = unit(.2, "cm"))
-pdf (paste0('Plots/Peaks_to_',gene,'.pdf'), height=2, width=6)
-Heatmap (pmat, column_title = paste (gene, 'local epigenome -',maxDist),
-  clustering_distance_rows = "euclidean", name = 'coverage', bottom_annotation = ha,
-  cluster_columns=F, row_names_gp = gpar (fontsize = 5),
-  cluster_rows = T, column_names_gp = gpar (fontsize = 3), border=T,
-  col = rev(viridis::magma(100)))
-dev.off()
-
-LE_region = p2gGR_gene[c(1, length(p2gGR_gene))]
-LE_region = GRanges (seqnames = seqnames (LE_region)[1], ranges = IRanges(start = start(LE_region)[1], end=end(LE_region)[2]))
-LE_region_p <- plotBrowserTrack(
-    ArchRProj = archp, 
-    groupBy = metaGroupName2, 
-    region = LE_region, 
-    upstream = 0,
-    downstream = 0,
-    pal = paletteDiscrete(unique(archp@cellColData[,metaGroupName2]), set='rushmore', reverse=T),
-    loops = getPeak2GeneLinks (archp, corCutOff = 0.2,
-      returnLoops = TRUE)[[1]],
-    useGroups= NULL
-)
-plotPDF (LE_region_p, ArchRProj = archp, width=10, height=4)
-
-ann_peaks = ps[queryHits(findOverlaps (ps, pSEs))]
-peakType = paste(ann_peaks$peakType, paste(ranges(ann_peaks)))
-pmat = t(assays (pSEs)[[1]])
-all (rownames(archp) == rownames (pmat))
-pmat = as.data.frame (pmat)
-pmat = pmat / archp$ReadsInTSS * 1000
-
-LE_score = data.frame (LE_score = rowSums (pmat))
-LE_score$metaGroup = as.character(archp@cellColData[, metaGroupName2])[match(rownames(LE_score), archp$cellNames)]
-#LE_score = LE_score[order(-LE_score$LE_score),,drop=F]
-#LE_score$cluster = rownames(LE_score)
-#LE_score$cluster = factor (LE_score$cluster, levels = LE_score$cluster)
-p<-ggplot(data=LE_score, aes(x=metaGroup, y=LE_score)) +
-  geom_boxplot() + theme_bw() + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-pdf (paste0('Plots/local_epigenome_score_',gene,'_barplot.pdf'), 3,5)
-p
-dev.off()
-
-
-# Import cNMF results and intersect with p2g
-nfeat=5000
-k=25
-cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
-cnmf_list = lapply (cnmf_list, function(x) head (x,20))
-p2g_cnmf = lapply (cnmf_list, function(x) p2gGR[p2gGR$geneName %in% x])
-
-tf_match = getMatches (archp)
-colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-bg_peakSet = rowRanges (tf_match)
-tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
-nmf_TF = lapply (p2g_cnmf, function(x) hyperMotif (
-  selected_peaks = x, 
-  motifmatch = tf_match))
-
-nmf_TF = lapply (nmf_TF, function(x) x[rownames(nmf_TF[[1]]), ])
-nmf_TF_df = do.call (cbind, nmf_TF)
-nmf_TF_df = nmf_TF_df[, grep ('padj', colnames(nmf_TF_df))]
-nmf_TF_df[nmf_TF_df > 0.05] = 1
-nmf_TF_df = -log10(nmf_TF_df)
-nmf_TF_df = nmf_TF_df[rowSums (nmf_TF_df) != 0, ]
-nmf_TF_df[sapply(nmf_TF_df, is.infinite)] <- 300
-
-TF_ht = Heatmap (nmf_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
-
-pdf (paste0('Plots/TF_nmf_',k,'_nfeat_',nfeat,'_heatmap.pdf'),width = 3,height=15)
-TF_ht
-dev.off()
-
-
 
 
 
