@@ -1,22 +1,30 @@
 
+# Load functions for hub detection
+source ('../../PM_scATAC/knnGen.R')
+source ('../../PM_scATAC/addCoax.R')
+source ('../../PM_scATAC/Hubs_finder.R')
+source ('../../PM_scATAC/hubs_track.R')
+
 ### Run Hub detection and correlate with sarcomatoid TFs
-KNN = readRDS (paste0 ('KNN_',metaGroupName,'.rds'))
+metaGroupName = 'Sample2'
+KNNs = readRDS (paste0 ('KNN_',metaGroupName,'.rds'))
 
 
 ###--- Hubs analysis --###
-metaGroupName = "Clusters"
-cor_cutoff = 0.3
+metaGroupName = "Sample2"
+cor_cutoff = 0.2
 max_dist = 12500
 min_peaks = 5
-dgs = 0
+dgs = 2000
 projdir_hubs = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks,'/')
+
 system (paste('mkdir -p',projdir_hubs))
 system (paste('mkdir -p',paste0(projdir_hubs,'Plots')))
 
 
 archp = addCoAx (
   archp, 
-  KNN,
+  KNNs,
   maxDist = max_dist)
 
 #archp = saveArchRProject (archp, load=T)
@@ -33,7 +41,7 @@ if (!file.exists (paste0(projdir_hubs,'global_hubs_obj.rds')) | force)
     min_peaks = min_peaks,
     macs_score = 1,
     dgs = dgs,
-    cores=4
+    cores=1
     ) 
   saveRDS (hubs_obj, paste0(projdir_hubs,'global_hubs_obj.rds'))
   } else {
@@ -46,7 +54,11 @@ if (!file.exists (paste0(projdir_hubs,'global_hubs_obj.rds')) | force)
 write.table (as.data.frame (hubs_obj$hubsCollapsed), paste0(projdir_hubs, 'hub_regions.bed'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
 
 # Plot KNN groups on UMAP
-KNNs_df = lapply (seq_along(KNNs), function(x) data.frame (cell = KNNs[[x]], group=paste0('KNN_',x)))
+KNNs_df = lapply (seq_along(KNNs), function(x) data.frame (
+  cell = KNNs[[x]], 
+  group=paste0('KNN_',x), 
+  group2 = unlist(strsplit (names(KNNs)[x],'KNN'))[1]))
+
 KNNs_df = do.call (rbind, KNNs_df)
 archp$knn_groups = KNNs_df$group[match (archp$cellNames, KNNs_df$cell)]
 umap_knn = plotEmbedding (ArchRProj = archp, embedding = 'UMAP',
@@ -56,9 +68,15 @@ pdf (paste0(projdir_hubs, 'Plots/knn_test.pdf'), height=20, width=20)
 umap_knn
 dev.off()
 
+fragments = unlist(getFragmentsFromProject (
+  ArchRProj = archp))  
+  
 ###--- Generate matrces of hubs x cells / knn from collapsed non-redundant hubs to identify differential hubs  ---###
+metaGroup = as.character (archp@cellColData[,metaGroupName])
+metaGroup_df = data.frame (barcode = barcodes, metaGroup = metaGroup)
+
 metaGroup3 = names (sapply (seq_along(KNNs), function(x) 
-  table(metaGroup_df$metaGroup2[match (KNNs[[x]],metaGroup_df$barcode)])))
+  table(metaGroup_df$metaGroup[match (KNNs[[x]],metaGroup_df$barcode)])))
 
 # Generate matrix of fragment counts of peaks x cluster
 peaksKnn_mat = matrix (ncol = length(KNNs), nrow = length(hubs_obj$peaksMerged))
@@ -85,14 +103,59 @@ cellpool_nFrags = sapply(KNNs,function(v) sum(archp$ReadsInTSS[archp$cellNames %
 hubsKnn_mat = t(t(hubsKnn_mat) * (10^6 /cellpool_nFrags)) # scale
 colnames (hubsKnn_mat) = metaGroup3
 saveRDS (hubsKnn_mat, paste0 (projdir_hubs, 'hubs_knn_matrix_global.rds'))
+hubsKnn_mat = readRDS (paste0 (projdir_hubs, 'hubs_knn_matrix_global.rds'))
 
-hubsClust_mat = as.data.frame (t (hubsKnn_mat))
-hubsClust_mat$metaGroup = metaGroup3
-hubsClust_mat = aggregate (.~ metaGroup, data = hubsClust_mat, FUN = mean)
-rownames (hubsClust_mat) = hubsClust_mat[,1]
-hubsClust_mat = hubsClust_mat[,-1]
-saveRDS (hubsClust_mat, paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
-hubsClust_mat = readRDS (paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
+# hubsClust_mat = as.data.frame (t (hubsKnn_mat))
+# hubsClust_mat$metaGroup = metaGroup3
+# hubsClust_mat = aggregate (.~ metaGroup, data = hubsClust_mat, FUN = mean)
+# rownames (hubsClust_mat) = hubsClust_mat[,1]
+# hubsClust_mat = hubsClust_mat[,-1]
+# saveRDS (hubsClust_mat, paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
+# hubsClust_mat = readRDS (paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
+
+
+# Correlate with SOX9 genescore
+if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
+gsSE = gsSE[, archp$cellNames]
+gsMat = assays (gsSE)[[1]]
+rownames (gsMat) = rowData (gsSE)$name
+
+head (KNNs_df)
+gsMat = gsMat[c(tf_name_selected, 'AXL','VIM','CALB2','ITLN1'),]
+gsMat = as.data.frame (t(gsMat))
+gsMat = gsMat[unlist(KNNs),]
+gsMat$cellGroup = KNNs_df$group
+gsMat = aggregate (.~ cellGroup, data = gsMat, FUN = mean)
+rownames (gsMat) = gsMat[,1]
+gsMat = gsMat[,-1]
+
+hubsKnn_mat = t(hubsKnn_mat)
+hubsKnn_mat = as.data.frame (hubsKnn_mat)
+rownames (hubsKnn_mat) = rownames (gsMat)
+TF_hub_cor = lapply (unique(KNNs_df$group2), function(x) cor (gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SOX9'], hubsKnn_mat[unique(KNNs_df$group[KNNs_df$group2 == x]),], method = 'spearman'))
+names (TF_hub_cor) = unique(KNNs_df$group2)
+
+TF_hub_cor2 = as.data.frame (t(TF_hub_cor[['P10']]))
+TF_hub_cor2 = TF_hub_cor2[order (-TF_hub_cor2$V1),, drop=F]
+head (TF_hub_cor2, 20)
+
+pdf ('Plots/hubs_expression_knn.pdf')
+hubsKnn_mat
+# Run correlation per cluster
+
+a = lapply (unique(KNNs_df$group2), function(x) cor (gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SNAI2'], gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'AXL']))
+names(a) = unique(KNNs_df$group2)
+
+pdf ('Plots/cor_genescore_genes.pdf')
+plot (gsMat[,'SOX9'], gsMat[,'VIM'])
+dev.off 
+
+
+
+
+
+
+
 
 
 

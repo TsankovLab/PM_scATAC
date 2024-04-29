@@ -161,10 +161,10 @@ activeTF = function (
       }
 
     gsMat = assay (geneScoreSE)
-    gsMat = gsMat[,rownames(archp)]
+    gsMat = gsMat[,rownames(archp@cellColData)]
     rownames (gsMat) = rowData (geneScoreSE)$name
     mMat = assay (motifSE)
-    mMat = mMat[,rownames(archp)]
+    mMat = mMat[,rownames(archp@cellColData)]
     rownames (mMat) = rowData (motifSE)$name
     gene_int = intersect(rownames(gsMat) , rownames(mMat))
     gsMat = gsMat[gene_int, ]

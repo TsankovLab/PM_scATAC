@@ -36,12 +36,6 @@ source ('../../PM_scATAC/useful_functions.R')
 source ('../../PM_scATAC/ggplot_aestetics.R')
 source ('../../PM_scATAC/scATAC_functions.R')
 
-# Load functions for hub detection
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/knnGen.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/addCoAx.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/Hubs_finder.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/hubs_track.R')
-
 set.seed(1234)
 addArchRThreads (threads = 8) 
 addArchRGenome("Hg38")
@@ -255,7 +249,7 @@ DAG_top_list = lapply (seq_along(DAG_top_list), function(x) {
   })
 DAG_df = Reduce (rbind ,DAG_top_list)
 
-if (!any (ls() == 'gsSE')) gsSE = getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
+if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
 gsSE = gsSE[, archp$cellNames]
 gsMat = assays (gsSE)[[1]]
 rownames (gsMat) = rowData (gsSE)$name
@@ -369,7 +363,7 @@ metaGroupName = 'Clusters'
 archp = addGroupCoverages (
   ArchRProj = archp, 
   groupBy = metaGroupName,  
-  force = TRUE,
+  force = FALSE,
   minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
   maxCells = 500,
   minReplicates = 2,
@@ -530,7 +524,7 @@ archp = saveArchRProject (ArchRProj = archp,
 ### Find activating and repressing TFs ###
 ##########################################
 
-metaGroupName = 'Clusters'
+metaGroupName = 'Sample2'
 metaGroup = as.character (archp@cellColData[,metaGroupName])
 barcodes = as.character (archp$cellNames)
 metaGroup_df = data.frame (barcode = barcodes, metaGroup = metaGroup)
@@ -545,7 +539,7 @@ if (!file.exists(paste0 ('KNN_',metaGroupName,'.rds')) | force)
     group = metaGroupName,
     k = 100,
     knnIteration=500,
-    overlapCutoff = 0.7,
+    overlapCutoff = 0.5,
     #cellsToUse = metaGroup_df$barcode,
     min.cells_in_group = min_cells,
     min_knn_cluster = 1
@@ -577,7 +571,7 @@ if (!file.exists(paste0 ('KNN_',metaGroupName,'.rds')) | force)
 #   }
 
 # Load Matrices
-if (!any (ls() == 'gsSE')) gsSE = getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
+if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
 gsSE = gsSE[, archp$cellNames]
 
 devMethod = 'ArchR'
@@ -585,7 +579,7 @@ devMethod = 'ArchR'
 if (devMethod == 'ArchR')
   {
   TF_db='Motif'
-  mSE = getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
+  mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
   mSE = mSE[, archp$cellNames]
   rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
   rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
@@ -603,11 +597,11 @@ if (devMethod == 'ArchR')
 geneScoreSE = gsSE  
 subsample = 3 # subsample KNN to have same number per metagroupElement so correlation is not biased toward most numerous metagroupElement  
 itern=100
-force=T
+force=F
 if (!file.exists (paste0('activeTF_gs_subsampled_',subsample,'_',itern,'_iter_',names(geneScoreSE@assays),'_',devMethod,'.rds')) | force)
   {
   tf_gs_cor = activeTF (archp, knns= KNN, metaGroupName, motifSE = mSE, subsample = subsample, geneScoreSE=geneScoreSE, iter = itern)  
-  saveRDS (tf_gs_cor, paste0(projdir, 'activeTF_gs_subsampled_',subsample,'_',itern,'_iter_',names(geneScoreSE@assays),'_',devMethod,'.rds'))
+  saveRDS (tf_gs_cor, paste0('activeTF_gs_subsampled_',subsample,'_',itern,'_iter_',names(geneScoreSE@assays),'_',devMethod,'.rds'))
   # tf_gs_corL2 = lapply (1:1000, function(x) activeTF (archp, knns= KNN, metaGroupName, motifSE = mSE, subsample = subsample, useMotifmatrix = paste0(TF_db,'Matrix'),  geneScoreSE=gsSE)[[1]])
   # saveRDS (tf_gs_corL2, paste0(projdir, 'activeTF_',metaGroupName,'_tfdb_',TF_db,'gs_subsampled_',subsample,'_10000iter.rds'))
   } else {
@@ -886,7 +880,7 @@ dev.off()
 
 ### Co-expression of TFs ###
 metaGroupName = 'Sample2'
-if (!any (ls() == 'mSE')) mSE = getMatrixFromProject (archp, useMatrix = 'MotifMatrix', logFile=NULL)
+if (!any (ls() == 'mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = 'MotifMatrix', logFile=NULL)
 mSE = mSE[, archp$cellNames]
 all (colnames(mSE) == rownames(archp))
 
@@ -1103,42 +1097,62 @@ bp
 dev.off()
 
 
-# Make scatterplot of normal deviation vs median tumor deviations of active TF and the same for RNA
-#mMat_agg_scaled = t(scale(t(mMat_agg)))
-TF_diff = data.frame (
-  tumor = apply (mMat_agg[,unique(archp$Sample2)[!unique(archp$Sample2) == 'normal_pleura']], 1, mean),
-  normal = mMat_agg[,unique(archp$Sample2)[unique(archp$Sample2) == 'normal_pleura']])
-diff_line = 0
-TF_diff$label = ''
-TF_diff$label[head (order(-(TF_diff$tumor - TF_diff$normal)),10)] =  head (rownames(TF_diff)[rev(order(TF_diff$tumor - TF_diff$normal))],10)
-TF_diff$color = TF_diff$tumor > diff_line & TF_diff$normal < diff_line
-tf_diff_p = ggplot (TF_diff, aes (x= tumor, color = color, y = normal, label = label)) + 
-  geom_point( size = .5) + # Color points based on x value
-  scale_color_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
-  geom_vline(xintercept = diff_line, linetype = "dashed", color = "grey44") + # Vertical dashed line
-  geom_hline(yintercept = diff_line, linetype = "dashed", color = "grey44") + # Vertical dashed line
-  gtheme_no_rot + # Use a minimal theme
-   geom_text_repel(
-    segment.size=.2,
-#    point.padding = 0.2, 
-    size=1#,
-#   nudge_x = .25,
-#    nudge_y = .2,
-#    segment.curvature = -1e-20
-    ) +
-    xlab ('median tumor dev') + 
-    ylab ('normal dev')
+# # Make scatterplot of normal deviation vs median tumor deviations of active TF and the same for RNA
+# #mMat_agg_scaled = t(scale(t(mMat_agg)))
+# TF_diff = data.frame (
+#   tumor = apply (mMat_agg[,unique(archp$Sample2)[!unique(archp$Sample2) == 'normal_pleura']], 1, mean),
+#   normal = mMat_agg[,unique(archp$Sample2)[unique(archp$Sample2) == 'normal_pleura']])
+# diff_line = 0
+# TF_diff$label = ''
+# TF_diff$label[head (order(-(TF_diff$tumor - TF_diff$normal)),10)] =  head (rownames(TF_diff)[rev(order(TF_diff$tumor - TF_diff$normal))],10)
+# TF_diff$color = TF_diff$tumor > diff_line & TF_diff$normal < diff_line
+# tf_diff_p = ggplot (TF_diff, aes (x= tumor, color = color, y = normal, label = label)) + 
+#   geom_point( size = .5) + # Color points based on x value
+#   scale_color_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
+#   geom_vline(xintercept = diff_line, linetype = "dashed", color = "grey44") + # Vertical dashed line
+#   geom_hline(yintercept = diff_line, linetype = "dashed", color = "grey44") + # Vertical dashed line
+#   gtheme_no_rot + # Use a minimal theme
+#    geom_text_repel(
+#     segment.size=.2,
+# #    point.padding = 0.2, 
+#     size=1#,
+# #   nudge_x = .25,
+# #    nudge_y = .2,
+# #    segment.curvature = -1e-20
+#     ) +
+#     xlab ('median tumor dev') + 
+#     ylab ('normal dev')
 
-pdf (paste0 ('Plots/Diff_normal_tumor_deviation_var_scatterplot.pdf'),4,height = 3)
-tf_diff_p
-dev.off()
+# pdf (paste0 ('Plots/Diff_normal_tumor_deviation_var_scatterplot.pdf'),4,height = 3)
+# tf_diff_p
+# dev.off()
 
 # Make scatterplot of deviation difference and expression difference between normal and tumors
+metaGroupName = 'Sample2'
+archp_meta = as.data.frame (archp@cellColData)
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+
+mMat = mMat[activators,]
+
+mMat_agg = as.data.frame (t(mMat))
+mMat_agg$metaGroup = as.character (archp_meta[,metaGroupName])
+mMat_agg = aggregate (.~ metaGroup, mMat_agg, mean)
+rownames (mMat_agg) = mMat_agg[,1]
+mMat_agg = mMat_agg[,-1]
+mMat_agg = t(mMat_agg)
+
+metaGroupName = 'sampleID'
+DefaultAssay(srt) = 'RNA'
+sample_names_rna = c('P1','P4','P8','P3','P5','P10','P11','P12','P13','P14','HU37','HU62')
+ps = log2(as.data.frame (AverageExpression (srt, features = activators, group.by = metaGroupName)[[1]]) +1)
+ps = ps[, colnames(ps) %in% sample_names_rna]
+
 TF_diff_rna = data.frame (
-  tumor_dev = apply (mMat_agg[,unique(archp$Sample2)[!unique(archp$Sample2) == 'normal_pleura']], 1, median),
+  tumor_dev = apply (mMat_agg[,unique(archp$Sample2)[!unique(archp$Sample2) == 'normal_pleura']], 1, mean),
   normal_dev = mMat_agg[,unique(archp$Sample2)[unique(archp$Sample2) == 'normal_pleura']],
   normal_rna = apply (ps[,c('HU37','HU62')], 1, median),
-  tumor_rna = apply (ps[, !colnames(ps) %in% c('HU37','HU62')], 1, median))
+  tumor_rna = apply (ps[, !colnames(ps) %in% c('HU37','HU62')], 1, mean))
 TF_diff_rna$dev_diff = TF_diff_rna$tumor_dev - TF_diff_rna$normal_dev
 TF_diff_rna$rna_diff = TF_diff_rna$tumor_rna - TF_diff_rna$normal_rna
 diff_line = 0
@@ -1211,7 +1225,7 @@ TF_exp_selected_hm = Heatmap (ps[tf_name_selected,],
         border=T,
         width = unit(2, "cm"))
 
-pdf (paste0 ('Plots/selected_TF_dev_exp_heatmaps.pdf'), width = 5,height=9)
+pdf (paste0 ('Plots/selected_TF_dev_exp_heatmaps.pdf'), width = 5,height=15)
 draw (TF_cluster_selected_hm + TF_exp_selected_hm)
 dev.off()
 

@@ -83,7 +83,7 @@ if (!file.exists ('srt.rds'))
 	DimPlot (srt, group.by = 'sampleID')
 	dev.off()
 	} else {
-	srt = readRDS ('srt.rds')	
+	srt = readRDS ('scRNA_meso.rds')	
 	}
   
 #### Run cNMF ####
@@ -257,13 +257,13 @@ srt <- MetacellsByGroups(
   seurat_obj = srt,
   group.by = c("sampleID"), # specify the columns in seurat_obj@meta.data to group by
   reduction = 'umap', # select the dimensionality reduction to perform KNN on
-  k = 30, # nearest-neighbors parameter
-  max_shared = 20, # maximum number of shared cells between two metacells
+  k = 50, # nearest-neighbors parameter
+  max_shared = 25, # maximum number of shared cells between two metacells
   ident.group = 'sampleID' # set the Idents of the metacell seurat object
 )
 
 # normalize metacell expression matrix:
-srt <- NormalizeMetacells(srt)
+srt <- NormalizeMetacells (srt)
 metacells = GetMetacellObject (srt)
 
 metacells = metacells[activeTFs[[2]], ]
@@ -296,9 +296,9 @@ gmt_annotations = c(
 'h.all.v7.4.symbols.gmt',#,
 'c5.bp.v7.1.symbol.gmt'
 )
-gmt_annotation = gmt_annotations[1]
-
-if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_,_ann_',gmt_annotation,'.rds')))
+gmt_annotation = gmt_annotations[2]
+force = T
+if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_,_ann_',gmt_annotation,'.rds')) | force)
 	{
 	TF_cor_sample = list()
 	for (sam in unique(metacells$sampleID))
@@ -314,7 +314,7 @@ if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_,_ann_',gmt_annotation,'
 	  	pathways = read.gmt (gmt.file)
 	  	#pathways = split (pathways$gene, pathways$term)
 	    message (paste ('EnrichR running module',x)) 
-	    egmt <- enricher(head (names(tc_cor),100), TERM2GENE=pathways, universe = enricher_universe)
+	    egmt = enricher(head (names(tc_cor),100), TERM2GENE=pathways, universe = enricher_universe)
 	    egmt@result
 	    })
 	   #EnrichRResAll[[ann]] = EnrichRResCluster    
@@ -335,7 +335,7 @@ pvalAdjTrheshold = 0.05
 top_pathways = 10
 TF_cor_sample = lapply (TF_cor_sample, function(x) {names(x) = activeTFs[[2]]; x})
 EnrichRes_dp = lapply (TF_cor_sample, function(x) dotGSEA (enrichmentsTest_list = x, type = 'enrich', padj_threshold = pvalAdjTrheshold, top_pathways= top_pathways))
-pdf (paste0('Plots/EnrichR_top_nmf_genes_ann_',gmt_annotation,'_dotplots.pdf'), width = 20, height = 15)
+pdf (paste0('Plots/EnrichR_top_nmf_genes_ann_',gmt_annotation,'_dotplots.pdf'), width = 20, height = 25)
 print (EnrichRes_dp)
 dev.off()
   
@@ -344,6 +344,12 @@ pdf (paste0 ('Plots/selected_TF_exp_corr_heatmaps.pdf'), width = 8,height=9)
 cor_TF_l
 dev.off()
 
+# Correlate TFs with cNMFs on metacells
+metacells = GetMetacellObject (srt)
+vf = VariableFeatures (FindVariableFeatures (metacells, nfeat=10000))
+metacells_assay = metacells@assays$RNA@layers$data
+rownames (metacells_assay) = rownames(srt)
+metacells_assay = metacells_assay[unique(c(vf, activeTFs[[2]])),]
 
 metacells = ModScoreCor (
         seurat_obj = metacells, 
@@ -366,12 +372,12 @@ names (tc_cor) = unique(metacells$sampleID)
 #lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
 
 
-cor_TF <- tc_cor[[1]]
-cor_TF[] <- tapply(unlist(tc_cor), rep(seq(length(tc_cor[[1]])),length(tc_cor)), FUN=function(x) median(x,na.rm=T))
+cor_TF = tc_cor[[1]]
+cor_TF[] = tapply(unlist(tc_cor), rep(seq(length(tc_cor[[1]])),length(tc_cor)), FUN=function(x) median(x,na.rm=T))
 
 dim (cor_TF)
 
-pdf ('Plots/cor_nmf_TF.pdf',width=10, height=3)
+pdf ('Plots/cor_nmf_TF.pdf',width=15, height=3)
 Heatmap (cor_TF, 
 	column_names_gp = gpar(fontsize = 5),
 	row_names_gp = gpar(fontsize = 5),
@@ -379,7 +385,32 @@ Heatmap (cor_TF,
 	clustering_distance_columns='pearson')
 dev.off()
 
+tc_cor_long = lapply (seq_along(tc_cor), function(x){tmp = gather (as.data.frame(tc_cor[[x]]['cNMF20',,drop=F]),TF, expression); tmp$sample = names(tc_cor)[x];tmp})
+tc_cor_long = do.call (rbind, tc_cor_long)
+tf_median = sapply (unique (tc_cor_long$TF), function(x) {median(tc_cor_long[tc_cor_long$TF == x,'expression'],na.rm=T)})
+tf_median = tf_median[order (-tf_median)]
+tc_cor_long$TF = factor (tc_cor_long$TF, levels = names (tf_median))
+#filter_TF = names(tf_median[tf_median > quantile (tf_median)[4] | tf_median < quantile (tf_median)[2]])
+tc_cor_long_box = ggplot (tc_cor_long, aes (x = TF, y = expression)) + 
+geom_boxplot(outlier.size = 0.1) + 
+theme_classic() +
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=4)) + 
+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+pdf (paste0('Plots/distribution_TF_cor_cNMF.pdf'), width=10)
+tc_cor_long_box
+dev.off()
 
+filter_TF = c('SOX9','HIC1','MESP1','RUNX3','TWIST1','OLIG3','PITX2','SMARCC2','MEF2A')
+tc_cor_long = tc_cor_long[tc_cor_long$TF %in% filter_TF,]
+
+tc_cor_long_box = ggplot (tc_cor_long, aes (x = TF, y = expression)) + 
+geom_boxplot(outlier.size = 0.1) + 
+geom_point() + 
+theme_classic() +
+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=8))
+pdf (paste0('Plots/distribution_TF_cor_cNMF_filtered.pdf'), width=4)
+tc_cor_long_box
+dev.off()
 
 # Order cells per samples along SOX9 expression and plot the rest of TF expression together
 mMat = metacells@assays$RNA@layers$data[rownames(metacells) %in% activeTFs[[2]],]
@@ -402,10 +433,6 @@ for (sam in unique(metacells$sampleID))
 pdf ('Plots/sarc_trajectory_per_sample.pdf', height=10)
 traj_sample
 dev.off()
-
-
-
-
 
 
 
