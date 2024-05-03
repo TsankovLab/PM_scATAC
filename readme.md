@@ -31,6 +31,6 @@ devtools::install_github("GreenleafLab/chromVARmotifs")
 BiocManager::install("fgsea")  
 BiocManager::install("clusterProfiler")  
 BiocManager::install(c("WGCNA", "igraph", "devtools", "GeneOverlap", "ggrepel", "UCell"))
-devtools::install_github('smorabit/hdWGCNA', ref='dev')
-
+install.packages ('ape')
+install.packages('dendextend')
 

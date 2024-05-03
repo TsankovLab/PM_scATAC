@@ -142,7 +142,7 @@ cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'
 cnmf_spectra = t(cnmf_spectra)
 max_spectra = apply (cnmf_spectra, 1, which.max)
 
-top_nmf_genes = 50
+top_nmf_genes = Inf
 cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
       {
       tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
@@ -154,6 +154,16 @@ names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
 
 saveRDS (cnmf_spectra_unique, paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds'))
 write.csv (patchvecs(cnmf_spectra_unique), paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.csv'))
+
+top_nmf_genes = 50
+cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
+      {
+      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
+      tmp = tmp[order(-tmp[,1]),,drop=F]
+      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
+      head(rownames(tmp),top_nmf_genes)
+      })
+names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
 
 srt = ModScoreCor (
         seurat_obj = srt, 
@@ -184,6 +194,79 @@ print (wrap_plots (bp1))
 dev.off()
 
 
+### FIGURE 3B - Plot boxplots of sarcomatoid cnmf ####
+ccomp_df = srt@meta.data
+ccomp_df = aggregate (ccomp_df[,c('cNMF20')], by=as.list(srt@meta.data[,'sampleID',drop=F]), 'mean')
+rownames(ccomp_df) = ccomp_df[,1]
+ccomp_df = ccomp_df[,-1]
+srt$sampleID = factor (srt$sampleID, levels = rownames(arrange (ccomp_df[,'cNMF20', drop=FALSE], -ccomp_df[,'cNMF20', drop=FALSE])))
+
+ccomp_df = srt@meta.data
+box = ggplot (ccomp_df, aes_string (x= 'sampleID', y= 'cNMF20')) +
+  geom_violin (trim=TRUE, aes_string (fill = 'sampleID'),size=2,
+    width=1, scale='width',
+    linewidth = .2, alpha=0.7) +
+  geom_boxplot (aes_string(fill = 'sampleID'),
+    linewidth = .2,
+    width=0.2,
+    outlier.alpha = 0.2,
+    outlier.size = .5,
+     size=0.3, alpha=0.7
+     ) +
+  scale_fill_manual (values= palette_sample) +
+  gtheme
+  
+png(paste0('Plots/sarc_signatures_order_boxplot.png'),1200,600, res=300) #width = 10, height = 11,
+box
+dev.off()
+
+
+
+#### FIGURE S2A - Generate Neftel diagram using the four subtypes from bueno ####
+# Generate GBM cell states as in paper Nefter et al
+# On y axis = D = max(SCopc,SCnpc) - max(SCac,SCmes)
+max_sarc = pmax(srt$Sarcomatoid, srt$`Biphasic-S`)
+max_epit = pmax(srt$Epithelioid, srt$`Biphasic-E`)
+srt$y_axis <- log2(abs(max_sarc - max_epit) + 1)
+srt$y_axis[max_epit > max_sarc] <- -1 * srt$y_axis[max_epit > max_sarc]
+
+srt$x_axis = 0
+srt$x_axis[srt$y_axis > 0] = log2(abs(srt$Sarcomatoid - srt$`Biphasic-S`) + 1)[srt$y_axis > 0]
+srt$x_axis[srt$y_axis > 0 & srt$Sarcomatoid > srt$`Biphasic-S`] <- -1 * srt$x_axis[srt$y_axis > 0 & srt$Sarcomatoid > srt$`Biphasic-S`]
+
+srt$x_axis[srt$y_axis < 0] = log2(abs(srt$Epithelioid - srt$`Biphasic-E`) + 1)[srt$y_axis < 0]
+srt$x_axis[srt$y_axis < 0 & srt$`Biphasic-E` > srt$Epithelioid] <- -1 * srt$x_axis[srt$y_axis < 0 & srt$`Biphasic-E` > srt$Epithelioid]
+
+p2l = lapply (levels (srt$sampleID), function(x) 
+  {    
+  df = srt@meta.data[srt$sampleID == x,]
+  tot_cells = nrow(df)    
+  ggplot(df, aes(x=x_axis, y=y_axis, fill=y_axis, color=y_axis)) +
+  geom_point(alpha=.8, shape=21, stroke=.05, linewidth=3) +
+  xlim (c(-2,2)) + ylim (c(-2,2)) +
+  #xlab ('Sarcomatoid - Biphasic-S / Epithelioid - Biphasic-E') +
+  #ylab ('Sarcomatoid/Biphasic-S - Epithelioid/Biphasic-E') +#+ scale_fill_viridis() + scale_color_viridis()
+  geom_vline(xintercept = 0,linetype = 'dashed', size=.1) +
+  geom_hline(yintercept = 0,linetype = 'dashed', size=.1) +
+  scale_fill_gradientn(colors=rev(palette_sample)) +
+  scale_color_gradientn(colors=rev(palette_sample)) +
+  #scale_fill_manual (values= sample_colors) +
+  #scale_color_manual (values= sample_colors) +
+  annotate("text", x = -1.1, y = 1.8, label = paste0("Sarco ",round(sum(df$x_axis < 0 & df$y_axis > 0) / tot_cells *100,1),'%') , size=2.5) +
+  annotate("text", x = 1.2, y = 1.8, label = paste0("Bi-S ",round(sum(df$x_axis > 0 & df$y_axis > 0)/ tot_cells *100,1),'%'), size=2.5) +
+  annotate("text", x = -1.2, y = -1.8, label = paste0("Bi-E ",round(sum(df$x_axis < 0 & df$y_axis < 0)/ tot_cells *100,1),'%'), size=2.5) +
+  annotate("text", x = 1.2, y = -1.8, label = paste0("Epit ",round(sum(df$x_axis > 0 & df$y_axis < 0)/ tot_cells *100,1),'%'), size=2.5) + 
+  xlab('') +
+  ylab('') + 
+  ggtitle (x) + 
+  theme_void() + 
+  NoLegend()
+  })
+png ('Plots/neftel_diagram_on_malignant_cells_per_sample.png',2200,2200, res=300)
+wrap_plots (p2l, ncol=4)
+dev.off()
+
+
 reductionName = 'umap'
   umap_df = data.frame (srt[[reductionName]]@cell.embeddings, srt@meta.data[,c(names(cnmf_spectra_unique))])
   umap_p1 = lapply (names(cnmf_spectra_unique), function(x) ggplot(data = umap_df) + 
@@ -210,9 +293,10 @@ enricher_universe = vf
 #do.fgsea = TRUE
 gmt_annotations = c(
 'h.all.v7.4.symbol.gmt',#,
-'c5.bp.v7.1.symbol.gmt'
+'c5.bp.v7.1.symbol.gmt',
+'c3.tft.v7.1.symbol.gmt'
 )
-gmt_annotation = gmt_annotations[2]
+gmt_annotation = gmt_annotations[3]
 if (!file.exists (paste0('cNMF_normalized/',cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds')) | force)
   {
     gmt.file = paste0 ('../../PM_scATAC/files/',gmt_annotation)
@@ -400,7 +484,7 @@ pdf (paste0('Plots/distribution_TF_cor_cNMF.pdf'), width=10)
 tc_cor_long_box
 dev.off()
 
-filter_TF = c('SOX9','HIC1','MESP1','RUNX3','TWIST1','OLIG3','PITX2','SMARCC2','MEF2A')
+filter_TF = c('SOX9','HIC1','MESP1','SNAI2','TWIST1','OLIG3','PITX2','SMARCC2','MEF2A')
 tc_cor_long = tc_cor_long[tc_cor_long$TF %in% filter_TF,]
 
 tc_cor_long_box = ggplot (tc_cor_long, aes (x = TF, y = expression)) + 
@@ -408,7 +492,7 @@ geom_boxplot(outlier.size = 0.1) +
 geom_point() + 
 theme_classic() +
 theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size=8))
-pdf (paste0('Plots/distribution_TF_cor_cNMF_filtered.pdf'), width=4)
+pdf (paste0('Plots/distribution_TF_cor_cNMF_filtered.pdf'), width=4, height=3)
 tc_cor_long_box
 dev.off()
 
@@ -417,14 +501,18 @@ mMat = metacells@assays$RNA@layers$data[rownames(metacells) %in% activeTFs[[2]],
 rownames(mMat) = rownames(metacells)[rownames(metacells) %in% activeTFs[[2]]]
 
 traj_sample = list()
+TF = 'SOX9'
 for (sam in unique(metacells$sampleID))
     {
     mMat_ordered_sample = mMat[,metacells$sampleID == sam]
     mMat_ordered_sample = mMat_ordered_sample[, order(mMat_ordered_sample['SOX9',])]
     mMat_ordered_sample_sclaled = as.matrix(mMat_ordered_sample)
+    mMat_ordered_sample_sclaled = t(scale(t(as.matrix(mMat_ordered_sample_sclaled))))
     mMat_ordered_sample_sclaled[is.na(mMat_ordered_sample_sclaled)] = 0
+    ha = HeatmapAnnotation (tf = mMat_ordered_sample_sclaled[TF,])
     traj_sample[[sam]] = Heatmap (
-      as.matrix(mMat_ordered_sample_sclaled), 
+    	top_annotation = ha,
+      mMat_ordered_sample_sclaled[!rownames(mMat_ordered_sample_sclaled) %in% TF,], 
       col = viridis::plasma(100), 
       cluster_columns=F, name = sam,
       row_names_gp = gpar(fontsize = 4))

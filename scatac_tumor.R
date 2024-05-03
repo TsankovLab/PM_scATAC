@@ -198,693 +198,354 @@ if (!file.exists ('Save-ArchR-Project.rds'))
 
 
 ### Gene score based analysis ####
+run_GS_analysis = FALSE
 
-# Find DAG ####
-metaGroupName = "Clusters"
-force = FALSE
-if (!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force)
+if (run_GS_analysis)
   {
-  DAG_list = getMarkerFeatures (
-    ArchRProj = archp, 
-    testMethod = "wilcoxon",
-          #useGroups = "ClusterA",
-          #bgdGroups = "Clusters1B",
-    binarize = FALSE,
-    useMatrix = "GeneScoreMatrix",
-    groupBy = metaGroupName
-  #  useSeqnames="z"
-  )
-  listnames = colnames (DAG_list)
-  DAG_list = lapply (1:ncol (DAG_list), function(x) 
+  # Find DAG ####
+  metaGroupName = "Clusters"
+  force = FALSE
+  if (!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force)
     {
-    df = DAG_list[,x]  
-    df = do.call (cbind, (assays(df)))
-    colnames(df) = names (assays(DAG_list))
-    df$gene = rowData (DAG_list)$name
-    df
-    })
-  names (DAG_list) = listnames
-  saveRDS (DAG_list, paste0 ('DAG_',metaGroupName,'.rds'))    
-  } else {
-  DAG_list = readRDS (paste0('DAG_',metaGroupName,'.rds'))
-  }
-
-FDR_threshold = 1e-8
-lfc_threshold = 1
-top_genes = 20
-DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
-DAG_top_list = lapply (seq_along(DAG_top_list), function(x) {
-  res = DAG_top_list[[x]]
-  res = na.omit (res)
-  res = res[res$FDR < FDR_threshold,]
-  res = res[order (res$FDR), ]
-  res = res[abs(res$Log2FC) > lfc_threshold,]
-  res$comparison = names(DAG_top_list)[x]
-  if (nrow(res) < top_genes) 
-    {
-    res
+    DAG_list = getMarkerFeatures (
+      ArchRProj = archp, 
+      testMethod = "wilcoxon",
+            #useGroups = "ClusterA",
+            #bgdGroups = "Clusters1B",
+      binarize = FALSE,
+      useMatrix = "GeneScoreMatrix",
+      groupBy = metaGroupName
+    #  useSeqnames="z"
+    )
+    listnames = colnames (DAG_list)
+    DAG_list = lapply (1:ncol (DAG_list), function(x) 
+      {
+      df = DAG_list[,x]  
+      df = do.call (cbind, (assays(df)))
+      colnames(df) = names (assays(DAG_list))
+      df$gene = rowData (DAG_list)$name
+      df
+      })
+    names (DAG_list) = listnames
+    saveRDS (DAG_list, paste0 ('DAG_',metaGroupName,'.rds'))    
     } else {
-    head (res,top_genes)
+    DAG_list = readRDS (paste0('DAG_',metaGroupName,'.rds'))
     }
-  })
-DAG_df = Reduce (rbind ,DAG_top_list)
-
-if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
-gsSE = gsSE[, archp$cellNames]
-gsMat = assays (gsSE)[[1]]
-rownames (gsMat) = rowData (gsSE)$name
-gsMat_mg = gsMat[rownames (gsMat) %in% DAG_df$gene, ]
-gsMat_mg = as.data.frame (t(gsMat_mg))
-gsMat_mg$metaGroup = as.character(archp@cellColData[,metaGroupName])
-gsMat_mg = aggregate (.~ metaGroup, gsMat_mg, mean)
-rownames (gsMat_mg) = gsMat_mg[,1]
-gsMat_mg = gsMat_mg[,-1]
-gsMat_mg = gsMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
-DAG_hm = Heatmap (t(scale(gsMat_mg)), 
-        row_labels = colnames (gsMat_mg),
-        column_title = paste('top',top_genes),
-        clustering_distance_columns = 'euclidean',
-        clustering_distance_rows = 'euclidean',
-        cluster_rows = T,
-        #col = pals_heatmap[[5]],
-        cluster_columns=T,#col = pals_heatmap[[1]],
-        row_names_gp = gpar(fontsize = 6),
-        column_names_gp = gpar(fontsize = 4),
-        rect_gp = gpar(col = "white", lwd = .5),
-        border=TRUE
-        #right_annotation = motif_ha
-        )
-       
-#DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
-pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 8, height = 50)
-DAG_hm
-dev.off()
-
-### Plot cell type markers using GeneScores ####
-metaGroupName = 'Sample2'
-celltype_markers = c('WT1','CALB2','GATA4','MSLN','KRT5','KRT18','ITLN1','HP')
-meso_markers <- plotBrowserTrack(
-    ArchRProj = archp, 
-    groupBy = metaGroupName, 
-    geneSymbol = celltype_markers,
-    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
-    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-    upstream = 50000,
-    downstream = 50000,
-    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
-    #loops = getCoAccessibility (archp, corCutOff = 0.3,
-    #  returnLoops = TRUE),
-    useGroups= NULL
-)
-plotPDF (meso_markers, ArchRProj = archp, width=4, name ='MPM_markers_coveragePlots.pdf')
+  
+  FDR_threshold = 1e-8
+  lfc_threshold = 1
+  top_genes = 20
+  DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
+  DAG_top_list = lapply (seq_along(DAG_top_list), function(x) {
+    res = DAG_top_list[[x]]
+    res = na.omit (res)
+    res = res[res$FDR < FDR_threshold,]
+    res = res[order (res$FDR), ]
+    res = res[abs(res$Log2FC) > lfc_threshold,]
+    res$comparison = names(DAG_top_list)[x]
+    if (nrow(res) < top_genes) 
+      {
+      res
+      } else {
+      head (res,top_genes)
+      }
+    })
+  DAG_df = Reduce (rbind ,DAG_top_list)
+  
+  if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
+  gsSE = gsSE[, archp$cellNames]
+  gsMat = assays (gsSE)[[1]]
+  rownames (gsMat) = rowData (gsSE)$name
+  gsMat_mg = gsMat[rownames (gsMat) %in% DAG_df$gene, ]
+  gsMat_mg = as.data.frame (t(gsMat_mg))
+  gsMat_mg$metaGroup = as.character(archp@cellColData[,metaGroupName])
+  gsMat_mg = aggregate (.~ metaGroup, gsMat_mg, mean)
+  rownames (gsMat_mg) = gsMat_mg[,1]
+  gsMat_mg = gsMat_mg[,-1]
+  gsMat_mg = gsMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
+  DAG_hm = Heatmap (t(scale(gsMat_mg)), 
+          row_labels = colnames (gsMat_mg),
+          column_title = paste('top',top_genes),
+          clustering_distance_columns = 'euclidean',
+          clustering_distance_rows = 'euclidean',
+          cluster_rows = T,
+          #col = pals_heatmap[[5]],
+          cluster_columns=T,#col = pals_heatmap[[1]],
+          row_names_gp = gpar(fontsize = 6),
+          column_names_gp = gpar(fontsize = 4),
+          rect_gp = gpar(col = "white", lwd = .5),
+          border=TRUE
+          #right_annotation = motif_ha
+          )
+         
+  #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+  pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 8, height = 50)
+  DAG_hm
+  dev.off()
+  
+  ### Plot cell type markers using GeneScores ####
+  metaGroupName = 'Sample2'
+  celltype_markers = c('WT1','CALB2','GATA4','MSLN','KRT5','KRT18','ITLN1','HP','SOX9')
+  #celltype_markers = c('WT1','CALB2','GATA4','MSLN','KRT5','KRT18','ITLN1','HP','SOX9')
+  meso_markers <- plotBrowserTrack(
+      ArchRProj = archp, 
+      groupBy = metaGroupName, 
+      geneSymbol = celltype_markers,
+      #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+      #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+      upstream = 150000,
+      downstream = 150000,
+      loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+      #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+      #loops = getCoAccessibility (archp, corCutOff = 0.3,
+      #  returnLoops = TRUE),
+      useGroups= NULL
+  )
+  plotPDF (meso_markers, ArchRProj = archp, width=14, name ='MPM_markers_coveragePlots.pdf')
+  }
 
 
 ### Compare bins malignants normal ####
-# Load fragments
-fragments = unlist (getFragmentsFromProject (
-     ArchRProj = archp))
+run_bin_analysis = FALSE
 
-ws = 1e6
-ss = 2e5
-if (!file.exists (paste0('bins_',ws,'_ss_',ss,'.rds')))
+if (run_bin_analysis)
   {
-  blacklist = toGRanges(paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/blacklisted_regions/ENCODE_blacklist/',"hg38-blacklist.v2.bed")) # taken from https://github.com/Boyle-Lab/Blacklist/tree/master/lists
-  windows = makeWindows(genome = BSgenome.Hsapiens.UCSC.hg38, blacklist = blacklist,
-    windowSize = ws, slidingSize = ss)
-  saveRDS (windows, paste0('bins_',ws,'_ss_',ss,'.rds'))
-  } else {
-  windows = readRDS (paste0('bins_',ws,'_ss_',ss,'.rds'))  
+  # Load fragments
+  fragments = unlist (getFragmentsFromProject (
+       ArchRProj = archp))
+  
+  ws = 1e6
+  ss = 2e5
+  if (!file.exists (paste0('bins_',ws,'_ss_',ss,'.rds')))
+    {
+    blacklist = toGRanges(paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/blacklisted_regions/ENCODE_blacklist/',"hg38-blacklist.v2.bed")) # taken from https://github.com/Boyle-Lab/Blacklist/tree/master/lists
+    windows = makeWindows(genome = BSgenome.Hsapiens.UCSC.hg38, blacklist = blacklist,
+      windowSize = ws, slidingSize = ss)
+    saveRDS (windows, paste0('bins_',ws,'_ss_',ss,'.rds'))
+    } else {
+    windows = readRDS (paste0('bins_',ws,'_ss_',ss,'.rds'))  
+    }
+  
+  flt_celltypes = 100
+  
+  #archp$celltype_sample = paste0(archp$celltype, '-', archp$Sample2)
+  metaGroupName = 'Clusters'
+  
+  #fragments$RG = as.character(fragments$RG)  
+  barcode_metaGroup = as.data.frame (archp@cellColData[,c(metaGroupName, 'TSSEnrichment','nFrags')])
+  colnames (barcode_metaGroup)[colnames (barcode_metaGroup) == metaGroupName] = 'metaGroup'
+  barcode_metaGroup$barcode = rownames(barcode_metaGroup)
+  celltype_bins = lapply (unique(archp@cellColData[,metaGroupName]), function(mg) 
+    {
+    high_quality_cells = barcode_metaGroup[barcode_metaGroup$metaGroup == mg,]
+    high_quality_cells = high_quality_cells[order (-high_quality_cells$TSSEnrichment),] # ordering by TSSEnrichment seem to work the best
+    high_quality_cells = head (high_quality_cells$barcode, flt_celltypes)
+    fragments_group = fragments[fragments$RG %in% high_quality_cells]
+    #names (fragments_cell) = NULL 
+    #fragments_cts = sample (unique(fragments_ct$RG), 200)
+    fr_ov = countOverlaps (windows, fragments_group)
+  #  fr_ov = fr_ov / sum (archp$nFrags[archp$celltype_sample == x])
+    #(fr_ov / sum (fr_ov)) * 1000
+    })
+  celltype_bins = do.call (cbind, celltype_bins)
+  colnames (celltype_bins) = sapply (unique(archp@cellColData[,metaGroupName]), function(x) unlist(strsplit (x,'-'))[1])
+  head (celltype_bins)
+  
+  celltype_bins_cor = cor (celltype_bins, method = 'spearman')
+  ha = HeatmapAnnotation (sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) unlist(strsplit (x,'-'))[2]), which='row')
+  binH = Heatmap (celltype_bins_cor, col = viridis::rocket(100),# row_names_gp= gpar (fontsize=6), 
+    #column_names_gp= gpar (fontsize=6), 
+    right_annotation = ha,
+    cluster_rows = T, #row_km = 2, column_km = 2,
+    clustering_distance_rows = 'pearson', 
+    clustering_distance_columns = 'pearson',
+    column_title = paste('Binned',ws))
+  
+  png (paste0('Plots/binned_fragments_binned_',ws,'_celltype_heatmap.png'),width=600, height=500)
+  binH
+  dev.off()
   }
-
-flt_celltypes = 100
-
-#archp$celltype_sample = paste0(archp$celltype, '-', archp$Sample2)
-metaGroupName = 'Clusters'
-
-#fragments$RG = as.character(fragments$RG)  
-barcode_metaGroup = as.data.frame (archp@cellColData[,c(metaGroupName, 'TSSEnrichment','nFrags')])
-colnames (barcode_metaGroup)[colnames (barcode_metaGroup) == metaGroupName] = 'metaGroup'
-barcode_metaGroup$barcode = rownames(barcode_metaGroup)
-celltype_bins = lapply (unique(archp@cellColData[,metaGroupName]), function(mg) 
-  {
-  high_quality_cells = barcode_metaGroup[barcode_metaGroup$metaGroup == mg,]
-  high_quality_cells = high_quality_cells[order (-high_quality_cells$TSSEnrichment),] # ordering by TSSEnrichment seem to work the best
-  high_quality_cells = head (high_quality_cells$barcode, flt_celltypes)
-  fragments_group = fragments[fragments$RG %in% high_quality_cells]
-  #names (fragments_cell) = NULL 
-  #fragments_cts = sample (unique(fragments_ct$RG), 200)
-  fr_ov = countOverlaps (windows, fragments_group)
-#  fr_ov = fr_ov / sum (archp$nFrags[archp$celltype_sample == x])
-  #(fr_ov / sum (fr_ov)) * 1000
-  })
-celltype_bins = do.call (cbind, celltype_bins)
-colnames (celltype_bins) = sapply (unique(archp@cellColData[,metaGroupName]), function(x) unlist(strsplit (x,'-'))[1])
-head (celltype_bins)
-
-celltype_bins_cor = cor (celltype_bins, method = 'spearman')
-ha = HeatmapAnnotation (sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) unlist(strsplit (x,'-'))[2]), which='row')
-binH = Heatmap (celltype_bins_cor, col = viridis::rocket(100),# row_names_gp= gpar (fontsize=6), 
-  #column_names_gp= gpar (fontsize=6), 
-  right_annotation = ha,
-  cluster_rows = T, #row_km = 2, column_km = 2,
-  clustering_distance_rows = 'pearson', 
-  clustering_distance_columns = 'pearson',
-  column_title = paste('Binned',ws))
-
-png (paste0('Plots/binned_fragments_binned_',ws,'_celltype_heatmap.png'),width=600, height=500)
-binH
-dev.off()
-
 
 
 ### Run peak calling on celltype annotation ####
-### Call peaks on celltypes ###
-metaGroupName = 'Clusters'
-archp = addGroupCoverages (
-  ArchRProj = archp, 
-  groupBy = metaGroupName,  
-  force = FALSE,
-  minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
-  maxCells = 500,
-  minReplicates = 2,
-  sampleRatio = 0.8,
-  useLabels = TRUE)
+run_peakCall = FALSE
 
-archp = addReproduciblePeakSet (
-    archp,
-    groupBy= metaGroupName,
-    peakMethod = 'Macs2',
-    reproducibility = "1",
-    maxPeaks = 500000, 
-    minCells=20,
-    force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower
-archp = addPeakMatrix (archp)
-
-archp = saveArchRProject (archp, load=TRUE)
-
-metaGroupNames = c('TSSEnrichment','nFrags','ReadsInTSS','FRIP')  
-  umap_p12 = lapply (metaGroupNames, function(x) plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
-   name = x, embedding = "UMAP"))
-    
-pdf (paste0(projdir,'/Plots/qc_umap_after_filtering.pdf'), 15,15)
-wrap_plots (umap_p12, ncol=5)
-dev.off()
+if (run_peakCall)
+  {
+  ### Call peaks on celltypes ###
+  metaGroupName = 'Clusters'
+  archp = addGroupCoverages (
+    ArchRProj = archp, 
+    groupBy = metaGroupName,  
+    force = FALSE,
+    minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
+    maxCells = 500,
+    minReplicates = 2,
+    sampleRatio = 0.8,
+    useLabels = TRUE)
+  
+  archp = addReproduciblePeakSet (
+      archp,
+      groupBy= metaGroupName,
+      peakMethod = 'Macs2',
+      reproducibility = "1",
+      maxPeaks = 500000, 
+      minCells=20,
+      force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower
+  archp = addPeakMatrix (archp)
+  
+  archp = saveArchRProject (archp, load=TRUE)
+  
+  metaGroupNames = c('TSSEnrichment','nFrags','ReadsInTSS','FRIP')  
+    umap_p12 = lapply (metaGroupNames, function(x) plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
+     name = x, embedding = "UMAP"))
+      
+  pdf (paste0(projdir,'/Plots/qc_umap_after_filtering.pdf'), 15,15)
+  wrap_plots (umap_p12, ncol=5)
+  dev.off()
+  }
 
 
 
 
 ### chromVAR analysis ####
-archp = addBgdPeaks (archp, force= FALSE)
-archp = addMotifAnnotations (ArchRProj = archp, 
-    motifSet = "cisbp", 
-    #motifSet = 'JASPAR2020',
-    #name = "JASPAR2020_Motif",
-    force=FALSE)
-archp = addDeviationsMatrix (
-  ArchRProj = archp, 
-  peakAnnotation = "Motif",
-  force = FALSE
-)
 
-archp = saveArchRProject (ArchRProj = archp,  
-    load = TRUE)
+run_chromVAR = FALSE
 
-# ### Check distribution of deviations per sample to check if sample normalization has to happen before downstream analysis
-# TF_db='Motif'
-# if (!any (ls() == 'mSE')) mSE = getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
-# mSE = mSE[, archp$cellNames]
-# rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name) 
-# rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
-
-# mmat = as.data.frame (t (assay (mSE)))
-# mmat = mmat[,grep ('SPI1', colnames (mmat)), drop=F]
-# mmat$sample = sapply (rownames(mmat), function(x) unlist(strsplit (x, '\\#'))[1])
-# mmat$sample[grep ('RPL',mmat$sample)] = 'normal'
-# mmat = gather (mmat, gene, deviation, 1:(ncol(mmat)-1))
-
-# mmat %>%
-#   ggplot(aes(x=deviation, fill=sample, alpha=.5)) +
-#   geom_density()+ 
-#   labs(x= "chromVar deviations per sample",
-#        subtitle="",
-#        caption="")
- 
-# ggsave (paste0(projdir, 'Plots/chromvar_distribution_per_sample.pdf'))
-
-# mmat = as.data.frame (t (assay (mSE)))
-# all (rownames (archp) == rownames (mmat))
-# sample_id = sapply (rownames(mmat), function(x) unlist(strsplit (x, '\\#'))[1])
-# sample_id[grep ('RPL',sample_id)] = 'normal'
-# celltype = archp$celltype
-
-# pca_dev = prcomp (mmat)
-# library(ggbiplot)
-# g1 <- ggbiplot (pca_dev,alpha=0.1,
-#               choices = 1:2,
-#               obs.scale = 1,
-#               var.scale = 1,
-#               groups = sample_id,
-#               ellipse = T,
-#               circle = T,
-#               ellipse.prob = 0.68,
-#               var.axes=F) +
-#   theme_classic()
-#   g11 <- ggbiplot (pca_dev,alpha=0.1,
-#               choices = 1:2,
-#               obs.scale = 1,
-#               var.scale = 1,
-#               groups = celltype,
-#               ellipse = T,
-#               circle = T,
-#               ellipse.prob = 0.68,
-#               var.axes=F) +
-#   theme_classic()
-
-# g2 <- ggbiplot (pca_dev, alpha=0.1,
-#               choices = 2:3,
-#               obs.scale = 1,
-#               var.scale = 1,
-#               groups = sample_id,
-#               ellipse = T,
-#               circle = T,
-#               ellipse.prob = 0.68,
-#               var.axes=F) +
-#   theme_classic()
-# g22 <- ggbiplot (pca_dev, alpha=0.1,
-#               choices = 2:3,
-#               obs.scale = 1,
-#               var.scale = 1,
-#               groups = celltype,
-#               ellipse = T,
-#               circle = T,
-#               ellipse.prob = 0.68,
-#               var.axes=F) +
-#   theme_classic()
-
-# pdf (paste0(projdir,'Plots/PCA_chromvar_deviations_sample.pdf'),10,8)
-# wrap_plots (g1, g11, g2, g22)
-# dev.off()
-
-
-# ### Use chromVAR pulling samples together first
-# # Run chromVAR deviation on bulk ATAC
-# if (!file.exists (paste0(projdir, 'chromvar_deviations.rds')))
-#   {
-#   pSE = getMatrixFromProject (archp, useMatrix = 'PeakMatrix')
-#   pSE = pSE[, rownames(archp)]
-#   pMat = assays (pSE)[[1]]
-#   se <- SummarizedExperiment::SummarizedExperiment(
-#       assays = list(
-#         counts = pMat#, 
-#         #z = z
-#       ),
-#       colData = colnames (pSE),
-#       #rowData = as.data.frame(peaks),
-#       rowRanges=rowRanges (pSE)
-#     )
+if (run_chromVAR)
+  {  
+  archp = addBgdPeaks (archp, force= FALSE)
+  archp = addMotifAnnotations (ArchRProj = archp, 
+      motifSet = "cisbp", 
+      #motifSet = 'JASPAR2020',
+      #name = "JASPAR2020_Motif",
+      force=FALSE)
+  archp = addDeviationsMatrix (
+    ArchRProj = archp, 
+    peakAnnotation = "Motif",
+    force = FALSE
+  )
   
-#   # Compute deviation of ALL TCGA ATAC bulk
-#   data("human_pwms_v2")
-#   #windows_ann <- getAnnotations (windows, 
-#   #                          rowRanges = rowRanges (fragment_counts))
-#   peak_counts <- addGCBias (se, genome = BSgenome.Hsapiens.UCSC.hg38)
-#   #motif_ix <- matchMotifs (human_pwms_v2, peak_counts, genome = BSgenome.Hsapiens.UCSC.hg38)
-#   motifmatch = getMatches (archp)
-#   library (BiocParallel)
-#   BiocParallel::register(MulticoreParam(1))
-#   devMat <- computeDeviations (object = peak_counts, 
-#                                    annotations = motifmatch)
-#   saveRDS (devMat, paste0(projdir, 'chromvar_deviations.rds'))
-#   } else {
-#   devMat = readRDS (paste0(projdir, 'chromvar_deviations.rds'))
-#   }
+  archp = saveArchRProject (ArchRProj = archp,  
+      load = TRUE)
+  }
 
 
 ##########################################
 ### Find activating and repressing TFs ###
 ##########################################
-
-metaGroupName = 'Sample2'
-metaGroup = as.character (archp@cellColData[,metaGroupName])
-barcodes = as.character (archp$cellNames)
-metaGroup_df = data.frame (barcode = barcodes, metaGroup = metaGroup)
-
-force = F
-min_cells=100
-if (!file.exists(paste0 ('KNN_',metaGroupName,'.rds')) | force)
-  {
-  KNN = knnGen (
-    ArchRProj = archp, 
-    reducedDims = 'IterativeLSI', 
-    group = metaGroupName,
-    k = 100,
-    knnIteration=500,
-    overlapCutoff = 0.5,
-    #cellsToUse = metaGroup_df$barcode,
-    min.cells_in_group = min_cells,
-    min_knn_cluster = 1
-    )
-  saveRDS (KNN, paste0 ('KNN_',metaGroupName,'.rds'))  
-  } else {
-  KNN = readRDS (paste0 ('KNN_',metaGroupName,'.rds'))
-  }
-
-# Subsample KNN before running hubs detection per cell type
-# KNN_names = names (KNN)
-# KNN_names = sub ('KNN\\d*','', KNN_names)
-# KNN_names_flt = table (KNN_names)[table (KNN_names) > 10]
-# KNN_names_sub = unlist(lapply(split (names(KNN), KNN_names), function(x) 
-#   {
-#   if (length(x) >= min (KNN_names_flt)) x = sample (x, min (KNN_names_flt))
-#   }))
-# KNNsub = KNN[KNN_names_sub]
-
-# if (!file.exists (paste0(projdir, 'activeTF_',metaGroupName,'_tfdb_',TF_db,'.rds')) | force)
-#   {
-#   tf_gs_corL = activeTF (archp, knns= KNN, metaGroupName, motifSE = mSE, subsample = subsample, useMotifmatrix = paste0(TF_db,'Matrix'),  geneScoreSE=gsSE)
-#   tf_gi_corL = activeTF (archp, knns= KNN, metaGroupName, motifSE = mSE, subsample = subsample, useMotifmatrix = paste0(TF_db,'Matrix'),  geneScoreSE=giSE)
-#   saveRDS (tf_gs_corL, paste0(projdir, 'activeTF_',metaGroupName,'_tfdb_',TF_db,'gs_subsampled_',subsample,'.rds'))
-#   saveRDS (tf_gi_corL, paste0(projdir, 'activeTF_',metaGroupName,'_tfdb_',TF_db,'gi_subsampled_',subsample,'.rds'))
-#   } else {
-#   tf_gs_corL = readRDS(paste0(projdir, 'activeTF_',metaGroupName,'_tfdb_',TF_db,'gs_subsampled_',subsample,'.rds'))
-#   tf_gi_corL = readRDS(paste0(projdir, 'activeTF_',metaGroupName,'_tfdb_',TF_db,'gi_subsampled_',subsample,'.rds'))
-#   }
-
-# Load Matrices
-if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
-gsSE = gsSE[, archp$cellNames]
+run_activeTF = FALSE
 
 devMethod = 'ArchR'
-
-if (devMethod == 'ArchR')
+ if (devMethod == 'ArchR')
+    {
+    TF_db='Motif'
+    mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
+    mSE = mSE[, archp$cellNames]
+    rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
+    rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
+    }
+  
+if (run_activeTF)
   {
-  TF_db='Motif'
-  mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
-  mSE = mSE[, archp$cellNames]
-  rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
-  rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
-  }
-# if (devMethod == 'chromVAR') 
-#   {
-#   mSE = readRDS (paste0(projdir, 'chromvar_deviations.rds'))  
-#   mSE = mSE[, archp$cellNames]
-#   rowData(mSE)$name = gsub ('_.*','',rownames(rowData(mSE)))
-#   rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
-#   }
- 
-
-# Run Genescore vs deviation correlation x TF n times
-geneScoreSE = gsSE  
-subsample = 3 # subsample KNN to have same number per metagroupElement so correlation is not biased toward most numerous metagroupElement  
-itern=100
-force=F
-if (!file.exists (paste0('activeTF_gs_subsampled_',subsample,'_',itern,'_iter_',names(geneScoreSE@assays),'_',devMethod,'.rds')) | force)
-  {
-  tf_gs_cor = activeTF (archp, knns= KNN, metaGroupName, motifSE = mSE, subsample = subsample, geneScoreSE=geneScoreSE, iter = itern)  
-  saveRDS (tf_gs_cor, paste0('activeTF_gs_subsampled_',subsample,'_',itern,'_iter_',names(geneScoreSE@assays),'_',devMethod,'.rds'))
-  # tf_gs_corL2 = lapply (1:1000, function(x) activeTF (archp, knns= KNN, metaGroupName, motifSE = mSE, subsample = subsample, useMotifmatrix = paste0(TF_db,'Matrix'),  geneScoreSE=gsSE)[[1]])
-  # saveRDS (tf_gs_corL2, paste0(projdir, 'activeTF_',metaGroupName,'_tfdb_',TF_db,'gs_subsampled_',subsample,'_10000iter.rds'))
+  seGroupMotif <- getGroupSE(ArchRProj = archp, useMatrix = "MotifMatrix", groupBy = "Clusters")
+  seZ <- seGroupMotif[rowData(seGroupMotif)$seqnames=="z",]
+  rowData(seZ)$maxDelta <- lapply(seq_len(ncol(seZ)), function(x){
+    rowMaxs(assay(seZ) - assay(seZ)[,x])
+  }) %>% Reduce("cbind", .) %>% rowMaxs
+  corGSM_MM <- correlateMatrices(
+      ArchRProj = archp,
+      useMatrix1 = "GeneScoreMatrix",
+      useMatrix2 = "MotifMatrix",
+      reducedDims = "IterativeLSI"
+  )
+  corGSM_MM = corGSM_MM[!grepl ('-AS',corGSM_MM$GeneScoreMatrix_name),]
+  corGSM_MM = corGSM_MM[!grepl ('-DT',corGSM_MM$GeneScoreMatrix_name),]
+  corGSM_MM = corGSM_MM[!grepl ('-OT',corGSM_MM$GeneScoreMatrix_name),]
+  corGSM_MM = corGSM_MM[!grepl ('-RAB5IF',corGSM_MM$GeneScoreMatrix_name),]
+  corGSM_MM = corGSM_MM[!grepl ('-IT2',corGSM_MM$GeneScoreMatrix_name),]
+  corGSM_MM = corGSM_MM[!grepl ('-C8orf76',corGSM_MM$GeneScoreMatrix_name),]
+  corGSM_MM = na.omit (corGSM_MM)
+  saveRDS (corGSM_MM, 'TF_activators_genescore.rds')
   } else {
-  tf_gs_cor = readRDS(paste0('activeTF_gs_subsampled_',subsample,'_',itern,'_iter_',names(geneScoreSE@assays),'_',devMethod,'.rds'))
+  activators = readRDS ('TF_activators_genescore.rds') 
   }
-
-# tf_gs_corL2 = lapply (tf_gs_corL2, function(x) {
-#   x$gene = rownames (x)
-#   x
-#   })
-# tf_gs_cor2_df = do.call (rbind, tf_gs_corL2)
-tf_median = sapply (unique (tf_gs_cor[[1]]$gene), function(x) median (tf_gs_cor[[1]][tf_gs_cor[[1]]$gene == x,'correlation']))
-tf_median = tf_median[order (-tf_median)]
-tf_gs_cor[[1]]$gene = factor (tf_gs_cor[[1]]$gene, levels = names (tf_median))
-tf_gs_cor_box = ggplot (tf_gs_cor[[1]], aes (x = gene, y = correlation)) + 
-geom_boxplot(outlier.size = 0.1) + 
-theme_classic() +
-theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size=4)) + 
-theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-pdf (paste0('Plots/distribution_dev_gs_cor_',metaGroupName,'_tfdb_',TF_db,'_subsampled_',subsample,'_',itern,'_iter_',names(geneScoreSE@assays),'_',devMethod,'.pdf'), width=40)
-tf_gs_cor_box
-dev.off()
-
-# distribution of TF using median correlation and variance (Deviation)
-tf_dev = rowVars (as.matrix (assays (mSE)[[1]]))
-names (tf_dev) = rowData(mSE)$name
-
-tf_gs_mean = colMeans (tf_gs_cor[['gsAvKnn_mean']])
-
-# Calculate the standard deviation
-tf_sd <- apply(tf_gs_cor[['gsAvKnn_mean']],2, sd)
-
-# Calculate CV2 (Coefficient of Variation)
-tf_cv2 <- (tf_sd / tf_gs_mean) * 100
-
-vline_x = .3
-tf_act_df = data.frame (
-  cor = tf_median, 
-  var = tf_dev[names(tf_median)], 
-  gs_mean = tf_gs_mean[names(tf_median)],
-  CV2 = tf_cv2)
-tf_act_df$label = ifelse (tf_median > vline_x, rownames (tf_act_df), '')
-
-tf_act_p = ggplot (tf_act_df, aes (x= tf_median, color = tf_median > vline_x, y = gs_mean,label = label)) + 
-  geom_point( size = .5) + # Color points based on x value
-  scale_color_manual(values = c("FALSE" = "grey", "TRUE" = "red")) + # Customize colors
-  geom_vline(xintercept = vline_x, linetype = "dashed", color = "grey44") + # Vertical dashed line
-  gtheme_no_rot + # Use a minimal theme
-  labs(color = "Position") + 
-   geom_text_repel(
-    segment.size=.2,
-    point.padding = 0.2, 
-    size=2,
-    nudge_x = .25,
-    nudge_y = .2,
-    segment.curvature = -1e-20) +
-    xlab ('median correlation') + 
-    ylab ('mean genescore')
-
-pdf (paste0 ('Plots/deviation_var_scatterplot.pdf'),4,height = 3)
-tf_act_p
-dev.off()
-
-# Plot distribution of deviation vs genescore correlation
-# pdf (paste0(projdir, 'Plots/deviation_genescore_distribution.pdf'))
-# hist (tf_gs_corL[[1]]$tf_gs_cor)
-# dev.off()
-
-# Plot TF deviation vs genescore and maxDelta  
-actTF_threshold = 0
-# tf_gs_cor = tf_gs_corL[[1]]
-# tf_gs_cor$label = ""
-# tf_gs_cor$label[abs(tf_gs_cor$tf_gs_cor) > actTF_threshold] = rownames (tf_gs_cor)[abs(tf_gs_cor$tf_gs_cor) > actTF_threshold] 
-# tf_gs_cor$type = ""
-# tf_gs_cor$type [tf_gs_cor$tf_gs_cor > actTF_threshold] = 'activator'
-# tf_gs_cor$type [tf_gs_cor$tf_gs_cor < -actTF_threshold] = 'repressor'
-# tf_gs_cor = tf_gs_cor[order(-tf_gs_cor$tf_gs_cor),]
-
-# p = ggplot (tf_gs_cor, aes(tf_gs_cor, delta, color = type, label = label)) +
-#   geom_point(alpha=.5) + 
-#   theme_ArchR() +
-#   geom_vline(xintercept = 0, lty = "dashed") + 
-#   scale_color_manual (values = c("activator"="navy", "repressor"="firebrick3")) +
-#   xlab("Correlation To Gene Score") +
-#   ylab("Max TF Motif Delta") + 
-#   geom_label_repel(max.overlaps = 20) + 
-#   scale_y_continuous(
-#     expand = c(0,0), 
-#     limits = c(0, max(tf_gs_cor$delta)*1.05)
-#   ) + geom_vline (xintercept=actTF_threshold, linetype="dashed", color = "blue") +
-#    geom_vline (xintercept=actTF_threshold, linetype="dashed", color = "blue") +
-#    geom_vline (xintercept=-actTF_threshold, linetype="dashed", color = "blue")
-# pdf (paste0(projdir,'Plots/TF_activation_tfdb_',TF_db,',_gs_ArchR.pdf'), 7,7)
-# print (p)
-# dev.off()
-
-activators = names(tf_median)[tf_median > actTF_threshold]
-write.csv (activators, paste0(projdir, 'activators_',devMethod,'.csv'))
-activators = read.csv (paste0(projdir, 'activators_',devMethod,'.csv'))$x
-#activators = c(activators, c('PITX2','ID3','TWIST1'))
-# Save Df of TFs
-# gsAvknn_df = as.data.frame (tf_gs_corL[[3]])
-# gsAvknn_df$tf  = rownames (gsAvknn_df)
-# gsAvknn_dfl = gather (gsAvknn_df, knn_gs, mean_gs, 1:(ncol(gsAvknn_df)-1))
-# mAvknn_df = as.data.frame (tf_gs_corL[[2]])
-# mAvknn_df$tf  = rownames (mAvknn_df)
-# mAvknn_dfl = gather (mAvknn_df, knn_gs, mean_deviation, 1:(ncol(mAvknn_df)-1))
-# gsmAvknn_df = cbind (gsAvknn_dfl, mAvknn_dfl)
-# gsmAvknn_df = gsmAvknn_df[,-2]
-# gsmAvknn_df$cluster = gsub ('KNN\\d*','',gsmAvknn_df$knn_gs)
-# gsmAvknn_df$cor = tf_gs_cor$tf_gs_cor[match (gsmAvknn_df$tf, rownames(tf_gs_cor))]
-# gsmAvknn_df$cluster = sub ('\\_.*','',gsmAvknn_df$cluster)
-
-knn_samples = sapply (rownames(tf_gs_cor[[2]]), function(x) unlist(strsplit(x, 'KNN'))[[1]])
-cancer_normal_pal1 = setNames (as.character(sample(paletteer::paletteer_d("palettesForR::GrayViolet"),length(unique(knn_samples)[unique(knn_samples) != 'C3']))) , unique(knn_samples)[unique(knn_samples) != 'C3'])
-cancer_normal_pal2 = setNames ('blue' , unique(knn_samples)[grep ('^C3',unique(knn_samples))])
-cancer_normal_pal = c(cancer_normal_pal1, cancer_normal_pal2)
-activators_df = cbind (
-  gather(tf_gs_cor[[2]], gene, dev_mean), 
-  gather(tf_gs_cor[[3]], gene, dev_min),
-  gather(tf_gs_cor[[4]], gene, dev_max),
-  gather(tf_gs_cor[[5]], gene, gs_mean),
-  gather(tf_gs_cor[[6]], gene, gs_min),
-  gather(tf_gs_cor[[7]], gene, gs_max))
-colnames(activators_df)[1] = 'TF'
-activators_df = activators_df[, !grepl ('gene', colnames (activators_df))]
-activator_p = list()
-for (i in activators)
-  {
-  activator.df = activators_df[activators_df$TF == i,]
-  activator.df$color = knn_samples
-  activator_p[[i]]= ggplot(activator.df, aes(
-    x=dev_mean, y= gs_mean, ymin = gs_min, ymax = gs_max)) + 
-  geom_point(size = 3, shape = 21, alpha=0.8,
-    aes(fill=color, colour = color)) + 
-    geom_errorbar(aes(xmin = gs_min, xmax = gs_max, colour = color)) + 
-    geom_errorbarh(aes (xmin = dev_min, xmax = dev_max, colour = color)) + 
-    ggtitle (paste('motif vs Gene score',i), subtitle = paste('r', round(tf_median[i],2))) +
-    xlab('Motif deviation') + ylab('Gene Score') +
-    scale_fill_manual(values= cancer_normal_pal) +
-    scale_color_manual(values= cancer_normal_pal) +
-    theme_classic() #+
-    #geom_smooth (method=lm, se=FALSE)
-   }
-
-pdf (paste0('Plots/Activators_KNN_TF_subsampled_',subsample,'_',itern,'_iter_',names(geneScoreSE@assays),'_',devMethod,'_scatterplot.pdf'), width=85, height=85)
-print (wrap_plots (activator_p))
-dev.off()
-
 
 
 ### Use P2G analysis and cNMF from RNA to identify active TF via regulons  ####
-maxDist = 250000
-archp = addPeak2GeneLinks(
-    ArchRProj = archp,
-    useMatrix = 'GeneScoreMatrix',
-    reducedDims = "IterativeLSI",
-    maxDist = maxDist
-)
+run_p2g_TF = FALSE
 
+if (run_p2g_TF)
+  {
+  run_p2g = FALSE  
+  if (run_p2g)
+    {
+    maxDist = 250000
+    archp = addPeak2GeneLinks(
+        ArchRProj = archp,
+        useMatrix = 'GeneScoreMatrix',
+        reducedDims = "IterativeLSI",
+        maxDist = maxDist
+    )
+    }  
+    
+  p2g_corr = .2
+  p2g = getPeak2GeneLinks(
+      ArchRProj = archp,
+      corCutOff = p2g_corr,
+      resolution = 1,
+      returnLoops = FALSE
+  )
+  
+  # # Convert df in Granges add gene Name and correlation
+  # gene = 'WT1'
+  p2g$geneName = mcols(metadata(p2g)$geneSet)$name[p2g$idxRNA]
+  p2g = p2g[!is.na (p2g$FDR),] # remove NaN correlations (not sure why there are some)
+  p2g = p2g[p2g$Correlation > p2g_corr, ]
+  p2gGR = metadata (p2g)$peakSet[p2g$idxATAC]
+  p2gGR$geneName = p2g$geneName
+  p2gGR$correlation = p2g$Correlation
+  
 
-p2g = getPeak2GeneLinks(
-    ArchRProj = archp,
-    corCutOff = 0.45,
-    resolution = 1,
-    returnLoops = FALSE
-)
+  # Import cNMF results and intersect with p2g
+  nfeat=5000
+  k=25
+  cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
+  cnmf_list = lapply (cnmf_list, function(x) head (x,200))
+  p2g_cnmf = lapply (cnmf_list, function(x) p2gGR[p2gGR$geneName %in% x])
+  
+  tf_match = getMatches (archp)
+  colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+  bg_peakSet = rowRanges (tf_match)
+  #tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+  nmf_TF = lapply (p2g_cnmf, function(x) hyperMotif (
+    selected_peaks = x, 
+    motifmatch = tf_match))
+  
+  nmf_TF = lapply (nmf_TF, function(x) x[rownames(nmf_TF[[1]]), ])
+  nmf_TF_df = do.call (cbind, nmf_TF)
+  nmf_TF_df = nmf_TF_df[, grep ('padj', colnames(nmf_TF_df))]
+  nmf_TF_df[nmf_TF_df > 0.05] = 1
+  nmf_TF_df = -log10(nmf_TF_df)
+  nmf_TF_df = nmf_TF_df[rowSums (nmf_TF_df) != 0, ]
+  nmf_TF_df[sapply(nmf_TF_df, is.infinite)] <- 300
+  saveRDS (nmf_TF_df, paste0('nmf_TF_p2g_enrichments.rds'))
+  TF_ht = Heatmap (nmf_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
+  
+  pdf (paste0('Plots/TF_nmf_',k,'_nfeat_',nfeat,'_heatmap.pdf'),width = 3,height=25)
+  print (TF_ht)
+  dev.off()
+  } else {
+  nmf_TF_df = readRDS (paste0('nmf_TF_p2g_enrichments.rds'))
+  }
 
-
-
-# # Convert df in Granges add gene Name and correlation
-p2g_corr = .2
-# gene = 'WT1'
-p2g$geneName = mcols(metadata(p2g)$geneSet)$name[p2g$idxRNA]
-p2g = p2g[!is.na (p2g$FDR),] # remove NaN correlations (not sure why there are some)
-p2g = p2g[p2g$Correlation > p2g_corr, ]
-p2gGR = metadata (p2g)$peakSet[p2g$idxATAC]
-p2gGR$geneName = p2g$geneName
-p2gGR$correlation = p2g$Correlation
-# p2gGR_gene = p2gGR[p2gGR$geneName == gene]
-
-# # Subset peakMatrix by peaks in genomic region 
-# if(!any (ls() == 'pSE')) pSE = getMatrixFromProject (archp, useMatrix = 'PeakMatrix')
-# pSE = pSE[, rownames(archp)]
-# pSEs = subsetByOverlaps (pSE, p2gGR_gene)
-
-# # Annotate peaks with peakSet
-# metaGroupName2 = 'Sample2'
-# ps = getPeakSet (archp)
-# ann_peaks = ps[queryHits(findOverlaps (ps, pSEs))]
-# peakType = paste(ann_peaks$peakType, paste(ranges(ann_peaks))) 
-# pmat = t(assays (pSEs)[[1]])
-# all (rownames(archp) == rownames (pmat))
-# pmat = as.data.frame (pmat)
-# pmat = pmat / archp$ReadsInTSS * 1000
-# pmat$metaGroup = as.character(archp@cellColData[,metaGroupName2])
-# pmat = aggregate (.~ metaGroup, pmat, sum)
-# cell_norm = sapply (pmat$metaGroup, function(x) sum(archp@cellColData[,metaGroupName2] == x))
-# pmat = pmat[,-1]
-# pmat = pmat / cell_norm
-# colnames (pmat) = peakType
-# rownames (pmat) = names(cell_norm)
-# ha = HeatmapAnnotation (peakType = sapply(peakType, function(x) unlist(strsplit(x,' '))[1]),simple_anno_size = unit(.2, "cm"))
-# pdf (paste0('Plots/Peaks_to_',gene,'.pdf'), height=2, width=6)
-# Heatmap (pmat, column_title = paste (gene, 'local epigenome -',maxDist),
-#   clustering_distance_rows = "euclidean", name = 'coverage', bottom_annotation = ha,
-#   cluster_columns=F, row_names_gp = gpar (fontsize = 5),
-#   cluster_rows = T, column_names_gp = gpar (fontsize = 3), border=T,
-#   col = rev(viridis::magma(100)))
-# dev.off()
-
-# LE_region = p2gGR_gene[c(1, length(p2gGR_gene))]
-# LE_region = GRanges (seqnames = seqnames (LE_region)[1], ranges = IRanges(start = start(LE_region)[1], end=end(LE_region)[2]))
-# LE_region_p <- plotBrowserTrack(
-#     ArchRProj = archp, 
-#     groupBy = metaGroupName2, 
-#     region = LE_region, 
-#     upstream = 0,
-#     downstream = 0,
-#     pal = paletteDiscrete(unique(archp@cellColData[,metaGroupName2]), set='rushmore', reverse=T),
-#     loops = getPeak2GeneLinks (archp, corCutOff = 0.2,
-#       returnLoops = TRUE)[[1]],
-#     useGroups= NULL
-# )
-# plotPDF (LE_region_p, ArchRProj = archp, width=10, height=4)
-
-# ann_peaks = ps[queryHits(findOverlaps (ps, pSEs))]
-# peakType = paste(ann_peaks$peakType, paste(ranges(ann_peaks)))
-# pmat = t(assays (pSEs)[[1]])
-# all (rownames(archp) == rownames (pmat))
-# pmat = as.data.frame (pmat)
-# pmat = pmat / archp$ReadsInTSS * 1000
-
-# LE_score = data.frame (LE_score = rowSums (pmat))
-# LE_score$metaGroup = as.character(archp@cellColData[, metaGroupName2])[match(rownames(LE_score), archp$cellNames)]
-# #LE_score = LE_score[order(-LE_score$LE_score),,drop=F]
-# #LE_score$cluster = rownames(LE_score)
-# #LE_score$cluster = factor (LE_score$cluster, levels = LE_score$cluster)
-# p<-ggplot(data=LE_score, aes(x=metaGroup, y=LE_score)) +
-#   geom_boxplot() + theme_bw() + 
-#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-# pdf (paste0('Plots/local_epigenome_score_',gene,'_barplot.pdf'), 3,5)
-# p
-# dev.off()
-
-
-# Import cNMF results and intersect with p2g
-nfeat=5000
-k=25
-cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
-cnmf_list = lapply (cnmf_list, function(x) head (x,200))
-p2g_cnmf = lapply (cnmf_list, function(x) p2gGR[p2gGR$geneName %in% x])
-
-tf_match = getMatches (archp)
-colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-bg_peakSet = rowRanges (tf_match)
-tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
-nmf_TF = lapply (p2g_cnmf, function(x) hyperMotif (
-  selected_peaks = x, 
-  motifmatch = tf_match))
-
-nmf_TF = lapply (nmf_TF, function(x) x[rownames(nmf_TF[[1]]), ])
-nmf_TF_df = do.call (cbind, nmf_TF)
-nmf_TF_df = nmf_TF_df[, grep ('padj', colnames(nmf_TF_df))]
-nmf_TF_df[nmf_TF_df > 0.05] = 1
-nmf_TF_df = -log10(nmf_TF_df)
-nmf_TF_df = nmf_TF_df[rowSums (nmf_TF_df) != 0, ]
-nmf_TF_df[sapply(nmf_TF_df, is.infinite)] <- 300
-
-TF_ht = Heatmap (nmf_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
-
-pdf (paste0('Plots/TF_nmf_',k,'_nfeat_',nfeat,'_heatmap.pdf'),width = 3,height=15)
-TF_ht
-dev.off()
-
-### Co-expression of TFs ###
+# ### Co-expression of TFs ###
 metaGroupName = 'Sample2'
 if (!any (ls() == 'mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = 'MotifMatrix', logFile=NULL)
 mSE = mSE[, archp$cellNames]
 all (colnames(mSE) == rownames(archp))
 
-# Get deviation matrix and subset for relevant TF and aggregate
+# # Get deviation matrix and subset for relevant TF and aggregate
 archp_meta = as.data.frame (archp@cellColData)
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
@@ -920,24 +581,24 @@ sample_names_rna = c('P1','P4','P8','P3','P5','P10','P11','P12','P13','P14','HU3
 ps = log2(as.data.frame (AverageExpression (srt, features = activators, group.by = metaGroupName)[[1]]) +1)
 ps = ps[, colnames(ps) %in% sample_names_rna]
 
-cor_TF_hm = Heatmap (cor_TF[tf_name,tf_name],
-        cluster_rows = T,
-        cluster_columns= T,
-        #left_annotation = km_ha,
-        #row_split = km$cluster,
-        column_title = 'all_MPM',
-        column_gap = unit(.2, "mm"),
-        row_gap = unit(.2, "mm"),
-        name = 'r',
-        #column_km_repeats=20,
-        col = viridis::viridis(100),
-        #clustering_distance_rows = 'pearson', 
-        #clustering_distance_columns = 'pearson', 
-        #column_split = km$cluster,
-        #col = pal_corr1,
-        row_names_gp = gpar(fontsize = 0),
-        column_names_gp = gpar(fontsize = 0),
-        width = unit(2, "cm"))
+# cor_TF_hm = Heatmap (cor_TF[tf_name,tf_name],
+#         cluster_rows = T,
+#         cluster_columns= T,
+#         #left_annotation = km_ha,
+#         #row_split = km$cluster,
+#         column_title = 'all_MPM',
+#         column_gap = unit(.2, "mm"),
+#         row_gap = unit(.2, "mm"),
+#         name = 'r',
+#         #column_km_repeats=20,
+#         col = viridis::viridis(100),
+#         #clustering_distance_rows = 'pearson', 
+#         #clustering_distance_columns = 'pearson', 
+#         #column_split = km$cluster,
+#         #col = pal_corr1,
+#         row_names_gp = gpar(fontsize = 0),
+#         column_names_gp = gpar(fontsize = 0),
+#         width = unit(2, "cm"))
 
 column_split = ifelse (grepl ('normal_pleura', colnames(mMat_agg)), 'Normal','Tumor')
 TF_cluster_hm = Heatmap (t(scale(t(mMat_agg[tf_name,]))),
@@ -991,18 +652,18 @@ TF_regulons_hm = Heatmap (t(scale(t(nmf_TF_df[tf_name,]))),
         border=F,
         width = unit(5, "cm"))
 
-# Add deviations from TCGA ATAC bulk
-#tcga_dev = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/TCGA_atac/tcga_meso_atac_deviations_clinical_info.rds')
-#tcga_mat = assays (tcga_dev)$z
-#tcga_mat = aggregate (t(tcga_mat), by = list(sampleID= colnames(tcga_mat)), mean)
-#rownames (tcga_mat) = tcga_mat[,1]
-#tcga_mat = tcga_mat[,-1]
-#tcga_mat = as.data.frame (t(tcga_mat))
-#rownames (tcga_mat) = unname (sapply (rownames(tcga_mat), function(x) unlist (strsplit (x, '_'))[3]))
-##tcga_mat = rowMeans (tcga_mat)
-#tcga_mat = tcga_mat[tf_name,]
-#colnames (tcga_mat) = unname (sapply (colnames(tcga_mat), function(x) unlist (strsplit (x, '_'))[2]))
-#heat_bulkATAC = Heatmap (t(scale(t(tcga_mat[tf_name,]))), 
+# # Add deviations from TCGA ATAC bulk
+# tcga_dev = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/TCGA_atac/tcga_meso_atac_deviations_clinical_info.rds')
+# tcga_mat = assays (tcga_dev)$z
+# tcga_mat = aggregate (t(tcga_mat), by = list(sampleID= colnames(tcga_mat)), mean)
+# rownames (tcga_mat) = tcga_mat[,1]
+# tcga_mat = tcga_mat[,-1]
+# tcga_mat = as.data.frame (t(tcga_mat))
+# rownames (tcga_mat) = unname (sapply (rownames(tcga_mat), function(x) unlist (strsplit (x, '_'))[3]))
+# #tcga_mat = rowMeans (tcga_mat)
+# tcga_mat = tcga_mat[tf_name,]
+# colnames (tcga_mat) = unname (sapply (colnames(tcga_mat), function(x) unlist (strsplit (x, '_'))[2]))
+# heat_bulkATAC = Heatmap (t(scale(t(tcga_mat[tf_name,]))), 
 #        clustering_distance_columns = 'pearson', 
 #        cluster_columns=T, 
 #        #col = pals_heatmap[[2]],
@@ -1013,88 +674,88 @@ TF_regulons_hm = Heatmap (t(scale(t(nmf_TF_df[tf_name,]))),
 #        col = viridis::mako(10),
 #        border=TRUE, width = 2)#, left_annotation=bulk_box_ha)
 
-pdf (paste0 ('Plots/TF_cancer_modules_heatmaps.pdf'), width = 12,height=16)
-draw (TF_cluster_hm + TF_exp_hm)
+pdf (paste0 ('Plots/TF_cancer_modules_heatmaps2.pdf'), width = 18,height=25)
+draw (TF_cluster_hm + TF_exp_hm + TF_regulons_hm)
 dev.off()
 
 
-# make oncogenic signatures and plot on UMAP
-# for (i in tf_name)
-# {
-#   # archp = addCellColData (archp, name = colnames(malig_modules_dev)[i], 
-#   #   data = malig_modules_dev[,i], cells =rownames(malig_modules_dev), force=TRUE)
-# }
+# # make oncogenic signatures and plot on UMAP
+# # for (i in tf_name)
+# # {
+# #   # archp = addCellColData (archp, name = colnames(malig_modules_dev)[i], 
+# #   #   data = malig_modules_dev[,i], cells =rownames(malig_modules_dev), force=TRUE)
+# # }
 
-tf_name2 = sapply (tf_name, function(x) rowData (mSE)$name[grepl (paste0('^',x,'_'), rowData (mSE)$name)])
-tf_name2 = paste0('z:',tf_name2)
-TF_p = plotEmbedding (
-    ArchRProj = archp,
-    colorBy = "MotifMatrix",
-    name = tf_name2, 
-    useSeqnames='z',
-    embedding = "UMAP")
+# tf_name2 = sapply (tf_name, function(x) rowData (mSE)$name[grepl (paste0('^',x,'_'), rowData (mSE)$name)])
+# tf_name2 = paste0('z:',tf_name2)
+# TF_p = plotEmbedding (
+#     ArchRProj = archp,
+#     colorBy = "MotifMatrix",
+#     name = tf_name2, 
+#     useSeqnames='z',
+#     embedding = "UMAP")
 
-png (paste0(projdir,'Plots/coexp_TF_UMAPs.png'),
-   width=16800,height=16200, res=300)
-wrap_plots (TF_p)
-dev.off()
+# png (paste0(projdir,'Plots/coexp_TF_UMAPs.png'),
+#    width=16800,height=16200, res=300)
+# wrap_plots (TF_p)
+# dev.off()
 
-tf_name2 = unlist(sapply (c('SOX9','TWIST1','MESP1','NKX2-5'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
-tf_name2 = paste0('z:',tf_name2)
-TF_p = plotEmbedding (
-    ArchRProj = archp,
-    colorBy = "MotifMatrix",
-    name = tf_name2, 
-    useSeqnames='z',
-    embedding = "UMAP")
+# tf_name2 = unlist(sapply (c('SOX9','TWIST1','MESP1','NKX2-5'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
+# tf_name2 = paste0('z:',tf_name2)
+# TF_p = plotEmbedding (
+#     ArchRProj = archp,
+#     colorBy = "MotifMatrix",
+#     name = tf_name2, 
+#     useSeqnames='z',
+#     embedding = "UMAP")
 
-tf_name2 = c('SOX9','TWIST1','MESP1','NKX2-5')
-TF_p2 = plotEmbedding (
-    ArchRProj = archp,
-    colorBy = "GeneScoreMatrix",
-    name = tf_name2, 
-    #useSeqnames='z',
-    embedding = "UMAP")
+# tf_name2 = c('SOX9','TWIST1','MESP1','NKX2-5')
+# TF_p2 = plotEmbedding (
+#     ArchRProj = archp,
+#     colorBy = "GeneScoreMatrix",
+#     name = tf_name2, 
+#     #useSeqnames='z',
+#     embedding = "UMAP")
 
-png (paste0('Plots/coexp_selected_TF_UMAPs.png'),
-   width=16800,height=16200, res=300)
-wrap_plots (c(TF_p, TF_p2))
-dev.off()
+# png (paste0('Plots/coexp_selected_TF_UMAPs.png'),
+#    width=16800,height=16200, res=300)
+# wrap_plots (c(TF_p, TF_p2))
+# dev.off()
 
-# Show distribution per sample
-ccomp_df = as.data.frame (mMat_agg)
-ccomp_df$TF = rownames (ccomp_df)
-ccomp_df = gather (ccomp_df, 'sample','deviation', c(1:ncol(ccomp_df)-1))
-ccomp_df$status = ifelse (grepl ('N',ccomp_df$sample), 'Normal','Tumor')
-library (dplyr)
-tf_avg = ccomp_df %>% group_by (TF) %>% summarise_at(vars(deviation),
-                ~summary(.)[[3]])
-ccomp_df$TF = factor (ccomp_df$TF, levels = tf_avg$TF[order(-tf_avg$deviation)])
-ccomp_df = ccomp_df[ccomp_df$sample != 'N3',]
-bp = ggplot (ccomp_df, aes (x= TF, y= deviation), fill = status) +
-            geom_boxplot (aes (fill = status),trim=TRUE) +
-            #geom_boxplot (aes (fill = status)) +
-            #geom_jitter (color="black", size=0.4, alpha=0.9) +
-            theme_classic() + 
-            #scale_fill_manual (values= module_pal) + 
-            ggtitle ('Mean TF activity per sample') + 
-            theme (axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
-    #if (length(unique(metaGroupNames)) == 3) box_p = lapply (seq_along(meta_modules_names), function(x) box_p[[x]] + facet_wrap (as.formula(paste("~", metaGroupNames[3]))) + theme_classic()+ 
-    #        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))) 
+# # Show distribution per sample
+# ccomp_df = as.data.frame (mMat_agg)
+# ccomp_df$TF = rownames (ccomp_df)
+# ccomp_df = gather (ccomp_df, 'sample','deviation', c(1:ncol(ccomp_df)-1))
+# ccomp_df$status = ifelse (grepl ('N',ccomp_df$sample), 'Normal','Tumor')
+# library (dplyr)
+# tf_avg = ccomp_df %>% group_by (TF) %>% summarise_at(vars(deviation),
+#                 ~summary(.)[[3]])
+# ccomp_df$TF = factor (ccomp_df$TF, levels = tf_avg$TF[order(-tf_avg$deviation)])
+# ccomp_df = ccomp_df[ccomp_df$sample != 'N3',]
+# bp = ggplot (ccomp_df, aes (x= TF, y= deviation), fill = status) +
+#             geom_boxplot (aes (fill = status),trim=TRUE) +
+#             #geom_boxplot (aes (fill = status)) +
+#             #geom_jitter (color="black", size=0.4, alpha=0.9) +
+#             theme_classic() + 
+#             #scale_fill_manual (values= module_pal) + 
+#             ggtitle ('Mean TF activity per sample') + 
+#             theme (axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+#     #if (length(unique(metaGroupNames)) == 3) box_p = lapply (seq_along(meta_modules_names), function(x) box_p[[x]] + facet_wrap (as.formula(paste("~", metaGroupNames[3]))) + theme_classic()+ 
+#     #        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))) 
 
-library (rstatix)
-stat.test2 = ccomp_df %>% group_by (TF) %>%
-  t_test(reformulate('status', 'deviation'), paired=F) %>%
-  adjust_pvalue(method = "fdr") %>%
-  add_significance()
-stat.test2 = stat.test2 %>% add_xy_position (x = "TF", step.increase=0.05)
-bp = bp + stat_pvalue_manual (stat.test2, remove.bracket=FALSE,
-   bracket.nudge.y = 0, hide.ns = TRUE,
-    label = "p.adj.signif") 
+# library (rstatix)
+# stat.test2 = ccomp_df %>% group_by (TF) %>%
+#   t_test(reformulate('status', 'deviation'), paired=F) %>%
+#   adjust_pvalue(method = "fdr") %>%
+#   add_significance()
+# stat.test2 = stat.test2 %>% add_xy_position (x = "TF", step.increase=0.05)
+# bp = bp + stat_pvalue_manual (stat.test2, remove.bracket=FALSE,
+#    bracket.nudge.y = 0, hide.ns = TRUE,
+#     label = "p.adj.signif") 
 
-pdf (paste0 ('Plots/Sample_distribution_coexp_TF.pdf'), height = 6,width=24)
-bp
-dev.off()
+# pdf (paste0 ('Plots/Sample_distribution_coexp_TF.pdf'), height = 6,width=24)
+# bp
+# dev.off()
 
 
 # # Make scatterplot of normal deviation vs median tumor deviations of active TF and the same for RNA
@@ -1127,44 +788,43 @@ dev.off()
 # tf_diff_p
 # dev.off()
 
-# Make scatterplot of deviation difference and expression difference between normal and tumors
+# Make scatterplot of deviation difference and expression difference between normal and tumors ####
 metaGroupName = 'Sample2'
 archp_meta = as.data.frame (archp@cellColData)
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
-
-mMat = mMat[activators,]
-
 mMat_agg = as.data.frame (t(mMat))
 mMat_agg$metaGroup = as.character (archp_meta[,metaGroupName])
 mMat_agg = aggregate (.~ metaGroup, mMat_agg, mean)
 rownames (mMat_agg) = mMat_agg[,1]
 mMat_agg = mMat_agg[,-1]
 mMat_agg = t(mMat_agg)
-
+mMat_agg = mMat_agg[rownames(mMat_agg) %in% rownames(srt),]
 metaGroupName = 'sampleID'
 DefaultAssay(srt) = 'RNA'
 sample_names_rna = c('P1','P4','P8','P3','P5','P10','P11','P12','P13','P14','HU37','HU62')
-ps = log2(as.data.frame (AverageExpression (srt, features = activators, group.by = metaGroupName)[[1]]) +1)
+ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat_agg), group.by = metaGroupName)[[1]]) +1)
 ps = ps[, colnames(ps) %in% sample_names_rna]
 
 TF_diff_rna = data.frame (
   tumor_dev = apply (mMat_agg[,unique(archp$Sample2)[!unique(archp$Sample2) == 'normal_pleura']], 1, mean),
   normal_dev = mMat_agg[,unique(archp$Sample2)[unique(archp$Sample2) == 'normal_pleura']],
   normal_rna = apply (ps[,c('HU37','HU62')], 1, median),
-  tumor_rna = apply (ps[, !colnames(ps) %in% c('HU37','HU62')], 1, mean))
+  tumor_rna = apply (ps[, !colnames(ps) %in% c('HU37','HU62')], 1, mean),
+  genescore = corGSM_MM$cor[match(rownames(mMat_agg), corGSM_MM$GeneScoreMatrix_name)])
 TF_diff_rna$dev_diff = TF_diff_rna$tumor_dev - TF_diff_rna$normal_dev
 TF_diff_rna$rna_diff = TF_diff_rna$tumor_rna - TF_diff_rna$normal_rna
 diff_line = 0
 TF_diff_rna$label = ifelse (TF_diff_rna$dev_diff > 0 & TF_diff_rna$rna_diff > 0, rownames(TF_diff_rna),'') 
 TF_diff_rna$label_color = TF_diff_rna$label != ''
 TF_diff_rna$color = TF_diff_rna$dev_diff > diff_line & TF_diff_rna$rna_diff > diff_line
-tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, color = label_color, y = rna_diff, label = label), fill='grey') + 
-  geom_point( size = .3, shape = 21, fill='grey') + # Color points based on x value
+tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, y = rna_diff)) + 
+  geom_point(aes(fill=genescore, color=color), size = .3, shape = 21, stroke=0.1) + # Color points based on x value
   scale_color_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
+  scale_fill_gradient(low = "white", high = "black") +
   #scale_fill_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
-  geom_vline(xintercept = diff_line, linetype = "dashed", color = "grey44") + # Vertical dashed line
-  geom_hline(yintercept = diff_line, linetype = "dashed", color = "grey44") + # Vertical dashed line
+  geom_vline(xintercept = diff_line, linetype = "dashed", color = "grey44", linewidth=.3) + # Vertical dashed line
+  geom_hline(yintercept = diff_line, linetype = "dashed", color = "grey44", linewidth=.3) + # Vertical dashed line
   gtheme_no_rot + # Use a minimal theme
 #    geom_text_repel(
 #     segment.size=.2,
@@ -1184,14 +844,46 @@ pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot.pdf'),3,heig
 tf_diff_p
 dev.off()
 
+# Compute significance per sample vs normal in RNA space ####
+library (presto)
+srt$sampleID2 = srt$sampleID
+srt$sampleID2[srt$sampleID2 %in% c('HU37','HU62')] = 'normal'
+comparisons = list(
+  P1 = c('P1','normal'),
+  P11 = c('P11','normal'),
+  P12 = c('P12','normal'),
+  P13 = c('P13','normal'),
+  P14 = c('P14','normal'),
+  P3 = c('P3','normal'),
+  P4 = c('P4','normal'),
+  P5 = c('P5','normal'),
+  P8 = c('P8','normal'))
+
+res = lapply (comparisons, function(x) 
+  wilcoxauc (srt[rownames(mMat_agg),], group_by = 'sampleID2', groups_use = x))
+res_df = lapply (names (comparisons), function(x) res[[x]][res[[x]]$group == x,'padj',drop=FALSE])
+res_df = do.call (cbind , res_df)
+occurence_filter = apply (res_df, 1, function(x) sum (x < 0.01))
+rownames (res_df) = rownames(mMat_agg)
+colnames (res_df) = names(comparisons)
+res_df_filtered = res_df[occurence_filter > 4, ]
+tf_tumor_pos = TF_diff_rna$label[grepl('.',TF_diff_rna$label)]
+res_df_filtered = res_df_filtered[rownames(res_df_filtered) %in% tf_tumor_pos,]
+selected_TF = rownames(res_df_filtered)
+
 palette_deviation = rev (as.character (paletteer::paletteer_c("grDevices::Rocket",100)))
 palette_expression = rev (as.character(paletteer::paletteer_c("grDevices::Purple-Blue",100)))
 palette_deviation = colorRamp2(c(-.2,-.1,0,.1,.2), c("white",'white','white', "brown",'black'))  
 
-tf_name_selected = TF_diff_rna$label[grepl('.',TF_diff_rna$label)]
+# Order by median logFC
+res_df2 = lapply (names (comparisons), function(x) res[[x]][res[[x]]$group == x,'logFC',drop=FALSE])
+res_df2 = do.call (cbind , res_df2)
+rownames (res_df2) = rownames(mMat_agg)
+tf_order = rownames(res_df2)[order (-apply (res_df2, 1, median))]
+selected_TF_ordered = tf_order[tf_order%in% selected_TF]
+
 column_split = ifelse (grepl ('normal_pleura', colnames(mMat_agg)), 'Normal','Tumor')
-tf_name_selected = tf_name_selected[order (-TF_diff_rna[tf_name_selected,'tumor_rna'])]
-TF_cluster_selected_hm = Heatmap (mMat_agg[tf_name_selected,],
+TF_cluster_selected_hm = Heatmap (mMat_agg[selected_TF_ordered,],
         #right_annotation=tf_mark,
         column_split = column_split,
         cluster_rows = F, #km = 4, 
@@ -1209,10 +901,10 @@ TF_cluster_selected_hm = Heatmap (mMat_agg[tf_name_selected,],
 
 #ps_order = ps[tf_name,sarc_order$sampleID]
 column_split_rna = ifelse (grepl ('HU', colnames(ps)), 'Normal','Tumor')
-TF_exp_selected_hm = Heatmap (ps[tf_name_selected,],
+TF_exp_selected_hm = Heatmap (ps[selected_TF_ordered,],
         #right_annotation=tf_mark,
         column_split = column_split_rna,
-        cluster_rows = F, #km = 4, 
+        cluster_rows = T, #km = 4, 
         name = 'expression',
         column_gap = unit(.5, "mm"),
         row_gap = unit(.2, "mm"),
@@ -1225,8 +917,49 @@ TF_exp_selected_hm = Heatmap (ps[tf_name_selected,],
         border=T,
         width = unit(2, "cm"))
 
-pdf (paste0 ('Plots/selected_TF_dev_exp_heatmaps.pdf'), width = 5,height=15)
-draw (TF_cluster_selected_hm + TF_exp_selected_hm)
+
+TF_regulons_hm = Heatmap (t(scale(t(nmf_TF_df[selected_TF_ordered,]))),
+        #right_annotation=tf_mark,
+#        column_split = column_split,
+        cluster_rows = F, #km = 4, 
+        name = 'expression',
+        column_gap = unit(.2, "mm"),
+        row_gap = unit(.2, "mm"),
+        clustering_distance_rows = 'euclidean',
+        clustering_distance_columns = 'euclidean',
+        cluster_columns=T,
+        column_names_rot = 45, 
+        col = viridis::inferno (100),
+        row_names_gp = gpar(fontsize = 5),
+        column_names_gp = gpar(fontsize = 5), 
+        border=F,
+        width = unit(5, "cm"))
+
+# Add deviations from TCGA ATAC bulk
+tcga_dev = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/TCGA_atac/tcga_meso_atac_deviations_clinical_info.rds')
+tcga_mat = assays (tcga_dev)$z
+tcga_mat = aggregate (t(tcga_mat), by = list(sampleID= colnames(tcga_mat)), mean)
+rownames (tcga_mat) = tcga_mat[,1]
+tcga_mat = tcga_mat[,-1]
+tcga_mat = as.data.frame (t(tcga_mat))
+rownames (tcga_mat) = unname (sapply (rownames(tcga_mat), function(x) unlist (strsplit (x, '_'))[3]))
+#tcga_mat = rowMeans (tcga_mat)
+tcga_mat = tcga_mat[selected_TF,]
+colnames (tcga_mat) = unname (sapply (colnames(tcga_mat), function(x) unlist (strsplit (x, '_'))[2]))
+heat_bulkATAC = Heatmap (t(scale(t(tcga_mat[selected_TF,]))), 
+       clustering_distance_columns = 'pearson', 
+       cluster_columns=T, 
+       #col = pals_heatmap[[2]],
+       row_names_gp = gpar(fontsize = 5), 
+       name = 'z-score\ndeviations',
+       column_names_gp = gpar(fontsize = 6),
+       column_names_rot = 45,
+       #rect_gp = gpar(col = "white", lwd = .5),
+       col = viridis::mako(10),
+       border=TRUE, width = unit(2, "cm"))#, left_annotation=bulk_box_ha)
+
+pdf (paste0 ('Plots/selected_TF_dev_exp_significant_heatmaps.pdf'), width = 7,height=9)
+draw (TF_regulons_hm + TF_cluster_selected_hm + TF_exp_selected_hm)
 dev.off()
 
 
