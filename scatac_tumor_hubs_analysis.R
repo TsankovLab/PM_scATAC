@@ -5,24 +5,62 @@ source ('../../PM_scATAC/addCoax.R')
 source ('../../PM_scATAC/Hubs_finder.R')
 source ('../../PM_scATAC/hubs_track.R')
 
-### Run Hub detection and correlate with sarcomatoid TFs
-k= 50
-metaGroupName = 'Sample2'
-KNNs = readRDS (paste0 ('KNN_',metaGroupName,'_k_',k,'.rds'))
+
+peak_regions = as.data.frame (getPeakSet (archp), row.names=NULL)
+peak_regions = peak_regions[,c(1:3)]
+write.table (peak_regions, file.path('peak_regions.bed'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
 
 
 ###--- Hubs analysis --###
 metaGroupName = "Sample2"
 cor_cutoff = 0.2
 max_dist = 12500
+max_dist = 5000
 min_peaks = 5
-dgs = 2000
-projdir_hubs = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks,'/')
+dgs = 0
+hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks)
+dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 
-system (paste('mkdir -p',projdir_hubs))
-system (paste('mkdir -p',paste0(projdir_hubs,'Plots')))
+# Generate cluster-aware knn groups
+k= 30
+metaGroupName = 'Sample2'
 
-run_coax = FALSE
+force = FALSE
+if (!file.exists(paste0 ('KNNs_',metaGroupName,'k_',k,'.rds')) | force)
+  {
+  KNNs = knnGen (
+    ArchRProj = archp, 
+    k = k,
+    reducedDims = 'IterativeLSI', 
+    group = metaGroupName,
+    overlapCutoff = 0.6,
+    #cellsToUse = metaGroup_df$barcode,
+    #min.cells_in_group = min_cells,
+    min_knn_cluster = 2
+    )  
+  saveRDS (KNNs, paste0 ('KNNs_',metaGroupName,'k_',k,'.rds'))  
+  } else {
+  KNNs = readRDS (paste0 ('KNNs_',metaGroupName,'k_',k,'.rds'))
+  }
+
+# Plot KNN groups on UMAP
+KNNs_df = lapply (seq_along(KNNs), function(x) data.frame (
+  cell = KNNs[[x]], 
+  group=paste0('KNN_',x), 
+  group2 = unlist(strsplit (names(KNNs)[x],'KNN'))[1]))
+
+KNNs_df = do.call (rbind, KNNs_df)
+archp$knn_groups = KNNs_df$group[match (archp$cellNames, KNNs_df$cell)]
+umap_knn = plotEmbedding (ArchRProj = archp, embedding = 'UMAP',
+  colorBy = "cellColData", name = 'knn_groups',plotAs ='hex',
+    baseSize=0, labelMeans=FALSE) + NoLegend() 
+pdf (file.path(hubs_dir, 'Plots',paste0('knn_',k,'.pdf')), height=20, width=20)
+umap_knn
+dev.off()
+
+
+
+run_coax = TRUE
 if (run_coax)
   {
   archp = addCoAx (
@@ -33,7 +71,7 @@ if (run_coax)
 
 #archp = saveArchRProject (archp, load=T)
 force=F
-if (!file.exists (paste0(projdir_hubs,'global_hubs_obj.rds')) | force)
+if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (
     ArchRProj = archp, 
@@ -47,32 +85,19 @@ if (!file.exists (paste0(projdir_hubs,'global_hubs_obj.rds')) | force)
     dgs = dgs,
     cores=1
     ) 
-  saveRDS (hubs_obj, paste0(projdir_hubs,'global_hubs_obj.rds'))
-  write.table (as.data.frame (hubs_obj$hubsCollapsed), paste0(projdir_hubs, 'hub_regions.bed'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+  saveRDS (hubs_obj, file.path(hubs_dir,'global_hubs_obj.rds'))
+  hubs_regions = as.data.frame (hubs_obj$hubsCollapsed)
+  hubs_regions$width = hubs_obj$hubs_id
+  write.table (hubs_regions, file.path(hubs_dir, 'hub_regions.bed'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
   } else {
-  hubs_obj = readRDS (paste0(projdir_hubs,'global_hubs_obj.rds'))  
+  hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))  
   }
 
 
 
 # Export bed file of hub regions
 
-# Plot KNN groups on UMAP
-KNNs_df = lapply (seq_along(KNNs), function(x) data.frame (
-  cell = KNNs[[x]], 
-  group=paste0('KNN_',x), 
-  group2 = unlist(strsplit (names(KNNs)[x],'KNN'))[1]))
-
-KNNs_df = do.call (rbind, KNNs_df)
-archp$knn_groups = KNNs_df$group[match (archp$cellNames, KNNs_df$cell)]
-umap_knn = plotEmbedding (ArchRProj = archp, embedding = 'UMAP',
-  colorBy = "cellColData", name = 'knn_groups',plotAs ='hex',
-    baseSize=0, labelMeans=FALSE) + NoLegend() 
-pdf (paste0(projdir_hubs, 'Plots/knn_test.pdf'), height=20, width=20)
-umap_knn
-dev.off()
-
-fragments = unlist(getFragmentsFromProject (
+fragments = unlist (getFragmentsFromProject (
   ArchRProj = archp))  
   
 ###--- Generate matrces of hubs x cells / knn from collapsed non-redundant hubs to identify differential hubs  ---###
@@ -82,159 +107,215 @@ metaGroup_df = data.frame (barcode = rownames(archp@cellColData), metaGroup = me
 metaGroup3 = names (sapply (seq_along(KNNs), function(x)
   table(metaGroup_df$metaGroup[match (KNNs[[x]],metaGroup_df$barcode)])))
 
-# Generate matrix of fragment counts of peaks x cluster
-peaksKnn_mat = matrix (ncol = length(KNNs), nrow = length(hubs_obj$peaksMerged))
-pb =progress::progress_bar$new(total = length (KNNs)) 
-for (i in 1:length(KNNs)) {
+# # Generate matrix of fragment counts of peaks x cluster
+# peaksKnn_mat = matrix (ncol = length(KNNs), nrow = length(hubs_obj$peaksMerged))
+# pb =progress::progress_bar$new(total = length (KNNs)) 
+# for (i in 1:length(KNNs)) {
+#     pb$tick()  
+#     peaks_fr = fragments[fragments$RG %in% KNNs[[i]]]  
+#     fragments_hubs = countOverlaps (hubs_obj$peaksMerged, peaks_fr)
+#     peaksKnn_mat[,i] = fragments_hubs
+# }
+# peaksKnn_mat = as.data.frame (peaksKnn_mat)
+# peaksKnn_mat$hubs_id = paste0(rep (hubs_obj$hubs_id,sapply(hubs_obj$hubsMerged,nrow)))
+
+# # Aggregate peaks x knn matrix to hub level taking mean
+# #gm_mean = function (x, na.rm=TRUE){ exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x)) } # geometric mean, doesnt work as good as normal mean i think
+# hubsKnn_mat = aggregate (. ~ hubs_id, data = peaksKnn_mat, FUN = mean)
+# rownames (hubsKnn_mat) = apply (data.frame(as.data.frame (hubs_obj$hubsCollapsed), hubs_id = hubs_obj$hubs_id)[,c(7,1,2,3,6)], 1,
+#  function(x) paste(x, collapse = '_')) [match (hubsKnn_mat$hubs_id, hubs_obj$hubs_id)]
+# rownames (hubsKnn_mat) = gsub (' ','', rownames(hubsKnn_mat))
+# hubsKnn_mat = hubsKnn_mat[,-1]
+
+# # Normalise by seq depth
+# cellpool_nFrags = sapply(KNNs,function(v) sum(archp$ReadsInTSS[archp$cellNames %in% v]))
+# hubsKnn_mat = t(t(hubsKnn_mat) * (10^6 /cellpool_nFrags)) # scale
+# colnames (hubsKnn_mat) = metaGroup3
+# saveRDS (hubsKnn_mat, paste0 (projdir_hubs, 'hubs_knn_matrix_global.rds'))
+# hubsKnn_mat = readRDS (paste0 (projdir_hubs, 'hubs_knn_matrix_global.rds'))
+
+# # hubsClust_mat = as.data.frame (t (hubsKnn_mat))
+# # hubsClust_mat$metaGroup = metaGroup3
+# # hubsClust_mat = aggregate (.~ metaGroup, data = hubsClust_mat, FUN = mean)
+# # rownames (hubsClust_mat) = hubsClust_mat[,1]
+# # hubsClust_mat = hubsClust_mat[,-1]
+# # saveRDS (hubsClust_mat, paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
+# # hubsClust_mat = readRDS (paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
+
+
+# # Correlate with SOX9 genescore
+# if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
+# gsSE = gsSE[, archp$cellNames]
+# gsMat = assays (gsSE)[[1]]
+# rownames (gsMat) = rowData (gsSE)$name
+
+# head (KNNs_df)
+# gsMat = gsMat[c(tf_name_selected, 'AXL','VIM','CALB2','ITLN1'),]
+# gsMat = as.data.frame (t(gsMat))
+# gsMat = gsMat[unlist(KNNs),]
+# gsMat$cellGroup = KNNs_df$group
+# gsMat = aggregate (.~ cellGroup, data = gsMat, FUN = mean)
+# rownames (gsMat) = gsMat[,1]
+# gsMat = gsMat[,-1]
+
+# hubsKnn_mat = t(hubsKnn_mat)
+# hubsKnn_mat = as.data.frame (hubsKnn_mat)
+# rownames (hubsKnn_mat) = rownames (gsMat)
+# TF_hub_cor = lapply (unique(KNNs_df$group2), function(x) cor (gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SOX9'], hubsKnn_mat[unique(KNNs_df$group[KNNs_df$group2 == x]),], method = 'spearman'))
+# names (TF_hub_cor) = unique(KNNs_df$group2)
+
+# TF_hub_cor2 = as.data.frame (t(TF_hub_cor[['P1']]))
+# TF_hub_cor2 = TF_hub_cor2[order (-TF_hub_cor2$V1),, drop=F]
+# head (TF_hub_cor2, 10)
+# rownames (TF_hub_cor2) = sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit(x, '_'))[1])
+
+
+# KNNs_df2 = KNNs_df[!duplicated(KNNs_df$group),]
+# table (KNNs_df2$group2)
+# a = lapply (unique(KNNs_df$group2), function(x) cor (gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SNAI2'], gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SOX9'], method='spearman'))
+# names(a) = unique(KNNs_df$group2)
+
+
+
+
+
+
+# nfeat=5000
+#   k=25
+#   cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
+#   cnmf_list = lapply (cnmf_list, function(x) head (x,50))
+# gsMat = assays (gsSE)[[1]]
+# rownames (gsMat) = rowData (gsSE)$name
+# gsMat = gsMat[rownames (gsMat) %in% c(cnmf_list[[20]],'SOX9'),]
+# gsMat = as.data.frame (t(gsMat))
+
+# gsMat = gsMat[unlist(KNNs),]
+# gsMat$cellGroup = KNNs_df$group
+# gsMat = aggregate (.~ cellGroup, data = gsMat, FUN = mean)
+# rownames (gsMat) = gsMat[,1]
+# gsMat = gsMat[,-1]
+# gsMat_p1 = gsMat[unique(KNNs_df$group[KNNs_df$group2 == 'P1']),]
+
+# cor (gsMat_p1[,'TWIST1'],gsMat_p1[,'SNAI2'], method='spearman')
+
+# pdf ('Plots/cor_genescore_genes.pdf')
+# plot (gsMat[,'SOX9'], gsMat[,'VIM'])
+# dev.off 
+
+
+
+
+# # Check enrichment of TF in hubs using fgsea
+# TF = 'MESP1'
+# hubs_id = sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit (x, '_'))[1])
+# tf_matches = getMatches (archp)
+# TF = colnames(tf_matches)[grep (TF, colnames(tf_matches))]
+
+
+# hub_peaks = rep (hubs_obj$hubs_id, sapply (hubs_obj$hubsClusters[[1]], nrow))
+# hubs_obj$peaksMerged$hub_id = hub_peaks
+# hubs_peaks_idx = subjectHits (findOverlaps (hubs_obj$peaksMerged,rowRanges(tf_matches)))
+# tf_matches = tf_matches[hubs_peaks_idx, colnames(tf_matches) == TF]
+# tf_matches_hit = which (assays (tf_matches)[[1]][,1])
+# hub_peaks_cor = setNames (TF_hub_cor2[hubs_obj$peaksMerged$hub_id,]$V1, paste0('h',1:nrow(tf_matches))) 
+# #tf_matches_peaks = unique(queryHits (findOverlaps (hubs_obj$hubsCollapsed[match(TF_hubs_id, hubs_obj$hubs_id)], rowRanges(tf_matches)[tf_matches_hit])))
+# pathways = list(SOX9 = paste0('h',tf_matches_hit))
+
+# library (fgsea)
+# hub_peaks_cor = na.omit (hub_peaks_cor)
+# fgseaRes = fgseaMultilevel (pathways, 
+#           hub_peaks_cor#, 
+#           #minSize=15, 
+#           #maxSize=1500,
+#           #BPPARAM = NULL
+#           )
+
+
+# tf_match = getMatches (archp)
+# colnames(tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+# bg_peakSet = rowRanges (tf_match)
+# top_cor_hubs = head (sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit (x, '_'))[1]),100)
+# top_cor_hubs_peaks = lapply(top_cor_hubs, function(x) getPeakSet(archp) [queryHits(findOverlaps(getPeakSet(archp), hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]))])
+# top_cor_hubs_TF = lapply (top_cor_hubs_peaks, function(x) hyperMotif (
+#   selected_peaks = x,
+#   motifmatch = tf_match))
+  
+# top_cor_hubs_TF = lapply (top_cor_hubs_TF, function(x) x[rownames(top_cor_hubs_TF[[1]]), ])
+#   top_cor_hubs_TF_df = do.call (cbind, top_cor_hubs_TF)
+#   top_cor_hubs_TF_df = top_cor_hubs_TF_df[, grep ('padj', colnames(top_cor_hubs_TF_df))]
+#   top_cor_hubs_TF_df[top_cor_hubs_TF_df > 0.05] = 1
+#   top_cor_hubs_TF_df = -log10(top_cor_hubs_TF_df)
+#   top_cor_hubs_TF_df = top_cor_hubs_TF_df[rowSums (top_cor_hubs_TF_df) != 0, ]
+#   top_cor_hubs_TF_df[sapply(top_cor_hubs_TF_df, is.infinite)] <- 300
+  
+#   TF_ht = Heatmap (top_cor_hubs_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
+  
+#   pdf (paste0('Plots/TF_top_cor_hubs_heatmap.pdf'),width = 15,height=15)
+#   print (TF_ht)
+#   dev.off()
+
+
+
+# Generate matrix of fragment counts of hubs x sample ####
+if (!file.exists(file.path (hubs_dir,'hubs_sample_mat.rds')))
+  {
+  hubsSample_mat = matrix (ncol = length(unique(archp$Sample2)), nrow = length(hubs_obj$hubsCollapsed))
+  colnames (hubsSample_mat) = unique(archp$Sample2)
+  rownames (hubsSample_mat) = hubs_obj$hubs_id
+  pb =progress::progress_bar$new(total = length (unique(archp$Sample2)))
+  for (sam in unique(archp$Sample2))
+    {
     pb$tick()  
-    peaks_fr = fragments[fragments$RG %in% KNNs[[i]]]  
-    fragments_hubs = countOverlaps (hubs_obj$peaksMerged, peaks_fr)
-    peaksKnn_mat[,i] = fragments_hubs
-}
-peaksKnn_mat = as.data.frame (peaksKnn_mat)
-peaksKnn_mat$hubs_id = paste0(rep (hubs_obj$hubs_id,sapply(hubs_obj$hubsMerged,nrow)))
+    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[archp$Sample2 == sam]]  
+    fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
+    hubsSample_mat[,sam] = fragments_in_sample_in_hubs
+    }
+  frags_in_sample = sapply (unique(archp$Sample2), function(x) sum (archp$nFrags[archp$Sample2 == x]))
+  hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
+  saveRDS (hubsSample_mat, file.path (hubs_dir,'hubs_sample_mat.rds'))
+  } else {
+  hubsSample_mat = readRDS (file.path (hubs_dir,'hubs_sample_mat.rds'))  
+  }
+hubsSample_mat = as.data.frame (hubsSample_mat)
 
-# Aggregate peaks x knn matrix to hub level taking mean
-#gm_mean = function (x, na.rm=TRUE){ exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x)) } # geometric mean, doesnt work as good as normal mean i think
-hubsKnn_mat = aggregate (. ~ hubs_id, data = peaksKnn_mat, FUN = mean)
-rownames (hubsKnn_mat) = apply (data.frame(as.data.frame (hubs_obj$hubsCollapsed), hubs_id = hubs_obj$hubs_id)[,c(7,1,2,3,6)], 1,
- function(x) paste(x, collapse = '_')) [match (hubsKnn_mat$hubs_id, hubs_obj$hubs_id)]
-rownames (hubsKnn_mat) = gsub (' ','', rownames(hubsKnn_mat))
-hubsKnn_mat = hubsKnn_mat[,-1]
-
-# Normalise by seq depth
-cellpool_nFrags = sapply(KNNs,function(v) sum(archp$ReadsInTSS[archp$cellNames %in% v]))
-hubsKnn_mat = t(t(hubsKnn_mat) * (10^6 /cellpool_nFrags)) # scale
-colnames (hubsKnn_mat) = metaGroup3
-saveRDS (hubsKnn_mat, paste0 (projdir_hubs, 'hubs_knn_matrix_global.rds'))
-hubsKnn_mat = readRDS (paste0 (projdir_hubs, 'hubs_knn_matrix_global.rds'))
-
-# hubsClust_mat = as.data.frame (t (hubsKnn_mat))
-# hubsClust_mat$metaGroup = metaGroup3
-# hubsClust_mat = aggregate (.~ metaGroup, data = hubsClust_mat, FUN = mean)
-# rownames (hubsClust_mat) = hubsClust_mat[,1]
-# hubsClust_mat = hubsClust_mat[,-1]
-# saveRDS (hubsClust_mat, paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
-# hubsClust_mat = readRDS (paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
+ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
+hm = Heatmap (
+  scale (t(hubsSample_mat)), 
+  top_annotation = ha, 
+  column_names_gp = gpar(fontsize = 0),
+  show_column_dend = F,
+  row_dend_width = unit(3,'mm'),
+  row_dend_side = 'left')
+pdf (file.path (hubs_dir,'Plots','hubs_sample_heatmap.pdf'), height=3)
+hm
+dev.off()
 
 
-# Correlate with SOX9 genescore
-if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
-gsSE = gsSE[, archp$cellNames]
-gsMat = assays (gsSE)[[1]]
-rownames (gsMat) = rowData (gsSE)$name
+# Check if there are hub size differences between normal and tumor sample ####
+library (presto)
+tumor_sample = unique (archp$Sample2)[unique(archp$Sample2) != 'normal_pleura']
+wlc_res = lapply (tumor_sample, function(x) 
+  {
+  hubsCell_mat_comp = hubsCell_mat[,archp$Sample2 %in% c(x,'normal_pleura')]
+  comparison = archp$Sample2[archp$Sample2 %in% c(x,'normal_pleura')]
+  res = wilcoxauc (log2(hubsCell_mat_comp+1), comparison)
+  res[res$group == 'normal_pleura',]
+  })
+names (wlc_res) = tumor_sample
+size_comp = lapply (wlc_res, function(x)
+   {
+    x$width = width (hubs_obj$hubsCollapsed)
+    x$group = ifelse (x$logFC < 0, 'normal_pleura','tumor')
+    x
+   })
 
-head (KNNs_df)
-gsMat = gsMat[c(tf_name_selected, 'AXL','VIM','CALB2','ITLN1'),]
-gsMat = as.data.frame (t(gsMat))
-gsMat = gsMat[unlist(KNNs),]
-gsMat$cellGroup = KNNs_df$group
-gsMat = aggregate (.~ cellGroup, data = gsMat, FUN = mean)
-rownames (gsMat) = gsMat[,1]
-gsMat = gsMat[,-1]
-
-hubsKnn_mat = t(hubsKnn_mat)
-hubsKnn_mat = as.data.frame (hubsKnn_mat)
-rownames (hubsKnn_mat) = rownames (gsMat)
-TF_hub_cor = lapply (unique(KNNs_df$group2), function(x) cor (gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SOX9'], hubsKnn_mat[unique(KNNs_df$group[KNNs_df$group2 == x]),], method = 'spearman'))
-names (TF_hub_cor) = unique(KNNs_df$group2)
-
-TF_hub_cor2 = as.data.frame (t(TF_hub_cor[['P1']]))
-TF_hub_cor2 = TF_hub_cor2[order (-TF_hub_cor2$V1),, drop=F]
-head (TF_hub_cor2, 10)
-rownames (TF_hub_cor2) = sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit(x, '_'))[1])
-
-
-KNNs_df2 = KNNs_df[!duplicated(KNNs_df$group),]
-table (KNNs_df2$group2)
-a = lapply (unique(KNNs_df$group2), function(x) cor (gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SNAI2'], gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SOX9'], method='spearman'))
-names(a) = unique(KNNs_df$group2)
-
-
-
-
-
-
-nfeat=5000
-  k=25
-  cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
-  cnmf_list = lapply (cnmf_list, function(x) head (x,50))
-gsMat = assays (gsSE)[[1]]
-rownames (gsMat) = rowData (gsSE)$name
-gsMat = gsMat[rownames (gsMat) %in% c(cnmf_list[[20]],'SOX9'),]
-gsMat = as.data.frame (t(gsMat))
-
-gsMat = gsMat[unlist(KNNs),]
-gsMat$cellGroup = KNNs_df$group
-gsMat = aggregate (.~ cellGroup, data = gsMat, FUN = mean)
-rownames (gsMat) = gsMat[,1]
-gsMat = gsMat[,-1]
-gsMat_p1 = gsMat[unique(KNNs_df$group[KNNs_df$group2 == 'P1']),]
-
-cor (gsMat_p1[,'TWIST1'],gsMat_p1[,'SNAI2'], method='spearman')
-
-pdf ('Plots/cor_genescore_genes.pdf')
-plot (gsMat[,'SOX9'], gsMat[,'VIM'])
-dev.off 
-
-
-
-
-# Check enrichment of TF in hubs using fgsea
-TF = 'MESP1'
-hubs_id = sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit (x, '_'))[1])
-tf_matches = getMatches (archp)
-TF = colnames(tf_matches)[grep (TF, colnames(tf_matches))]
-
-
-hub_peaks = rep (hubs_obj$hubs_id, sapply (hubs_obj$hubsClusters[[1]], nrow))
-hubs_obj$peaksMerged$hub_id = hub_peaks
-hubs_peaks_idx = subjectHits (findOverlaps (hubs_obj$peaksMerged,rowRanges(tf_matches)))
-tf_matches = tf_matches[hubs_peaks_idx, colnames(tf_matches) == TF]
-tf_matches_hit = which (assays (tf_matches)[[1]][,1])
-hub_peaks_cor = setNames (TF_hub_cor2[hubs_obj$peaksMerged$hub_id,]$V1, paste0('h',1:nrow(tf_matches))) 
-#tf_matches_peaks = unique(queryHits (findOverlaps (hubs_obj$hubsCollapsed[match(TF_hubs_id, hubs_obj$hubs_id)], rowRanges(tf_matches)[tf_matches_hit])))
-pathways = list(SOX9 = paste0('h',tf_matches_hit))
-
-library (fgsea)
-hub_peaks_cor = na.omit (hub_peaks_cor)
-fgseaRes = fgseaMultilevel (pathways, 
-          hub_peaks_cor#, 
-          #minSize=15, 
-          #maxSize=1500,
-          #BPPARAM = NULL
-          )
-
-
-tf_match = getMatches (archp)
-colnames(tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-bg_peakSet = rowRanges (tf_match)
-top_cor_hubs = head (sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit (x, '_'))[1]),100)
-top_cor_hubs_peaks = lapply(top_cor_hubs, function(x) getPeakSet(archp) [queryHits(findOverlaps(getPeakSet(archp), hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]))])
-top_cor_hubs_TF = lapply (top_cor_hubs_peaks, function(x) hyperMotif (
-  selected_peaks = x,
-  motifmatch = tf_match))
-  
-top_cor_hubs_TF = lapply (top_cor_hubs_TF, function(x) x[rownames(top_cor_hubs_TF[[1]]), ])
-  top_cor_hubs_TF_df = do.call (cbind, top_cor_hubs_TF)
-  top_cor_hubs_TF_df = top_cor_hubs_TF_df[, grep ('padj', colnames(top_cor_hubs_TF_df))]
-  top_cor_hubs_TF_df[top_cor_hubs_TF_df > 0.05] = 1
-  top_cor_hubs_TF_df = -log10(top_cor_hubs_TF_df)
-  top_cor_hubs_TF_df = top_cor_hubs_TF_df[rowSums (top_cor_hubs_TF_df) != 0, ]
-  top_cor_hubs_TF_df[sapply(top_cor_hubs_TF_df, is.infinite)] <- 300
-  
-  TF_ht = Heatmap (top_cor_hubs_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
-  
-  pdf (paste0('Plots/TF_top_cor_hubs_heatmap.pdf'),width = 15,height=15)
-  print (TF_ht)
-  dev.off()
-
+size_comp_df = do.call (rbind, size_comp)
 
 
 
 
 # Generate matrix of fragment counts of hubs x barcodes ####
-if (!file.exists('hubs_cells_mat.rds'))
+if (!file.exists(file.path (hubs_dir,'hubs_cells_mat.rds')))
   {
   hubsCell_mat = matrix (ncol = length(rownames(archp@cellColData)), nrow = length(hubs_obj$hubsCollapsed))
   colnames (hubsCell_mat) = rownames(archp@cellColData)
@@ -247,147 +328,197 @@ if (!file.exists('hubs_cells_mat.rds'))
     fragments_in_cell_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_cell)
     hubsCell_mat[,cell] = fragments_in_cell_in_hubs
     }
-  hubsCell_mat = t(t(hubsCell_mat) * (10^6 /archp$nFrags)) # scale
-  saveRDS (hubsCell_mat, 'hubs_cells_mat.rds')  
+  all (colnames (hubsCell_mat) == rownames(archp@cellColData))  
+  hubsCell_mat = t(t(hubsCell_mat) * (10^6 / archp$nFrags)) # scale
+  saveRDS (hubsCell_mat, file.path (hubs_dir,'hubs_cells_mat.rds'))
   } else {
-  hubsCell_mat = readRDS ('hubs_cells_mat.rds')  
+  hubsCell_mat = readRDS (file.path (hubs_dir,'hubs_cells_mat.rds'))  
   }
-
 hubsCell_mat = as.data.frame (hubsCell_mat)
 
-# Compute differential hub accessibility DHA ####
+
+
+# # Compute differential hub accessibility DHA ####
 library (presto)
-hubsCell_mat_comp = hubsCell_mat[,archp$Sample2 %in% c('P1','normal_pleura')]
-comparison = archp$Sample2[archp$Sample2 %in% c('P1','normal_pleura')]
-hubsCell_mat_comp2 = hubsCell_mat[,archp$Sample2 %in% c('P1','P8','P5','P4')]
-comparison2 = archp$Sample2[archp$Sample2 %in% c('P1','P8','P5','P4')] 
-comparison2 = ifelse(comparison2 == 'P1','P1','epit')  
-res = wilcoxauc (log2(hubsCell_mat_comp+1), comparison)
-res2 = wilcoxauc (log2(hubsCell_mat_comp2+1), comparison2)
+archp$tumor_vs_normal = ifelse (archp$Sample2 == 'normal_pleura', 'normal','tumor')
+#hubsCell_mat_comp = hubsCell_mat[,archp$Sample2 %in% c('P1','normal_pleura')]
+#comparison = archp$Sample2[archp$Sample2 %in% c('P1','normal_pleura')]
+#hubsCell_mat_comp2 = hubsCell_mat[,archp$Sample2 %in% c('P1','P8','P5','P4')]
+#comparison2 = archp$Sample2[archp$Sample2 %in% c('P1','P8','P5','P4')] 
+#comparison2 = ifelse(comparison2 == 'P1','P1','epit')  
+res = wilcoxauc (log2(hubsCell_mat+1), archp$tumor_vs_normal)
+res = res[res$group == 'tumor',]
+res = res[order (res$padj),]
+head (res[order(-res$logFC),])
 
-# comparison2 = archp$Sample2 == 'P1'
-# res_P1_rest = wilcoxauc(log2(hubsCell_mat[,comparison2 %in% c('P1','normal_pleura')]+1), comparison2[comparison2 %in% c('P1','normal_pleura')])
+logfcThreshold = 1
+pvalAdjTrheshold = 0.05
+res$sig = ifelse (abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold, 1,0)
+res$sig = res$sig * sign (res$logFC)
+res$sig = as.character(res$sig)
+res_filtered = res[abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold,]
+res_filtered = head (res_filtered$feature[order (-abs(res_filtered$logFC))],20)
+res$labels = ''
+res$labels[match (res_filtered, res$feature)] = res_filtered
+vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
+    geom_point(size=1, shape=19, aes (color = sig), alpha=.5) +
+    geom_vline(xintercept = logfcThreshold, linetype="dotted", 
+                color = "grey20", size=1) +
+    geom_vline(xintercept = -logfcThreshold, linetype="dotted", 
+                color = "grey20", size=1) +
+    geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dotted", 
+                color = "grey20", size=1) + 
+    geom_text_repel (size=2, data = res, aes(label = labels)) + 
+    ggtitle ('Hubs differential accessibility') +
+    #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
+    scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + theme_light()
 
-res_p1 = res[res$group == 'P1',]
-res_p1$region = as.character(hubs_obj$hubsCollapsed)
-#res_p1 = res_p1[res_p1$padj < 0.05 & res_p1$logFC > 0 & res_p1$avgExpr > 3,]
-
-# Intersect with hubs higher in P1 vs epithelioid samples ####
-res2_p1 = res2[res2$group == 'P1',]
-res2_p1$region = as.character(hubs_obj$hubsCollapsed)
-res2_p1 = res2_p1[res2_p1$padj < 0.05 & res2_p1$logFC > 0 & res2_p1$avgExpr > 3,]
-res_p1 = res_p1[res_p1$feature %in% res2_p1$feature,]
-
-
-# intersect with correlated hubs to SOX9 ####
-res_p1$SOX9_cor = TF_hub_cor2[res_p1$feature,]$V1
-res_p1 = res_p1[order (-res_p1$SOX9_cor),]
-res_p1 = res_p1[res_p1$SOX9_cor > 0.1, ]
-
-tf_match = getMatches (archp)
-colnames(tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-tf_match = tf_match[queryHits(findOverlaps(rowRanges(tf_match),hubs_obj$hubsCollapsed)),]
-top_cor_hubs = res_p1$feature
-top_cor_hubs_peaks = lapply(top_cor_hubs, function(x) getPeakSet(archp) [queryHits(findOverlaps(getPeakSet(archp), hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]))])
-top_cor_hubs_TF = lapply (top_cor_hubs_peaks, function(x) hyperMotif (
-  selected_peaks = x,
-  motifmatch = tf_match))
-names (top_cor_hubs_TF) = top_cor_hubs
-
-top_cor_hubs_TF = lapply (top_cor_hubs_TF, function(x) x[rownames(top_cor_hubs_TF[[1]]), ])
-top_cor_hubs_TF_df = do.call (cbind, top_cor_hubs_TF)
-top_cor_hubs_TF_df = top_cor_hubs_TF_df[, grep ('padj', colnames(top_cor_hubs_TF_df))]
-top_cor_hubs_TF_df[top_cor_hubs_TF_df > 0.05] = 1
-top_cor_hubs_TF_df = -log10(top_cor_hubs_TF_df)
-top_cor_hubs_TF_df = top_cor_hubs_TF_df[rowSums (top_cor_hubs_TF_df) != 0, ]
-top_cor_hubs_TF_df[sapply(top_cor_hubs_TF_df, is.infinite)] <- 300
-
-TF_ht = Heatmap (top_cor_hubs_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
-
-pdf (paste0('Plots/TF_top_DHA_P1_hubs_heatmap.pdf'),width = 40,height=25)
-print (TF_ht)
+pdf (file.path (hubs_dir, 'DAH_voclano.pdf'),4,4)
+vp
 dev.off()
 
-top_cor_hubs_TF_df['SOX9',]
-res_p1[res_p1$feature == 'HUB22404',]
-# all peaks of top hubs
-top_cor_hubs = res_p1$feature[1:1000]
-top_cor_hubs_peaks = getPeakSet(archp)[queryHits(findOverlaps(getPeakSet(archp), hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% top_cor_hubs)]))]
-top_cor_hubs_TF = hyperMotif (
-  selected_peaks = top_cor_hubs_peaks,
-  motifmatch = tf_match)
-head (top_cor_hubs_TF[order (top_cor_hubs_TF$padj),],100)
+
+# Check hub size distribution between normal and tumor ####
+res$width = width(hubs_obj$hubsCollapsed)[match (res$feature, hubs_obj$hubs_id)]
+vp = ggplot (res, aes(x=log10(width), y=logFC)) +
+    geom_point(size=1, shape=19, aes (color = sig), alpha=.5) + 
+    ggtitle ('Hub size')
+
+pdf (file.path (hubs_dir, 'Plots','DAH_size.pdf'),4,4)
+vp
+dev.off()
 
 
 
 
 
-
-library (presto)
-pSE = getMatrixFromProject (archp, useMatrix = 'PeakMatrix')
-pMat = assays (pSE)[[1]]
-hubs_peaks_idx1 = subjectHits (findOverlaps (hubs_obj$peaksMerged,rowRanges(pSE)))
-pMat = pMat[hubs_peaks_idx1,]
-
-pMat_comp = pMat[,archp$Sample2 %in% c('P1','normal_pleura')]
-comparison = archp$Sample2[archp$Sample2 %in% c('P1','normal_pleura')]
-pMat_comp2 = pMat[,archp$Sample2 %in% c('P1','P8','P5','P4')]
-comparison2 = archp$Sample2[archp$Sample2 %in% c('P1','P8','P5','P4')] 
-comparison2 = ifelse(comparison2 == 'P1','P1','epit')  
-res = wilcoxauc (pMat_comp, comparison)
-res2 = wilcoxauc (log2(pMat_comp2), comparison2)
-
+# res2 = wilcoxauc (log2(hubsCell_mat_comp2+1), comparison2)
+# res2 = res2[res2$logFC >0,]
+# res2 = res2[order(res2$padj),]
+# head (res2, 20)
 # comparison2 = archp$Sample2 == 'P1'
 # res_P1_rest = wilcoxauc(log2(hubsCell_mat[,comparison2 %in% c('P1','normal_pleura')]+1), comparison2[comparison2 %in% c('P1','normal_pleura')])
 
-res_p1 = res[res$group == 'P1',]
-res_p1 = res_p1[res_p1$avgExpr != 0,]
+#res_p1 = res[res$group == 'P1',]
 #res_p1$region = as.character(hubs_obj$hubsCollapsed)
+#res_p1 = res_p1[res_p1$padj < 0.05 & res_p1$logFC > 0 & res_p1$avgExpr > 3,]
 
-# Try using fgsea ####
-TF = 'MESP1'
-tf_matches = getMatches (archp)
-TF = colnames(tf_matches)[grep (TF, colnames(tf_matches))]
-
-hubs_peaks_idx2 = subjectHits (findOverlaps (hubs_obj$peaksMerged, rowRanges(tf_matches)))
-tf_matches = tf_matches[hubs_peaks_idx2, colnames(tf_matches) == TF]
-tf_matches_hit = which (assays (tf_matches)[[1]][,1])
-hub_peaks_rank = setNames (-log10(res_p1$pval) * res_p1$logFC, paste0('h',1:nrow(res_p1)))
-#tf_matches_peaks = unique(queryHits (findOverlaps (hubs_obj$hubsCollapsed[match(TF_hubs_id, hubs_obj$hubs_id)], rowRanges(tf_matches)[tf_matches_hit])))
-pathways = list(SOX9 = paste0('h',tf_matches_hit))
-
-library (fgsea)
-#hub_peaks_rank = na.omit (hub_peaks_rank)
-fgseaRes = fgseaMultilevel (pathways, 
-          hub_peaks_rank#, 
-          #minSize=15, 
-          #maxSize=1500,
-          #BPPARAM = NULL
-          )
+# # Intersect with hubs higher in P1 vs epithelioid samples ####
+# res2_p1 = res2[res2$group == 'P1',]
+# res2_p1$region = as.character(hubs_obj$hubsCollapsed)
+# res2_p1 = res2_p1[res2_p1$padj < 0.05 & res2_p1$logFC > 0 & res2_p1$avgExpr > 3,]
+# res_p1 = res_p1[res_p1$feature %in% res2_p1$feature,]
 
 
-tf_match = getMatches (archp)
-colnames(tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-bg_peakSet = rowRanges (tf_match)
-top_cor_hubs = head (sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit (x, '_'))[1]),100)
-top_cor_hubs_peaks = lapply(top_cor_hubs, function(x) getPeakSet(archp) [queryHits(findOverlaps(getPeakSet(archp), hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]))])
-top_cor_hubs_TF = lapply (top_cor_hubs_peaks, function(x) hyperMotif (
-  selected_peaks = x,
-  motifmatch = tf_match))
+# # intersect with correlated hubs to SOX9 ####
+# res_p1$SOX9_cor = TF_hub_cor2[res_p1$feature,]$V1
+# res_p1 = res_p1[order (-res_p1$SOX9_cor),]
+# res_p1 = res_p1[res_p1$SOX9_cor > 0.1, ]
+
+# tf_match = getMatches (archp)
+# colnames(tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+# tf_match = tf_match[queryHits(findOverlaps(rowRanges(tf_match),hubs_obj$hubsCollapsed)),]
+# top_cor_hubs = res_p1$feature
+# top_cor_hubs_peaks = lapply(top_cor_hubs, function(x) getPeakSet(archp) [queryHits(findOverlaps(getPeakSet(archp), hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]))])
+# top_cor_hubs_TF = lapply (top_cor_hubs_peaks, function(x) hyperMotif (
+#   selected_peaks = x,
+#   motifmatch = tf_match))
+# names (top_cor_hubs_TF) = top_cor_hubs
+
+# top_cor_hubs_TF = lapply (top_cor_hubs_TF, function(x) x[rownames(top_cor_hubs_TF[[1]]), ])
+# top_cor_hubs_TF_df = do.call (cbind, top_cor_hubs_TF)
+# top_cor_hubs_TF_df = top_cor_hubs_TF_df[, grep ('padj', colnames(top_cor_hubs_TF_df))]
+# top_cor_hubs_TF_df[top_cor_hubs_TF_df > 0.05] = 1
+# top_cor_hubs_TF_df = -log10(top_cor_hubs_TF_df)
+# top_cor_hubs_TF_df = top_cor_hubs_TF_df[rowSums (top_cor_hubs_TF_df) != 0, ]
+# top_cor_hubs_TF_df[sapply(top_cor_hubs_TF_df, is.infinite)] <- 300
+
+# TF_ht = Heatmap (top_cor_hubs_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
+
+# pdf (paste0('Plots/TF_top_DHA_P1_hubs_heatmap.pdf'),width = 40,height=25)
+# print (TF_ht)
+# dev.off()
+
+# top_cor_hubs_TF_df['SOX9',]
+# res_p1[res_p1$feature == 'HUB22404',]
+# # all peaks of top hubs
+# top_cor_hubs = res_p1$feature[1:1000]
+# top_cor_hubs_peaks = getPeakSet(archp)[queryHits(findOverlaps(getPeakSet(archp), hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% top_cor_hubs)]))]
+# top_cor_hubs_TF = hyperMotif (
+#   selected_peaks = top_cor_hubs_peaks,
+#   motifmatch = tf_match)
+# head (top_cor_hubs_TF[order (top_cor_hubs_TF$padj),],100)
+
+
+
+
+
+
+# library (presto)
+# pSE = getMatrixFromProject (archp, useMatrix = 'PeakMatrix')
+# pMat = assays (pSE)[[1]]
+# hubs_peaks_idx1 = subjectHits (findOverlaps (hubs_obj$peaksMerged,rowRanges(pSE)))
+# pMat = pMat[hubs_peaks_idx1,]
+
+# pMat_comp = pMat[,archp$Sample2 %in% c('P1','normal_pleura')]
+# comparison = archp$Sample2[archp$Sample2 %in% c('P1','normal_pleura')]
+# pMat_comp2 = pMat[,archp$Sample2 %in% c('P1','P8','P5','P4')]
+# comparison2 = archp$Sample2[archp$Sample2 %in% c('P1','P8','P5','P4')] 
+# comparison2 = ifelse(comparison2 == 'P1','P1','epit')  
+# res = wilcoxauc (pMat_comp, comparison)
+# res2 = wilcoxauc (log2(pMat_comp2), comparison2)
+
+# # comparison2 = archp$Sample2 == 'P1'
+# # res_P1_rest = wilcoxauc(log2(hubsCell_mat[,comparison2 %in% c('P1','normal_pleura')]+1), comparison2[comparison2 %in% c('P1','normal_pleura')])
+
+# res_p1 = res[res$group == 'P1',]
+# res_p1 = res_p1[res_p1$avgExpr != 0,]
+# #res_p1$region = as.character(hubs_obj$hubsCollapsed)
+
+# # Try using fgsea ####
+# TF = 'MESP1'
+# tf_matches = getMatches (archp)
+# TF = colnames(tf_matches)[grep (TF, colnames(tf_matches))]
+
+# hubs_peaks_idx2 = subjectHits (findOverlaps (hubs_obj$peaksMerged, rowRanges(tf_matches)))
+# tf_matches = tf_matches[hubs_peaks_idx2, colnames(tf_matches) == TF]
+# tf_matches_hit = which (assays (tf_matches)[[1]][,1])
+# hub_peaks_rank = setNames (-log10(res_p1$pval) * res_p1$logFC, paste0('h',1:nrow(res_p1)))
+# #tf_matches_peaks = unique(queryHits (findOverlaps (hubs_obj$hubsCollapsed[match(TF_hubs_id, hubs_obj$hubs_id)], rowRanges(tf_matches)[tf_matches_hit])))
+# pathways = list(SOX9 = paste0('h',tf_matches_hit))
+
+# library (fgsea)
+# #hub_peaks_rank = na.omit (hub_peaks_rank)
+# fgseaRes = fgseaMultilevel (pathways, 
+#           hub_peaks_rank#, 
+#           #minSize=15, 
+#           #maxSize=1500,
+#           #BPPARAM = NULL
+#           )
+
+
+# tf_match = getMatches (archp)
+# colnames(tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+# bg_peakSet = rowRanges (tf_match)
+# top_cor_hubs = head (sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit (x, '_'))[1]),100)
+# top_cor_hubs_peaks = lapply(top_cor_hubs, function(x) getPeakSet(archp) [queryHits(findOverlaps(getPeakSet(archp), hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]))])
+# top_cor_hubs_TF = lapply (top_cor_hubs_peaks, function(x) hyperMotif (
+#   selected_peaks = x,
+#   motifmatch = tf_match))
   
-top_cor_hubs_TF = lapply (top_cor_hubs_TF, function(x) x[rownames(top_cor_hubs_TF[[1]]), ])
-  top_cor_hubs_TF_df = do.call (cbind, top_cor_hubs_TF)
-  top_cor_hubs_TF_df = top_cor_hubs_TF_df[, grep ('padj', colnames(top_cor_hubs_TF_df))]
-  top_cor_hubs_TF_df[top_cor_hubs_TF_df > 0.05] = 1
-  top_cor_hubs_TF_df = -log10(top_cor_hubs_TF_df)
-  top_cor_hubs_TF_df = top_cor_hubs_TF_df[rowSums (top_cor_hubs_TF_df) != 0, ]
-  top_cor_hubs_TF_df[sapply(top_cor_hubs_TF_df, is.infinite)] <- 300
+# top_cor_hubs_TF = lapply (top_cor_hubs_TF, function(x) x[rownames(top_cor_hubs_TF[[1]]), ])
+#   top_cor_hubs_TF_df = do.call (cbind, top_cor_hubs_TF)
+#   top_cor_hubs_TF_df = top_cor_hubs_TF_df[, grep ('padj', colnames(top_cor_hubs_TF_df))]
+#   top_cor_hubs_TF_df[top_cor_hubs_TF_df > 0.05] = 1
+#   top_cor_hubs_TF_df = -log10(top_cor_hubs_TF_df)
+#   top_cor_hubs_TF_df = top_cor_hubs_TF_df[rowSums (top_cor_hubs_TF_df) != 0, ]
+#   top_cor_hubs_TF_df[sapply(top_cor_hubs_TF_df, is.infinite)] <- 300
   
-  TF_ht = Heatmap (top_cor_hubs_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
+#   TF_ht = Heatmap (top_cor_hubs_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
   
-  pdf (paste0('Plots/TF_top_cor_hubs_heatmap.pdf'),width = 15,height=15)
-  print (TF_ht)
-  dev.off()
+#   pdf (paste0('Plots/TF_top_cor_hubs_heatmap.pdf'),width = 15,height=15)
+#   print (TF_ht)
+#   dev.off()
 
 
 
@@ -476,65 +607,188 @@ top_cor_hubs_TF = lapply (top_cor_hubs_TF, function(x) x[rownames(top_cor_hubs_T
 
 
 
-# Compute differential hub accessibility DHA ####
-library (presto)
-hubsCell_mat_comp = hubsCell_mat[,archp$Sample2 %in% c('P1','normal_pleura')]
-comparison = archp$Sample2[archp$Sample2 %in% c('P1','normal_pleura')]
-hubsCell_mat_comp2 = hubsCell_mat[,archp$Sample2 %in% c('P1','P8','P5','P4')]
-comparison2 = archp$Sample2[archp$Sample2 %in% c('P1','P8','P5','P4')] 
-comparison2 = ifelse(comparison2 == 'P1','P1','epit')  
-res = wilcoxauc (log2(hubsCell_mat_comp+1), comparison)
-res2 = wilcoxauc (log2(hubsCell_mat_comp2+1), comparison2)
+# # Compute differential hub accessibility DHA ####
+# library (presto)
+# hubsCell_mat_comp = hubsCell_mat[,archp$Sample2 %in% c('P1','normal_pleura')]
+# comparison = archp$Sample2[archp$Sample2 %in% c('P1','normal_pleura')]
+# hubsCell_mat_comp2 = hubsCell_mat[,archp$Sample2 %in% c('P1','P8','P5','P4')]
+# comparison2 = archp$Sample2[archp$Sample2 %in% c('P1','P8','P5','P4')] 
+# comparison2 = ifelse(comparison2 == 'P1','P1','epit')  
+# res = wilcoxauc (log2(hubsCell_mat_comp+1), comparison)
+# res2 = wilcoxauc (log2(hubsCell_mat_comp2+1), comparison2)
 
-# comparison2 = archp$Sample2 == 'P1'
-# res_P1_rest = wilcoxauc(log2(hubsCell_mat[,comparison2 %in% c('P1','normal_pleura')]+1), comparison2[comparison2 %in% c('P1','normal_pleura')])
+# # comparison2 = archp$Sample2 == 'P1'
+# # res_P1_rest = wilcoxauc(log2(hubsCell_mat[,comparison2 %in% c('P1','normal_pleura')]+1), comparison2[comparison2 %in% c('P1','normal_pleura')])
 
-res_p1 = res[res$group == 'P1',]
-res_p1$region = as.character(hubs_obj$hubsCollapsed)
-#res_p1 = res_p1[res_p1$padj < 0.05 & res_p1$logFC > 0 & res_p1$avgExpr > 3,]
+# res_p1 = res[res$group == 'P1',]
+# res_p1$region = as.character(hubs_obj$hubsCollapsed)
+# #res_p1 = res_p1[res_p1$padj < 0.05 & res_p1$logFC > 0 & res_p1$avgExpr > 3,]
 
-# # Intersect with hubs higher in P1 vs epithelioid samples ####
-# res2_p1 = res2[res2$group == 'P1',]
-# #res2_p1$region = as.character(hubs_obj$hubsCollapsed)
-# #res2_p1 = res2_p1[res2_p1$padj < 0.05 & res2_p1$logFC > 0 & res2_p1$avgExpr > 3,]
-# res_p1 = res_p1[res_p1$feature %in% res2_p1$feature,]
+# # # Intersect with hubs higher in P1 vs epithelioid samples ####
+# # res2_p1 = res2[res2$group == 'P1',]
+# # #res2_p1$region = as.character(hubs_obj$hubsCollapsed)
+# # #res2_p1 = res2_p1[res2_p1$padj < 0.05 & res2_p1$logFC > 0 & res2_p1$avgExpr > 3,]
+# # res_p1 = res_p1[res_p1$feature %in% res2_p1$feature,]
 
 
-# # intersect with correlated hubs to SOX9 ####
-# res_p1$SOX9_cor = TF_hub_cor2[res_p1$feature,]$V1
-# res_p1 = res_p1[order (-res_p1$SOX9_cor),]
-# res_p1 = res_p1[res_p1$SOX9_cor > 0.1, ]
+# # # intersect with correlated hubs to SOX9 ####
+# # res_p1$SOX9_cor = TF_hub_cor2[res_p1$feature,]$V1
+# # res_p1 = res_p1[order (-res_p1$SOX9_cor),]
+# # res_p1 = res_p1[res_p1$SOX9_cor > 0.1, ]
+
+# TF = 'SOX9'
+# tf_matches = getMatches (archp)
+# TF = colnames(tf_matches)[grep (TF, colnames(tf_matches))]
+
+# hub_peaks = rep (hubs_obj$hubs_id, sapply (hubs_obj$hubsClusters[[1]], nrow))
+# hubs_obj$peaksMerged$hub_id = hub_peaks
+
+# tf_matches = tf_matches[subjectHits(findOverlaps(hubs_obj$peaksMerged, rowRanges(tf_matches))),]
+# tf_matches = tf_matches[,colnames(tf_matches) == TF]
+# tf_matches_mat = as.data.frame(assays(tf_matches)[[1]])
+# tf_matches_mat$hubs_id = hubs_obj$peaksMerged$hub_id
+# tf_matches_mat = aggregate (. ~ hubs_id, data = tf_matches_mat, FUN = sum)
+# tf_matches_mat = tf_matches_mat[match(res_p1$feature, tf_matches_mat$hubs_id),]
+# tf_matches_mat[tf_matches_mat >0] = 1
+# hub_rank = setNames (res_p1$logFC, res_p1$feature)
+# pathways = list(res_p1$feature[tf_matches_mat[,2] > 0])
+# names (pathways) = TF
+# library (fgsea)
+
+# table (hub_rank[pathways[[1]]]>0)
+# table (res_p1$logFC>0)
+# #hub_peaks_rank = na.omit (hub_peaks_rank)
+# fgseaRes = fgseaMultilevel (pathways, 
+#           hub_rank#, 
+#           #minSize=15, 
+#           #maxSize=1500,
+#           #BPPARAM = NULL
+#           )
+
+# pdf (paste0('Plots/hubs_enrichmentplot_',TF,'.pdf'))
+# plotEnrichment(pathways[[TF]],
+#                hub_rank) + labs(title=TF)
+# dev.off()
+
+
+
+### Try correlating hubs to imputed gene score of TFs ####
+archp = addImputeWeights (archp)
+celltype_markers = c('WT1','CALB2','GATA4','HP','SOX9','MESP1','SOX6','TWIST1','SNAI2')
+seGS <- getMatrixFromProject (archp)
+seGS = seGS[rowData (seGS)$name %in% celltype_markers,]
+matGS <- imputeMatrix (assay(seGS), getImputeWeights(archp))
+rownames (matGS) = celltype_markers
+
+hubsCell_mat = hubsCell_mat[,colnames(matGS)]
+hubsCell_mat = log2(t(hubsCell_mat)+1)
+matGS = t(matGS)
+# sox9_cor = as.data.frame (t(cor (matGS[,'SOX9'], hubsCell_mat)))
+# sox9_cor$gene = hubs_obj$hubsCollapsed$gene[match (rownames(sox9_cor), hubs_obj$hubs_id)]
+# sox9_cor = sox9_cor[order (-sox9_cor$V1),, drop=F]
+# sox9_cor$region = as.character (hubs_obj$hubsCollapsed)[match (rownames(sox9_cor), hubs_obj$hubs_id)]
+# head (sox9_cor,20)
+
+TF_hub_cor = lapply (unique(KNNs_df$group2)[unique(KNNs_df$group2) != 'normal_pleura'], function(x) cor (matGS[grepl (paste0(x,'#'), rownames(matGS)),'SOX9'], hubsCell_mat[grepl (paste0(x,'#'), rownames(matGS)),], method = 'spearman'))
+TF_hub_cor = lapply (TF_hub_cor, function(x) {
+ as.data.frame (t(x))
+  #x = x[order (-x$V1),drop=F,]
+  })
+TF_hub_cor = do.call (cbind, TF_hub_cor)
+TF_hub_cor_means = as.data.frame (rowMeans (TF_hub_cor))
+TF_hub_cor_means = na.omit (TF_hub_cor_means)
+TF_hub_cor_means = TF_hub_cor_means[order (-TF_hub_cor_means[,1]),, drop=F]
+colnames (TF_hub_cor_means) = 'cor'
+
+TF_hub_cor_means$gene = hubs_obj$hubsCollapsed$gene[match (rownames(TF_hub_cor_means), hubs_obj$hubs_id)]
+TF_hub_cor_means$region = as.character (hubs_obj$hubsCollapsed)[match (rownames(TF_hub_cor_means), hubs_obj$hubs_id)]
+
+TF_hub_cor = TF_hub_cor[] 
+
+hubs_obj$hubsCollapsed[5118]
+
+
+pdf ('Plots/hubs_barcodes.pdf')
+plot (matGS[,'SOX9'], hubsCell_mat[,'HUB95'])
+dev.off()
+
+
+### Correlate hubs to imputed TF gene score sorting cells by TF gene score ####
+archp = addImputeWeights (archp)
+celltype_markers = c('WT1','CALB2','GATA4','HP','SOX9','MESP1','SOX6','TWIST1','SNAI2')
+seGS <- getMatrixFromProject (archp)
+seGS = seGS[rowData (seGS)$name %in% celltype_markers,]
+matGS <- imputeMatrix (assay(seGS), getImputeWeights(archp))
+rownames (matGS) = celltype_markers
+
+hubsCell_mat = hubsCell_mat[,colnames(matGS)]
+hubsCell_mat = log2(t(hubsCell_mat)+1)
 
 TF = 'SOX9'
-tf_matches = getMatches (archp)
-TF = colnames(tf_matches)[grep (TF, colnames(tf_matches))]
 
-hub_peaks = rep (hubs_obj$hubs_id, sapply (hubs_obj$hubsClusters[[1]], nrow))
-hubs_obj$peaksMerged$hub_id = hub_peaks
+barcode_order = colnames(matGS) [order (matGS[TF,])]
 
-tf_matches = tf_matches[subjectHits(findOverlaps(hubs_obj$peaksMerged, rowRanges(tf_matches))),]
-tf_matches = tf_matches[,colnames(tf_matches) == TF]
-tf_matches_mat = as.data.frame(assays(tf_matches)[[1]])
-tf_matches_mat$hubs_id = hubs_obj$peaksMerged$hub_id
-tf_matches_mat = aggregate (. ~ hubs_id, data = tf_matches_mat, FUN = sum)
-tf_matches_mat = tf_matches_mat[match(res_p1$feature, tf_matches_mat$hubs_id),]
-tf_matches_mat[tf_matches_mat >0] = 1
-hub_rank = setNames (res_p1$logFC, res_p1$feature)
-pathways = list(res_p1$feature[tf_matches_mat[,2] > 0])
-names (pathways) = TF
-library (fgsea)
+hubs_mat = hubsCell_mat
+hub_to_TF = function(TF= NULL, genescore_mat = NULL, hubs_mat = NULL, slice_size = 30)
+  {
+   genescore_TF = genescore_mat[TF, ] 
+   genescore_TF = genescore_TF[order(genescore_TF)]
+   hubs_mat_sorted = as.data.frame (hubs_mat[names(genescore_TF),])
+   hubs_mat_sorted$TF = genescore_TF
+   slice_number = floor (nrow (hubs_mat_sorted) / slice_size)
+   slices = rep (seq(slice_number), each = slice_size)
+   hubs_mat_sorted_adj = hubs_mat_sorted[1:length(slices),]
+   hubs_mat_sorted_adj$slice = slices
+   hubs_mat_agg = aggregate (.~ slice, data = hubs_mat_sorted_adj, FUN = 'mean')
+   hubs_mat_agg = hubs_mat_agg[,-1]
+   return (cor (hubs_mat_agg[,1:(ncol(hubs_mat_agg)-1)], hubs_mat_agg[,ncol(hubs_mat_agg)], method='spearman'))
+  }
 
-table (hub_rank[pathways[[1]]]>0)
-table (res_p1$logFC>0)
-#hub_peaks_rank = na.omit (hub_peaks_rank)
-fgseaRes = fgseaMultilevel (pathways, 
-          hub_rank#, 
-          #minSize=15, 
-          #maxSize=1500,
-          #BPPARAM = NULL
-          )
+print (all (colnames(matGS) == rownames (hubsCell_mat)))
+hubs_to_TF_list = lapply (unique(KNNs_df$group2)[unique(KNNs_df$group2) != 'normal_pleura'], function(y) 
+    hub_to_TF (TF = 'SNAI2', genescore_mat = matGS[,grepl (paste0(y,'#'), colnames(matGS))], hubs_mat = hubsCell_mat[grepl (paste0(y,'#'), rownames(hubsCell_mat)),], slice_size=30))
 
-pdf (paste0('Plots/hubs_enrichmentplot_',TF,'.pdf'))
-plotEnrichment(pathways[[TF]],
-               hub_rank) + labs(title=TF)
-dev.off()
+hubs_to_TF_list = lapply (hubs_to_TF_list, function(x) {
+  x = as.data.frame (x)  
+  x$gene = hubs_obj$hubsCollapsed$gene[match (rownames(x), hubs_obj$hubs_id)]
+  x$region = as.character (hubs_obj$hubsCollapsed)[match (rownames(x), hubs_obj$hubs_id)]
+  x
+})
+
+hubs_to_TF_list_ordered = lapply (hubs_to_TF_list, function (x) {x = x[order(-x[,1]),]; x})
+
+
+### Pull hubs from genes correlated to TF from the scRNA ####
+tf_cor_genes = readRDS ('../scrna/TF_cor_genes_per_sample.rds')
+
+# check hubs in top 300 correlated genes per TF
+TF = 'SOX9'
+cor_genes = tf_cor_genes[[TF]]
+cor_genes = apply (cor_genes,1,median)
+cor_genes = cor_genes[order(-cor_genes)]
+
+hubs_P1 = res2$feature[res2$logFC > 0.3 & res2$avgExpr > 0]
+hub_genes = sapply (names (head (cor_genes, 100)), function(x) as.character(hubs_obj[hubs_obj$hubs_id %in% hubs_P1]$hubsCollapsed[grepl (x, hubs_obj[hubs_obj$hubs_id %in% hubs_P1]$hubsCollapsed$gene)]))
+hub_genes = hub_genes[sapply(hub_genes, function(x) length(x) > 0)]
+
+
+  metaGroupName = 'Sample2'
+  celltype_markers = c('HIC1','CD44','BHLHE40', 'SERPINE1')
+  #celltype_markers = c('WT1','CALB2','GATA4','MSLN','KRT5','KRT18','ITLN1','HP','SOX9')
+  meso_markers <- plotBrowserTrack(
+      ArchRProj = archp, 
+      groupBy = metaGroupName, 
+      geneSymbol = celltype_markers,
+      #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+      #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+      upstream = 150000,
+      downstream = 150000,
+      loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+      #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+      #loops = getCoAccessibility (archp, corCutOff = 0.3,
+      #  returnLoops = TRUE),
+      useGroups= NULL
+  )
+  plotPDF (meso_markers, ArchRProj = archp, width=14, name ='MPM_markers_coveragePlots.pdf')
+
+

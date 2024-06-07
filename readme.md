@@ -5,6 +5,9 @@ conda install r-devtools
 conda install bioconda::bioconductor-dirichletmultinomial
 conda install bioconda::bioconductor-chromvar
 conda install bioconda::bioconductor-scran
+conda install bioconda::bioconductor-infercnv
+conda install bioconda::macs2
+
 
 # Install SCENIC+ in the same conda environment
 git clone https://github.com/aertslab/scenicplus
@@ -33,4 +36,6 @@ BiocManager::install("clusterProfiler")
 BiocManager::install(c("WGCNA", "igraph", "devtools", "GeneOverlap", "ggrepel", "UCell"))
 install.packages ('ape')
 install.packages('dendextend')
-
+conda install conda-forge::r-factoextra
+BiocManager::install ('org.Hs.eg.db')
+install.packages ('RColorBrewer')

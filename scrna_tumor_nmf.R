@@ -1,4 +1,6 @@
+conda activate meso_scatac
 use UGER # Add this before running R to be able to run cNMF scripts using UGER 
+R
 library (Seurat)
 library (scran)
 library (ggplot2)
@@ -8,6 +10,9 @@ library (clusterProfiler)
 library (hdWGCNA)
 library(ComplexHeatmap)
 library (fgsea)
+library (circlize)
+library (tidyverse)
+
 set.seed(1234)
 
 # Set project dir
@@ -15,6 +20,9 @@ projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_c
 dir.create (paste0(projdir,'/Plots/'), recursive =T)
 setwd (projdir)
 source ('../../PM_scATAC/useful_functions.R')
+source ('../../PM_scATAC/palettes.R')
+source ('../../PM_scATAC/ggplot_aestetics.R')
+source ('../../PM_scATAC/palettes.R')
 
 sample_names = c(
     'P1', # p786
@@ -85,59 +93,84 @@ if (!file.exists ('srt.rds'))
 	} else {
 	srt = readRDS ('scRNA_meso.rds')	
 	}
+
+
+#### Import bulk RNA subtype signatures to define malignant score ####
+# Bueno ####
+figures.dir = '/ahg/regevdata/projects/lungCancerBueno/Results/TCGAsubtypes/LUAD_LUSC_MESO/Bueno/v2/'
+markers.res1.2 = get(load(paste0(figures.dir,'markers.res1.2.Rda'))) 
+markers.res1.2.trimmed = markers.res1.2[markers.res1.2$avg_logFC > 0.2,]
+
+top_bueno_genes = markers.res1.2.trimmed %>% group_by(cluster) %>% top_n(20, avg_logFC)
+
+#top20genes = markers.res1.2.trimmed.2 %>% group_by(cluster) %>% top_n(10, avg_logFC)
+top_bueno_genes = split (top_bueno_genes$gene, top_bueno_genes$cluster)
+
+if (!all (names(top_bueno_genes) %in% colnames (srt@meta.data)))
+	{
+	srt = ModScoreCor (
+	        seurat_obj = srt, 
+	        geneset_list = top_bueno_genes, 
+	        cor_threshold = NULL, 
+	        pos_threshold = NULL, # threshold for fetal_pval2
+	        listName = 'Bueno_', outdir = paste0(projdir,'Plots/'))
+
+	}
   
 #### Run cNMF ####
 nfeat = 5000
 force=F
 k_list = c(5:30)
-#k_list=10
 k_selections = c(5:30)
-#nfeat = 10000
+k_selection = 25
 cores= 100
+
+cnmf_name = 'scrna_tumor'
+cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
+dir.create (file.path(cnmf_out,'Plots'), recursive=T)
 
 ### RUN consensus NMF ####
 # conda create --yes --channel bioconda --channel conda-forge --channel defaults python=3.7 fastcluster matplotlib numpy palettable pandas scipy 'scikit-learn>=1.0' pyyaml 'scanpy>=1.8' -p /ahg/regevdata/projects/ICA_Lung/Bruno/conda/cnmf && conda clean --yes --all # Create environment, cnmf_env, containing required packages
 # conda activate cnmf
 # pip install cnmf
-cnmf_name = 'scrna_tumor'
-cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
-dir.create (paste0(cnmf_out,'/Plots/'), recursive=T)
-
-# Extract and save count and data matrices from seurat object	
-count_mat = t(srt@assays$RNA@counts[vf,])
-norm_mat = t(srt@assays$RNA@data[vf,])
-if (!file.exists (paste0('cNMF/counts_nmf_',nfeat,'.txt')) | force) write.table (count_mat, paste0('cNMF/counts_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
-if (!file.exists (paste0('cNMF/norm_nmf_',nfeat,'.txt')) | force) write.table (norm_mat, paste0('cNMF/norm_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
-
-## Format k_list variable to be passed correctly to bash script
-message ('submit cNMF job')
-if(length(k_list) > 1) 
+if (!file.exists(paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt')))
 	{
-	k_list_formatted = paste (k_list, collapse=' ')	
-	k_list_formatted = shQuote (k_list_formatted)
+	# Extract and save count and data matrices from seurat object	
+	count_mat = t(srt@assays$RNA@counts[vf,])
+	norm_mat = t(srt@assays$RNA@data[vf,])
+	if (!file.exists (paste0('cNMF/counts_nmf_',nfeat,'.txt')) | force) write.table (count_mat, paste0('cNMF/counts_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
+	if (!file.exists (paste0('cNMF/norm_nmf_',nfeat,'.txt')) | force) write.table (norm_mat, paste0('cNMF/norm_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
+	
+	## Format k_list variable to be passed correctly to bash script
+	message ('submit cNMF job')
+	if(length(k_list) > 1) 
+		{
+		k_list_formatted = paste (k_list, collapse=' ')	
+		k_list_formatted = shQuote (k_list_formatted)
+		}
+	
+	
+	# Run cNMF prepare script
+	system (paste0('chmod +x ../../PM_scATAC/cnmf_prepare_job.sh'), wait=FALSE) 
+	system (paste0('bash ','../../PM_scATAC/cnmf_prepare_job.sh ', projdir,' ', k_list_formatted,' ', nfeat, ' ', cnmf_out, ' ', cores), wait=TRUE)
+	
+	# Submitting cNMF factorization job
+	system (paste0('chmod +x ../../PM_scATAC/cnmf_factorization_parallel.sh'), wait=FALSE)
+	system (paste0 ('qsub -t 1-',cores,' ','../../PM_scATAC/cnmf_factorization_parallel.sh ', projdir,' ', cnmf_out, ' ', cores))
+	
+	# Run script to combine K iterations generated in previous script
+	system (paste0('chmod +x ../../PM_scATAC/cnmf_combine_job.sh'), wait=FALSE)
+	system (paste0('bash ','../../PM_scATAC/cnmf_combine_job.sh ', projdir, ' ',cnmf_out), wait=TRUE) # combine cnmf factors
+	
+	
+	# Run cNMF bash script
+	system (paste0('chmod +x ','../../PM_scATAC/cnmf_consensus_job.sh'), wait=FALSE)
+	system (paste0('qsub ','../../PM_scATAC/cnmf_consensus_job.sh ', projdir, ' ', cnmf_out,' ', k_selection), wait=FALSE)
+	} else {
+	cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
 	}
 
-
-# Run cNMF prepare script
-system (paste0('chmod +x ../../PM_scATAC/cnmf_prepare_job.sh'), wait=FALSE) 
-system (paste0('bash ','../../PM_scATAC/cnmf_prepare_job.sh ', projdir,' ', k_list_formatted,' ', nfeat, ' ', cnmf_out, ' ', cores), wait=TRUE)
-
-# Submitting cNMF factorization job
-system (paste0('chmod +x ../../PM_scATAC/cnmf_factorization_parallel.sh'), wait=FALSE)
-system (paste0 ('qsub -t 1-',cores,' ','../../PM_scATAC/cnmf_factorization_parallel.sh ', projdir,' ', cnmf_out, ' ', cores))
-
-# Run script to combine K iterations generated in previous script
-system (paste0('chmod +x ../../PM_scATAC/cnmf_combine_job.sh'), wait=FALSE)
-system (paste0('bash ','../../PM_scATAC/cnmf_combine_job.sh ', projdir, ' ',cnmf_out), wait=TRUE) # combine cnmf factors
-
-k_selection = 25
-# Run cNMF bash script
-system (paste0('chmod +x ','../../PM_scATAC/cnmf_consensus_job.sh'), wait=FALSE)
-system (paste0('qsub ','../../PM_scATAC/cnmf_consensus_job.sh ', projdir, ' ', cnmf_out,' ', k_selection), wait=FALSE)
-
-# Read in NMF results ####
-cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
-
+# Format NMF results ####
 # Assign genes uniquely to cNMF modules based on spectra values
 cnmf_spectra = t(cnmf_spectra)
 max_spectra = apply (cnmf_spectra, 1, which.max)
@@ -165,12 +198,17 @@ cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x)
       })
 names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
 
-srt = ModScoreCor (
-        seurat_obj = srt, 
-        geneset_list = cnmf_spectra_unique, 
-        cor_threshold = NULL, 
-        pos_threshold = NULL, # threshold for fetal_pval2
-        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+# Add module score of cNMF modules ####
+if (!all (names(cnmf_spectra_unique) %in% colnames (srt@meta.data)))
+	{
+	srt = ModScoreCor (
+	        seurat_obj = srt, 
+	        geneset_list = cnmf_spectra_unique, 
+	        cor_threshold = NULL, 
+	        pos_threshold = NULL, # threshold for fetal_pval2
+	        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+
+	}
 
 srt$cNMF = 'cNMF'
 ccomp_df = srt@meta.data[,c(names(cnmf_spectra_unique),'sampleID'), drop=FALSE]
@@ -189,7 +227,7 @@ bp1 = lapply (names(cnmf_spectra_unique), function(x) {
       })
 
   
-png (paste0(cnmf_out,'/Plots/cNMF_module_scores_boxplots_',k_selection,'nfeat_',nfeat,'.png'),5000,5000,res=300)
+png (file.path(cnmf_out,'Plots',paste0('cNMF_module_scores_boxplots_',k_selection,'nfeat_',nfeat,'.png')),5000,5000,res=300)
 print (wrap_plots (bp1))
 dev.off()
 
@@ -198,8 +236,8 @@ dev.off()
 ccomp_df = srt@meta.data
 ccomp_df = aggregate (ccomp_df[,c('cNMF20')], by=as.list(srt@meta.data[,'sampleID',drop=F]), 'mean')
 rownames(ccomp_df) = ccomp_df[,1]
-ccomp_df = ccomp_df[,-1]
-srt$sampleID = factor (srt$sampleID, levels = rownames(arrange (ccomp_df[,'cNMF20', drop=FALSE], -ccomp_df[,'cNMF20', drop=FALSE])))
+ccomp_df = ccomp_df[,-1, drop=F]
+srt$sampleID = factor (srt$sampleID, levels = rownames(arrange (ccomp_df[,'x', drop=FALSE], -ccomp_df[,'x', drop=FALSE])))
 
 ccomp_df = srt@meta.data
 box = ggplot (ccomp_df, aes_string (x= 'sampleID', y= 'cNMF20')) +
@@ -216,7 +254,7 @@ box = ggplot (ccomp_df, aes_string (x= 'sampleID', y= 'cNMF20')) +
   scale_fill_manual (values= palette_sample) +
   gtheme
   
-png(paste0('Plots/sarc_signatures_order_boxplot.png'),1200,600, res=300) #width = 10, height = 11,
+png(file.path('Plots','sarc_signatures_order_boxplot.png'),1200,600, res=300) #width = 10, height = 11,
 box
 dev.off()
 
@@ -262,10 +300,9 @@ p2l = lapply (levels (srt$sampleID), function(x)
   theme_void() + 
   NoLegend()
   })
-png ('Plots/neftel_diagram_on_malignant_cells_per_sample.png',2200,2200, res=300)
+png (file.path('Plots','neftel_diagram_on_malignant_cells_per_sample.png'),2200,2200, res=300)
 wrap_plots (p2l, ncol=4)
 dev.off()
-
 
 reductionName = 'umap'
   umap_df = data.frame (srt[[reductionName]]@cell.embeddings, srt@meta.data[,c(names(cnmf_spectra_unique))])
@@ -277,7 +314,7 @@ reductionName = 'umap'
   theme_classic() +
   theme_void())
   
-png (paste0(cnmf_out,'/Plots/cNMF_module_scores_umaps_',k_selection,'nfeat_',nfeat,'.png'),10000,10000,res=300)
+png (file.path(cnmf_out,'Plots',paste0('cNMF_module_scores_umaps_',k_selection,'nfeat_',nfeat,'.png')),10000,10000,res=300)
 print (wrap_plots (umap_p1))
 dev.off()
 
@@ -328,47 +365,54 @@ if (!file.exists (paste0('cNMF_normalized/',cnmf_out, '/EnrichR_cNMF_module_gene
 
 
 # Make correlation network using TFs from scatac analysis
+library (hdWGCNA)
 activeTFs = read.csv ('../scatac_ArchR/Active_TFs.csv')
 
-srt <- SetupForWGCNA(
-  srt,
-  gene_select = "fraction", # the gene selection approach
-  fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
-  wgcna_name = "metacells" # the name of the hdWGCNA experiment
-)
-# construct metacells  in each group
-srt <- MetacellsByGroups(
-  seurat_obj = srt,
-  group.by = c("sampleID"), # specify the columns in seurat_obj@meta.data to group by
-  reduction = 'umap', # select the dimensionality reduction to perform KNN on
-  k = 50, # nearest-neighbors parameter
-  max_shared = 25, # maximum number of shared cells between two metacells
-  ident.group = 'sampleID' # set the Idents of the metacell seurat object
-)
+if (!file.exists ('metacells.rds'))
+	{
+	srt <- SetupForWGCNA(
+	  srt,
+	  gene_select = "fraction", # the gene selection approach
+	  fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
+	  wgcna_name = "metacells" # the name of the hdWGCNA experiment
+	)
+	# construct metacells  in each group
+	srt <- MetacellsByGroups(
+	  seurat_obj = srt,
+	  group.by = c("sampleID"), # specify the columns in seurat_obj@meta.data to group by
+	  reduction = 'umap', # select the dimensionality reduction to perform KNN on
+	  k = 50, # nearest-neighbors parameter
+	  max_shared = 25, # maximum number of shared cells between two metacells
+	  ident.group = 'sampleID' # set the Idents of the metacell seurat object
+	)
+	
+	# normalize metacell expression matrix:
+	srt <- NormalizeMetacells (srt)
+	metacells = GetMetacellObject (srt)
+	saveRDS (metacells, 'metacells.rds')
+	} else {
+	metacells = readRDS ('metacells.rds')	
+	}
 
-# normalize metacell expression matrix:
-srt <- NormalizeMetacells (srt)
-metacells = GetMetacellObject (srt)
+# metacells = metacells[activeTFs[[2]], ]
+# cor_TF_l = list()
+# for (sam in unique(metacells$sampleID))
+#   {
+#   cor_TF_l[[sam]] = cor (t(as.matrix(metacells@assays$RNA@layers$data[,metacells$sampleID == sam])))
+#   rownames (cor_TF_l[[sam]]) = activeTFs[[2]]
+#   colnames (cor_TF_l[[sam]]) = activeTFs[[2]]
+#   cor_TF_l[[sam]][is.na(cor_TF_l[[sam]])] = 0
+#   cor_TF_l[[sam]] = Heatmap (cor_TF_l[[sam]], name = sam,
+#     row_names_gp = gpar(fontsize = 5),
+#     column_names_gp = gpar(fontsize = 5))
+#   }
 
-metacells = metacells[activeTFs[[2]], ]
-cor_TF_l = list()
-for (sam in unique(metacells$sampleID))
-  {
-  cor_TF_l[[sam]] = cor (t(as.matrix(metacells@assays$RNA@layers$data[,metacells$sampleID == sam])))
-  rownames (cor_TF_l[[sam]]) = activeTFs[[2]]
-  colnames (cor_TF_l[[sam]]) = activeTFs[[2]]
-  cor_TF_l[[sam]][is.na(cor_TF_l[[sam]])] = 0
-  cor_TF_l[[sam]] = Heatmap (cor_TF_l[[sam]], name = sam,
-    row_names_gp = gpar(fontsize = 5),
-    column_names_gp = gpar(fontsize = 5))
-  }
-
-pdf (paste0 ('Plots/selected_TF_exp_corr_heatmaps.pdf'), width = 8,height=9)
-cor_TF_l
-dev.off()
+# pdf (paste0 ('Plots/selected_TF_exp_corr_heatmaps.pdf'), width = 8,height=9)
+# cor_TF_l
+# dev.off()
 
 #
-metacells = GetMetacellObject (srt)
+#metacells = GetMetacellObject (srt)
 vf = VariableFeatures (FindVariableFeatures (metacells, nfeat=10000))
 metacells_assay = metacells@assays$RNA@layers$data
 rownames (metacells_assay) = rownames(srt)
@@ -380,12 +424,15 @@ gmt_annotations = c(
 'h.all.v7.4.symbols.gmt',#,
 'c5.bp.v7.1.symbol.gmt'
 )
-gmt_annotation = gmt_annotations[2]
+
+samplesID = unique(metacells$sampleID)[!unique(metacells$sampleID) %in% c('HU37','HU62')]
+gmt_annotation = gmt_annotations[1]
 force = T
-if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_,_ann_',gmt_annotation,'.rds')) | force)
+top_genes= 300
+if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_top_genes_',top_genes,'.rds')) | force)
 	{
 	TF_cor_sample = list()
-	for (sam in unique(metacells$sampleID))
+	for (sam in samplesID)
 	  {
 	  metacells_assay_sample = metacells_assay[,metacells$sampleID == sam]
 	  TF_cor_sample[[sam]] = lapply (activeTFs[[2]], function(x) 
@@ -398,7 +445,7 @@ if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_,_ann_',gmt_annotation,'
 	  	pathways = read.gmt (gmt.file)
 	  	#pathways = split (pathways$gene, pathways$term)
 	    message (paste ('EnrichR running module',x)) 
-	    egmt = enricher(head (names(tc_cor),100), TERM2GENE=pathways, universe = enricher_universe)
+	    egmt = enricher(head (names(tc_cor),top_genes), TERM2GENE=pathways, universe = enricher_universe)
 	    egmt@result
 	    })
 	   #EnrichRResAll[[ann]] = EnrichRResCluster    
@@ -411,28 +458,81 @@ if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_,_ann_',gmt_annotation,'
 		# fgseaResCol = collapsePathways (fgseaRes, stats = tc_cor, pathway = pathways)
 		# fgseaRes[fgseaRes$pathway %in% fgseaResCol$mainPathways]
 		}
-	saveRDS (TF_cor_sample, paste0('EnrichR_activeTF_cor_top_genes_,_ann_',gmt_annotation,'.rds'))
+	saveRDS (TF_cor_sample, paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_top_genes_',top_genes,'.rds'))
 	} else {
-	TF_cor_sample = readRDS (paste0('EnrichR_activeTF_cor_top_genes_,_ann_',gmt_annotation,'.rds'))
+	TF_cor_sample = readRDS (paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_top_genes_',top_genes,'.rds'))
 	}
-pvalAdjTrheshold = 0.05
-top_pathways = 10
-TF_cor_sample = lapply (TF_cor_sample, function(x) {names(x) = activeTFs[[2]]; x})
-EnrichRes_dp = lapply (TF_cor_sample, function(x) dotGSEA (enrichmentsTest_list = x, type = 'enrich', padj_threshold = pvalAdjTrheshold, top_pathways= top_pathways))
-pdf (paste0('Plots/EnrichR_top_nmf_genes_ann_',gmt_annotation,'_dotplots.pdf'), width = 20, height = 25)
-print (EnrichRes_dp)
-dev.off()
-  
 
-pdf (paste0 ('Plots/selected_TF_exp_corr_heatmaps.pdf'), width = 8,height=9)
-cor_TF_l
+gmt.file = paste0 ('../../PM_scATAC/files/',gmt_annotation)
+pathways = read.gmt (gmt.file)
+pathway_names = as.character (unique(pathways$term))
+
+TF_cor_sample_mat = lapply(TF_cor_sample, function(x)
+	{
+	pathway_mat = do.call (cbind, lapply (x, function(y) 
+		{
+		y = y[pathway_names, 'p.adjust', drop=F]
+		y$p.adjust = y$p.adjust < 0.05
+		}))
+	})
+
+TF_cor_sum = Reduce ('+', TF_cor_sample_mat)
+rownames (TF_cor_sum) = pathway_names
+colnames (TF_cor_sum) = activeTFs[[2]]
+TF_cor_sum[is.na(TF_cor_sum)] = 0
+#TF_cor_sum[TF_cor_sum < 3] = 0
+TF_cor_sum = TF_cor_sum[rowSums (TF_cor_sum) > 0, ]
+TF_cor_sum = TF_cor_sum[,colSums (TF_cor_sum) > 0 ]
+
+# Export enrichment table 
+saveRDS (TF_cor_sum, 'enrichment_pathways_TFs.rds')
+
+# Add correlation to bulk RNA sarcomatoid score
+tf_sarc_cor = read.csv ('../../bulkRNA_meso/activeTF_sarcomatoid_correlation.csv', row.names = 1)
+rownames (TF_cor_sum) = sub ('HALLMARK_','',rownames (TF_cor_sum))
+hm = Heatmap (
+		t(TF_cor_sum),
+		column_names_rot =45, 
+		col =palette_enrichment, 
+		cell_fun = function(j, i, x, y, width, height, fill) {
+        grid.text(sprintf("%.0f", t(TF_cor_sum)[i, j]), x, y, gp = gpar(fontsize = 10, col='white'))
+},
+		border=T)
+hm2 = Heatmap (
+	tf_sarc_cor[colnames(TF_cor_sum),],
+	column_split = colnames (tf_sarc_cor),#,column_names_rot = 45, 
+	cluster_columns = F,
+	col =palette_module_correlation_fun, 
+	border=T)
+pdf (file.path('Plots','pathway_enrich_TF_cor.pdf'), width=14, height=14)
+draw (hm + hm2,  padding = unit(c(2, 60, 2, 2), "mm"))
 dev.off()
+
+### Export genes correlated to TFs ####
+TF_cor_sample2 = list()
+for (tf in activeTFs[[2]])
+	{
+	TF_cor_sample = list()
+	for (sam in samplesID)
+	  {
+	  metacells_assay_sample = metacells_assay[,metacells$sampleID == sam]	 
+	  tc_cor = t(cor (metacells_assay_sample[tf,], t(metacells_assay_sample)))
+	  TF_cor_sample[[sam]] = tc_cor
+	  }
+	 TF_cor_sample2[[tf]] = do.call (cbind, TF_cor_sample)
+	 TF_cor_sample2[[tf]][is.na(TF_cor_sample2[[tf]])] = 0
+	 colnames (TF_cor_sample2[[tf]]) = samplesID
+	}
+saveRDS (TF_cor_sample2, 'TF_cor_genes_per_sample.rds')
+
+# pdf (paste0 ('Plots/selected_TF_exp_corr_heatmaps.pdf'), width = 8,height=9)
+# cor_TF_l
+# dev.off()
 
 # Correlate TFs with cNMFs on metacells
-metacells = GetMetacellObject (srt)
 vf = VariableFeatures (FindVariableFeatures (metacells, nfeat=10000))
 metacells_assay = metacells@assays$RNA@layers$data
-rownames (metacells_assay) = rownames(srt)
+rownames (metacells_assay) = rownames (srt)
 metacells_assay = metacells_assay[unique(c(vf, activeTFs[[2]])),]
 
 metacells = ModScoreCor (
@@ -521,6 +621,131 @@ for (sam in unique(metacells$sampleID))
 pdf ('Plots/sarc_trajectory_per_sample.pdf', height=10)
 traj_sample
 dev.off()
+
+
+# Run cNMF x TF correlation across all metacells ####
+ccomp_df = metacells@meta.data[,c(names(cnmf_spectra_unique))]
+metacells_assay = metacells@assays$RNA@layers$data
+rownames (metacells_assay) = rownames(srt)
+metacells_assay = metacells_assay[unique(c(vf, activeTFs[[2]])),]
+
+res = sapply (activeTFs[[2]], function (y) cor (metacells_assay[y,], ccomp_df, method = 'spearman'))
+rownames (res) = colnames (ccomp_df)
+
+pdf ('Plots/cor_nmf_TF_across_all.pdf',width=15, height=3)
+Heatmap (res, 
+	column_names_gp = gpar(fontsize = 5),
+	row_names_gp = gpar(fontsize = 5),
+	clustering_distance_rows = 'pearson',
+	clustering_distance_columns='pearson')
+dev.off()
+
+
+# Run cNMF x TF correlation across all metacells subsampled ####
+ccomp_df = metacells@meta.data[,c(names(cnmf_spectra_unique))]
+metacells_assay = metacells@assays$RNA@layers$data
+rownames (metacells_assay) = rownames(srt)
+metacells_assay = metacells_assay[unique(c(vf, activeTFs[[2]])),]
+
+subsample = function(metagroupname, size) {
+	tmp = split (metagroupname, metagroupname)
+	tmp = lapply (tmp, function (s) 
+		{
+		if (!size > length (s))	
+			{
+			names(s) %in% names(sample (s, size, replace = F))
+			} else {
+			rep (TRUE, length (s))	
+		}})
+	do.call (c, tmp)
+	}
+
+subsampled = subsample (metacells$sampleID, 5)
+table (metacells$sampleID, subsampled)
+
+res = sapply (activeTFs[[2]], function (y) cor (metacells_assay[y,subsampled], ccomp_df[subsampled,], method = 'spearman'))
+rownames (res) = colnames (ccomp_df)
+
+# Export cNMF TF correlation matrix ####
+saveRDS (res, 'cNMF_TF_correlation_subsampled.rds')
+pdf ('Plots/cor_nmf_TF_across_all_subsampled.pdf',width=15, height=3)
+Heatmap (res, 
+	column_names_gp = gpar(fontsize = 5),
+	row_names_gp = gpar(fontsize = 5),
+	clustering_distance_rows = 'pearson',
+	clustering_distance_columns='pearson')
+dev.off()
+
+
+# Order metacells by sarcomatoid score ####
+mMat = metacells@assays$RNA@layers$data[rownames(metacells) %in% activeTFs[[2]],]
+rownames(mMat) = rownames(metacells)[rownames(metacells) %in% activeTFs[[2]]]
+mMat = mMat[,order (metacells$cNMF20)]
+mMat = mMat[colnames(res)[order(res['cNMF20',])],]
+
+
+top_10_sarc_TF = head (colnames(res)[order(res['cNMF20',])],20)
+top_10_sarc_TF = c(top_10_sarc_TF,head (colnames(res)[order(-res['cNMF20',])], 20))
+mMat_scaled = t(scale(t(as.matrix(mMat))))[top_10_sarc_TF,]
+mMat_scaled[mMat_scaled > abs(min(mMat_scaled))] = abs (min (mMat_scaled))
+ha = HeatmapAnnotation (sample = metacells$sampleID[order (metacells$cNMF20)], col = list(sample = palette_sample))
+sarc_traj = Heatmap (mMat_scaled, 
+	top = ha,
+  col = palette_expression, 
+  cluster_columns=F, 
+  cluster_rows=F,
+  row_names_gp = gpar(fontsize = 14))
+
+png ('Plots/sarc_trajectory_across_sample.png', height=600)
+sarc_traj
+dev.off()
+
+
+
+# Make PCA of cNMF TF correlations
+cor_TF_pca = prcomp (cor_TF)
+# Example using the mtcars dataset
+
+
+# Standardize the data: mean = 0, SD = 1
+
+# Run PCA
+pca_result <- prcomp(t(cor_TF), center = TRUE, scale. = TRUE)
+
+# Summary of the PCA
+summary(pca_result)
+
+# Plot PCA
+pdf ('Plots/cNMF_TF_correlation_pca.pdf')
+fviz_pca_var(pca_result,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+fviz_pca_ind(pca_result,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+dev.off()
+
+srt_TF = CreateSeuratObject (counts = cor_TF, data = cor_TF)
+srt_TF[['RNA']]$scale.data = cor_TF
+VariableFeatures(srt_TF) = rownames (cor_TF)
+srt_TF = RunPCA (srt_TF)
+srt_TF = RunUMAP (srt_TF, n.components = 3, n.neighbors = 20)
+
+cor_TF_umap <- umap(cor_TF, config=umap.defaults)
+
+
+
+
+
+
+
+
+
+
 
 
 

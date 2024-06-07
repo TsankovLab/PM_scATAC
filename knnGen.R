@@ -33,10 +33,10 @@ knnGen2 = function(
 
   #KNN Matrix
 
-  knnObj <- .computeKNN(data = rD, query = rD[idx,], k = k)
+  knnObj <- .computeKNN (data = rD, query = rD[idx,], k = k)
 
   #Determin Overlap
-  keepKnn <- determineOverlapCpp(knnObj, floor(overlapCutoff * k))
+  keepKnn <- determineOverlapCpp (knnObj, floor(overlapCutoff * k))
 
   #Keep Above Cutoff
   knnObj <- knnObj[keepKnn==0,, drop=F]

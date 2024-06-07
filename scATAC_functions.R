@@ -492,111 +492,111 @@ makeWindows <- function(genome, blacklist, windowSize = 10e6, slidingSize = 2e6,
   windowNuc
 }
 
-scCNA <- function (windows, fragments, neighbors = 100, force = FALSE, remove = c("chrM","chrX","chrY"),
-  by_col = 'RG',prc_length=10, gene_density = FALSE, bgr_k = 'GC', LFC=1.5, FDR=0.1){
+# scCNA <- function (windows, fragments, neighbors = 100, force = FALSE, remove = c("chrM","chrX","chrY"),
+#   by_col = 'RG',prc_length=10, gene_density = FALSE, bgr_k = 'GC', LFC=1.5, FDR=0.1){
   
-  #Keep only regions in filtered chromosomes
-  windows <- GenomeInfoDb::keepStandardChromosomes(windows, pruning.mode = "coarse")
-  fragments <- GenomeInfoDb::keepStandardChromosomes(fragments, pruning.mode = "coarse")
-  windows <- windows[seqnames(windows) %ni% remove]
-  fragments <- fragments[seqnames(fragments) %ni% remove]
+#   #Keep only regions in filtered chromosomes
+#   windows <- GenomeInfoDb::keepStandardChromosomes(windows, pruning.mode = "coarse")
+#   fragments <- GenomeInfoDb::keepStandardChromosomes(fragments, pruning.mode = "coarse")
+#   windows <- windows[seqnames(windows) %ni% remove]
+#   fragments <- fragments[seqnames(fragments) %ni% remove]
 
-  #Count Insertions in windows
-  message("Getting Counts...")
-  counts <- countInsertions (windows, fragments, by = by_col)[[1]]
-  message("Summarizing...")
-  windowSummary <- GRangesList()
-  countSummary <- matrix(nrow=length(unique(windows$name)), ncol = ncol(counts))
-  gene_density=NULL
-  for(x in seq_along(unique(mcols(windows)$name)))
-    {
-    if(x %% 100 == 0)
-      {
-      message(sprintf("%s of %s", x, length(unique(mcols(windows)$name))))
-      }
-    idx <- which(mcols(windows)$name == unique(mcols(windows)$name)[x])
-    wx <- windows[idx,]
-    wo <- GRanges(mcols(wx)$wSeq , ranges = IRanges(mcols(wx)$wStart, mcols(wx)$wEnd))[1,]
-    mcols(wo)$name <- mcols(wx)$name[1]
-    mcols(wo)$effectiveLength <- sum(width(wx))
-    mcols(wo)$percentEffectiveLength <- 100*sum(width(wx))/width(wo)
-    mcols(wo)$GC <- sum(mcols(wx)$GC * width(wx))/width(wo)
-    mcols(wo)$AT <- sum(mcols(wx)$AT * width(wx))/width(wo)
-    mcols(wo)$N <- sum(mcols(wx)$N * width(wx))/width(wo)
-    mcols(wo)$gene_density = sum(as.numeric(mcols(wx)$gene_density) * (width(wx))/width(wo))
-    gene_density = append (gene_density, sum(as.numeric(mcols(wx)$gene_density) * (width(wx))/width(wo)))
-    countSummary[x,] <- Matrix::colSums(counts[x,,drop=FALSE]) * (wo$percentEffectiveLength / 100)
-    windowSummary[[x]] <- wo
-    }
-  windowSummary = unlist(windowSummary)
-  which(is.na(countSummary), arr.ind=TRUE)
+#   #Count Insertions in windows
+#   message("Getting Counts...")
+#   counts <- countInsertions (windows, fragments, by = by_col)[[1]]
+#   message("Summarizing...")
+#   windowSummary <- GRangesList()
+#   countSummary <- matrix(nrow=length(unique(windows$name)), ncol = ncol(counts))
+#   gene_density=NULL
+#   for(x in seq_along(unique(mcols(windows)$name)))
+#     {
+#     if(x %% 100 == 0)
+#       {
+#       message(sprintf("%s of %s", x, length(unique(mcols(windows)$name))))
+#       }
+#     idx <- which(mcols(windows)$name == unique(mcols(windows)$name)[x])
+#     wx <- windows[idx,]
+#     wo <- GRanges(mcols(wx)$wSeq , ranges = IRanges(mcols(wx)$wStart, mcols(wx)$wEnd))[1,]
+#     mcols(wo)$name <- mcols(wx)$name[1]
+#     mcols(wo)$effectiveLength <- sum(width(wx))
+#     mcols(wo)$percentEffectiveLength <- 100*sum(width(wx))/width(wo)
+#     mcols(wo)$GC <- sum(mcols(wx)$GC * width(wx))/width(wo)
+#     mcols(wo)$AT <- sum(mcols(wx)$AT * width(wx))/width(wo)
+#     mcols(wo)$N <- sum(mcols(wx)$N * width(wx))/width(wo)
+#     #mcols(wo)$gene_density = sum(as.numeric(mcols(wx)$gene_density) * (width(wx))/width(wo))
+#     #gene_density = append (gene_density, sum(as.numeric(mcols(wx)$gene_density) * (width(wx))/width(wo)))
+#     countSummary[x,] <- Matrix::colSums(counts[x,,drop=FALSE]) * (wo$percentEffectiveLength / 100)
+#     windowSummary[[x]] <- wo
+#     }
+#   windowSummary = unlist(windowSummary)
+#   which(is.na(countSummary), arr.ind=TRUE)
   
-  # Extract residuals
-  #model <- lm(countSummary ~ gene_density)
-  #countSummary <- resid(model)
+#   # Extract residuals
+#   #model <- lm(countSummary ~ gene_density)
+#   #countSummary <- resid(model)
   
-  #Keep only regions with less than 0.1% N
-  keep <- which (windowSummary$N < 0.1)
-  windowSummary <- windowSummary[keep,]
-  countSummary <- countSummary[keep,]
+#   #Keep only regions with less than 0.1% N
+#   keep <- which (windowSummary$N < 0.1)
+#   windowSummary <- windowSummary[keep,]
+#   countSummary <- countSummary[keep,]
   
-  #Keep only regions with effective length at least 50% of the window length
-  low_width = windowSummary$percentEffectiveLength > prc_length
-  keep = which (low_width)
-  windowSummary = windowSummary[keep,]
-  countSummary = countSummary[keep,]
-  message (paste('Regions with lower than',prc_length,'% of window length removed:',table(low_width)[1]))
-  #countSummary = countSummary / windowSummary$gene_density # normalising for gene density does not work!!
+#   #Keep only regions with effective length at least 50% of the window length
+#   low_width = windowSummary$percentEffectiveLength > prc_length
+#   keep = which (low_width)
+#   windowSummary = windowSummary[keep,]
+#   countSummary = countSummary[keep,]
+#   message (paste('Regions with lower than',prc_length,'% of window length removed:',table(low_width)[1]))
+#   #countSummary = countSummary / windowSummary$gene_density # normalising for gene density does not work!!
   
-  # # Determine the nearest neighbors by GC content
-  # message("Computing Background...")
-  # bdgMean = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
-  # bdgSd = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
-  # log2FC = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
-  # z = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
-  # pval = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
+#   # Determine the nearest neighbors by GC content
+#   message("Computing Background...")
+#   bdgMean = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
+#   bdgSd = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
+#   log2FC = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
+#   z = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
+#   pval = matrix (nrow=nrow(countSummary), ncol= ncol(countSummary))
 
-  # for(x in seq_len(nrow(countSummary)))
-  #   {
-  #   if(x %% 100 == 0)
-  #     {
-  #     message(sprintf("%s of %s", x, nrow(countSummary)))
-  #     }
-  #   #Get Nearest Indices
-  #   knn = abs(windowSummary$GC[x] - windowSummary$GC)
-  #   idxNN = head(order(knn), neighbors + 1)
-  #   idxNN = idxNN[idxNN %ni% x]
-  #   #idxNN = intersect (idxNN, idxNNgd)
-  #   #message (paste('Number of background bin identified:', length(idxNN)))
-  #   #Background
-  #   #if(any(colMeans(countSummary[idxNN, ]) == 0))
-  #     # {
-  #     # if(force)
-  #       # {
-  #       #message("Warning! Background Mean = 0 Try a higher neighbor count or remove cells with 0 in colMins")
-  #       # } else {
-  #       # stop ("Background Mean = 0!")
-  #       # }
-  #     # }
-  #   bdgMean[x, ] =  apply (countSummary[idxNN,],2,function(x) weighted.mean (x, w= max(knn[idxNN])-knn[idxNN])) # added weighted mean
-  #   bdgSd[x, ] = matrixStats::colSds(countSummary[idxNN, ])
-  #   log2FC[x, ] = log2 ((countSummary[x, ] + 1e-5) / (bdgMean[x, ] + 1e-5)) # it was 1e-5 for both
-  #   z[x, ] = (countSummary[x,] - bdgMean[x, ]) / bdgSd[x, ]
-  #   pval[x, ] = 2*pnorm(-abs(z[x, ]))
-  #   }
-  # padj = apply (pval, 2, function(x) p.adjust(x, method = "fdr"))
-  # CNA = matrix (0, nrow=nrow(countSummary), ncol=ncol(countSummary))
-  # CNA [which (log2FC >= LFC & padj <= FDR)] <- 1
+#   for(x in seq_len(nrow(countSummary)))
+#     {
+#     if(x %% 100 == 0)
+#       {
+#       message(sprintf("%s of %s", x, nrow(countSummary)))
+#       }
+#   #   #Get Nearest Indices
+#     knn = abs(windowSummary$GC[x] - windowSummary$GC)
+#     idxNN = head(order(knn), neighbors + 1)
+#     idxNN = idxNN[idxNN %ni% x]
+#     # idxNN = intersect (idxNN, idxNNgd)
+#     #Background
+#     if(any(colMeans(countSummary[idxNN, ]) == 0))
+#       {
+#       if(force)
+#         {
+#         message("Warning! Background Mean = 0 Try a higher neighbor count or remove cells with 0 in colMins")
+#         } else {
+#         stop ("Background Mean = 0!")
+#         }
+#       }
+#   bdgMean[x, ] =  apply (countSummary[idxNN,],2,function(x) weighted.mean (x, w= max(knn[idxNN])-knn[idxNN])) # added weighted mean
+#     bdgSd[x, ] = matrixStats::colSds(countSummary[idxNN, ])
+#     log2FC[x, ] = log2 ((countSummary[x, ] + 1e-5) / (bdgMean[x, ] + 1e-5)) # it was 1e-5 for both
+#   z[x, ] = (countSummary[x,] - bdgMean[x, ]) / bdgSd[x, ]
+#     pval[x, ] = 2*pnorm(-abs(z[x, ]))
+#     }
+#   padj = apply (pval, 2, function(x) p.adjust(x, method = "fdr"))
+#   CNA = matrix (0, nrow=nrow(countSummary), ncol=ncol(countSummary))
+#   CNA [which (log2FC >= LFC & padj <= FDR)] <- 1
 
-  se <- SummarizedExperiment::SummarizedExperiment(
-    assays = S4Vectors::SimpleList(
-        counts = countSummary
-        ),
-    rowRanges = windowSummary
-  )
-  colnames(se) <- colnames(counts)
-  return(se)
-}
+#   se <- SummarizedExperiment::SummarizedExperiment(
+#     assays = S4Vectors::SimpleList(
+#         counts = countSummary,
+#         z = z
+#         ),
+#     rowRanges = windowSummary
+#   )
+#   colnames(se) <- colnames(counts)
+#   return(se)
+# }
 
 # Original functions
 
@@ -664,94 +664,94 @@ scCNA <- function (windows, fragments, neighbors = 100, force = FALSE, remove = 
 #  windowNuc
 #}
 #
-#scCNA <- function(windows, fragments, neighbors = 100, LFC = 1.5, FDR = 0.1, force = FALSE, remove = c("chrM","chrX","chrY"),
-#  by_col = 'RG2'){
-#  
-#  #Keep only regions in filtered chromosomes
-#  windows   <- GenomeInfoDb::keepStandardChromosomes(windows, pruning.mode = "coarse")
-#  fragments <- GenomeInfoDb::keepStandardChromosomes(fragments, pruning.mode = "coarse")
-#  windows <- windows[seqnames(windows) %ni% remove]
-#  fragments <- fragments[seqnames(fragments) %ni% remove]
-#
-#  #Count Insertions in windows
-#  message("Getting Counts...")
-#  counts <- countInsertions(windows, fragments, by = by_col)[[1]]
-#  message("Summarizing...")
-#  windowSummary <- GenomicRangesList()
-#  countSummary <- matrix(nrow=length(unique(windows$name)), ncol = ncol(counts))
-#  for(x in seq_along(unique(mcols(windows)$name))){
-#    if(x %% 100 == 0){
-#      message(sprintf("%s of %s", x, length(unique(mcols(windows)$name))))
-#    }
-#    idx <- which(mcols(windows)$name == unique(mcols(windows)$name)[x])
-#    wx <- windows[idx,]
-#    wo <- GRanges(mcols(wx)$wSeq , ranges = IRanges(mcols(wx)$wStart, mcols(wx)$wEnd))[1,]
-#    mcols(wo)$name <- mcols(wx)$name[1]
-#    mcols(wo)$effectiveLength <- sum(width(wx))
-#    mcols(wo)$percentEffectiveLength <- 100*sum(width(wx))/width(wo)
-#    mcols(wo)$GC <- sum(mcols(wx)$GC * width(wx))/width(wo)
-#    mcols(wo)$AT <- sum(mcols(wx)$AT * width(wx))/width(wo)
-#    mcols(wo)$N <- sum(mcols(wx)$N * width(wx))/width(wo)
-#    countSummary[x,] <- Matrix::colSums(counts[idx,,drop=FALSE])
-#    windowSummary[[x]] <- wo
-#  }
-#  windowSummary <- unlist(windowSummary)
-#  
-#  #Keep only regions with less than 0.1% N
-#  keep <- which(windowSummary$N < 0.001) 
-#  windowSummary <- windowSummary[keep,]
-#  countSummary <- countSummary[keep,]
-#  
-#  #Now determine the nearest neighbors by GC content
-#  message("Computing Background...")
-#  bdgMean <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
-#  bdgSd <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
-#  log2FC <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
-#  z <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
-#  pval <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
-#
-#  for(x in seq_len(nrow(countSummary))){
-#    if(x %% 100 == 0){
-#      message(sprintf("%s of %s", x, nrow(countSummary)))
-#    }
-#    #Get Nearest Indices
-#    idxNN <- head(order(abs(windowSummary$GC[x] - windowSummary$GC)), neighbors + 1)
-#    idxNN <- idxNN[idxNN %ni% x]
-#    #Background
-#    if(any(colMeans(countSummary[idxNN, ])==0)){
-#      if(force){
-#        message("Warning! Background Mean = 0 Try a higher neighbor count or remove cells with 0 in colMins")
-#      }else{
-#        stop("Background Mean = 0!")
-#      }
-#    }
-#    bdgMean[x, ] <- colMeans(countSummary[idxNN, ])
-#    bdgSd[x, ] <- matrixStats::colSds(countSummary[idxNN, ])
-#    log2FC[x, ] <- log2((countSummary[x, ]+1e-5) / (bdgMean[x, ]+1e-5))
-#    z[x, ] <- (countSummary[x,] - bdgMean[x, ]) / bdgSd[x, ]
-#    pval[x, ] <- 2*pnorm(-abs(z[x, ]))
-#  }
-#  padj <- apply(pval, 2, function(x) p.adjust(x, method = "fdr"))
-#  CNA <- matrix(0, nrow=nrow(countSummary), ncol=ncol(countSummary))
-#  CNA[which(log2FC >= LFC & padj <= FDR)] <- 1
-#
-#  se <- SummarizedExperiment(
-#    assays = SimpleList(
-#        CNA = CNA,
-#        counts = countSummary,
-#        log2FC = log2FC,
-#        padj = padj,
-#        pval = pval,
-#        z = z,
-#        bdgMean = bdgMean,
-#        bdgSd = bdgSd
-#      ),
-#    rowRanges = windowSummary
-#  )
-#  colnames(se) <- colnames(counts)
-#
-#  return(se)
-#}
+scCNA = function(windows, fragments, neighbors = 100, LFC = 1.5, FDR = 0.1, force = FALSE, remove = c("chrM","chrX","chrY"),
+ by_col = 'RG'){
+ 
+ #Keep only regions in filtered chromosomes
+ windows <- GenomeInfoDb::keepStandardChromosomes(windows, pruning.mode = "coarse")
+ fragments <- GenomeInfoDb::keepStandardChromosomes(fragments, pruning.mode = "coarse")
+ windows <- windows[as.character(seqnames(windows)) %ni% remove]
+ fragments <- fragments[as.character(seqnames(fragments)) %ni% remove]
+
+ #Count Insertions in windows
+ message("Getting Counts...")
+ counts <- countInsertions(windows, fragments, by = by_col)[[1]]
+ message("Summarizing...")
+ windowSummary <- GRangesList()
+ countSummary <- matrix(nrow=length(unique(windows$name)), ncol = ncol(counts))
+ for(x in seq_along(unique(mcols(windows)$name))){
+   if(x %% 100 == 0){
+     message(sprintf("%s of %s", x, length(unique(mcols(windows)$name))))
+   }
+   idx <- which(mcols(windows)$name == unique(mcols(windows)$name)[x])
+   wx <- windows[idx,]
+   wo <- GRanges(mcols(wx)$wSeq , ranges = IRanges(mcols(wx)$wStart, mcols(wx)$wEnd))[1,]
+   mcols(wo)$name <- mcols(wx)$name[1]
+   mcols(wo)$effectiveLength <- sum(width(wx))
+   mcols(wo)$percentEffectiveLength <- 100*sum(width(wx))/width(wo)
+   mcols(wo)$GC <- sum(mcols(wx)$GC * width(wx))/width(wo)
+   mcols(wo)$AT <- sum(mcols(wx)$AT * width(wx))/width(wo)
+   mcols(wo)$N <- sum(mcols(wx)$N * width(wx))/width(wo)
+   countSummary[x,] <- Matrix::colSums(counts[idx,,drop=FALSE])
+   windowSummary[[x]] <- wo
+ }
+ windowSummary <- unlist(windowSummary)
+ 
+ #Keep only regions with less than 0.1% N
+ keep <- which(windowSummary$N < 0.001) 
+ windowSummary <- windowSummary[keep,]
+ countSummary <- countSummary[keep,]
+ 
+ #Now determine the nearest neighbors by GC content
+ message("Computing Background...")
+ bdgMean <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
+ bdgSd <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
+ log2FC <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
+ z <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
+ pval <- matrix(nrow=nrow(countSummary), ncol=ncol(countSummary))
+
+ for(x in seq_len(nrow(countSummary))){
+   if(x %% 100 == 0){
+     message(sprintf("%s of %s", x, nrow(countSummary)))
+   }
+   #Get Nearest Indices
+   idxNN <- head(order(abs(windowSummary$GC[x] - windowSummary$GC)), neighbors + 1)
+   idxNN <- idxNN[idxNN %ni% x]
+   #Background
+   if(any(colMeans(countSummary[idxNN, ])==0)){
+     if(force){
+       message("Warning! Background Mean = 0 Try a higher neighbor count or remove cells with 0 in colMins")
+     }else{
+       stop("Background Mean = 0!")
+     }
+   }
+   bdgMean[x, ] <- colMeans(countSummary[idxNN, ])
+   bdgSd[x, ] <- matrixStats::colSds(countSummary[idxNN, ])
+   log2FC[x, ] <- log2((countSummary[x, ]+1e-5) / (bdgMean[x, ]+1e-5))
+   z[x, ] <- (countSummary[x,] - bdgMean[x, ]) / bdgSd[x, ]
+   pval[x, ] <- 2*pnorm(-abs(z[x, ]))
+ }
+ padj <- apply(pval, 2, function(x) p.adjust(x, method = "fdr"))
+ CNA <- matrix(0, nrow=nrow(countSummary), ncol=ncol(countSummary))
+ CNA[which(log2FC >= LFC & padj <= FDR)] <- 1
+
+ se <- SummarizedExperiment(
+   assays = SimpleList(
+       CNA = CNA,
+       counts = countSummary,
+       log2FC = log2FC,
+       padj = padj,
+       pval = pval,
+       z = z,
+       bdgMean = bdgMean,
+       bdgSd = bdgSd
+     ),
+   rowRanges = windowSummary
+ )
+ colnames(se) <- colnames(counts)
+
+ return(se)
+}
 
 ################ CNV ANALYSIS END ###################
 
@@ -1319,3 +1319,21 @@ hyperMotif = function (selected_peaks, motifmatch)
   return (hyper_res)
   }
 
+
+cCNV_score = function (x)
+  {
+   #x_pos = mean (unlist(lapply(split(x, cumsum(x < 0)), length)))
+   x_pos = split(x, cumsum(x < 0))
+   #x_pos = x_pos[sapply (x_pos, function(x) length(x) != 1)]
+   x_pos = unlist(lapply (x_pos, length))
+   x_pos = x_pos[order (-x_pos)]
+   x_pos = mean(head (x_pos, round (length(x_pos) / 10)))
+   #x_neg = mean (unlist(lapply(split(x, cumsum(x > 0)), length)))
+   x_neg = split(x, cumsum(x > 0))
+   #x_neg = x_neg[sapply (x_neg, function(x) length(x) != 1)]
+   x_neg = unlist(lapply (x_neg, length))
+   x_neg = x_neg[order (-x_neg)]
+   x_neg = mean(head (x_neg, round(length(x_neg) / 10)))
+   #x_neg = summary (unlist(lapply (x_neg, length)))[5]
+  return (x_pos + abs(x_neg))
+  }

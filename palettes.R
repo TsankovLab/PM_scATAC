@@ -1,4 +1,4 @@
-
+library (paletteer)
 
 
 palette_celltype_simplified = c(
@@ -18,7 +18,7 @@ palette_celltype_simplified = c(
   Mast = 'royalblue4',
   Mesothelium = 'olivedrab1',
   Glia = 'lawngreen',
-  pDC = 'tomato')
+  pDCs = 'tomato')
 
 
 
@@ -40,8 +40,8 @@ palette_sample = c(
 #375974
 #003c5b')
 palette_sample = c(unlist(strsplit (palette_sample, '\n')))
-palette_sample = c(rev(as.character(paletteer::paletteer_c("pals::ocean.curl",12))), 'grey')
-palette_sample = setNames (palette_sample , c('P1','P13','P3','P12','P6','P2','P5','P7','P11','P4','P8','P9','P10'))
+palette_sample = c(as.character(paletteer::paletteer_d("impressionist.colors::la_chanson_du_chien")), 'grey','grey')
+palette_sample = setNames (palette_sample , c('P1','P13','P3','P12','P5','P11','P4','P8','P10','P14','HU62','HU37'))
 #palette_sample = setNames (as.character(paletteer::paletteer_c("pals::ocean.dense",13)))
 #palette_sample = c(palette_sample, P10 = 'grey')
 palette_sample2 = c(palette_sample[3], palette_sample[6], palette_sample[10])
@@ -55,7 +55,7 @@ palette_cnv_fun = colorRamp2(c(-.5,0,.5), palette_cnv)
 ov_pal = rev(paletteer::paletteer_c("grDevices::Purple-Blue",100))
 
 palette_module_correlation = paletteer::paletteer_c("pals::kovesi.diverging_bwr_40_95_c42",100)
-palette_module_correlation_fun = colorRamp2(c(-1,0,1), c(palette_module_correlation[1],'white',palette_module_correlation[100]))
+palette_module_correlation_fun = colorRamp2(c(-1,0,1), c('blue','white','red'))
 
 # Set palette
 palette_bulk = setNames (as.character(paletteer::paletteer_d("rcartocolor::ArmyRose")[c(1,2,5,7,3,1,7)]), c('Epithelioid','Biphasic-E','Biphasic-S','Sarcomatoid','Biphasic','E_score','S_score'))
@@ -85,4 +85,9 @@ palette_celltypes_normal = setNames(brewer.pal(11,'Paired'),rev(c('AT1','AT2','B
 
 
 #for (pal in ls()[grep('palette',ls())]) store_pal (list(pal = get(pal)))
+palette_deviation = rev (as.character (paletteer::paletteer_c("grDevices::Rocket",100)))
+palette_expression = rev (as.character(paletteer::paletteer_c("grDevices::Purple-Blue",100)))
+palette_deviation = colorRamp2(c(-.2,-.1,0,.1,.2), c("grey44",'gray','white', "brown",'black'))  
+palette_enrichment = rev (as.character(paletteer::paletteer_c("grDevices::Purples 3",100)))
+
 

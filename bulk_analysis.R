@@ -1,3 +1,7 @@
+conda activate meso_scatac
+
+R
+
 # Load packages
 packages = c(
   'Seurat',
@@ -27,7 +31,7 @@ lapply(packages, require, character.only = TRUE)
 
 set.seed(1234)
 # Set directory
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/TCGA_meso_RNA/'
+projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/'
 system (paste('mkdir -p',paste0(projdir,'Plots/')))
 setwd(projdir)
 
@@ -219,6 +223,7 @@ module_l = c(neuroendocrine1 = 'PMP2', neuroendocrine2 = 'VGF')
 module_l = c(sox9 = 'SOX9', twist1 = 'TWIST1',SMARCC2 = 'SMARCC2',pitx2 = 'PITX2', mesp1 = 'MESP1', mef2a='MEF2A')
 module_l = c(il32 = 'IL32')
 module_l = c(SNAI2 = 'SNAI2')
+module_l = c(CD90 = 'CD44'),stem='CD73',stem='CD146')
 module_l = c(ELK4 = 'ELK4')
 study = c('bueno_rpkm','tcga','mesomics')
 
@@ -285,6 +290,93 @@ for (mod_name in names(module_l))
     }
 
 
+##################################################################
+# Correlation analyses between two genes or mean of set of genes 
+##################################################################
+cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds')))
+
+your.gene1 = 'MESP1'
+your.gene2 = head(cnmf_spectra_unique[['cNMF20']],50)
+
+corr_res = list()
+#study = c('bueno_immune_corrected','tcga_immune_corrected','mesomics_immune_corrected')
+study = c('bueno_rpkm','tcga','mesomics')
+by_histology=FALSE
+for (blk in study)
+  {
+  meso_bulk = meso_bulk_l[[blk]] 
+  meso_bulk_meta = meso_bulk_meta_l[[blk]]
+
+  if (length(your.gene1) > 1) gene_exp1 = colMeans(meso_bulk[rownames(meso_bulk) %in% your.gene1,,drop=F]) else  
+  gene_exp1 = as.vector (unlist (meso_bulk[your.gene1,,drop=F]))
+  if (length(your.gene2) > 1) gene_exp2 = colMeans(meso_bulk[rownames(meso_bulk) %in% your.gene2,,drop=F]) else  
+  gene_exp2 = as.vector (unlist (meso_bulk[your.gene2,,drop=F]))
+
+  exp_df = data.frame (your.gene1 = gene_exp1, your.gene2 = gene_exp2)
+  rownames (exp_df) = colnames (meso_bulk)
+  exp_df$histology = meso_bulk_meta[match (rownames(exp_df), names(meso_bulk_meta))]
+  exp_df = exp_df[!is.na(exp_df$histology),]
+  if (by_histology) {
+  corr_res[[blk]] = ggscatter (
+            exp_df, 
+            x = 'your.gene1', 
+            y = 'your.gene2',
+            #palette = bulk_palette 
+            shape=16,
+            color = 'histology',
+            add = "reg.line", conf.int = FALSE, 
+            cor.coef = TRUE, cor.method = "pearson",
+            xlab = paste(your.gene1, collapse=' '), ylab = paste(your.gene2, collapse=' '),
+            title = paste0(blk,'(n=',nrow(exp_df),')'), fullrange = TRUE) + 
+            scale_fill_manual (values=bulk_palette) + 
+            scale_color_manual (values=bulk_palette) +
+            facet_wrap (~histology, drop=TRUE, scales = 'free_x', ncol=length (unique(exp_df$histology))) +
+            NoLegend()
+  }else {
+  corr_res[[blk]] = ggscatter (
+            exp_df, 
+            x = 'your.gene1',
+            y = 'your.gene2',
+            #palette = bulk_palette 
+            shape=16,
+            color = 'histology',
+            add = "reg.line", conf.int = FALSE, 
+            cor.coef = TRUE, cor.method = "pearson",
+            xlab = paste(your.gene1, collapse=' '), ylab = paste(your.gene2, collapse=' '),
+            title = paste0(blk,'(n=',nrow(exp_df),')'), fullrange = TRUE) + 
+            scale_fill_manual (values=bulk_palette) + 
+            scale_color_manual (values=bulk_palette) +
+            NoLegend()
+  #corr_res[[blk]] = ggMarginal(corr_res[[blk]], type = "density", groupColour = TRUE, groupFill = TRUE)
+  }
+}
+
+pdf (paste0 ( 'Plots/',your.gene1,'_',your.gene2,'_correlation_scatterplots2.pdf'),20,4)
+wrap_plots (corr_res, ncol=3)
+#corr_res
+dev.off()
+
+# Correlate TFs vs sarcomatoid score (cNMF20) and extract values ####
+nfeat = 5000
+k_selection = 25
+cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds')))
+activeTFs = read.csv ('../tumor_compartment/scatac_ArchR/Active_TFs.csv')[[2]]
+
+
+study = c('bueno_rpkm','tcga','mesomics')
+cor_res_study = list()
+by_histology=FALSE
+for (blk in study)
+  {
+  meso_bulk = meso_bulk_l[[blk]] 
+  gene_exp1 = t(meso_bulk[rownames(meso_bulk) %in% activeTFs,,drop=F]  )
+  gene_exp2 = colMeans(meso_bulk[rownames(meso_bulk) %in% head(cnmf_spectra_unique[['cNMF20']],50),,drop=F])
+  cor_res_study[[blk]] = cor (gene_exp1, gene_exp2, method ='spearman')
+  }
+cor_res_study = lapply (cor_res_study, function(x) x[activeTFs,])  
+cor_res_studies = do.call (cbind, cor_res_study)  
+colnames (cor_res_studies) = study
+write.csv (cor_res_studies, 'activeTF_sarcomatoid_correlation.csv')
 
 # # Load TCGA ATAC-seq data (chromvar deviations)
 # Match with bulkRNA patient ids to label histology
