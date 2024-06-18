@@ -105,7 +105,7 @@ if (!file.exists('TCGA_cnv_sample_avg.rds'))
   cnv_mat_avg$end =  end (windows[!duplicated(as.character(windows))])
   cnv_mat_avg = cnv_mat_avg[,c('seqnames','start','end','CNV_avg_log')]
   
-  saveRDS ('TCGA_cnv_sample_avg.rds')
+  saveRDS (cnv_mat_avg,'TCGA_cnv_sample_avg.rds')
   
   #cnv_mat_avg$seqnames = sub ('chr','',cnv_mat_avg$seqnames)    
   } else {

@@ -892,41 +892,7 @@ hub_genes = hub_genes[sapply(hub_genes, function(x) length(x) > 0)]
 
 
 # Overlap hubs with CNV data from TCGA to prioritize oncogenic hubs ####
-library (RTCGA)
-(cohorts <- infoTCGA() %>% 
-   rownames() %>% 
-   sub("-counts", "", x=.))
-checkTCGA('Dates')
-
-releaseDate <- "2016-01-28"
-cohorts = 'MESO'
-for (cohort in cohorts) {
-  dir.create ('TCGA_CNV2')
-  try(downloadTCGA( cancerTypes = cohort, destDir = "TCGA_CNV2", date = releaseDate, dataSet = "Merge_snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.Level_3" ),
-      silent=TRUE)
-}
-
-meso_CNV <- read.table(file.path ('TCGA_CNV2','gdac.broadinstitute.org_MESO.Merge_snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.Level_3.2016012800.0.0','MESO.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt'),h=T) 
-meso_CNV = split (meso_CNV, meso_CNV$Sample)
-meso_CNV = lapply (meso_CNV, function(x) {x$portion = sapply (x$Sample, function(x) unlist(strsplit (x, '-'))[4]); x})
-table (sapply (meso_CNV, function(x) unique(x$portion)))
-meso_CNV = meso_CNV[sapply (meso_CNV, function(x) unique(x$portion == '01A'))]
-meso_CNV = lapply (meso_CNV, function(x) {
-  x$Chromosome = paste0('chr',x$Chromosome)
-  x$Chromosome[x$Chromosome == 'chr23'] = 'chrX'
-  x = x[,-1]
-  x})
-meso_CNV_gr = lapply (meso_CNV, function(x) makeGRangesFromDataFrame (x,keep.extra.columns=T))
-
-library ("liftOver")
-if(!file.exists ("hg19ToHg38.over.chain")) 
-  {
-  download.file("https://hgdownload.soe.ucsc.edu/gbdb/hg19/liftOver/hg19ToHg38.over.chain.gz", "hg19ToHg38.over.chain.gz")
-  system("gzip -d hg19ToHg38.over.chain.gz")
-  }
-z <- import.chain ("hg19ToHg38.over.chain")
-#seqlevelsStyle (fragments_normal_flt) = "UCSC"  # necessary
-meso_CNV_gr_hg38 = lapply (meso_CNV_gr, function(x) unlist (liftOver(x, z)))
+source ('../../PM_scATAC/compile_TCGA_CNV_data.R')
 
 cnv_hubs = matrix (ncol = length(meso_CNV_gr_hg38), nrow = length(hubs_obj$hubsCollapsed))
 rownames (cnv_hubs) = as.character(hubs_obj$hubsCollapsed)
