@@ -63,7 +63,7 @@ sample_names = c(
     )
 
 # Load RNA
-srt = readRDS ('../scrna/scRNA_meso.rds')
+srt = readRDS ('../scrna/srt.rds')
 sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
 
 # Load last istance
@@ -169,7 +169,7 @@ if (!file.exists ('Save-ArchR-Project.rds'))
      embedding = "UMAP")
   
   
-  pdf ('Plots/celltype_umap.pdf')
+  pdf (file.path('Plots','celltype_umap.pdf'))
   print (umap_p1)
   print (umap_p2)
   dev.off()
@@ -488,6 +488,185 @@ if (run_activeTF)
   } else {
   corGSM_MM = readRDS ('TF_activators_genescore.rds') 
   }
+
+
+### Co-expression of TFs #### 
+metaGroupName = 'Sample2'
+if (!any (ls() == 'mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = 'MotifMatrix', logFile=NULL)
+mSE = mSE[, archp$cellNames]
+all (colnames(mSE) == rownames(archp))
+
+# # Get deviation matrix ####
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+
+# Subset only for positively correlated TF with genescore ####
+positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0.1]
+mMat = mMat[positive_TF,]
+
+# mMat_agg = as.data.frame (t(mMat))
+# mMat_agg$metaGroup = as.character (archp_meta[,metaGroupName])
+# mMat_agg = aggregate (.~ metaGroup, mMat_agg, mean)
+# rownames (mMat_agg) = mMat_agg[,1]
+# mMat_agg = mMat_agg[,-1]
+# mMat_agg = t(mMat_agg)
+# rownames (mMat_agg) = active_TF
+
+mMat_cor = cor (as.matrix(t(mMat)), method = 'pearson')
+#d = as.dist (1-cor(as.matrix(t(mMat))))
+
+#d = dist (mMat, method ='euclidean')
+#hc1 <- hclust(d, method = "complete" ) # Hierarchical clustering using Complete Linkage
+
+# row_filt = rowSums (mMat_cor) != 0
+# tf_name = rownames(mMat_cor)[row_filt]
+km = kmeans (mMat_cor, centers=5)
+#km_ha = rowAnnotation (
+#  km = anno_simple(as.character(km$cluster), width = unit(2, "mm"),
+#    col = setNames (km_col, as.character(unique(km$cluster))), border=T))
+
+# cor_mMat_hm = Heatmap (mMat_cor,
+#         cluster_rows = T,
+#         cluster_columns= T,
+#         #left_annotation = km_ha,
+#         row_split = km$cluster,
+#         column_title = 'all_MPM',
+#         column_gap = unit(.2, "mm"),
+#         row_gap = unit(.2, "mm"),
+#         name = 'r',
+#         #column_km_repeats=20,
+#         col = viridis::turbo(100),
+#         #clustering_distance_rows = 'pearson', 
+#         #clustering_distance_columns = 'pearson', 
+#         column_split = km$cluster,
+#         #col = pal_corr1,
+#         row_names_gp = gpar(fontsize = 0),
+#         column_names_gp = gpar(fontsize = 0)#,
+#         #width = unit(5, "cm")
+#         )
+cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
+  #left_annotation = ha,
+  #rect_gp = gpar(type = "none"),
+  clustering_distance_rows='euclidean' ,
+  clustering_distance_columns = 'euclidean', 
+  col=palette_module_correlation_fun, 
+  row_split = km$cluster,
+  column_split = km$cluster,
+  #row_km=2, 
+  #column_km=2,
+#  right_annotation = ha,
+  border=F,
+  row_names_gp = gpar(fontsize = 0),
+  column_names_gp = gpar(fontsize = 0)))#,
+  # ,
+  # cell_fun = function(j, i, x, y, w, h, fill) {
+  #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+  #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#        }}))
+
+pdf (file.path ('Plots','TF_modules.pdf'), width = 4,height=3)
+cor_mMat_hm
+dev.off()
+
+tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+names (tf_modules) = paste0('mod_',unique(km$cluster))
+tf_modules = do.call (cbind, tf_modules)
+archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
+archp@cellColData = cbind (archp@cellColData, tf_modules) 
+
+TF_p = lapply (paste0('mod_',unique(km$cluster)), function(x) plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "cellColData",
+    name = x, 
+    pal = palette_deviation,
+    #useSeqnames='z',
+    embedding = "UMAP"))
+
+pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 20,height=6)
+wrap_plots (TF_p, ncol=5)
+dev.off()
+
+# # Make radar plot to show oncogenic signatures per sample ####
+# tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+# names (tf_modules) = paste0('mod_',unique(km$cluster))
+# tf_modules = do.call (cbind, tf_modules)
+# tf_modules_2 = apply (tf_modules, 1, function(x) colnames(tf_modules)[which.max (x)])
+# tf_modules_2 = split (tf_modules_2, archp$Sample2)
+# tf_modules_2 = lapply (tf_modules_2, function(x) 
+#   {
+#   x = as.data.frame(table(x))
+#   rownames (x) = x$x
+#   x = x[paste0('mod_',unique(km$cluster)),]
+#   rownames (x) = paste0('mod_',unique(km$cluster))
+#   as.data.frame (t(x[,2]))
+#   })
+# tf_modules_2 = do.call (rbind, tf_modules_2)
+# colnames (tf_modules_2) = paste0('mod_',unique(km$cluster))
+# tf_modules_2[is.na(tf_modules_2)] = 0
+
+# tf_modules_2 = as.data.frame(t(apply (tf_modules_2, 1, proportions)))
+
+# pdf (file.path ('Plots','TF_modules_radar_plots.pdf'), width = 10,height=10)
+# for (i in rownames (tf_modules_2))
+#   {
+#   maxmin = as.data.frame (t(data.frame (rep(max (tf_modules_2),length(colnames (tf_modules_2))), 0)  ))
+#   colnames (maxmin) = colnames (tf_modules_2)
+#   tf_modules_3 = rbind (maxmin, tf_modules_2[i,, drop=F])
+
+#   radarchart (tf_modules_3,
+#       axistype=0 , 
+#       maxmin=T,
+#       cglcol="grey", axislabcol="grey", caxislabels=seq(0,20,5), cglwd=0.8,
+#       #custom polygon
+#       pcol=palette_sample , pfcol=alpha(palette_sample,0.3) , plwd=1 , plty=1,
+#       #custom the grid
+#       cglty=1,
+#       #custom labels
+#       vlcex=0.8 
+#       )
+#   legend(x=0.7, y=1.3, legend = rownames(tf_modules_2), bty = "n", pch=20 , col=palette_sample , text.col = "grey", cex=.6, pt.cex=2)
+#   }
+
+# dev.off()
+
+
+
+# Try with ridge plots ####
+library(ggridges)
+library(ggplot2)
+library(viridis)
+#library(hrbrthemes)
+tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+names (tf_modules) = paste0('mod_',unique(km$cluster))
+tf_modules = as.data.frame (do.call (cbind, tf_modules))
+tf_modules$Sample = archp$Sample2
+
+# Plot
+rp = lapply (paste0('mod_',unique(km$cluster)), function(x) 
+  ggplot(tf_modules, aes_string(x = x, y = 'Sample', fill = '..x..')) +
+  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, alpha=.5) +
+  paletteer::scale_fill_paletteer_c("ggthemes::Orange-Blue-White Diverging", direction = -1) +
+    theme_classic())
+pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 20,height=3)
+wrap_plots (rp, ncol=5)
+dev.off()
+
+
+# Check expression of SOX9 and others - SOX9 should cluster with module 5 but it doesnt probably cause of low accuracy of deviation ####
+tf_name2 = 'SOX9_756'
+
+tf_name2 = unlist(sapply (c('SOX9','TWIST1','MESP1','NKX2-5'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
+tf_name2 = paste0('z:',tf_name2)
+TF_p = plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "MotifMatrix",
+    name = tf_name2, 
+    useSeqnames='z',    
+    embedding = "UMAP")
+
+pdf (file.path ('Plots','TF_umap.pdf'), width = 20,height=6)
+wrap_plots (TF_p, ncol=5)
+dev.off()
 
 
 ### Use P2G analysis and cNMF from RNA to identify active TF via regulons  ####
@@ -842,6 +1021,7 @@ rna_res_df = lapply (names (rna_comparisons), function(x) rna_res[[x]][rna_res[[
 rna_res_df = do.call (cbind , rna_res_df)
 rownames (rna_res_df) = rownames (srt[rowData (mSE)$name,])
 colnames (rna_res_df) = names (rna_comparisons)
+
 #occurence_filter = apply (rna_res_df, 1, function(x) sum (x < pval_threshold))
 # rna_res_df_filtered = rna_res_df[occurence_filter > occurrence_threshold, ]
 # tf_tumor_pos = rownames(TF_diff_rna)[TF_diff_rna$dev_diff > 0 & TF_diff_rna$rna_diff > 0]
@@ -889,11 +1069,11 @@ tf_tumor_pos = rownames(TF_diff_rna)[TF_diff_rna$dev_diff > 0 & TF_diff_rna$rna_
 selected_TF = selected_TF[selected_TF %in% tf_tumor_pos]
 
 
-# Order by median logFC ####
+# Order by mean logFC ####
 res_df2 = lapply (names (rna_comparisons), function(x) rna_res[[x]][rna_res[[x]]$group == x,'logFC',drop=FALSE])
 res_df2 = do.call (cbind , res_df2)
 rownames (res_df2) = rownames(mMat_agg)
-tf_order = rownames(res_df2)[order (-apply (res_df2, 1, median))]
+tf_order = rownames(res_df2)[order (-apply (res_df2, 1, mean))]
 selected_TF_ordered = tf_order[tf_order %in% selected_TF]
 corGSM_MM_filtered = as.data.frame (corGSM_MM [match (selected_TF_ordered, corGSM_MM$GeneScoreMatrix_name),])
 head (corGSM_MM_filtered [order (corGSM_MM_filtered$cor),c('GeneScoreMatrix_name','cor') ],100)
@@ -908,8 +1088,10 @@ TF_diff_rna$label[match (selected_TF_ordered,rownames(TF_diff_rna))] = selected_
 TF_diff_rna$color = TF_diff_rna$label != ''
 TF_diff_rna$label_top = ''
 TF_diff_rna$label_top[match (head (selected_TF_ordered,20),rownames(TF_diff_rna))] = head (selected_TF_ordered,20)
+TF_diff_rna$alpha = 0.7
+TF_diff_rna$alpha[match (selected_TF_ordered,rownames(TF_diff_rna))] = 1
 tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, y = rna_diff,label = label_top)) + 
-  geom_point(aes(fill=genescore, color=color), size = .3, shape = 21, stroke=0.1) + # Color points based on x value
+  geom_point(aes(fill=genescore, color=color, alpha = alpha), size = 2, shape = 21, stroke=0.3) + # Color points based on x value
   scale_color_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
   scale_fill_gradient(low = "white", high = "black") +
   #scale_fill_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
@@ -918,9 +1100,9 @@ tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, y = rna_diff,label = label_to
   gtheme_no_rot + # Use a minimal theme
    geom_text_repel(
     segment.size=.05,
-    max.overlaps = 10000,
+    max.overlaps = 100,
 #    point.padding = 0.2, 
-    size=1#,
+    size=2#,
 #   nudge_x = .25,
 #    nudge_y = .2,
 #    segment.curvature = -1e-20
@@ -930,7 +1112,7 @@ tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, y = rna_diff,label = label_to
     xlim (c(-0.2, .2)) + 
     ylim (c(-0.6, .6))
 
-pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot2.pdf'),3,height = 2)
+pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot2.pdf'),5,height = 4)
 tf_diff_p
 dev.off()
 
@@ -1067,19 +1249,139 @@ ccle_exp = ccle_exp[selected_TF,]
 ccle_exp = ccle_exp[colnames(ccle_exp) != 'gene']
 enr_path = t (readRDS ('../scrna/enrichment_pathways_TFs.rds'))
 enr_path = enr_path[selected_TF,]
-rna_res_sum_p = apply (do.call (cbind, lapply (rna_res, function(x) x[match(selected_TF, x$feature),c('padj'), drop=F])), 1, median)
-rna_res_sum_lfc = apply (do.call (cbind, lapply (rna_res, function(x) x[match(selected_TF, x$feature),c('logFC'), drop=F])),1, median)
-rna_res_sum_ae = apply (do.call (cbind, lapply (rna_res, function(x) x[match(selected_TF, x$feature),c('avgExpr'), drop=F])),1, median)
+rna_res_sum_p = apply (do.call (cbind, lapply (rna_res, function(x) x[match(selected_TF, x$feature),c('padj'), drop=F])), 1, mean)
+rna_res_sum_lfc = apply (do.call (cbind, lapply (rna_res, function(x) x[match(selected_TF, x$feature),c('logFC'), drop=F])),1, mean)
+rna_res_sum_ae = apply (do.call (cbind, lapply (rna_res, function(x) x[match(selected_TF, x$feature),c('avgExpr'), drop=F])),1, mean)
 rna_res_sum = data.frame (RNA_pvalue_mean = rna_res_sum_p, RNA_lfc_mean = rna_res_sum_lfc, RNA_avExpr_mean = rna_res_sum_ae)
 
-dev_res_sum_p = apply (do.call (cbind, lapply (dev_res, function(x) x[match(selected_TF, x$feature),c('padj'), drop=F])), 1, median)
-dev_res_sum_lfc = apply (do.call (cbind, lapply (dev_res, function(x) x[match(selected_TF, x$feature),c('logFC'), drop=F])), 1, median)
-dev_res_sum_ae = apply (do.call (cbind, lapply (dev_res, function(x) x[match(selected_TF, x$feature),c('avgExpr'), drop=F])), 1, median)
+dev_res_sum_p = apply (do.call (cbind, lapply (dev_res, function(x) x[match(selected_TF, x$feature),c('padj'), drop=F])), 1, mean)
+dev_res_sum_lfc = apply (do.call (cbind, lapply (dev_res, function(x) x[match(selected_TF, x$feature),c('logFC'), drop=F])), 1, mean)
+dev_res_sum_ae = apply (do.call (cbind, lapply (dev_res, function(x) x[match(selected_TF, x$feature),c('avgExpr'), drop=F])), 1, mean)
 dev_res_sum = data.frame (DEV_pvalue_mean = dev_res_sum_p, DEV_lfc_mean = dev_res_sum_lfc, DEV_avExpr_mean = dev_res_sum_ae)
 
 tf_table = cbind (dev_res_sum, rna_res_sum, tf_sarc_cor_tf[selected_TF,], ccle_exp, enr_path)
 rownames (tf_table) = selected_TF
 write.csv (tf_table, 'candidate_TFs_table.csv')
+
+
+
+### Investigate P11 heterogeneity ####
+# Identify differential TFs between HOX+ and HOX- clusters ####
+library (presto)
+
+#sample_names_rna = c('P1','P14','P13','P3','P12','P5','P11','P4','P8','P14','HU37','HU62')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat_P11 = mMat[,archp$Sample2 == 'P11']
+P11_clusters = archp$Clusters[archp$Sample2 == 'P11']
+P11_clusters = ifelse (P11_clusters == 'C14','P11_small','P11_large')
+p11_dev_rna = wilcoxauc (mMat_P11 , y = P11_clusters)
+p11_dev_rna = p11_dev_rna[p11_dev_rna$group == 'P11_large',]
+head (dev[order(p11_dev_rna$logFC),],20)
+p11_dev_rna[p11_dev_rna$feature == 'NFATC1',]
+# Make volcano plot showing also scRNA RNA expression
+pdf (paste0('Plots/scrna_clusters_umap.pdf'), 15,15)
+wrap_plots (DimPlot (srt, group.by = 'seurat_clusters'), DimPlot (srt, group.by = 'sampleID'))
+dev.off()
+
+ps = log2(as.data.frame (AverageExpression (srt, features = p11_dev_rna$feature, group.by = 'seurat_clusters')[[1]]) +1)
+#ps = ps[, colnames(ps) %in% sample_names_rna]
+ps_P11_diff = ps[, 'g14', drop=F] - ps[, 'g9', drop=F]
+
+p11_dev_rna$rna_diff = NA
+p11_dev_rna$rna_diff = ps_P11_diff[p11_dev_rna$feature,1]
+p11_dev_rna$rna_diff[is.na(p11_dev_rna$rna_diff)] = 0
+
+logfcThreshold = .1
+pvalAdjTrheshold = 0.05
+p11_dev_rna$sig = ifelse (abs(p11_dev_rna$logFC) > logfcThreshold & p11_dev_rna$padj < pvalAdjTrheshold, 1,0)
+p11_dev_rna$sig = p11_dev_rna$sig * sign (p11_dev_rna$logFC)
+p11_dev_rna$sig[p11_dev_rna$sig == -1] = 'HOX+'
+p11_dev_rna$sig[p11_dev_rna$sig == 1] = 'HOX-'
+
+p11_dev_rna$rna_sign = ifelse (abs(p11_dev_rna$logFC) > logfcThreshold & p11_dev_rna$padj < pvalAdjTrheshold, 1,0)
+p11_dev_rna$rna_sign = p11_dev_rna$rna_sign * sign (p11_dev_rna$rna_diff)
+p11_dev_rna$rna_sign[p11_dev_rna$rna_sign == -1] = 'HOX+'
+p11_dev_rna$rna_sign[p11_dev_rna$rna_sign == 1] = 'HOX-'
+
+res_filtered = p11_dev_rna[abs(p11_dev_rna$logFC) > logfcThreshold & p11_dev_rna$padj < pvalAdjTrheshold,]
+res_filtered = head (res_filtered$feature[order (-abs(res_filtered$logFC))],20)
+p11_dev_rna$labels = ''
+p11_dev_rna$labels[match (res_filtered, p11_dev_rna$feature)] = res_filtered
+vp = ggplot (p11_dev_rna, aes(x=logFC, y= -log10(padj))) +
+    geom_point(shape=21, aes (fill = sig, color = rna_sign, size = abs(rna_diff)), alpha=.5) +
+    geom_vline(xintercept = logfcThreshold, linetype="dotted", 
+                color = "grey20", size=1) +
+    geom_vline(xintercept = -logfcThreshold, linetype="dotted", 
+                color = "grey20", size=1) +
+    geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dotted", 
+                color = "grey20", size=1) + 
+    geom_text_repel (size=2, data = p11_dev_rna, aes(label = labels),segment.size=.2) + 
+    ggtitle ('Hubs differential accessibility') +
+    #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
+    scale_color_manual (values = c("0"='grey77',"HOX-"='green',"HOX+"='red')) + 
+    scale_fill_manual (values = c("0"='grey77',"HOX-"='green',"HOX+"='red')) + 
+    theme_light()
+
+pdf (file.path ('Plots', 'P11_TF_volcano.pdf'),height=3,width=5)
+vp
+dev.off()
+
+# Check most expressed HOX genes from the TF co-deviation module analysis above ####
+HOX_module = 3
+hox_dev_rna = p11_dev_rna[p11_dev_rna$feature %in% names(km$cluster)[km$cluster == HOX_module],]
+hox_dev_rna = hox_dev_rna[order (hox_dev_rna$rna_diff),]
+head (hox_dev_rna[grep ('HOX', hox_dev_rna$feature),])
+
+
+
+
+
+# Export bigiwg files ####
+metaGroupName = 'Sample2'
+getGroupBW(
+  ArchRProj = archp,
+  groupBy = metaGroupName,
+  normMethod = "ReadsInTSS",
+  tileSize = 100,
+  maxCells = 1000,
+  ceiling = 4,
+  verbose = TRUE,
+  threads = getArchRThreads(),
+  logFile = createLogFile("getGroupBW")
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1161,24 +1463,6 @@ tf_match = tf_match[, selected_TF_ordered]
 bg_peakSet = rowRanges (tf_match)
   #tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
   
-
-
-
-# Export bigiwg files ####
-metaGroupName = 'Sample2'
-getGroupBW(
-  ArchRProj = archp,
-  groupBy = metaGroupName,
-  normMethod = "ReadsInTSS",
-  tileSize = 100,
-  maxCells = 1000,
-  ceiling = 4,
-  verbose = TRUE,
-  threads = getArchRThreads(),
-  logFile = createLogFile("getGroupBW")
-)
-
-
 
 
 

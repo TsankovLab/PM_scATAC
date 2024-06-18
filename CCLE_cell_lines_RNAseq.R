@@ -60,8 +60,8 @@ saveRDS (ccle_list, paste0(projdir,'CCLE_rsem_expression_and_metadata.rds'))
 
 # Subset ccle for cell lines ordered
 cellLine_ids = c('NCI-H2052','MSTO-211H','NCI-H2452','NCI-H28')
-cellLine_ids = c('MSTO-211H','NCI-H2452')
-meta[grep ('meso',meta$Histology),]
+cellLine_ids = c('MSTO-211H','NCI-H2452','ACC-MESO-1')
+#meta[grep ('meso',meta$Histology),]
 
 
 ccle_meso = ccle[,colnames(ccle) %in% meta[meta$Name %in% cellLine_ids,'CCLE_ID']]
@@ -81,6 +81,7 @@ ccle_meso2 = ccle_meso[rownames (ccle_meso) %in% check_genes, ]
 ccle_meso2$gene = rownames (ccle_meso2)
 ccle_meso2$MSTO211H_PLEURA = log2 (ccle_meso2$MSTO211H_PLEURA + 1)
 ccle_meso2$NCIH2452_PLEURA = log2 (ccle_meso2$NCIH2452_PLEURA + 1)
+ccle_meso2$ACCMESO1_PLEURA = log2 (ccle_meso2$ACCMESO1_PLEURA + 1)
 write.csv (ccle_meso2, 'meso_scATAC_active_TFS.csv')
 ccle_meso2 = gather (ccle_meso2, cell_line, expression, 1:(ncol(ccle_meso2)-1))
 ccle_meso2$expression =  (ccle_meso2$expression)

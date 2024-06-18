@@ -38,4 +38,12 @@ install.packages ('ape')
 install.packages('dendextend')
 conda install conda-forge::r-factoextra
 BiocManager::install ('org.Hs.eg.db')
-install.packages ('RColorBrewer')
+install.packages ('RColorBrewer')  
+install.packages ('survminer')
+#devtools::install_github("ricardo-bion/ggradar")
+BiocManager::install("RTCGA")
+BiocManager::install("liftOver")
+
+
+
+

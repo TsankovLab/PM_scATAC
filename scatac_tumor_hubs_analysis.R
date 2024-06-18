@@ -6,15 +6,18 @@ source ('../../PM_scATAC/Hubs_finder.R')
 source ('../../PM_scATAC/hubs_track.R')
 
 
-peak_regions = as.data.frame (getPeakSet (archp), row.names=NULL)
-peak_regions = peak_regions[,c(1:3)]
-write.table (peak_regions, file.path('peak_regions.bed'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+if (!file.exists ('peak_regions.bed'))
+  {
+  peak_regions = as.data.frame (getPeakSet (archp), row.names=NULL)
+  peak_regions = peak_regions[,c(1:3)]
+  write.table (peak_regions, file.path('peak_regions.bed'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+  }
 
 
 ###--- Hubs analysis --###
 metaGroupName = "Sample2"
 cor_cutoff = 0.2
-max_dist = 12500
+#max_dist = 12500
 max_dist = 5000
 min_peaks = 5
 dgs = 0
@@ -43,7 +46,7 @@ if (!file.exists(paste0 ('KNNs_',metaGroupName,'k_',k,'.rds')) | force)
   KNNs = readRDS (paste0 ('KNNs_',metaGroupName,'k_',k,'.rds'))
   }
 
-# Plot KNN groups on UMAP
+# Make KNN data.frame ####
 KNNs_df = lapply (seq_along(KNNs), function(x) data.frame (
   cell = KNNs[[x]], 
   group=paste0('KNN_',x), 
@@ -51,6 +54,8 @@ KNNs_df = lapply (seq_along(KNNs), function(x) data.frame (
 
 KNNs_df = do.call (rbind, KNNs_df)
 archp$knn_groups = KNNs_df$group[match (archp$cellNames, KNNs_df$cell)]
+
+# Plot KNNs on UMAP ####
 umap_knn = plotEmbedding (ArchRProj = archp, embedding = 'UMAP',
   colorBy = "cellColData", name = 'knn_groups',plotAs ='hex',
     baseSize=0, labelMeans=FALSE) + NoLegend() 
@@ -60,7 +65,7 @@ dev.off()
 
 
 
-run_coax = TRUE
+run_coax = FALSE
 if (run_coax)
   {
   archp = addCoAx (
@@ -97,15 +102,12 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
 
 # Export bed file of hub regions
 
-fragments = unlist (getFragmentsFromProject (
-  ArchRProj = archp))  
-  
 ###--- Generate matrces of hubs x cells / knn from collapsed non-redundant hubs to identify differential hubs  ---###
-metaGroup = as.character (archp@cellColData[,metaGroupName])
-metaGroup_df = data.frame (barcode = rownames(archp@cellColData), metaGroup = metaGroup)
+# metaGroup = as.character (archp@cellColData[,metaGroupName])
+# metaGroup_df = data.frame (barcode = rownames(archp@cellColData), metaGroup = metaGroup)
 
-metaGroup3 = names (sapply (seq_along(KNNs), function(x)
-  table(metaGroup_df$metaGroup[match (KNNs[[x]],metaGroup_df$barcode)])))
+# metaGroup3 = names (sapply (seq_along(KNNs), function(x)
+#   table(metaGroup_df$metaGroup[match (KNNs[[x]],metaGroup_df$barcode)])))
 
 # # Generate matrix of fragment counts of peaks x cluster
 # peaksKnn_mat = matrix (ncol = length(KNNs), nrow = length(hubs_obj$peaksMerged))
@@ -259,6 +261,8 @@ metaGroup3 = names (sapply (seq_along(KNNs), function(x)
 # Generate matrix of fragment counts of hubs x sample ####
 if (!file.exists(file.path (hubs_dir,'hubs_sample_mat.rds')))
   {
+  fragments = unlist (getFragmentsFromProject (
+    ArchRProj = archp))   
   hubsSample_mat = matrix (ncol = length(unique(archp$Sample2)), nrow = length(hubs_obj$hubsCollapsed))
   colnames (hubsSample_mat) = unique(archp$Sample2)
   rownames (hubsSample_mat) = hubs_obj$hubs_id
@@ -291,6 +295,31 @@ hm
 dev.off()
 
 
+# Generate matrix of fragment counts of hubs x barcodes ####
+if (!file.exists(file.path (hubs_dir,'hubs_cells_mat.rds')))
+  {
+  fragments = unlist (getFragmentsFromProject (
+    ArchRProj = archp))    
+  hubsCell_mat = matrix (ncol = length(rownames(archp@cellColData)), nrow = length(hubs_obj$hubsCollapsed))
+  colnames (hubsCell_mat) = rownames(archp@cellColData)
+  rownames (hubsCell_mat) = hubs_obj$hubs_id
+  pb =progress::progress_bar$new(total = length (rownames(archp@cellColData)))
+  for (cell in rownames(archp@cellColData)) 
+    {
+    pb$tick()  
+    fragments_in_cell = fragments[fragments$RG %in% cell]  
+    fragments_in_cell_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_cell)
+    hubsCell_mat[,cell] = fragments_in_cell_in_hubs
+    }
+  all (colnames (hubsCell_mat) == rownames(archp@cellColData))  
+  hubsCell_mat = t(t(hubsCell_mat) * (10^6 / archp$nFrags)) # scale
+  saveRDS (hubsCell_mat, file.path (hubs_dir,'hubs_cells_mat.rds'))
+  } else {
+  hubsCell_mat = readRDS (file.path (hubs_dir,'hubs_cells_mat.rds'))  
+  }
+hubsCell_mat = as.data.frame (hubsCell_mat)
+
+
 # Check if there are hub size differences between normal and tumor sample ####
 library (presto)
 tumor_sample = unique (archp$Sample2)[unique(archp$Sample2) != 'normal_pleura']
@@ -313,28 +342,32 @@ size_comp_df = do.call (rbind, size_comp)
 
 
 
+### Try correlating BRD4 with Hubs load per cell ####
+archp = addImputeWeights (archp)
+seGS <- getMatrixFromProject (archp)
+celltype_markers = c('BRD4',rowData (seGS)$name[grep ('MED', rowData (seGS)$name)])
+seGS = seGS[rowData (seGS)$name %in% celltype_markers,]
+matGS <- imputeMatrix (assay(seGS), getImputeWeights(archp))
+rownames(matGS) = rowData (seGS)$name
+#rownames (matGS) = celltype_markers
 
-# Generate matrix of fragment counts of hubs x barcodes ####
-if (!file.exists(file.path (hubs_dir,'hubs_cells_mat.rds')))
-  {
-  hubsCell_mat = matrix (ncol = length(rownames(archp@cellColData)), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsCell_mat) = rownames(archp@cellColData)
-  rownames (hubsCell_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (rownames(archp@cellColData)))
-  for (cell in rownames(archp@cellColData)) 
-    {
-    pb$tick()  
-    fragments_in_cell = fragments[fragments$RG %in% cell]  
-    fragments_in_cell_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_cell)
-    hubsCell_mat[,cell] = fragments_in_cell_in_hubs
-    }
-  all (colnames (hubsCell_mat) == rownames(archp@cellColData))  
-  hubsCell_mat = t(t(hubsCell_mat) * (10^6 / archp$nFrags)) # scale
-  saveRDS (hubsCell_mat, file.path (hubs_dir,'hubs_cells_mat.rds'))
-  } else {
-  hubsCell_mat = readRDS (file.path (hubs_dir,'hubs_cells_mat.rds'))  
-  }
-hubsCell_mat = as.data.frame (hubsCell_mat)
+hubsCell_mean = hubsCell_mat[,colnames(matGS)]
+hubsCell_mean = colMeans (log2(hubsCell_mean+1))
+matGS = t (matGS)
+# sox9_cor = as.data.frame (t(cor (matGS[,'SOX9'], hubsCell_mat)))
+# sox9_cor$gene = hubs_obj$hubsCollapsed$gene[match (rownames(sox9_cor), hubs_obj$hubs_id)]
+# sox9_cor = sox9_cor[order (-sox9_cor$V1),, drop=F]
+# sox9_cor$region = as.character (hubs_obj$hubsCollapsed)[match (rownames(sox9_cor), hubs_obj$hubs_id)]
+# head (sox9_cor,20)
+
+TF_hub_cor = lapply (unique(archp$Sample2)[unique(archp$Sample2) != 'normal_pleura'], function(x) 
+  cor (as.matrix(matGS[grepl (paste0(x,'#'), rownames(matGS)),]), 
+    hubsCell_mean[grepl (paste0(x,'#'), names(hubsCell_mean))], method = 'pearson'))
+
+TF_hub_cor_o = lapply (TF_hub_cor, function(x) x[order(-x[,1]),])
+hubs_genes_cor = sapply (TF_hub_cor, function(x) x[grepl ('BRD4', rownames(x))])
+names (hubs_genes_cor) = unique(archp$Sample2)[unique(archp$Sample2) != 'normal_pleura']
+sapply (TF_hub_cor, function(x) x[grepl ('^MED1$', rownames(x))])
 
 
 
@@ -373,7 +406,7 @@ vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
     #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
     scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + theme_light()
 
-pdf (file.path (hubs_dir, 'DAH_voclano.pdf'),4,4)
+pdf (file.path (hubs_dir, 'DAH_volcano.pdf'),4,4)
 vp
 dev.off()
 
@@ -388,8 +421,72 @@ pdf (file.path (hubs_dir, 'Plots','DAH_size.pdf'),4,4)
 vp
 dev.off()
 
+mega_hubs = range (hubs_obj$hubsCollapsed[1:8])
+
+# Check mega hubs found in P11 ####
+meso_markers <- plotBrowserTrack(
+      ArchRProj = archp, 
+      groupBy = metaGroupName, 
+#      geneSymbol = celltype_markers,
+      #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+      #region = ext_range (hubs_obj$hubsCollapsed[1]),
+      region = mega_hubs,
+      pal = palette_sample,
+      #upstream = 150000,
+      #downstream = 150000,
+      loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+      #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+      #loops = getCoAccessibility (archp, corCutOff = 0.3,
+      #  returnLoops = TRUE),
+      useGroups= NULL
+  )
+#width (hubs_obj$hubsCollapsed[1])
+
+plotPDF (meso_markers, ArchRProj = archp, width=14, name ='mega_hubs_coveragePlots.pdf')
+
+# Export ranges of top HUBs
+saveRDS (mega_hubs, 'P11_chr18_region.rds')
 
 
+# Look into mega hubs identified in P11 HOX- cluster ####
+# Map large hubs to UMAP ####
+hubsCell_mat = hubsCell_mat[rownames(archp@cellColData),]
+archp@cellColData = cbind(archp@cellColData, hubsCell_mat[,c('HUB1','HUB2','HUB3','HUB4','HUB5','HUB6','HUB7','HUB8')])
+umap_p1 =  plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
+ name = c('HUB1','HUB2','HUB3','HUB4','HUB5','HUB6','HUB7','HUB8'), embedding = "UMAP")
+  
+pdf (file.path(hubs_dir,'Plots','HUB1_2_3_umap.pdf'), 15,15)
+wrap_plots (umap_p1, ncol=4)
+dev.off()
+
+### TF Enrichment in peaks in large hubs ####
+tf_match = getMatches (archp)
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+bg_peakSet = rowRanges (tf_match)
+mega_hubs = range (hubs_obj$hubsCollapsed[c(1:8)])
+mega_hubs_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, mega_hubs))]
+#tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+mega_hubs_TF =  hyperMotif (
+  selected_peaks = mega_hubs_peaks, 
+  motifmatch = tf_match)
+
+head (mega_hubs_TF, 20)
+
+### Correlate mega hubs on chr18 with other genes / TF ####
+archp = addImputeWeights (archp)
+#celltype_markers = c('WT1', 'CALB2','GATA4','HP','SOX9','MESP1','SOX6','TWIST1','SNAI2')
+celltype_markers = rownames (head (mega_hubs_TF, 20))
+seGS = getMatrixFromProject (archp)
+seGS = seGS[rowData (seGS)$name %in% celltype_markers,]
+matGS = imputeMatrix (assay(seGS), getImputeWeights(archp))
+rownames (matGS) = rowData (seGS)$name [rowData (seGS)$name %in% celltype_markers]
+matGS = t(matGS)
+
+hubsCell_mat2 = hubsCell_mat[,colnames(matGS)]
+hubsCell_mat2 = log2(t(hubsCell_mat2)+1)
+  cor (as.matrix(hubsCell_mat2[archp$Clusters %in% c('C15'),c('HUB1','HUB2','HUB3','HUB4','HUB5')]),
+  as.matrix(matGS)[archp$Clusters %in% c('C15'),])
+# sox9_cor = as.data.frame (t(cor (matGS[
 
 
 # res2 = wilcoxauc (log2(hubsCell_mat_comp2+1), comparison2)
@@ -791,4 +888,271 @@ hub_genes = hub_genes[sapply(hub_genes, function(x) length(x) > 0)]
   )
   plotPDF (meso_markers, ArchRProj = archp, width=14, name ='MPM_markers_coveragePlots.pdf')
 
+
+
+
+# Overlap hubs with CNV data from TCGA to prioritize oncogenic hubs ####
+library (RTCGA)
+(cohorts <- infoTCGA() %>% 
+   rownames() %>% 
+   sub("-counts", "", x=.))
+checkTCGA('Dates')
+
+releaseDate <- "2016-01-28"
+cohorts = 'MESO'
+for (cohort in cohorts) {
+  dir.create ('TCGA_CNV2')
+  try(downloadTCGA( cancerTypes = cohort, destDir = "TCGA_CNV2", date = releaseDate, dataSet = "Merge_snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.Level_3" ),
+      silent=TRUE)
+}
+
+meso_CNV <- read.table(file.path ('TCGA_CNV2','gdac.broadinstitute.org_MESO.Merge_snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.Level_3.2016012800.0.0','MESO.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt'),h=T) 
+meso_CNV = split (meso_CNV, meso_CNV$Sample)
+meso_CNV = lapply (meso_CNV, function(x) {x$portion = sapply (x$Sample, function(x) unlist(strsplit (x, '-'))[4]); x})
+table (sapply (meso_CNV, function(x) unique(x$portion)))
+meso_CNV = meso_CNV[sapply (meso_CNV, function(x) unique(x$portion == '01A'))]
+meso_CNV = lapply (meso_CNV, function(x) {
+  x$Chromosome = paste0('chr',x$Chromosome)
+  x$Chromosome[x$Chromosome == 'chr23'] = 'chrX'
+  x = x[,-1]
+  x})
+meso_CNV_gr = lapply (meso_CNV, function(x) makeGRangesFromDataFrame (x,keep.extra.columns=T))
+
+library ("liftOver")
+if(!file.exists ("hg19ToHg38.over.chain")) 
+  {
+  download.file("https://hgdownload.soe.ucsc.edu/gbdb/hg19/liftOver/hg19ToHg38.over.chain.gz", "hg19ToHg38.over.chain.gz")
+  system("gzip -d hg19ToHg38.over.chain.gz")
+  }
+z <- import.chain ("hg19ToHg38.over.chain")
+#seqlevelsStyle (fragments_normal_flt) = "UCSC"  # necessary
+meso_CNV_gr_hg38 = lapply (meso_CNV_gr, function(x) unlist (liftOver(x, z)))
+
+cnv_hubs = matrix (ncol = length(meso_CNV_gr_hg38), nrow = length(hubs_obj$hubsCollapsed))
+rownames (cnv_hubs) = as.character(hubs_obj$hubsCollapsed)
+
+gain = .25
+loss = -0.25
+for (pat in seq_along(meso_CNV_gr_hg38))
+  {
+  cnv_hubs_ov = findOverlaps (hubs_obj$hubsCollapsed, meso_CNV_gr_hg38[[pat]], select='first')
+  cnv_hubs[,pat] = meso_CNV_gr_hg38[[pat]]$Segment_Mean[cnv_hubs_ov]
+  cnv_hubs[,pat][cnv_hubs[,pat] >= gain] = 1
+  cnv_hubs[,pat][cnv_hubs[,pat] <= loss] = -1
+  cnv_hubs[,pat][cnv_hubs[,pat] > loss & cnv_hubs[,pat] < gain] = 0
+  }
+cnv_hubs_sum = rowMeans (cnv_hubs)
+cnv_hubs_df = data.frame(hub = factor (names(cnv_hubs_sum), levels = names(cnv_hubs_sum)[order (-cnv_hubs_sum)]), cnv = cnv_hubs_sum)
+rownames (cnv_hubs_df) = hubs_obj$hubs_id[match(cnv_hubs_df$hub, as.character(hubs_obj$hubsCollapsed))]
+
+bp = ggplot (cnv_hubs_df, aes (x = hub, y = cnv)) + 
+geom_bar (stat= 'identity')
+
+pdf (file.path('Plots','hubs_overlapping_CNV.pdf'))
+bp
+dev.off()
+
+# Plot CNV vs DAH ####
+cnv_hubs_df = cbind (cnv_hubs_df, res[match(rownames(cnv_hubs_df), res$feature),])
+cnv_hubs_df$avgExpr_sign = cnv_hubs_df$avgExpr * sign (cnv_hubs_df$logFC)
+sp = ggplot (cnv_hubs_df, aes (x = cnv, y = logFC)) + 
+geom_point ()
+
+pdf (file.path('Plots','hubs_overlapping_CNV_DAH.pdf'))
+sp
+dev.off()
+
+cnv_hubs_df$cnv_sign = ifelse (cnv_hubs_df$cnv > 0, 'Amp','Del')
+cnv_hubs_df2 = cnv_hubs_df[!is.na (cnv_hubs_df$cnv),]
+
+library (rstatix)
+library (ggpubr)
+bp = ggplot (cnv_hubs_df2, aes (x = cnv_sign, y = logFC)) + 
+geom_boxplot ()
+stat.test = cnv_hubs_df2 %>%
+t_test(reformulate ('cnv_sign', 'logFC')) %>%
+adjust_pvalue (method = "fdr") %>%
+add_significance ()
+stat.test = stat.test %>% add_xy_position (x = 'cnv_sign', step.increase=.4)
+bp = bp + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
+bracket.nudge.y = 1, hide.ns = T,
+label = "p.adj.signif") + NoLegend() + 
+theme_classic()
+
+
+pdf (file.path('Plots','hubs_overlapping_CNV_DAH_boxplot.pdf'), width=2, height=4)
+bp
+dev.off()
+
+
+logfcThreshold = 1
+pvalAdjTrheshold = 0.05
+cnv_hubs_df2$sig = ifelse (abs(cnv_hubs_df2$logFC) > logfcThreshold & cnv_hubs_df2$padj < pvalAdjTrheshold, 1,0)
+cnv_hubs_df2$sig = cnv_hubs_df2$sig * sign (cnv_hubs_df2$logFC)
+cnv_hubs_df2$sig[cnv_hubs_df2$sig == -1] = 'N'
+cnv_hubs_df2$sig[cnv_hubs_df2$sig == 1] = 'T'
+
+cnv_hubs_df2$cnv_sign = ifelse (abs(cnv_hubs_df2$logFC) > logfcThreshold & cnv_hubs_df2$padj < pvalAdjTrheshold, 1,0)
+cnv_hubs_df2$cnv_sign = cnv_hubs_df2$cnv_sign * sign (cnv_hubs_df2$cnv)
+cnv_hubs_df2$cnv_sign[cnv_hubs_df2$cnv_sign == -1] = 'Del'
+cnv_hubs_df2$cnv_sign[cnv_hubs_df2$cnv_sign == 1] = 'Amp'
+
+res_filtered = cnv_hubs_df2[abs(cnv_hubs_df2$logFC) > logfcThreshold & cnv_hubs_df2$padj < pvalAdjTrheshold,]
+res_filtered = head (res_filtered$feature[order (-abs(res_filtered$cnv))], 5)
+cnv_hubs_df2$labels = ''
+cnv_hubs_df2$labels[match (res_filtered, cnv_hubs_df2$feature)] = res_filtered
+vp = ggplot (cnv_hubs_df2, aes(x=logFC, y= -log10(padj))) +
+    geom_point(shape=19, aes (color = sig), alpha=.5) +
+    geom_vline(xintercept = logfcThreshold, linetype="dotted", 
+                color = "grey20", size=1) +
+    geom_vline(xintercept = -logfcThreshold, linetype="dotted", 
+                color = "grey20", size=1) +
+    geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dotted", 
+                color = "grey20", size=1) + 
+    geom_text_repel (
+      size=2, 
+      data = cnv_hubs_df2, 
+      aes(label = labels),
+      segment.size=.2,
+      max.overlaps = 10000) + 
+    ggtitle ('Hubs differential accessibility') +
+    #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
+    scale_color_manual (values = c("0"='grey77',"N"='green',"T"='red')) + 
+    scale_fill_manual (values = c("0"='grey77',"Del"='green',"Amp"='red')) + 
+    theme_light()
+
+pdf (file.path ('Plots', 'HUB_CNV_volcano.pdf'),height=3,width=3)
+vp
+dev.off()
+
+res_filtered = cnv_hubs_df2[cnv_hubs_df2$logFC < logfcThreshold & cnv_hubs_df2$padj < pvalAdjTrheshold,]
+res_filtered = head (res_filtered$feature[order (res_filtered$cnv)], 30)
+
+
+## Generate circos plot for showing hubs on recurrent CNVs ####
+
+# Compute bins ####
+ws = 1e6
+ss = 5e5
+blacklist = toGRanges (paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/blacklisted_regions/ENCODE_blacklist/',"hg38-blacklist.v2.bed")) # taken from https://github.com/Boyle-Lab/Blacklist/tree/master/lists
+
+if (!file.exists (paste0('windows_',ws,'_',ss,'.rds')))
+  {
+  windows = makeWindows (genome = BSgenome.Hsapiens.UCSC.hg38, blacklist = blacklist,
+    windowSize = ws, slidingSize = ss)
+  saveRDS (paste0('windows_',ws,'_',ss,'.rds'))
+  } else {
+  windows = readRDS (paste0('windows_',ws,'_',ss,'.rds'))  
+  }
+
+### Change SegMean to LOSS < -0.25; GAIN = > 0.25  ####
+gain = .25
+loss = -0.25
+meso_CNV_gr_hg38_cnv = lapply (meso_CNV_gr_hg38, function(x) 
+  {
+   tmp = x
+   tmp$Segment_Mean[tmp$Segment_Mean >= gain] = 1
+   tmp$Segment_Mean[tmp$Segment_Mean <= loss] = -1
+   tmp$Segment_Mean[tmp$Segment_Mean > loss & tmp$Segment_Mean < gain] = 0
+   tmp
+  })
+
+### Bin CNV per patient and then take average across patients ####
+force = F
+if (!file.exists('TCGA_cnv_mat.rds') | force)
+  {
+  pb =progress::progress_bar$new(total = length(meso_CNV_gr_hg38_cnv))
+  cnv_mat = matrix (nrow = length(windows), ncol = length(meso_CNV_gr_hg38_cnv))
+  rownames (cnv_mat) = as.character(windows)
+  for (pat in 1:length(meso_CNV_gr_hg38_cnv))
+    {
+    pb$tick()  
+     ov = as.data.frame (findOverlaps (windows, meso_CNV_gr_hg38_cnv[[pat]]))
+     ov_sum1 = split (ov, ov$queryHits)
+     ov_sum2 = unlist(lapply (ov_sum1, function(x) sum (meso_CNV_gr_hg38_cnv[[pat]]$Segment_Mean[x$subjectHits])))
+    cnv_mat[as.numeric(names(ov_sum1)),pat] = ov_sum2
+    }
+  saveRDS (cnv_mat, 'TCGA_cnv_mat.rds')
+  } else {
+  cnv_mat = readRDS ('TCGA_cnv_mat.rds')
+  }
+
+cnv_mat_avg = as.data.frame (rowSums (cnv_mat))
+colnames (cnv_mat_avg) = 'CNV_avg'
+cnv_mat_avg$CNV_avg_log = log2 (abs(cnv_mat_avg$CNV_avg) + 1)
+cnv_mat_avg$CNV_avg_log = cnv_mat_avg$CNV_avg_log * sign(cnv_mat_avg$CNV_avg)
+
+cnv_mat_avg = cnv_mat_avg[!duplicated(as.character(windows)),,drop=F]
+rownames (cnv_mat_avg) = as.character(windows)[!duplicated(as.character(windows))]
+cnv_mat_avg$seqnames =  as.character(seqnames (windows[!duplicated(as.character(windows))]))
+cnv_mat_avg$start =  start (windows[!duplicated(as.character(windows))])
+cnv_mat_avg$end =  end (windows[!duplicated(as.character(windows))])
+cnv_mat_avg = cnv_mat_avg[,c('seqnames','start','end','CNV_avg_log')]
+#cnv_mat_avg$seqnames = sub ('chr','',cnv_mat_avg$seqnames)
+
+# Add labels of hubs in top amplified regions and differentially accessed in tumors ####
+cnv_hubs_df2 = cnv_hubs_df2[cnv_hubs_df2$avgExpr_sign > 1, ]
+cnv_hubs_df2 = cnv_hubs_df2[order(-cnv_hubs_df2$cnv),]
+head (cnv_hubs_df2)
+cnv_hubs = rbind (head (cnv_hubs_df2,20), tail (cnv_hubs_df2,20))
+cnv_hubs$seqnames = sapply (as.character(cnv_hubs$hub), function(x) unlist(strsplit(x, '\\:'))[1])
+cnv_hubs$start = sapply (as.character(cnv_hubs$hub), function(x) unlist(strsplit(x, '\\-'))[1])
+cnv_hubs$start = as.numeric(sapply (as.character(cnv_hubs$start), function(x) unlist(strsplit(x, '\\:'))[2]))
+cnv_hubs$end = as.numeric(sapply (as.character(cnv_hubs$hub), function(x) unlist(strsplit(x, '\\-'))[2]))
+cnv_hubs = cnv_hubs[,c('seqnames','start','end','feature')]
+
+# hubs track
+cnv_hubs_df_track = cnv_hubs_df
+cnv_hubs_df_track$seqnames = sapply (as.character(cnv_hubs_df_track$hub), function(x) unlist(strsplit(x, '\\:'))[1])
+cnv_hubs_df_track$start = sapply (as.character(cnv_hubs_df_track$hub), function(x) unlist(strsplit(x, '\\-'))[1])
+cnv_hubs_df_track$start = as.numeric(sapply (as.character(cnv_hubs_df_track$start), function(x) unlist(strsplit(x, '\\:'))[2]))
+cnv_hubs_df_track$end = as.numeric(sapply (as.character(cnv_hubs_df_track$hub), function(x) unlist(strsplit(x, '\\-'))[2]))
+cnv_hubs_df_track = cnv_hubs_df_track[,c('seqnames','start','end','logFC')]
+
+col_fun = colorRamp2(c(-1, 0, 1), c("green", "white", "red"))
+
+
+pdf (file.path ('Plots','CNV_hubs_circos.pdf'))
+circos.initializeWithIdeogram (species = "hg38", chromosome.index= paste0('chr',1:22))
+circos.genomicTrack (cnv_mat_avg,
+    panel.fun = function(region, value, ...) {
+        circos.genomicRect(region, value, ytop.column = 1, ybottom = 0, bg.border = rep(0, 22),
+            col = ifelse(value[[1]] > 0, "red", "blue"), border=NA, ...)
+        #circos.lines(CELL_META$cell.xlim, c(0, 0), lty = 2, col = "#00000040")
+})
+# circos.genomicTrack (cnv_hubs_df_track,
+#     panel.fun = function(region, value, ...) {
+#         circos.genomicRect(region, value, ytop.column = 1, ybottom = 0, 
+#             col = ifelse(value[[1]] > 0, "red", "blue"), border=NA, ...)
+#         #circos.lines(CELL_META$cell.xlim, c(0, 0), lty = 2, col = "#00000040")
+# })
+# circos.genomicHeatmap(cnv_hubs_df_track, col = col_fun, side = "inside", border = "white")
+circos.genomicLabels(cnv_hubs, labels.column = 4, side = "inside",
+    col = 'grey22', line_col = 'grey22',padding = 0.6, cex=0.5)
+dev.off()
+
+pdf (file.path ('Plots','CNV_megahubs_circos.pdf'))
+circos.initializeWithIdeogram (species = "hg38", chromosome.index= paste0('chr',18))
+circos.genomicTrack(cnv_mat_avg,
+    panel.fun = function(region, value, ...) {
+        circos.genomicRect(region, value, ytop.column = 1, ybottom = 0, 
+            col = ifelse(value[[1]] > 0, "red", "blue"), border=NA, ...)
+        #circos.lines(CELL_META$cell.xlim, c(0, 0), lty = 2, col = "#00000040")
+})
+circos.genomicTrack (cnv_hubs_df_track,
+    panel.fun = function(region, value, ...) {
+        circos.genomicRect(region, value, ytop.column = 1, ybottom = 0, 
+            col = ifelse(value[[1]] > 0, "red", "blue"), border=NA, ...)
+        #circos.lines(CELL_META$cell.xlim, c(0, 0), lty = 2, col = "#00000040")
+})
+# circos.genomicHeatmap(cnv_hubs_df_track, col = col_fun, side = "inside", border = "white")
+# circos.genomicLabels(cnv_hubs, labels.column = 4, side = "inside",
+#     col = 'grey22', line_col = 'grey22',padding = 0.6, cex=0.5)
+dev.off()
+
+circos.initializeWithIdeogram()
+bed = generateRandomBed(nr = 50, fun = function(k) sample(letters, k, replace = TRUE))
+bed[1, 4] = "aaaaa"
+circos.genomicLabels(bed, labels.column = 4, side = "inside")
+dev.off()
 

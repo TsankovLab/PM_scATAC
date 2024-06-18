@@ -55,7 +55,7 @@ palette_cnv_fun = colorRamp2(c(-.5,0,.5), palette_cnv)
 ov_pal = rev(paletteer::paletteer_c("grDevices::Purple-Blue",100))
 
 palette_module_correlation = paletteer::paletteer_c("pals::kovesi.diverging_bwr_40_95_c42",100)
-palette_module_correlation_fun = colorRamp2(c(-1,0,1), c('blue','white','red'))
+palette_module_correlation_fun = colorRamp2(c(-1,0,1), c('#2B5C8AFF','white','#9E3D22FF'))
 
 # Set palette
 palette_bulk = setNames (as.character(paletteer::paletteer_d("rcartocolor::ArmyRose")[c(1,2,5,7,3,1,7)]), c('Epithelioid','Biphasic-E','Biphasic-S','Sarcomatoid','Biphasic','E_score','S_score'))
