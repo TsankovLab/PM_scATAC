@@ -1,6 +1,6 @@
 
 
-if(!file.exists ("'TCGA_CNV_hg38.rds'")) 
+if(!file.exists ("TCGA_CNV_hg38.rds")) 
   {
   if (!file.exists (file.path ('TCGA_CNV2','gdac.broadinstitute.org_MESO.Merge_snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.Level_3.2016012800.0.0','MESO.snp__genome_wide_snp_6__broad_mit_edu__Level_3__segmented_scna_minus_germline_cnv_hg19__seg.seg.txt')))
     {
@@ -59,10 +59,15 @@ if (!file.exists (paste0('windows_',ws,'_',ss,'.rds')))
   windows = readRDS (paste0('windows_',ws,'_',ss,'.rds'))  
   }
 
-### Change SegMean to LOSS < -0.25; GAIN = > 0.25  ####
-gain = .25
-loss = -0.25
-meso_CNV_gr_hg38_cnv = lapply (meso_CNV_gr_hg38, function(x) 
+
+### Bin CNV per patient and then take average across patients ####
+force = F
+if (!file.exists('TCGA_cnv_mat.rds') | force)
+  {
+  ### Change SegMean to LOSS < -0.25; GAIN = > 0.25  ####
+  gain = .25
+  loss = -0.25
+  meso_CNV_gr_hg38_cnv = lapply (meso_CNV_gr_hg38, function(x) 
   {
    tmp = x
    tmp$Segment_Mean[tmp$Segment_Mean >= gain] = 1
@@ -70,11 +75,6 @@ meso_CNV_gr_hg38_cnv = lapply (meso_CNV_gr_hg38, function(x)
    tmp$Segment_Mean[tmp$Segment_Mean > loss & tmp$Segment_Mean < gain] = 0
    tmp
   })
-
-### Bin CNV per patient and then take average across patients ####
-force = F
-if (!file.exists('TCGA_cnv_mat.rds') | force)
-  {
   pb =progress::progress_bar$new(total = length(meso_CNV_gr_hg38_cnv))
   cnv_mat = matrix (nrow = length(windows), ncol = length(meso_CNV_gr_hg38_cnv))
   rownames (cnv_mat) = as.character(windows)
