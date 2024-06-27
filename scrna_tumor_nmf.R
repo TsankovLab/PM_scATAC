@@ -1,5 +1,6 @@
 conda activate meso_scatac
 use UGER # Add this before running R to be able to run cNMF scripts using UGER 
+
 R
 library (Seurat)
 library (scran)

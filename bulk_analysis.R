@@ -138,11 +138,6 @@ if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM
   msm_meta = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/Mesothelioma_SampleInfo.txt')
   }
 
-## combine metadata from all bulk studies ####
-blk_meta = list (
-  bueno = bueno_meta, 
-  tcga = tcga_meta, 
-  mesomics = msm_meta)
 
 # #### Correct for immune infiltration using limma
 # bueno_meta3 = bueno_meta2 
@@ -176,9 +171,9 @@ blk_meta = list (
 meso_bulk_l = list (
   bueno = log2(bueno_mat[,rownames(bueno_meta)] + 1),
   tcga = log2 (tcga_mat + 1),
-  mesomics = log2 (msm+1))
+  mesomics = log2 (msm_mat+1))
 
-
+## combine metadata from all bulk studies ####
 meso_bulk_meta_l = list (
   bueno = bueno_meta,
   tcga = tcga_meta,
@@ -349,7 +344,7 @@ cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf
 activeTFs = read.csv ('../tumor_compartment/scatac_ArchR/Active_TFs.csv')[[2]]
 
 
-study = c('bueno_rpkm','tcga','mesomics')
+study = c('bueno','tcga','mesomics')
 cor_res_study = list()
 by_histology=FALSE
 for (blk in study)
@@ -430,9 +425,20 @@ genes_in_region = split (module_l,module_l)
 
 
 # Make metadata for survival analysis ####
+# Define module of genes to check ####
 module_l = list(TCF3 = 'TCF3', PITX1 = 'PITX1', TEAD1 = 'TEAD1')
 selected_TFs = read.csv ('../tumor_compartment/scatac_ArchR/Active_TFs.csv')$x
 module_l = split (selected_TFs, selected_TFs)
+
+#### Check chromatin regulators and genetic drivers genes ####
+chromatin_regulators = c('SETD5, ASH1L, CREBBP, PRDM2, KDM2B, KMT2D, EZH2, SETDB1')
+chromatin_regulators = unlist(strsplit (chromatin_regulators, ', '))
+genetic_drivers = c('BAP1, NF2, CDKN2A, CDKN2B, TP53, LATS2, SETD2, FAT4, PTCH1')
+genetic_drivers = unlist(strsplit (genetic_drivers, ', '))
+module_l = c(chromatin_regulators, genetic_drivers)
+module_l = split (module_l, module_l)
+
+
 meso_bulk_meta_l2 = meso_bulk_meta_l
 meso_bulk_meta_l2 = lapply (seq_along(meso_bulk_l)[1:2], function(x) 
   {

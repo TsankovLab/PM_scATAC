@@ -85,9 +85,9 @@ palette_celltypes_normal = setNames(brewer.pal(11,'Paired'),rev(c('AT1','AT2','B
 
 
 #for (pal in ls()[grep('palette',ls())]) store_pal (list(pal = get(pal)))
-palette_deviation = rev (as.character (paletteer::paletteer_c("grDevices::Rocket",100)))
 palette_expression = rev (as.character(paletteer::paletteer_c("grDevices::Purple-Blue",100)))
 palette_deviation = colorRamp2(c(-.2,-.1,0,.1,.2), c("grey44",'gray','white', "brown",'black'))  
+palette_deviation = rev (as.character (paletteer::paletteer_c("grDevices::Rocket",100)))
 palette_enrichment = rev (as.character(paletteer::paletteer_c("grDevices::Purples 3",100)))
 
 

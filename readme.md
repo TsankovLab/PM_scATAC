@@ -7,7 +7,7 @@ conda install bioconda::bioconductor-chromvar
 conda install bioconda::bioconductor-scran
 conda install bioconda::bioconductor-infercnv
 conda install bioconda::macs2
-
+conda install samtools
 
 # Install SCENIC+ in the same conda environment
 git clone https://github.com/aertslab/scenicplus

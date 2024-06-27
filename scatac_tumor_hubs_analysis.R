@@ -5,6 +5,24 @@ source ('../../PM_scATAC/addCoax.R')
 source ('../../PM_scATAC/Hubs_finder.R')
 source ('../../PM_scATAC/hubs_track.R')
 
+# Export bigiwg files ####
+metaGroupName = 'Sample2'
+exp_bigwig = FALSE
+if (exp_bigwig)
+  {
+  getGroupBW(
+    ArchRProj = archp,
+    groupBy = metaGroupName,
+    normMethod = "ReadsInTSS",
+    tileSize = 100,
+    maxCells = 1000,
+    ceiling = 4,
+    verbose = TRUE,
+    threads = getArchRThreads(),
+    logFile = createLogFile("getGroupBW")
+  )
+  }
+
 
 if (!file.exists ('peak_regions.bed'))
   {
@@ -14,7 +32,7 @@ if (!file.exists ('peak_regions.bed'))
   }
 
 
-###--- Hubs analysis --###
+### Hubs analysis #####
 metaGroupName = "Sample2"
 cor_cutoff = 0.2
 #max_dist = 12500
@@ -24,7 +42,7 @@ dgs = 0
 hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks)
 dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 
-# Generate cluster-aware knn groups
+# Generate cluster-aware knn groups ####
 k= 30
 metaGroupName = 'Sample2'
 
@@ -64,7 +82,7 @@ umap_knn
 dev.off()
 
 
-
+# Run Co-accessibility ####
 run_coax = FALSE
 if (run_coax)
   {
@@ -74,7 +92,7 @@ if (run_coax)
     maxDist = max_dist)
   }
 
-#archp = saveArchRProject (archp, load=T)
+### Run hub finder ####
 force=F
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
@@ -97,164 +115,6 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   } else {
   hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))  
   }
-
-
-
-# Export bed file of hub regions
-
-###--- Generate matrces of hubs x cells / knn from collapsed non-redundant hubs to identify differential hubs  ---###
-# metaGroup = as.character (archp@cellColData[,metaGroupName])
-# metaGroup_df = data.frame (barcode = rownames(archp@cellColData), metaGroup = metaGroup)
-
-# metaGroup3 = names (sapply (seq_along(KNNs), function(x)
-#   table(metaGroup_df$metaGroup[match (KNNs[[x]],metaGroup_df$barcode)])))
-
-# # Generate matrix of fragment counts of peaks x cluster
-# peaksKnn_mat = matrix (ncol = length(KNNs), nrow = length(hubs_obj$peaksMerged))
-# pb =progress::progress_bar$new(total = length (KNNs)) 
-# for (i in 1:length(KNNs)) {
-#     pb$tick()  
-#     peaks_fr = fragments[fragments$RG %in% KNNs[[i]]]  
-#     fragments_hubs = countOverlaps (hubs_obj$peaksMerged, peaks_fr)
-#     peaksKnn_mat[,i] = fragments_hubs
-# }
-# peaksKnn_mat = as.data.frame (peaksKnn_mat)
-# peaksKnn_mat$hubs_id = paste0(rep (hubs_obj$hubs_id,sapply(hubs_obj$hubsMerged,nrow)))
-
-# # Aggregate peaks x knn matrix to hub level taking mean
-# #gm_mean = function (x, na.rm=TRUE){ exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x)) } # geometric mean, doesnt work as good as normal mean i think
-# hubsKnn_mat = aggregate (. ~ hubs_id, data = peaksKnn_mat, FUN = mean)
-# rownames (hubsKnn_mat) = apply (data.frame(as.data.frame (hubs_obj$hubsCollapsed), hubs_id = hubs_obj$hubs_id)[,c(7,1,2,3,6)], 1,
-#  function(x) paste(x, collapse = '_')) [match (hubsKnn_mat$hubs_id, hubs_obj$hubs_id)]
-# rownames (hubsKnn_mat) = gsub (' ','', rownames(hubsKnn_mat))
-# hubsKnn_mat = hubsKnn_mat[,-1]
-
-# # Normalise by seq depth
-# cellpool_nFrags = sapply(KNNs,function(v) sum(archp$ReadsInTSS[archp$cellNames %in% v]))
-# hubsKnn_mat = t(t(hubsKnn_mat) * (10^6 /cellpool_nFrags)) # scale
-# colnames (hubsKnn_mat) = metaGroup3
-# saveRDS (hubsKnn_mat, paste0 (projdir_hubs, 'hubs_knn_matrix_global.rds'))
-# hubsKnn_mat = readRDS (paste0 (projdir_hubs, 'hubs_knn_matrix_global.rds'))
-
-# # hubsClust_mat = as.data.frame (t (hubsKnn_mat))
-# # hubsClust_mat$metaGroup = metaGroup3
-# # hubsClust_mat = aggregate (.~ metaGroup, data = hubsClust_mat, FUN = mean)
-# # rownames (hubsClust_mat) = hubsClust_mat[,1]
-# # hubsClust_mat = hubsClust_mat[,-1]
-# # saveRDS (hubsClust_mat, paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
-# # hubsClust_mat = readRDS (paste0(projdir_hubs, 'hubsClust_global_mat.rds'))
-
-
-# # Correlate with SOX9 genescore
-# if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
-# gsSE = gsSE[, archp$cellNames]
-# gsMat = assays (gsSE)[[1]]
-# rownames (gsMat) = rowData (gsSE)$name
-
-# head (KNNs_df)
-# gsMat = gsMat[c(tf_name_selected, 'AXL','VIM','CALB2','ITLN1'),]
-# gsMat = as.data.frame (t(gsMat))
-# gsMat = gsMat[unlist(KNNs),]
-# gsMat$cellGroup = KNNs_df$group
-# gsMat = aggregate (.~ cellGroup, data = gsMat, FUN = mean)
-# rownames (gsMat) = gsMat[,1]
-# gsMat = gsMat[,-1]
-
-# hubsKnn_mat = t(hubsKnn_mat)
-# hubsKnn_mat = as.data.frame (hubsKnn_mat)
-# rownames (hubsKnn_mat) = rownames (gsMat)
-# TF_hub_cor = lapply (unique(KNNs_df$group2), function(x) cor (gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SOX9'], hubsKnn_mat[unique(KNNs_df$group[KNNs_df$group2 == x]),], method = 'spearman'))
-# names (TF_hub_cor) = unique(KNNs_df$group2)
-
-# TF_hub_cor2 = as.data.frame (t(TF_hub_cor[['P1']]))
-# TF_hub_cor2 = TF_hub_cor2[order (-TF_hub_cor2$V1),, drop=F]
-# head (TF_hub_cor2, 10)
-# rownames (TF_hub_cor2) = sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit(x, '_'))[1])
-
-
-# KNNs_df2 = KNNs_df[!duplicated(KNNs_df$group),]
-# table (KNNs_df2$group2)
-# a = lapply (unique(KNNs_df$group2), function(x) cor (gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SNAI2'], gsMat[unique(KNNs_df$group[KNNs_df$group2 == x]),'SOX9'], method='spearman'))
-# names(a) = unique(KNNs_df$group2)
-
-
-
-
-
-
-# nfeat=5000
-#   k=25
-#   cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
-#   cnmf_list = lapply (cnmf_list, function(x) head (x,50))
-# gsMat = assays (gsSE)[[1]]
-# rownames (gsMat) = rowData (gsSE)$name
-# gsMat = gsMat[rownames (gsMat) %in% c(cnmf_list[[20]],'SOX9'),]
-# gsMat = as.data.frame (t(gsMat))
-
-# gsMat = gsMat[unlist(KNNs),]
-# gsMat$cellGroup = KNNs_df$group
-# gsMat = aggregate (.~ cellGroup, data = gsMat, FUN = mean)
-# rownames (gsMat) = gsMat[,1]
-# gsMat = gsMat[,-1]
-# gsMat_p1 = gsMat[unique(KNNs_df$group[KNNs_df$group2 == 'P1']),]
-
-# cor (gsMat_p1[,'TWIST1'],gsMat_p1[,'SNAI2'], method='spearman')
-
-# pdf ('Plots/cor_genescore_genes.pdf')
-# plot (gsMat[,'SOX9'], gsMat[,'VIM'])
-# dev.off 
-
-
-
-
-# # Check enrichment of TF in hubs using fgsea
-# TF = 'MESP1'
-# hubs_id = sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit (x, '_'))[1])
-# tf_matches = getMatches (archp)
-# TF = colnames(tf_matches)[grep (TF, colnames(tf_matches))]
-
-
-# hub_peaks = rep (hubs_obj$hubs_id, sapply (hubs_obj$hubsClusters[[1]], nrow))
-# hubs_obj$peaksMerged$hub_id = hub_peaks
-# hubs_peaks_idx = subjectHits (findOverlaps (hubs_obj$peaksMerged,rowRanges(tf_matches)))
-# tf_matches = tf_matches[hubs_peaks_idx, colnames(tf_matches) == TF]
-# tf_matches_hit = which (assays (tf_matches)[[1]][,1])
-# hub_peaks_cor = setNames (TF_hub_cor2[hubs_obj$peaksMerged$hub_id,]$V1, paste0('h',1:nrow(tf_matches))) 
-# #tf_matches_peaks = unique(queryHits (findOverlaps (hubs_obj$hubsCollapsed[match(TF_hubs_id, hubs_obj$hubs_id)], rowRanges(tf_matches)[tf_matches_hit])))
-# pathways = list(SOX9 = paste0('h',tf_matches_hit))
-
-# library (fgsea)
-# hub_peaks_cor = na.omit (hub_peaks_cor)
-# fgseaRes = fgseaMultilevel (pathways, 
-#           hub_peaks_cor#, 
-#           #minSize=15, 
-#           #maxSize=1500,
-#           #BPPARAM = NULL
-#           )
-
-
-# tf_match = getMatches (archp)
-# colnames(tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-# bg_peakSet = rowRanges (tf_match)
-# top_cor_hubs = head (sapply (rownames(TF_hub_cor2), function(x) unlist(strsplit (x, '_'))[1]),100)
-# top_cor_hubs_peaks = lapply(top_cor_hubs, function(x) getPeakSet(archp) [queryHits(findOverlaps(getPeakSet(archp), hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]))])
-# top_cor_hubs_TF = lapply (top_cor_hubs_peaks, function(x) hyperMotif (
-#   selected_peaks = x,
-#   motifmatch = tf_match))
-  
-# top_cor_hubs_TF = lapply (top_cor_hubs_TF, function(x) x[rownames(top_cor_hubs_TF[[1]]), ])
-#   top_cor_hubs_TF_df = do.call (cbind, top_cor_hubs_TF)
-#   top_cor_hubs_TF_df = top_cor_hubs_TF_df[, grep ('padj', colnames(top_cor_hubs_TF_df))]
-#   top_cor_hubs_TF_df[top_cor_hubs_TF_df > 0.05] = 1
-#   top_cor_hubs_TF_df = -log10(top_cor_hubs_TF_df)
-#   top_cor_hubs_TF_df = top_cor_hubs_TF_df[rowSums (top_cor_hubs_TF_df) != 0, ]
-#   top_cor_hubs_TF_df[sapply(top_cor_hubs_TF_df, is.infinite)] <- 300
-  
-#   TF_ht = Heatmap (top_cor_hubs_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
-  
-#   pdf (paste0('Plots/TF_top_cor_hubs_heatmap.pdf'),width = 15,height=15)
-#   print (TF_ht)
-#   dev.off()
 
 
 
@@ -991,8 +851,8 @@ pdf (file.path ('Plots', 'HUB_CNV_volcano.pdf'),height=3,width=3)
 vp
 dev.off()
 
-res_filtered = cnv_hubs_df2[cnv_hubs_df2$logFC < logfcThreshold & cnv_hubs_df2$padj < pvalAdjTrheshold,]
-res_filtered = head (res_filtered$feature[order (res_filtered$cnv)], 30)
+res_filtered = cnv_hubs_df2[cnv_hubs_df2$logFC > logfcThreshold & cnv_hubs_df2$padj < pvalAdjTrheshold,]
+res_filtered = head (res_filtered$feature[order (-res_filtered$cnv)], 30)
 
 
 ## Generate circos plot for showing hubs on recurrent CNVs ####
@@ -1058,10 +918,3 @@ circos.genomicTrack (cnv_hubs_df_track,
 # circos.genomicLabels(cnv_hubs, labels.column = 4, side = "inside",
 #     col = 'grey22', line_col = 'grey22',padding = 0.6, cex=0.5)
 dev.off()
-
-circos.initializeWithIdeogram()
-bed = generateRandomBed(nr = 50, fun = function(k) sample(letters, k, replace = TRUE))
-bed[1, 4] = "aaaaa"
-circos.genomicLabels(bed, labels.column = 4, side = "inside")
-dev.off()
-

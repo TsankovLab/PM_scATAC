@@ -1,4 +1,4 @@
-ish -q interactive -l h_vmem=16g -pe smp 8 -binding linear:8
+#ish -q interactive -l h_vmem=64g -pe smp 4 -binding linear:4
 use UGER
 conda activate meso_scatac
 R
@@ -46,28 +46,28 @@ addArchRGenome ("Hg38")
 
    
 fragment_paths = c(
-  file.path(datadir,'JShendure_scATAC', 'migrated_to_hg38', list.files (file.path (datadir, 'JShendure_scATAC','migrated_to_hg38'), pattern = 'bgz$')),
-  file.path(datadir,'bingren_adult_brain', list.files (file.path (datadir, 'bingren_adult_brain'), pattern = 'bgz$'))#,
+  #file.path(datadir,'JShendure_scATAC', 'migrated_to_hg38', list.files (file.path (datadir, 'JShendure_scATAC','migrated_to_hg38'), pattern = 'bgz$')),
+  #file.path(datadir,'bingren_adult_brain', list.files (file.path (datadir, 'bingren_adult_brain'), pattern = 'bgz$'))#,
   #file.path(datadir,'greenleaf_brain_scATAC', list.files (file.path (datadir, 'greenleaf_brain_scATAC'), pattern = 'bgz$')),
   #file.path(datadir,'yang_kidney_scATAC','migrated_to_hg38', list.files (file.path (datadir, 'yang_kidney_scATAC','migrated_to_hg38'), pattern = 'bgz$')),
   #file.path(datadir,'Tsankov_scATAC', list.files (file.path (datadir, 'Tsankov_scATAC'), pattern = 'bgz$')),
   #file.path(datadir,'bingren_scATAC', list.files (file.path (datadir, 'bingren_scATAC'), pattern = 'bgz$')),
-  #file.path(datadir,'greenleaf_colon_scATAC', list.files (file.path (datadir, 'greenleaf_colon_scATAC'), pattern = 'bgz$')),
+  #file.path(datadir,'greenleaf_colon_scATAC', list.files (file.path (datadir, 'greenleaf_colon_scATAC'), pattern = 'bgz$'))#,
   #file.path(datadir,'rawlins_fetal_lung_scATAC', list.files (file.path (datadir, 'rawlins_fetal_lung_scATAC'), pattern = 'bgz$'))
   )
-
+#fragment_paths = file.path(datadir,'bingren_adult_brain','sorted.bgzip')
 # fragment_paths = c(
 #   file.path(datadir,'JShendure_scATAC', 'migrated_to_hg38', 'sample_10_muscle.fragments.txt.bgz'),
 #   file.path(datadir,'bingren_adult_brain', 'GSM7822133_MM_439.bed.bgz')
 #   )
   sample_names = c(
-   paste0 ('JShendure', 1:length(list.files (file.path (datadir, 'JShendure_scATAC','migrated_to_hg38'), pattern = 'bgz$'))),
-    paste0 ('bingren_adult_brain', 1:length(list.files (file.path (datadir, 'bingren_adult_brain'), pattern = 'bgz$')))#,
+   #paste0 ('JShendure', 1:length(list.files (file.path (datadir, 'JShendure_scATAC','migrated_to_hg38'), pattern = 'bgz$'))),
+    #paste0 ('bingren_adult_brain', 1:length(list.files (file.path (datadir, 'bingren_adult_brain'), pattern = 'bgz$')))#,
     #paste0 ('greenleaf_brain', 1:length(list.files (file.path (datadir, 'greenleaf_brain_scATAC'), pattern = 'bgz$'))),
     #paste0 ('yang_kidney','migrated_to_hg38', 1:length(list.files (file.path (datadir, 'yang_kidney_scATAC','migrated_to_hg38'), pattern = 'bgz$'))),
     #paste0 ('Tsankov_lung', 1:length(list.files (file.path (datadir, 'Tsankov_scATAC'), pattern = 'bgz$'))),
     #paste0 ('bingren_pan', 1:length(list.files (file.path (datadir, 'bingren_scATAC'), pattern = 'bgz$'))),
-    #paste0 ('greenleaf_colon', 1:length(list.files (file.path (datadir, 'greenleaf_colon_scATAC'), pattern = 'bgz$'))),
+    #paste0 ('greenleaf_colon', 1:length(list.files (file.path (datadir, 'greenleaf_colon_scATAC'), pattern = 'bgz$')))#,
     #paste0 ('rawlins_fetal_lung', 1:length(list.files (file.path (datadir, 'rawlins_fetal_lung_scATAC'), pattern = 'bgz$')))
     )
   
@@ -83,21 +83,97 @@ fragment_paths = c(
   force = FALSE,
   subThreading = T
   )
+
+# reformatFragmentFiles(
+#   fragmentFiles = fragment_paths,
+#   checkChrPrefix = getArchRChrPrefix()
+# )
   
   archp = ArchRProject (
-    ArrowFiles = ArrowFiles, 
+    ArrowFiles = list.files (projdir, pattern = '.arrow'), 
     outputDirectory = projdir,
     copyArrows = FALSE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
   )
   
+table (archp$Sample)
+archp$project =  gsub("^\\d+|\\d+$", "", archp$Sample)    
+table (archp$project)
+
+### Import metadata ####
+meta_dir = '/broad/hptmp/bgiotti/BingRen_scATAC_atlas/data/metadata'
+
+meta_files = c(
+  'GSE184462_metadata.csv',
+  #bingren_adult_brain_metadata.csv
+  'GSE149683_File_S2.Metadata_of_high_quality_cells.csv',
+  'tsankov_refined_annotation.csv',
+  'GSE162170_atac_cell_metadata.csv',
+  'yang_kidney.csv',
+  'greenleaf_colon_metadata.csv',
+  'rawlins_fetal_lung_metadata.csv'
+  )
+#gse184 = read.table (file.path (meta_dir2, 'GSE184462_metadata.tsv'), sep='\t', header=T)
+meta_dir2 = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/all_tissues_ArchR/metadata_external_data'
+meta = lapply (meta_files, function(x) read.csv (file.path (meta_dir2, x), row.names=1))
+
+source ('../../PM_scATAC/all_tissues_annotate.R')
+
+
+
+
+
+for (prj in projects)
+  {  
+  archp_prj = ArchRProject (
+  ArrowFiles = list.files (projdir, pattern = '.arrow'), 
+  outputDirectory = file.path(projdir,prj),
+  copyArrows = FALSE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
+  )  
+  archp_prj$celltype = archp$celltype[match(rownames(archp_prj@cellColData), rownames(archp@cellColData))]
+
+  archp = addIterativeLSI (
+  ArchRProj = archp[archp$project == prj], 
+  useMatrix = "TileMatrix", 
+  name = "IterativeLSI",
+  force=FALSE)
+  archp = addUMAP (
+  ArchRProj = archp, 
+  reducedDims = "IterativeLSI",
+  force = FALSE)
+  
+  metaGroupName = 'celltype'
+  umap_p1 = lapply (metaGroupName, function(x) plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
+   name = x, embedding = "UMAP"))
+    
+  pdf (file.path('Plots',paste0('celltype_umap.pdf')), 15,15)
+  print (umap_p1)
+  dev.off()
+  
+
+  }
+
 
   ### Run peak calling on celltype annotation ####
 
 run_peakCall = FALSE
 if (run_peakCall)
   {
+  projects   = unique (archp$project)[7]
+  for (prj in projects)
+  {
   ### Call peaks on celltypes ###
-  metaGroupName = 'celltype'
+  metaGroupName = 'celltype_prj'
+  archp_sub = archp[as.character(archp@cellColData[, 'project']) == prj]
+  archp_sub = addGroupCoverages (
+    ArchRProj = archp_sub, 
+    groupBy = metaGroupName,  
+    force = FALSE,
+    minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
+    maxCells = 500,
+    minReplicates = 2,
+    sampleRatio = 0.8,
+    useLabels = TRUE)  
+  }
   archp = addGroupCoverages (
     ArchRProj = archp, 
     groupBy = metaGroupName,  
@@ -106,8 +182,7 @@ if (run_peakCall)
     maxCells = 500,
     minReplicates = 2,
     sampleRatio = 0.8,
-    useLabels = TRUE)
-  
+    useLabels = TRUE)  
   archp = addReproduciblePeakSet (
       archp,
       groupBy= metaGroupName,
@@ -115,7 +190,7 @@ if (run_peakCall)
       reproducibility = "1",
       maxPeaks = 500000, 
       minCells=20,
-      force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower
+      force =FALSE) # I think this should be set corresponding to the smallest cluster in the group or lower
   archp = addPeakMatrix (archp)
   
   archp = saveArchRProject (archp, load=TRUE)
