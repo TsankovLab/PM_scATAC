@@ -35,13 +35,14 @@ if (!file.exists ('peak_regions.bed'))
 
 ### Hubs analysis #####
 metaGroupName = "Clusters_H"
-cor_cutoff = 0.2
+cor_cutoff = 0.3
 #max_dist = 12500
-max_dist = 5000
+max_dist = 12000
 min_peaks = 5
 dgs = 0
 hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks)
 dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
+setwd (hubs_dir)
 
 # Generate cluster-aware knn groups ####
 k= 30
@@ -107,7 +108,8 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
     min_peaks = min_peaks,
     macs_score = 1,
     dgs = dgs,
-    cores=1
+    cores=1,
+    remove_chr = c('chrX')
     ) 
   saveRDS (hubs_obj, file.path(hubs_dir,'global_hubs_obj.rds'))
   hubs_regions = as.data.frame (hubs_obj$hubsCollapsed)

@@ -29,7 +29,8 @@ hubs_finder = function (
   min_peaks = 3,
   macs_score = 1,
   dgs = 2000,
-  cores = 1
+  cores = 1,
+  remove_chr = c('chrX')
   )
   {
   cat (paste(
@@ -155,7 +156,7 @@ hubs_finder = function (
       hubsMerged = hubsMerged[!sapply (hubsMerged, function(x) any(x$seqnames %in% remove_chr))]
       hubs_linksL = lapply (hubs_linksL, function(x) x[!seqnames(x) %in% remove_chr])
       }
-      
+
     # Collapse hubs
     message ('3 - collapse Hubs by genomc ranges')
     hubs_cluster_collapsed = mclapply (hubsMerged, function(x){
