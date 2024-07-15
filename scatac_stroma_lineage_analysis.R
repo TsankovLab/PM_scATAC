@@ -10,9 +10,9 @@
 # Read in peak files from scATAC studies ####
 projects = c('yang_kidney','Tsankov_lung','rawlins_fetal_lung','JShendure','greenleaf_colon','greenleaf_brain','bingren_pan')
 projects_peaks = lapply (seq_along(projects), function(x) {
-  bed_files = list.files (file.path('..','all_tissues_ArchR',projects[x],'PeakCalls'), pattern = '.rds')
+  bed_files = list.files (file.path('..','..','tumor_compartment','all_tissues_ArchR',projects[x],'PeakCalls'), pattern = '.rds')
   grlist = lapply (seq_along(bed_files), 
-    function(y) readRDS (file.path('..','all_tissues_ArchR',projects[x],'PeakCalls',bed_files[y])))
+    function(y) readRDS (file.path('..','..','tumor_compartment','all_tissues_ArchR',projects[x],'PeakCalls',bed_files[y])))
 names (grlist) = paste0(projects[x], '_', sapply (bed_files, function(z) unlist(strsplit (z, '-'))[1]))
 grlist
 })
@@ -238,8 +238,9 @@ grlist
 projects_peaks = unlist (projects_peaks, recursive=F)
 projects_peaks2 = GRangesList (projects_peaks)
 
-meso_peaks = lapply (unique (archp$Clusters), function(x) readRDS (file.path('PeakCalls',paste0(x,'-reproduciblePeaks.gr.rds'))))
-names (meso_peaks) = unique (archp$Clusters)
+#metaGroupName = 'Clusters'
+meso_peaks = lapply (list.files ('PeakCalls', pattern='.rds'), function(x) readRDS (file.path('PeakCalls',x)))
+names (meso_peaks) = list.files ('PeakCalls', pattern='.rds')
 peaks_ov_mat = sapply (meso_peaks, function(x) sapply (projects_peaks2, function(y) sum(countOverlaps (x, y) / min (c(length(x), length(y))))))
 
 # prop_sample_df[is.na(prop_sample_df)] = 0

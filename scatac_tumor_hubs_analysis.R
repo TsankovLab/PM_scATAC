@@ -918,3 +918,29 @@ circos.genomicTrack (cnv_hubs_df_track,
 # circos.genomicLabels(cnv_hubs, labels.column = 4, side = "inside",
 #     col = 'grey22', line_col = 'grey22',padding = 0.6, cex=0.5)
 dev.off()
+
+
+# Map point mutations from Waddel and MESOMICS WGS to identify hyper-mutated hubs ####
+snp_msm = read.table ('/ahg/regevdata/projects/ICA_Lung/Wooseung/Mesothelioma/Data/var_annovar_maf_corr_allvariants.txt', sep='\t',header=T, quote='')
+snp_wdl = read.table ('/ahg/regevdata/projects/ICA_Lung/Wooseung/SuperEnhancer/Data/Mutation/Waddellhg38.bed', sep='\t',header=F, quote='')
+colnames (snp_wdl) = c('chr','start','end','gene','gene2')
+snp_wdl$chr = paste0('chr',snp_wdl$chr)
+
+snp_msm_gr = makeGRangesFromDataFrame (snp_msm)
+snp_wdl_gr = makeGRangesFromDataFrame (snp_wdl)
+
+snp_msm_df = as.data.frame (snp_msm_gr)
+snp_msm_df = snp_msm_df[,1:3]
+snp_wdl_df = as.data.frame (snp_wdl_gr)
+snp_wdl_df = snp_wdl_df[,1:3]
+write.table (snp_msm_df, 'msm_mutation_snp.bed', sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+write.table (snp_wdl_df, 'wdl_mutation_snp.bed', sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+mutated_hubs = countOverlaps  (hubs_obj$hubsCollapsed, snp_wdl_gr)
+mut_density_hubs = mutated_hubs / width (hubs_obj$hubsCollapsed)
+mut_density_hubs = mut_density_hubs * mutated_hubs
+
+head (hubs_obj$hubs_id[order (-mut_density_hubs)],10)
+
+
+
+

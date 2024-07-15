@@ -150,6 +150,12 @@ hubs_finder = function (
     hubsMerged = hubsMerged[!duplicated(hub_dup)]
     message (paste(sum (duplicated(hub_dup)), 'duplicated hubs removed'))
 
+    if (!is.null(remove_chr)) 
+      {
+      hubsMerged = hubsMerged[!sapply (hubsMerged, function(x) any(x$seqnames %in% remove_chr))]
+      hubs_linksL = lapply (hubs_linksL, function(x) x[!seqnames(x) %in% remove_chr])
+      }
+      
     # Collapse hubs
     message ('3 - collapse Hubs by genomc ranges')
     hubs_cluster_collapsed = mclapply (hubsMerged, function(x){
@@ -177,6 +183,7 @@ hubs_finder = function (
     hubsClustersL = list()
     hubs_linksL = list()  
     main_peakSet = getPeakSet (ArchRProj)  
+
     cA1 = getCoAccessibility (
         ArchRProj = ArchRProj,
         corCutOff = cor_cutoff,
@@ -244,7 +251,12 @@ hubs_finder = function (
     message('Format hubs list')
     
     hubsMerged = hubsClustersL[['main']]
-  
+    if (!is.null(remove_chr)) 
+      {
+      hubsMerged = hubsMerged[!sapply (hubsMerged, function(x) any(x$seqnames %in% remove_chr))]
+      hubs_linksL = lapply (hubs_linksL, function(x) x[!seqnames(x) %in% remove_chr])
+      }
+    
     # Collapse hubs
     message ('1 - collapse Hubs by genomc ranges')
     hubs_cluster_collapsed = mclapply (hubsMerged, function(x){

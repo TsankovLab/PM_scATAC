@@ -72,23 +72,6 @@ fragment_paths = c(
     )
   
 
-  #setwd (projdir)
-  ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
-  sampleNames = sample_names,
-  minTSS = 4, #Dont set this too high because you can always increase later
-  minFrags = 1000,
-  maxFrags = Inf,
-  addTileMat = TRUE,
-  addGeneScoreMat = TRUE,
-  force = FALSE,
-  subThreading = T
-  )
-
-# reformatFragmentFiles(
-#   fragmentFiles = fragment_paths,
-#   checkChrPrefix = getArchRChrPrefix()
-# )
-  
   archp = ArchRProject (
     ArrowFiles = list.files (projdir, pattern = '.arrow'), 
     outputDirectory = projdir,
@@ -121,31 +104,44 @@ arrows = list.files (projdir, pattern = '.arrow')
 
 source ('../../PM_scATAC/all_tissues_scatac_annotate.R')
 
-projects = projects[-length(projects)]
-for (prj in projects)
-  {  
-  metaGroupName = 'celltype'
-  archp_prj = ArchRProject (
-  ArrowFiles = arrows[grep (prj, arrows)], 
-  outputDirectory = file.path(projdir,prj),
-  copyArrows = FALSE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
-  )
-  dir.create (file.path(projdir,prj,'Plots'))  
-  archp_prj$celltype = as.character(archp$celltype[match(rownames(archp_prj@cellColData), rownames(archp@cellColData))])
-  archp_prj = archp_prj[!is.na(archp_prj$celltype)]
-  archp_prj = archp_prj[archp_prj$celltype != 0]
-  archp_prj$celltype = gsub (' ','',archp_prj$celltype)
-  archp_prj$celltype = gsub ('/','_',archp_prj$celltype)
-  archp_prj$celltype = gsub ('-','_',archp_prj$celltype)
-  archp_prj = addIterativeLSI (
-  ArchRProj = archp_prj, 
-  useMatrix = "TileMatrix", 
-  name = "IterativeLSI",
-  force=FALSE)
-  archp_prj = addUMAP (
-  ArchRProj = archp_prj, 
-  reducedDims = "IterativeLSI",
-  force = FALSE)
+#arrows_controls = arrows[grep ('rawlins', arrows)]
+#arrows_controls = append (arrows_controls, arrows[grep ('Tsankov', arrows)])
+arrows_controls = arrows[grep ('bingren', arrows)]
+
+metaGroupName = 'celltype'
+archp_prj = ArchRProject (
+ArrowFiles = arrows_controls, 
+outputDirectory = file.path(projdir,'normal_controls_immune'),
+copyArrows = FALSE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
+)
+
+dir.create (file.path(projdir,'normal_controls_immune','Plots')) 
+archp_prj$celltype = as.character(archp$celltype[match(rownames(archp_prj@cellColData), rownames(archp@cellColData))])
+archp_prj = archp_prj[!is.na(archp_prj$celltype)]
+archp_prj = archp_prj[archp_prj$celltype != 0]
+archp_prj$celltype = gsub (' ','',archp_prj$celltype)
+archp_prj$celltype = gsub ('/','_',archp_prj$celltype)
+archp_prj$celltype = gsub ('-','_',archp_prj$celltype)
+archp_prj$project = gsub("^\\d+|\\d+$", "", archp_prj$Sample)    
+archp_prj$celltype_project = paste0(archp_prj$project,'_', archp_prj$celltype)
+table (archp_prj$celltype_project[grep ('meso', archp_prj$celltype_project, ignore.case = T)])
+table (archp_prj$celltype_project[grep ('bingren_pan_Adult_lung', archp_prj$celltype_project, ignore.case = T)])
+archp_prj = archp_prj[grep ('lung',archp_prj$celltype_project)]
+archp_prj$celltype = sapply (archp_prj$celltype_project, function(x) unlist(strsplit (x, '_'))[7])
+archp_prj = archp_prj[!archp_prj$celltype %in% c('AlveolarType1(AT1)Cell','AlveolarType2(AT2)Cell','CilliatedCell','ClubCell')]
+low_celltypes = table (archp_prj$celltype)[table (archp_prj$celltype) < 30]
+archp_prj = archp_prj[!archp_prj$celltype %in% names(low_celltypes)]
+saveArchRProject (archp_prj, dropCells = T)
+
+archp_prj = addIterativeLSI (
+ArchRProj = archp_prj, 
+useMatrix = "TileMatrix", 
+name = "IterativeLSI",
+force=FALSE)
+archp_prj = addUMAP (
+ArchRProj = archp_prj, 
+reducedDims = "IterativeLSI",
+force = FALSE)
   
   umap_p1 = lapply (metaGroupName, function(x) plotEmbedding (ArchRProj = archp_prj, colorBy = "cellColData",
    name = x, embedding = "UMAP"))

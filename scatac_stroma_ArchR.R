@@ -41,7 +41,7 @@ source ('../../PM_scATAC/palettes.R')
 set.seed (1234)
 addArchRThreads (threads = 8) 
 addArchRGenome ("Hg38")
-
+  
 sample_names = c(
     # Tumor  
     'P1', # p786
@@ -64,6 +64,10 @@ sample_names = c(
 
 # Load RNA
 #srt = readRDS ('../tumor_compartment/scrna/scRNA_meso.rds')
+#sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
+
+# Load RNA
+srt = readRDS ('../scrna/srt.rds')
 #sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
 
 # Load last istance
@@ -90,8 +94,6 @@ if (!file.exists ('Save-ArchR-Project.rds'))
     #"/ahg/regevdata/projects/ICA_Lung/10x/200116/wangy33.u.hpc.mssm.edu/10X_Single_Cell_RNA/TD01396_AlexTsankov/aDcd45n/outs/fragments.tsv.gz"
     )
      
-    
-    
       #setwd (projdir)  
       ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
       sampleNames = sample_names,
@@ -114,11 +116,8 @@ if (!file.exists ('Save-ArchR-Project.rds'))
   archp_main = loadArchRProject ('../../main/scatac_ArchR/')
   archp$celltype = 0
   archp$celltype[match (rownames(archp_main@cellColData), rownames(archp@cellColData))] = archp_main$celltype
-  archp_tumor = loadArchRProject ('../../tumor_compartment/scatac_ArchR/')
-  archp$celltype[match (rownames(archp_tumor@cellColData), rownames(archp@cellColData))] = archp_tumor$Sample2
-  archp = archp[archp$celltype != 'Malignant']
-
-  # Use Annotation from signac
+  
+  # Use Annotation from signac ####
   normal = readRDS ('../../per_sample_QC_signac/signac_normal.rds')
   normal_annotation = data.frame (barcode= colnames(normal), celltype = normal$predicted.id)
   normal_annotation$barcode = gsub (paste0(sample_names[11],'_'),paste0(sample_names[11],'#'),normal_annotation$barcode)
@@ -135,7 +134,7 @@ if (!file.exists ('Save-ArchR-Project.rds'))
   archp$celltype[archp$celltype == 'Myeloid'] = 'MonoMac'
   archp$celltype[archp$celltype == 'B.cells'] = 'B_cells'
   
-  archp = archp[!archp$celltype %in% c('AT1','AT2','Alveolar','B_cells','Ciliated','Mast','MonoMac','NK','Plasma','Secretory','T.NK.cells','T_cells','cDCs','pDCs')]
+  archp = archp[!archp$celltype %in% c('AT1','AT2','Alveolar','B_cells','Ciliated','Mast','MonoMac','NK','Plasma','Secretory','T.NK.cells','T_cells','cDCs','pDCs','Malignant')]
 
   archp$Sample2 = archp$Sample
   archp$Sample2[grep ('RPL',archp$Sample2)] = 'normal_pleura'
@@ -156,21 +155,21 @@ if (!file.exists ('Save-ArchR-Project.rds'))
     force = FALSE, LSIMethod = LSI_method,
     varFeatures = varfeat)
 
-#   archp = addHarmony (
-#     ArchRProj = archp,
-#     reducedDims = "IterativeLSI",
-#     name = "Harmony",
-#     groupBy = "Sample", force=FALSE
-# )
+  archp = addHarmony (
+    ArchRProj = archp,
+    reducedDims = "IterativeLSI",
+    name = "Harmony",
+    groupBy = "Sample2", force=FALSE
+)
 
-# archp = addUMAP (ArchRProj = archp, 
-#     reducedDims = "Harmony", name='UMAP_H',
-#     force = TRUE)
+archp = addUMAP (ArchRProj = archp, 
+    reducedDims = "Harmony", name='UMAP_H',
+    force = TRUE)
 
-# archp = addClusters (input = archp,
-#     reducedDims = "Harmony",
-#     name='Clusters_H',
-#     force = TRUE)
+archp = addClusters (input = archp,
+    reducedDims = "Harmony",
+    name='Clusters_H',
+    force = TRUE)
 
   archp = addClusters (input = archp, resolution = 3,
     reducedDims = "IterativeLSI", maxClusters = 100,
@@ -185,21 +184,21 @@ if (!file.exists ('Save-ArchR-Project.rds'))
   #archp = saveArchRProject (archp)
 
   umap_p1 = plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
-   name = "Sample", embedding = "UMAP")
+   name = "celltype", embedding = "UMAP")
   umap_p2 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "celltype",
+    colorBy = "cellColData", name = "Sample2",
      embedding = "UMAP")
   umap_p3 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "nFrags",
-     embedding = "UMAP")
+    colorBy = "cellColData", name = "Sample2",
+     embedding = "UMAP_H")
   umap_p4 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "TSSEnrichment",
-     embedding = "UMAP")
+    colorBy = "cellColData", name = "celltype",
+     embedding = "UMAP_H")
   umap_p5 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "Clusters",
-     embedding = "UMAP")
+    colorBy = "cellColData", name = "Clusters_H",
+     embedding = "UMAP_H")
   
-  pdf (file.path('Plots','celltype_umap_signac_filtered.pdf'),12,12)
+  pdf (file.path('Plots','celltype_umap_signac_filtered.pdf'),5,5)
   print (umap_p1)
   print (umap_p2)
   print (umap_p3)
@@ -207,17 +206,20 @@ if (!file.exists ('Save-ArchR-Project.rds'))
   print (umap_p5)
   dev.off()
   
-  plotPDF (umap_p1, umap_p2, umap_p3, umap_p4,
-   name = paste0('Plot-UMAP-Sample-Clusters_',LSI_method,'_',length(rownames(archp)),'_varfeat_',varfeat,'.pdf'),
-          ArchRProj = archp, addDOC = FALSE, width = 5, height = 5,logFile=NULL)
   
-  archp = saveArchRProject (archp, load = T)
+  archp = saveArchRProject (archp, load = T, dropCells=T)
   
   } else {
   archp = loadArchRProject (projdir)
   }
 
-metaGroupName = 'Clusters'
+### Run peak calling on celltype annotation ####
+run_peakCall = FALSE
+
+if (run_peakCall)
+  {
+  ### Call peaks on celltypes ###
+  metaGroupName = 'Clusters_H'
   archp = addGroupCoverages (
     ArchRProj = archp, 
     groupBy = metaGroupName,  
@@ -239,7 +241,12 @@ metaGroupName = 'Clusters'
   archp = addPeakMatrix (archp)
   
   archp = saveArchRProject (archp, load=TRUE)
-  
+  }
+
+### chromVAR analysis ####
+run_chromVAR = FALSE
+if (run_chromVAR)
+  {    
   archp = addBgdPeaks (archp, force= TRUE)
   archp = addMotifAnnotations (ArchRProj = archp,
       motifSet = "cisbp",
@@ -254,7 +261,7 @@ metaGroupName = 'Clusters'
   
   archp = saveArchRProject (ArchRProj = archp,  
       load = TRUE)
-
+  }
 
 # Find activating and repressing TFs ####
 run_activeTF = FALSE
@@ -269,7 +276,7 @@ devMethod = 'ArchR'
     rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
     }
   
-if (if (!file.exists ('TF_activators_genescore.rds')))
+if (!file.exists ('TF_activators_genescore.rds'))
   {
   seGroupMotif <- getGroupSE(ArchRProj = archp, useMatrix = "MotifMatrix", groupBy = "Clusters")
   seZ <- seGroupMotif[rowData(seGroupMotif)$seqnames=="z",]
@@ -325,7 +332,7 @@ mMat_cor = cor (as.matrix(t(mMat)), method = 'pearson')
 
 # row_filt = rowSums (mMat_cor) != 0
 # tf_name = rownames(mMat_cor)[row_filt]
-km = kmeans (mMat_cor, centers=20)
+km = kmeans (mMat_cor, centers=10)
 #km_ha = rowAnnotation (
 #  km = anno_simple(as.character(km$cluster), width = unit(2, "mm"),
 #    col = setNames (km_col, as.character(unique(km$cluster))), border=T))
@@ -379,18 +386,208 @@ tf_modules = do.call (cbind, tf_modules)
 archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
 archp@cellColData = cbind (archp@cellColData, tf_modules)
 
+archp = addImputeWeights (archp)
 TF_p = lapply (paste0('mod_',unique(km$cluster)), function(x) plotEmbedding (
     ArchRProj = archp,
     colorBy = "cellColData",
     name = x, 
     pal = palette_deviation,
     #useSeqnames='z',
-    embedding = "UMAP"))
+    imputeWeights = getImputeWeights(archp),
+    embedding = "UMAP_H"))
 
-pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 40,height=20)
+pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 30,height=14)
 wrap_plots (TF_p, ncol=5)
 dev.off()
 
 
+# Try with ridge plots ####
+library(ggridges)
+library(ggplot2)
+library(viridis)
+#library(hrbrthemes)
+tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+names (tf_modules) = paste0('mod_',unique(km$cluster))
+tf_modules = as.data.frame (do.call (cbind, tf_modules))
+tf_modules$Sample = archp$Sample2
+tf_modules$celltype = archp$celltype
+
+# Plot
+rp = lapply (paste0('mod_',unique(km$cluster)), function(x) 
+  ggplot(tf_modules, aes_string(x = x, y = 'Sample', fill = '..x..')) +
+  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, alpha=.5) +
+  paletteer::scale_fill_paletteer_c("ggthemes::Orange-Blue-White Diverging", direction = -1) +
+    facet_wrap (.~celltype) +
+    theme_classic())
+pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 40,height=6)
+wrap_plots (rp, ncol=5)
+dev.off()
+
+
+# Compare normal vs tumor CAF / smooth muscle and endothelial ####
+
+# Make data.frame of deviation difference and expression difference between normal and tumors ####
+celltypes = c('SmoothMuscle','Fibroblasts','Endothelial')
+min_cells = 10
+for (celltype in celltypes)
+  {
+
+metaGroupName = 'Sample2'
+archp_meta = as.data.frame (archp@cellColData)
+archp_meta = archp_meta[archp_meta$celltype == celltype,]
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat_agg = as.data.frame (t(mMat))
+mMat_agg = mMat_agg[rownames(archp_meta), ]
+mMat_agg$metaGroup = as.character (archp_meta[,metaGroupName])
+mMat_agg = aggregate (.~ metaGroup, mMat_agg, mean)
+rownames (mMat_agg) = mMat_agg[,1]
+mMat_agg = mMat_agg[,-1]
+mMat_agg = t(mMat_agg)
+mMat_agg = mMat_agg[rownames(mMat_agg) %in% rownames(srt),]
+metaGroupName = 'sampleID'
+srt_celltype = srt[,srt$celltype == celltype]
+DefaultAssay(srt_celltype) = 'RNA'
+normal_sample = names(table (srt_celltype$sampleID[grep ('HU',srt_celltype$sampleID)])[table (srt_celltype$sampleID[grep ('HU',srt_celltype$sampleID)]) > min_cells])
+sample_names_rna = c('P1','P14','P13','P3','P12','P5','P11','P4','P8','P14',normal_sample)
+ps = log2(as.data.frame (AverageExpression (srt_celltype, features = rownames(mMat_agg), group.by = metaGroupName)[[1]]) +1)
+ps = ps[, colnames(ps) %in% sample_names_rna]
+
+TF_diff_rna = data.frame (
+  tumor_dev = apply (mMat_agg[,unique(archp_meta$Sample2)[!unique(archp_meta$Sample2) == 'normal_pleura']], 1, mean),
+  normal_dev = mMat_agg[,unique(archp_meta$Sample2)[unique(archp_meta$Sample2) == 'normal_pleura']],
+  normal_rna = if (length(normal_sample) > 1) apply (ps[,normal_sample], 1, mean) else ps[,normal_sample],
+  tumor_rna = apply (ps[, !colnames(ps) %in% normal_sample], 1, mean),
+  genescore = corGSM_MM$cor[match(rownames(mMat_agg), corGSM_MM$GeneScoreMatrix_name)])
+TF_diff_rna$dev_diff = TF_diff_rna$tumor_dev - TF_diff_rna$normal_dev
+TF_diff_rna$rna_diff = TF_diff_rna$tumor_rna - TF_diff_rna$normal_rna
+
+
+# Compute significance per sample vs normal in scRNA and dev ####
+library (presto)
+pval_threshold = 0.01
+occurrence_threshold = 2
+
+srt_celltype$sampleID2 = srt_celltype$sampleID
+srt_celltype$sampleID2[srt_celltype$sampleID2 %in% normal_sample] = 'normal'
+rna_comparisons = list(
+  P1 = c('P1','normal'),
+  P11 = c('P11','normal'),
+  P12 = c('P12','normal'),
+  P13 = c('P13','normal'),
+  P14 = c('P14','normal'),
+  P3 = c('P3','normal'),
+  P4 = c('P4','normal'),
+  P5 = c('P5','normal'),
+  P8 = c('P8','normal'))
+
+rna_res = lapply (rna_comparisons, function(x) 
+  wilcoxauc (srt_celltype[rowData (mSE)$name,], group_by = 'sampleID2', groups_use = x))
+rna_res_df = lapply (names (rna_comparisons), function(x) rna_res[[x]][rna_res[[x]]$group == x,'padj',drop=FALSE])
+rna_res_df = do.call (cbind , rna_res_df)
+rownames (rna_res_df) = rownames (srt_celltype[rowData (mSE)$name,])
+colnames (rna_res_df) = names (rna_comparisons)
+
+# Repeat using chromVAR deviations ####
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = mMat[,rownames(archp_meta)]
+#all (colnames(mMat) == rownames(archp@cellColData))
+
+dev_comparisons = lapply(paste(unique(archp_meta$Sample2))[paste(unique(archp_meta$Sample2)) != 'normal_pleura'], function(x) c(x, 'normal_pleura'))
+names (dev_comparisons) = paste(unique(archp_meta$Sample2))[paste(unique(archp_meta$Sample2)) != 'normal_pleura']
+
+dev_res = lapply (dev_comparisons, function(x) 
+  wilcoxauc (mMat, y = archp_meta$Sample2, groups_use = x))
+dev_res_df = lapply (names (dev_comparisons), function(x) dev_res[[x]][dev_res[[x]]$group == x,'padj',drop=FALSE])
+dev_res_df = do.call (cbind , dev_res_df)
+rownames (dev_res_df) = rowData (mSE)$name
+colnames (dev_res_df) = names(dev_comparisons)
+#occurence_filter = apply (dev_res_df, 1, function(x) sum (x < pval_threshold))
+# dev_res_df_filtered = dev_res_df[occurence_filter > occurrence_threshold, ]
+# dev_res_df_filtered = dev_res_df_filtered[rownames(dev_res_df_filtered) %in% tf_tumor_pos,]
+# dev_selected_TF = rownames(dev_res_df_filtered)
+# selected_TF = intersect (rna_selected_TF, dev_selected_TF)
+
+rna_res_df_logic = rna_res_df < pval_threshold
+dev_res_df_logic = dev_res_df < pval_threshold
+rna_res_df_logic = rna_res_df_logic[unique (intersect (rownames(dev_res_df_logic), rownames(rna_res_df_logic))),]
+dev_res_df_logic = dev_res_df_logic[unique (intersect (rownames(dev_res_df_logic), rownames(rna_res_df_logic))),]
+common_samples = intersect (colnames(rna_res_df_logic), colnames(dev_res_df_logic))
+comb_res_df = rna_res_df_logic[,common_samples] + dev_res_df_logic[,common_samples]
+comb_res_df[comb_res_df == 1] = 0
+comb_res_df[comb_res_df == 2] = 1
+selected_TF = rownames(comb_res_df) [rowSums (comb_res_df) > occurrence_threshold] 
+tf_tumor_pos = rownames(TF_diff_rna)[TF_diff_rna$dev_diff > 0 & TF_diff_rna$rna_diff > 0]
+selected_TF = selected_TF[selected_TF %in% tf_tumor_pos]
+
+
+# Order by mean logFC ####
+res_df2 = lapply (names (rna_comparisons), function(x) rna_res[[x]][rna_res[[x]]$group == x,'logFC',drop=FALSE])
+res_df2 = do.call (cbind , res_df2)
+rownames (res_df2) = rownames(mMat_agg)
+tf_order = rownames(res_df2)[order (-apply (res_df2, 1, mean))]
+selected_TF_ordered = tf_order[tf_order %in% selected_TF]
+corGSM_MM_filtered = as.data.frame (corGSM_MM [match (selected_TF_ordered, corGSM_MM$GeneScoreMatrix_name),])
+head (corGSM_MM_filtered [order (corGSM_MM_filtered$cor),c('GeneScoreMatrix_name','cor') ],100)
+
+# Export selected TFs ####
+write.csv (selected_TF_ordered, 'Active_TFs.csv')
+
+# Plot distribution of diff deviation and diff expression between tumor and normal ####
+diff_line = 0
+TF_diff_rna$label = ''
+TF_diff_rna$label[match (selected_TF_ordered,rownames(TF_diff_rna))] = selected_TF_ordered
+TF_diff_rna$color = TF_diff_rna$label != ''
+TF_diff_rna$label_top = ''
+TF_diff_rna$label_top[match (head (selected_TF_ordered,20),rownames(TF_diff_rna))] = head (selected_TF_ordered,20)
+TF_diff_rna$alpha = 0.7
+TF_diff_rna$alpha[match (selected_TF_ordered,rownames(TF_diff_rna))] = 1
+tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, y = rna_diff,label = label_top)) + 
+  geom_point(aes(fill=genescore, color=color, alpha = alpha), size = 2, shape = 21, stroke=0.3) + # Color points based on x value
+  scale_color_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
+  scale_fill_gradient(low = "white", high = "black") +
+  #scale_fill_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
+  geom_vline(xintercept = diff_line, linetype = "dashed", color = "grey44", linewidth=.3) + # Vertical dashed line
+  geom_hline(yintercept = diff_line, linetype = "dashed", color = "grey44", linewidth=.3) + # Vertical dashed line
+  gtheme_no_rot + # Use a minimal theme
+   geom_text_repel(
+    segment.size=.05,
+    max.overlaps = 100,
+#    point.padding = 0.2, 
+    size=2#,
+#   nudge_x = .25,
+#    nudge_y = .2,
+#    segment.curvature = -1e-20
+    ) +
+    xlab ('deviation difference') + 
+    ylab ('RNA difference') + 
+    xlim (c(-0.2, .2)) + 
+    ylim (c(-0.6, .6))
+
+pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_',celltype,'_scatterplot2.pdf'),5,height = 4)
+print (tf_diff_p)
+dev.off()
+
+
+motifs <- unique(TF_diff_rna$label_top)
+motifs = motifs[motifs != '']
+markerMotifs <- getFeatures (archp, select = paste(motifs, collapse="|"), useMatrix = "MotifMatrix")
+markerMotifs <- grep ("z:", markerMotifs, value = TRUE)
+
+archp = addImputeWeights (archp)
+TF_p = plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "MotifMatrix", 
+    name = sort(markerMotifs), 
+    embedding = "UMAP_H",
+    pal = palette_deviation,
+    imputeWeights = getImputeWeights(archp)
+)
+
+pdf (file.path ('Plots',paste0('DEG_TF_',celltype,'_umap.pdf')), width = 30,height=14)
+print (wrap_plots (TF_p, ncol=5))
+dev.off()
+}
 
 

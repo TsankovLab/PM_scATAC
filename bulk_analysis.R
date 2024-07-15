@@ -424,6 +424,7 @@ genes_in_region = split (genes_in_region[[1]], genes_in_region)
 genes_in_region = split (module_l,module_l)
 
 
+
 # Make metadata for survival analysis ####
 # Define module of genes to check ####
 module_l = list(TCF3 = 'TCF3', PITX1 = 'PITX1', TEAD1 = 'TEAD1')
@@ -435,7 +436,10 @@ chromatin_regulators = c('SETD5, ASH1L, CREBBP, PRDM2, KDM2B, KMT2D, EZH2, SETDB
 chromatin_regulators = unlist(strsplit (chromatin_regulators, ', '))
 genetic_drivers = c('BAP1, NF2, CDKN2A, CDKN2B, TP53, LATS2, SETD2, FAT4, PTCH1')
 genetic_drivers = unlist(strsplit (genetic_drivers, ', '))
-module_l = c(chromatin_regulators, genetic_drivers)
+chromatin_regulators2 = c('LATS1, DDX3X, ULK2, RYR2, CFAP45, SETDB1, DDX51, SF3B1, TRAF7, PTEN, RBFOX1, CSMD1, MTAP, TTC28, PCDH15, USH2A, CNTNAP2, DNAH1, KCNH7, PTK2, ROBO2, DLG2, PBRM1, PTPRD, ANTXR2, CTNNA3, LINGO2, LRP1B, PLCB1, UNC79, WWOX')
+chromatin_regulators2 = unlist (strsplit (chromatin_regulators2, ', '))
+genetic_drivers = unlist(strsplit (genetic_drivers, ', '))
+module_l = unique (c(chromatin_regulators, genetic_drivers, chromatin_regulators2))
 module_l = split (module_l, module_l)
 
 

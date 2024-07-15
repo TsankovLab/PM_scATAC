@@ -40,7 +40,7 @@ names(archp_barcodes) = rownames(match_sample)[apply (match_sample, 2, which.max
 archp_barcodes = archp_barcodes[!names(archp_barcodes) == '']
 archp_barcodes2 = lapply (names(archp_barcodes), function(x) 
   {
-  archp_barcodes[[x]]$celltype = ext_meta[[x]]$cell_type[match(archp_barcodes[[x]]$barcode, ext_meta[[x]]$barcode)]
+  archp_barcodes[[x]]$celltype = paste0(ext_meta[[x]]$tissue,'_', ext_meta[[x]]$cell_type)[match(archp_barcodes[[x]]$barcode, ext_meta[[x]]$barcode)]
   archp_barcodes[[x]]
   })
 archp_barcodes2 = do.call (rbind, archp_barcodes2)
@@ -63,7 +63,7 @@ names(archp_barcodes) = rownames(match_sample)[apply (match_sample, 2, which.max
 archp_barcodes = archp_barcodes[!names(archp_barcodes) == '']
 archp_barcodes2 = lapply (names(archp_barcodes), function(x) 
   {
-  archp_barcodes[[x]]$celltype = ext_meta[[x]]$cell.type[match(archp_barcodes[[x]]$barcode, ext_meta[[x]]$barcode)]
+  archp_barcodes[[x]]$celltype = paste0(ext_meta[[x]]$Life.stage,'_',ext_meta[[x]]$tissue,'_',ext_meta[[x]]$cell.type)[match(archp_barcodes[[x]]$barcode, ext_meta[[x]]$barcode)]
   archp_barcodes[[x]]
   })
 archp_barcodes2 = do.call (rbind, archp_barcodes2)
@@ -94,7 +94,7 @@ archp_barcodes2 = lapply (names(archp_barcodes), function(x)
   archp_barcodes[[x]]
   })
 archp_barcodes2 = do.call (rbind, archp_barcodes2)
-archp_barcodes2 = archp_barcodes2[archp_barcodes2$barcode %in% rownames (archp@cellColData),]
+archp_barcodes2 = archp_barcodes2[rownames(archp_barcodes2) %in% rownames (archp@cellColData),]
 archp$celltype[match(rownames(archp_barcodes2), rownames(archp@cellColData))] = archp_barcodes2$celltype
 
 
