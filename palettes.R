@@ -1,5 +1,5 @@
 library (paletteer)
-
+library (circlize)
 
 palette_celltype_simplified = c(
   B_cells = 'magenta2',
@@ -86,8 +86,10 @@ palette_celltypes_normal = setNames(brewer.pal(11,'Paired'),rev(c('AT1','AT2','B
 
 #for (pal in ls()[grep('palette',ls())]) store_pal (list(pal = get(pal)))
 palette_expression = rev (as.character(paletteer::paletteer_c("grDevices::Purple-Blue",100)))
-palette_deviation = colorRamp2(c(-.2,-.1,0,.1,.2), c("grey44",'gray','white', "brown",'black'))  
-palette_deviation = rev (as.character (paletteer::paletteer_c("grDevices::Rocket",100)))
-palette_enrichment = rev (as.character(paletteer::paletteer_c("grDevices::Purples 3",100)))
 
+palette_deviation = paletteer::paletteer_c("grDevices::PuRd",20)
+palette_deviation_centered = colorRamp2(c(-4,-2,0,2,4), c(palette_deviation[1],palette_deviation[45],palette_deviation[50],palette_deviation[55],palette_deviation[100]))
+palette_enrichment = rev (as.character(paletteer::paletteer_c("grDevices::Purples 3",100)))
+palette_hubs_accessibility = paletteer_c("ggthemes::Classic Orange-White-Blue",20)
+palette_pseudotime = colorRamp2(c(-4,0,4), c('white','white','black'))
 

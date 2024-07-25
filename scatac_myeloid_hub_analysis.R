@@ -5,17 +5,14 @@ source ('../PM_scATAC/Hubs_finder.R')
 source ('../PM_scATAC/hubs_track.R')
 
 
-if (makeBW)
-{
 
 # Export bigiwg files ####
-archp$celltype_status = paste0(archp$celltype2, '_', archp$status)
-metaGroupName = 'celltype2'
+metaGroupName = 'Clusters_H'
 exp_bigwig = T
 if (exp_bigwig)
   {
   getGroupBW(
-    ArchRProj = archp,
+    ArchRProj = archp_sub,
     groupBy = metaGroupName,
     normMethod = "ReadsInTSS",
     tileSize = 100,
@@ -29,11 +26,11 @@ if (exp_bigwig)
 }
 
 
-if (!file.exists ('peak_regions.bed'))
+if (!file.exists ('myeloid_peak_regions.bed'))
   {
-  peak_regions = as.data.frame (getPeakSet (archp), row.names=NULL)
+  peak_regions = as.data.frame (getPeakSet (archp_sub), row.names=NULL)
   peak_regions = peak_regions[,c(1:3)]
-  write.table (peak_regions, file.path('peak_regions.bed'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+  write.table (peak_regions, file.path('myeloid_peak_regions.bed'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
   }
 
 
@@ -56,7 +53,7 @@ force = FALSE
 if (!file.exists(file.path (hubs_dir, paste0 ('KNNs_',metaGroupName,'k_',k,'.rds'))) | force)
   {
   KNNs = knnGen (
-    ArchRProj = archp, 
+    ArchRProj = archp_sub, 
     k = k,
     reducedDims = 'IterativeLSI', 
     group = metaGroupName,
@@ -77,10 +74,10 @@ KNNs_df = lapply (seq_along(KNNs), function(x) data.frame (
   group2 = unlist(strsplit (names(KNNs)[x],'KNN'))[1]))
 
 KNNs_df = do.call (rbind, KNNs_df)
-archp$knn_groups = KNNs_df$group[match (archp$cellNames, KNNs_df$cell)]
+archp_sub$knn_groups = KNNs_df$group[match (archp_sub$cellNames, KNNs_df$cell)]
 
 # Plot KNNs on UMAP ####
-umap_knn = plotEmbedding (ArchRProj = archp, embedding = 'UMAP_H',
+umap_knn = plotEmbedding (ArchRProj = archp_sub, embedding = 'UMAP_H',
   colorBy = "cellColData", name = 'knn_groups',plotAs ='hex',
     baseSize=0, labelMeans=FALSE) + NoLegend() 
 pdf (file.path(hubs_dir, 'Plots',paste0('knn_',k,'.pdf')), height=5, width=5)
@@ -92,8 +89,8 @@ dev.off()
 run_coax = FALSE
 if (run_coax)
   {
-  archp = addCoAx (
-    archp, 
+  archp_sub = addCoAx (
+    archp_sub, 
     KNNs,
     maxDist = max_dist)
   }
@@ -103,7 +100,7 @@ force=F
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (
-    ArchRProj = archp, 
+    ArchRProj = archp_sub, 
     group_by = NULL,
     cor_cutoff = cor_cutoff,
     #select_group = metaGroup_df$metaGroup,
@@ -125,7 +122,7 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
 
 
 # Generate matrix of fragment counts of hubs x metagroup ####
-metaGroupName = 'celltype3'
+metaGroupName = 'Clusters_H'
 if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (

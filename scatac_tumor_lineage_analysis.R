@@ -136,7 +136,7 @@ markerMotifs = getFeatures (archp, select = paste(scatac_celltype, collapse="|")
 markerMotifs = grep ("z:", markerMotifs, value = TRUE)
 
 archp = addImputeWeights (archp)
-TF_p = plotEmbedding(
+TF_p = plotEmbedding (
     ArchRProj = archp, 
     colorBy = "scATAC_datasetsMatrix", 
     name = sort(markerMotifs), 
@@ -175,7 +175,7 @@ devMethod = 'ArchR'
  if (devMethod == 'ArchR')
     {
     TF_db='Motif'
-    mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
+    if(!exists ('mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
     mSE = mSE[, archp$cellNames]
     rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
     rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
@@ -240,18 +240,28 @@ projects_peaks2 = GRangesList (projects_peaks)
 
 meso_peaks = lapply (unique (archp$Clusters), function(x) readRDS (file.path('PeakCalls',paste0(x,'-reproduciblePeaks.gr.rds'))))
 names (meso_peaks) = unique (archp$Clusters)
-peaks_ov_mat = sapply (meso_peaks, function(x) sapply (projects_peaks2, function(y) sum(countOverlaps (x, y) / min (c(length(x), length(y))))))
+peaks_ov_mat = sapply (meso_peaks, function(x) sapply (projects_peaks2, function(y) sum(countOverlaps (x, y)) / min (c(length(x), length(y)))))
 
 # prop_sample_df[is.na(prop_sample_df)] = 0
 ht = Heatmap (
   # prop_sample_df, 
-  t(scale(t(peaks_ov_mat))),
+  peaks_ov_mat,
   col = palette_deviation, 
   row_names_gp= gpar (fontsize=6), 
   column_names_gp= gpar (fontsize=6), 
   column_names_rot = 45)
 pdf (file.path ('Plots', 'scatacDatasets_overlap_sample_heatmap.pdf'),width = 6,height=44)
 ht
+dev.off()
+
+ct_mat = t(scale(t(peaks_ov_mat)))
+which.max (ct_mat[, 'C1'])
+
+umap_p12 = plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
+     name = 'Clusters', embedding = "UMAP")
+      
+pdf (file.path('Plots','qc_umap_after_filtering.pdf'), 10,10)
+umap_p12
 dev.off()
 
 

@@ -133,40 +133,6 @@ low_celltypes = table (archp_prj$celltype)[table (archp_prj$celltype) < 30]
 archp_prj = archp_prj[!archp_prj$celltype %in% names(low_celltypes)]
 saveArchRProject (archp_prj, dropCells = T)
 
-archp_prj = addIterativeLSI (
-ArchRProj = archp_prj, 
-useMatrix = "TileMatrix", 
-name = "IterativeLSI",
-force=FALSE)
-archp_prj = addUMAP (
-ArchRProj = archp_prj, 
-reducedDims = "IterativeLSI",
-force = FALSE)
-  
-  umap_p1 = lapply (metaGroupName, function(x) plotEmbedding (ArchRProj = archp_prj, colorBy = "cellColData",
-   name = x, embedding = "UMAP"))
-    
-  pdf (file.path(projdir,prj,'Plots',paste0('celltype_umap.pdf')), 10,10)
-  print (umap_p1)
-  dev.off()
-  
-  archp_prj = addGroupCoverages (
-    ArchRProj = archp_prj, 
-    groupBy = metaGroupName,  
-    force = TRUE,
-    minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
-    maxCells = 500,
-    minReplicates = 2,
-    sampleRatio = 0.8,
-    useLabels = TRUE)  
-  archp_prj = addReproduciblePeakSet (
-      archp_prj,
-      groupBy= metaGroupName,
-      peakMethod = 'Macs2',
-      reproducibility = "1",
-      maxPeaks = 500000, 
-      minCells=20,
-      force =FALSE) 
-  }
-
+# Export annotation cause i get an error saying arrofiles do not exist in saved ArchRProject ####
+write.csv (archp_prj@cellColData[,c('celltype','celltype_project')], 'archp_meta.csv')
 

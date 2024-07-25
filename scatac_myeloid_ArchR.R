@@ -27,8 +27,8 @@ packages = c(
   'RColorBrewer')
 lapply(packages, require, character.only = TRUE)
 
-####### ANALYSIS of NKT compartment #######
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells'
+####### ANALYSIS of Myeloid compartment #######
+projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
@@ -110,7 +110,7 @@ umap_p5 = plotEmbedding (ArchRProj = archp,
   dev.off()
 
 ## Further remove outlier clusters ####
-archp = archp[!archp$Clusters_H %in% c('C10','C1')]
+archp = archp[!archp$Clusters_H %in% c('C1')]
 
 
   # Dimensionality reduction and clustering
@@ -161,13 +161,9 @@ archp = addClusters (input = archp,
   print (umap_p5)
   dev.off()
 
-# Remove cluster C1 containing only 6 cells ####
-archp = archp[!archp$Clusters_H %in% c('C1')]
-}
 
-
-# TNK markers ####
-tnk_markers = c('FOXP3','CD8A','CD4','GNLY','CD3D','CD3E','FGFBP2')
+# Myeloid markers ####
+tnk_markers = c('C1QA','LYZ')
 archp = addImputeWeights (archp)
 p <- plotEmbedding(
     ArchRProj = archp,
@@ -181,7 +177,7 @@ p <- plotEmbedding(
 #archp$celltype[archp$Clusters == 'C30'] = 'Fibroblasts_WT1'
 #p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
 
-pdf (file.path('Plots','TNK_markers_fplots.pdf'), width = 25, height = 25)
+pdf (file.path('Plots','myeloid_markers_fplots.pdf'), width = 25, height = 25)
 print (p)
 dev.off()
 
@@ -208,7 +204,7 @@ dev.off()
 
 
 ### Call peaks on celltypes ####
-run_peakCall = FALSE
+run_peakCall = TRUE
 if (run_peakCall)
   {
   metaGroupName = 'Clusters_H'
@@ -244,7 +240,7 @@ if (run_peakCall)
   }
 
 ### chromVAR analysis ####
-run_chromVAR = FALSE
+run_chromVAR = TRUE
 
 if (run_chromVAR)
   {  
@@ -257,8 +253,9 @@ if (run_chromVAR)
   archp = addDeviationsMatrix (
     ArchRProj = archp, 
     peakAnnotation = "Motif",
-    force = TRUE
-  )}
+    force = TRUE)
+  archp = saveArchRProject (archp, load=TRUE)
+  }
   
 
 # Find activating and repressing TFs ####
@@ -398,12 +395,48 @@ archp_sub = archp[archp$Sample2 %in% c('P1','P10','P11','P12','P13','P14','P3','
     force = FALSE, LSIMethod = LSI_method,
     varFeatures = varfeat)
 
-  archp_sub = addClusters (input = archp_sub, resolution = 3,
-    reducedDims = "IterativeLSI", maxClusters = 100,
-    force = TRUE)
-  archp_sub = addUMAP (ArchRProj = archp_sub, 
+  archp_sub = addHarmony (
+    ArchRProj = archp_sub,
     reducedDims = "IterativeLSI",
+    name = "Harmony_sample",
+    groupBy = c('Sample2'), force=TRUE
+)
+
+archp_sub = addUMAP (ArchRProj = archp_sub, 
+    reducedDims = "Harmony_sample", name='UMAP_H',
     force = TRUE)
+
+archp_sub = addClusters (input = archp_sub,
+    reducedDims = "Harmony_sample",
+    name='Clusters_H',
+    force = TRUE)
+
+  umap_p3 = plotEmbedding (ArchRProj = archp_sub, 
+    colorBy = "cellColData", name = "Sample2",
+     embedding = "UMAP_H",
+     pal = palette_sample)
+  umap_p4 = plotEmbedding (ArchRProj = archp_sub, 
+    colorBy = "cellColData", name = "celltype",
+     embedding = "UMAP_H"
+     )
+  umap_p5 = plotEmbedding (ArchRProj = archp_sub, 
+    colorBy = "cellColData", name = "Clusters_H",
+     embedding = "UMAP_H")
+  
+  pdf (file.path('Plots','celltype_umap_signac_filtered_harmony_on_project3.pdf'),5,5)
+  print (umap_p3)
+  print (umap_p4)
+  print (umap_p5)
+  dev.off()
+
+# Remove doublets ####
+archp_sub = archp_sub[archp_sub$Clusters_H != 'C5']
+  varfeat = 25000
+  LSI_method = 2
+  archp_sub = addIterativeLSI (ArchRProj = archp_sub,
+    useMatrix = "TileMatrix", name = "IterativeLSI",
+    force = TRUE, LSIMethod = LSI_method,
+    varFeatures = varfeat)
 
   archp_sub = addHarmony (
     ArchRProj = archp_sub,
@@ -421,36 +454,55 @@ archp_sub = addClusters (input = archp_sub,
     name='Clusters_H',
     force = TRUE)
 
-  umap_p1 = plotEmbedding (ArchRProj = archp_sub, colorBy = "cellColData",
-   name = "celltype", embedding = "UMAP")
-  umap_p2 = plotEmbedding (ArchRProj = archp_sub, 
-    colorBy = "cellColData", name = "Sample2",
-     embedding = "UMAP")
+archp_sub = archp_sub[archp_sub$Clusters_H != 'C1']
+  varfeat = 25000
+  LSI_method = 2
+  archp_sub = addIterativeLSI (ArchRProj = archp_sub,
+    useMatrix = "TileMatrix", name = "IterativeLSI",
+    force = TRUE, LSIMethod = LSI_method,
+    varFeatures = varfeat)
+
+  archp_sub = addHarmony (
+    ArchRProj = archp_sub,
+    reducedDims = "IterativeLSI",
+    name = "Harmony_sample",
+    groupBy = c('Sample2'), force=TRUE
+)
+
+archp_sub = addUMAP (ArchRProj = archp_sub, 
+    reducedDims = "Harmony_sample", name='UMAP_H',
+    force = TRUE)
+
+archp_sub = addClusters (input = archp_sub,
+    reducedDims = "Harmony_sample",
+    name='Clusters_H',
+    force = TRUE)
   umap_p3 = plotEmbedding (ArchRProj = archp_sub, 
     colorBy = "cellColData", name = "Sample2",
-     embedding = "UMAP_H")
+     embedding = "UMAP_H",
+     pal = palette_sample)
   umap_p4 = plotEmbedding (ArchRProj = archp_sub, 
     colorBy = "cellColData", name = "celltype",
-     embedding = "UMAP_H")
+     embedding = "UMAP_H"
+     )
   umap_p5 = plotEmbedding (ArchRProj = archp_sub, 
     colorBy = "cellColData", name = "Clusters_H",
      embedding = "UMAP_H")
   
   pdf (file.path('Plots','celltype_umap_signac_filtered_harmony_on_project3.pdf'),5,5)
-  print (umap_p1)
-  print (umap_p2)
   print (umap_p3)
   print (umap_p4)
   print (umap_p5)
   dev.off()
 
-# TNK markers ####
-meso_markers = c('FOXP3','CD8A','CD4','GNLY','CD3D','CD3E')
+# Myeloid markers ####
+meso_markers = c('C1QA','APOE','IL1B')
 archp_sub = addImputeWeights (archp_sub)
 p <- plotEmbedding(
     ArchRProj = archp_sub,
     colorBy = "GeneScoreMatrix", 
     name = meso_markers, 
+    size=1,
     embedding = "UMAP_H",
     pal = palette_expression,
     imputeWeights = getImputeWeights(archp_sub)
@@ -459,29 +511,10 @@ p <- plotEmbedding(
 #archp$celltype[archp$Clusters == 'C30'] = 'Fibroblasts_WT1'
 #p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
 
-pdf (file.path('Plots','TNK_markers_fplots_only_meso.pdf'), width = 25, height = 25)
-print (p)
+pdf (file.path('Plots','myeloid_markers_fplots_only_meso.pdf'), width = 8, height = 5)
+wrap_plots (p, ncol=3)
 dev.off()
 
-### Annotate meso cells ####
-archp_sub$celltype3 = archp_sub$celltype2
-archp_sub$celltype3[archp_sub$Clusters_H %in% c('C6')] = 'NK_FGFBP2'
-archp_sub$celltype3[archp_sub$Clusters_H %in% c('C5')] = 'NK'
-archp_sub$celltype3[archp_sub$Clusters_H %in% c('C2')] = 'Tregs'
-archp_sub$celltype3[archp_sub$Clusters_H %in% c('C3','C4','C7')] = 'CD4'
-archp_sub$celltype3[archp_sub$Clusters_H %in% c('C1','C8','C9','C10','C11')] = 'CD8'
-
-
-
-umap_p6 = plotEmbedding (ArchRProj = archp_sub, 
-    colorBy = "cellColData", name = "celltype3",
-     embedding = "UMAP_H")
-  
-pdf (file.path('Plots','celltype_umap_signac_filtered_harmony_on_project_meso_only.pdf'),5,5)
-print (umap_p4)
-print (umap_p5)
-print (umap_p6)
-dev.off()
 
 
 run_GS_analysis = TRUE
@@ -489,8 +522,8 @@ run_GS_analysis = TRUE
 if (run_GS_analysis)
   {
   # Find DAG ####
-  metaGroupName = "celltype3"
-  force = FALSE
+  metaGroupName = "Clusters_H"
+  force = TRUE
   if (!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force)
     {
     DAG_list = getMarkerFeatures (
@@ -521,7 +554,7 @@ if (run_GS_analysis)
   
   FDR_threshold = 1e-8
   lfc_threshold = 1
-  top_genes = 5
+  top_genes = 20
   DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
   DAG_top_list = lapply (seq_along(DAG_top_list), function(x) {
     res = DAG_top_list[[x]]
@@ -569,10 +602,21 @@ if (run_GS_analysis)
           )
 
   #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
-pdf (file.path ('Plots',paste0('DAG_clusters_',metaGroupName,'_heatmaps_only_meso.pdf')), width = 2.5, height = 6)
+pdf (file.path ('Plots',paste0('DAG_clusters_',metaGroupName,'_heatmaps_only_meso.pdf')), width = 2.5, height = 12)
 print(DAG_hm)
 dev.off()
 }
+
+archp_sub$celltype = 0
+archp_sub$celltype[archp_sub$Clusters_H %in% c('C5','C6','C7')] = 'Monocytes'
+archp_sub$celltype[archp_sub$Clusters_H %in% c('C1','C2','C3','C4')] = 'Macs'
+umap_p6 = plotEmbedding (ArchRProj = archp_sub, 
+    colorBy = "cellColData", name = "celltype",
+     embedding = "UMAP_H")
+  
+pdf (file.path('Plots','celltype_umap_signac_filtered_harmony_on_project_meso_only.pdf'),5,5)
+print (umap_p6)
+dev.off()
 
 
 # Find activating and repressing TFs ####
@@ -587,7 +631,7 @@ devMethod = 'ArchR'
     rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
     }
   
-metaGroupName='Clusters_H'
+metaGroupName='celltype'
 if (!file.exists ('TF_activators_genescore.rds'))
   {
   seGroupMotif <- getGroupSE(ArchRProj = archp_sub, useMatrix = "MotifMatrix", groupBy = metaGroupName)
@@ -620,8 +664,9 @@ run_chromVAR_analysis = TRUE
 if (run_chromVAR_analysis)
   {
   # Find DAM ####
-  metaGroupName = "celltype3"
-  force = FALSE
+  metaGroupName = "celltype"
+  metaGroupName = "Clusters_H"
+  force = TRUE
   if (!file.exists (paste0('DAM_',metaGroupName,'.rds')) | force)
     {
     DAM_list = getMarkerFeatures (

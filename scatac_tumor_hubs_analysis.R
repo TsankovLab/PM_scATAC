@@ -7,6 +7,7 @@ source ('../../PM_scATAC/hubs_track.R')
 
 # Export bigiwg files ####
 metaGroupName = 'Sample2'
+metaGroupName = 'SampleP11'
 exp_bigwig = FALSE
 if (exp_bigwig)
   {
@@ -36,7 +37,7 @@ if (!file.exists ('peak_regions.bed'))
 metaGroupName = "Sample2"
 cor_cutoff = 0.2
 #max_dist = 12500
-max_dist = 5000
+max_dist = 12500
 min_peaks = 5
 dgs = 0
 hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks)
@@ -83,7 +84,7 @@ dev.off()
 
 
 # Run Co-accessibility ####
-run_coax = FALSE
+run_coax = TRUE
 if (run_coax)
   {
   archp = addCoAx (
@@ -118,66 +119,74 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
 
 
 
-# Generate matrix of fragment counts of hubs x sample ####
-if (!file.exists(file.path (hubs_dir,'hubs_sample_mat.rds')))
+# Generate matrix of fragment counts of hubs x metagroup ####
+metaGroupName = 'Sample2'
+archp$SampleP11 = archp$Sample2
+archp$SampleP11[archp$Clusters == 'C14'] = 'P11_HOX+'
+metaGroupName = 'SampleP11'
+if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
   {
-  fragments = unlist (getFragmentsFromProject (
+  if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
     ArchRProj = archp))   
-  hubsSample_mat = matrix (ncol = length(unique(archp$Sample2)), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsSample_mat) = unique(archp$Sample2)
+  hubsSample_mat = matrix (ncol = length(unique(archp@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
+  colnames (hubsSample_mat) = unique(archp@cellColData[,metaGroupName])
   rownames (hubsSample_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (unique(archp$Sample2)))
-  for (sam in unique(archp$Sample2))
+  pb =progress::progress_bar$new(total = length (unique(archp@cellColData[,metaGroupName])))
+  for (sam in unique(archp@cellColData[,metaGroupName]))
     {
     pb$tick()  
-    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[archp$Sample2 == sam]]  
+    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == sam]]  
     fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
     hubsSample_mat[,sam] = fragments_in_sample_in_hubs
     }
-  frags_in_sample = sapply (unique(archp$Sample2), function(x) sum (archp$nFrags[archp$Sample2 == x]))
+  frags_in_sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) sum (archp$nFrags[as.character(archp@cellColData[,metaGroupName]) == x]))
   hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
-  saveRDS (hubsSample_mat, file.path (hubs_dir,'hubs_sample_mat.rds'))
+  saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
   } else {
-  hubsSample_mat = readRDS (file.path (hubs_dir,'hubs_sample_mat.rds'))  
+  hubsSample_mat = readRDS (file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))  
   }
 hubsSample_mat = as.data.frame (hubsSample_mat)
 
 ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
 hm = Heatmap (
   scale (t(hubsSample_mat)), 
-  top_annotation = ha, 
+#  top_annotation = ha, 
   column_names_gp = gpar(fontsize = 0),
   show_column_dend = F,
-  row_dend_width = unit(3,'mm'),
-  row_dend_side = 'left')
-pdf (file.path (hubs_dir,'Plots','hubs_sample_heatmap.pdf'), height=3)
+  #row_dend_width = unit(5,'mm'),
+  row_dend_side = 'left',
+  col = rev(palette_hubs_accessibility),
+  border=T,
+  name = 'Hubs')
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=2.2)
 hm
 dev.off()
 
 
 # Generate matrix of fragment counts of hubs x barcodes ####
-if (!file.exists(file.path (hubs_dir,'hubs_cells_mat.rds')))
+if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))))
   {
-  fragments = unlist (getFragmentsFromProject (
+  if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
     ArchRProj = archp))    
   hubsCell_mat = matrix (ncol = length(rownames(archp@cellColData)), nrow = length(hubs_obj$hubsCollapsed))
   colnames (hubsCell_mat) = rownames(archp@cellColData)
   rownames (hubsCell_mat) = hubs_obj$hubs_id
   pb =progress::progress_bar$new(total = length (rownames(archp@cellColData)))
-  for (cell in rownames(archp@cellColData)) 
+  for (cell in rownames(archp@cellColData))
     {
-    pb$tick()  
+    pb$tick()
     fragments_in_cell = fragments[fragments$RG %in% cell]  
     fragments_in_cell_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_cell)
     hubsCell_mat[,cell] = fragments_in_cell_in_hubs
     }
   all (colnames (hubsCell_mat) == rownames(archp@cellColData))  
   hubsCell_mat = t(t(hubsCell_mat) * (10^6 / archp$nFrags)) # scale
-  saveRDS (hubsCell_mat, file.path (hubs_dir,'hubs_cells_mat.rds'))
+  saveRDS (hubsCell_mat, file.path (hubs_dir,paste0('hubs_cells_mat.rds')))
   } else {
-  hubsCell_mat = readRDS (file.path (hubs_dir,'hubs_cells_mat.rds'))  
+  hubsCell_mat = readRDS (file.path (hubs_dir,paste0('hubs_cells_mat.rds')))  
   }
 hubsCell_mat = as.data.frame (hubsCell_mat)
+
 
 
 # Check if there are hub size differences between normal and tumor sample ####
@@ -683,7 +692,6 @@ hubsCell_mat = log2(t(hubsCell_mat)+1)
 
 TF = 'SOX9'
 
-barcode_order = colnames(matGS) [order (matGS[TF,])]
 
 hubs_mat = hubsCell_mat
 hub_to_TF = function(TF= NULL, genescore_mat = NULL, hubs_mat = NULL, slice_size = 30)
@@ -701,9 +709,21 @@ hub_to_TF = function(TF= NULL, genescore_mat = NULL, hubs_mat = NULL, slice_size
    return (cor (hubs_mat_agg[,1:(ncol(hubs_mat_agg)-1)], hubs_mat_agg[,ncol(hubs_mat_agg)], method='spearman'))
   }
 
+pdf (file.path (hubs_dir, 'Plots','sanity_check_corr_hub_TF.pdf'))
+plot (hubs_mat_agg[,'HUB8564'], hubs_mat_agg[,'TF'])
+dev.off()
+
 print (all (colnames(matGS) == rownames (hubsCell_mat)))
-hubs_to_TF_list = lapply (unique(KNNs_df$group2)[unique(KNNs_df$group2) != 'normal_pleura'], function(y) 
-    hub_to_TF (TF = 'SNAI2', genescore_mat = matGS[,grepl (paste0(y,'#'), colnames(matGS))], hubs_mat = hubsCell_mat[grepl (paste0(y,'#'), rownames(hubsCell_mat)),], slice_size=30))
+
+# Run TF vs hub correlation ####
+archp_meta = archp@cellColData
+archp_meta = archp_meta[archp_meta$Clusters != 'C14',]
+archp_meta = archp_meta[archp_meta$Sample2 != 'normal_pleura',]
+hubs_to_TF_list = lapply (unique (archp_meta$Sample2), function(y)
+    hub_to_TF (TF = 'SNAI2', 
+      genescore_mat = matGS[,rownames(archp_meta)[as.logical(archp_meta$Sample2 == y)]], 
+      hubs_mat = hubsCell_mat[rownames(archp_meta)[as.logical(archp_meta$Sample2 == y)],], 
+      slice_size=30))
 
 hubs_to_TF_list = lapply (hubs_to_TF_list, function(x) {
   x = as.data.frame (x)  
@@ -711,8 +731,20 @@ hubs_to_TF_list = lapply (hubs_to_TF_list, function(x) {
   x$region = as.character (hubs_obj$hubsCollapsed)[match (rownames(x), hubs_obj$hubs_id)]
   x
 })
-
+names (hubs_to_TF_list) = unique(archp_meta$Sample2)
 hubs_to_TF_list_ordered = lapply (hubs_to_TF_list, function (x) {x = x[order(-x[,1]),]; x})
+names (hubs_to_TF_list_ordered) = unique(archp_meta$Sample2)
+head (hubs_to_TF_list_ordered[['P5']],10)
+
+high_sample = c('P4','P5','P11','P12','P10')
+hubs_to_TF_list_fl = hubs_to_TF_list[high_sample]
+hubs_to_TF_median = as.data.frame (apply (do.call(cbind, lapply(hubs_to_TF_list_fl, function(x) x[,'V1',drop=F])), 1, median))
+hubs_to_TF_median = hubs_to_TF_median[order(-hubs_to_TF_median[,1]),,drop=F]
+
+hubs_obj$hubsCollapsed[match (head (rownames(hubs_to_TF_median),50), hubs_obj$hubs_id)]$gene
+
+write.csv (hubs_obj$hubsCollapsed[match (head (rownames(hubs_to_TF_median),200), hubs_obj$hubs_id)]$gene, 
+  file.path (hubs_dir, paste0('hubs_correlated_',TF,'.csv')))
 
 
 ### Pull hubs from genes correlated to TF from the scRNA ####
@@ -723,9 +755,11 @@ TF = 'SOX9'
 cor_genes = tf_cor_genes[[TF]]
 cor_genes = apply (cor_genes,1,median)
 cor_genes = cor_genes[order(-cor_genes)]
+hubs_with_genes = sapply(head(names(cor_genes),50), 
+    function(y) which(grepl(y, hubs_obj$hubsCollapsed$gene)))
 
-hubs_P1 = res2$feature[res2$logFC > 0.3 & res2$avgExpr > 0]
-hub_genes = sapply (names (head (cor_genes, 100)), function(x) as.character(hubs_obj[hubs_obj$hubs_id %in% hubs_P1]$hubsCollapsed[grepl (x, hubs_obj[hubs_obj$hubs_id %in% hubs_P1]$hubsCollapsed$gene)]))
+#hubs_P1 = res2$feature[res2$logFC > 0.3 & res2$avgExpr > 0]
+#hub_genes = sapply (names (head (cor_genes, 100)), function(x) as.character(hubs_obj[hubs_obj$hubs_id %in% hubs_P1]$hubsCollapsed[grepl (x, hubs_obj[hubs_obj$hubs_id %in% hubs_P1]$hubsCollapsed$gene)]))
 hub_genes = hub_genes[sapply(hub_genes, function(x) length(x) > 0)]
 
 
@@ -747,6 +781,82 @@ hub_genes = hub_genes[sapply(hub_genes, function(x) length(x) > 0)]
       useGroups= NULL
   )
   plotPDF (meso_markers, ArchRProj = archp, width=14, name ='MPM_markers_coveragePlots.pdf')
+
+
+### Check peaks around HOXB13 ####
+tf_match = getMatches (archp)
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+bg_peakSet = rowRanges (tf_match)
+mega_hubs = GRanges ('chr17:48727159-48731662')
+mega_hubs_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, mega_hubs))]
+#tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+mega_hubs_TF =  hyperMotif (
+  selected_peaks = mega_hubs_peaks, 
+  motifmatch = tf_match)
+
+head (mega_hubs_TF, 40)
+
+
+
+
+
+
+
+# Compare peaks overlap between scatac celltypes and meso tumors / normal ####
+
+# # Compute differential hub accessibility DHA for each tumor ####
+library (presto)
+res = wilcoxauc (log2(hubsCell_mat+1), archp$SampleP11)
+res_flt = lapply (split (res, res$group), function(x) x[x$logFC > 1, ])
+ps = getPeakSet (archp)
+res_peaks = lapply (res_flt, function(x) ps[queryHits (findOverlaps(ps, hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x$feature)]))])
+
+# Compare peaks overlap between scatac celltypes and meso tumors / normal ####
+projects = c('yang_kidney','Tsankov_lung','rawlins_fetal_lung','JShendure','greenleaf_colon','greenleaf_brain','bingren_pan')
+projects_peaks = lapply (seq_along(projects), function(x) {
+  bed_files = list.files (file.path('..','all_tissues_ArchR',projects[x],'PeakCalls'), pattern = '.rds')
+  grlist = lapply (seq_along(bed_files), 
+    function(y) readRDS (file.path('..','all_tissues_ArchR',projects[x],'PeakCalls',bed_files[y])))
+names (grlist) = paste0(projects[x], '_', sapply (bed_files, function(z) unlist(strsplit (z, '-'))[1]))
+grlist
+})
+projects_peaks = unlist (projects_peaks, recursive=F)
+projects_peaks2 = GRangesList (projects_peaks)
+
+meso_peaks = res_peaks
+peaks_ov_mat = sapply (meso_peaks, function(x) sapply (projects_peaks2, function(y) sum(countOverlaps (x, y)) / min (c(length(x), length(y)))))
+
+# prop_sample_df[is.na(prop_sample_df)] = 0
+ht = Heatmap (
+  # prop_sample_df, 
+  peaks_ov_mat,
+  col = rev(palette_deviation), 
+  row_names_gp= gpar (fontsize=6), 
+  column_names_gp= gpar (fontsize=6), 
+  column_names_rot = 45)
+pdf (file.path ('Plots', 'scatacDatasets_overlap_DAH_sampleP11_heatmap.pdf'),width = 6,height=44)
+ht
+dev.off()
+
+# Plot only fetal mesothelium
+ht = Heatmap (
+  # prop_sample_df, 
+  t(scale(t(peaks_ov_mat[c('rawlins_fetal_lung_Earlymeso',
+    'rawlins_fetal_lung_Mid_latemeso',
+    'bingren_pan_Mesothelial.Cell'),order(-peaks_ov_mat['rawlins_fetal_lung_Earlymeso',])]))),
+  cluster_rows=F,
+  cluster_columns=F,
+  col = rev(palette_deviation), 
+  row_names_gp= gpar (fontsize=6), 
+  column_names_gp= gpar (fontsize=6),
+  name = 'overlap'#, 
+  #column_names_rot = 45
+  )
+pdf (file.path ('Plots', 'scatacDatasets_overlap_DAH_sampleP11_only_meso_heatmap.pdf'),width = 3.6,height=1.2)
+ht
+dev.off()
+
+
 
 
 

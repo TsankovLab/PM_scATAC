@@ -136,8 +136,11 @@ if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM
   } else {
   msm_mat = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/mesomics_data.rds')
   msm_meta = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/Mesothelioma_SampleInfo.txt')
+  msm_meta2 = read.csv ('mesomics_SamplesOverview.csv')
   }
 
+msm_meta2 = msm_meta2[match(colnames(msm_mat), msm_meta2$Sample), ]
+msm_meta2 = msm_meta2[, 1:96]
 
 # #### Correct for immune infiltration using limma
 # bueno_meta3 = bueno_meta2 
@@ -177,15 +180,15 @@ meso_bulk_l = list (
 meso_bulk_meta_l = list (
   bueno = bueno_meta,
   tcga = tcga_meta,
-  mesomics = msm_meta)
+  mesomics = msm_meta2)
 
-meso_bulk_meta_l[['tcga']][meso_bulk_meta_l[['tcga']] == 'Biphasic Mesothelioma'] = 'Biphasic'
-meso_bulk_meta_l[['tcga']][meso_bulk_meta_l[['tcga']] == 'Epithelioid Mesothelioma'] = 'Epithelioid'
-meso_bulk_meta_l[['tcga']][meso_bulk_meta_l[['tcga']] == 'Sarcomatoid Mesothelioma'] = 'Sarcomatoid'
+meso_bulk_meta_l[['tcga']]$TUMOR_TYPE[meso_bulk_meta_l[['tcga']]$TUMOR_TYPE == 'Biphasic Mesothelioma'] = 'Biphasic'
+meso_bulk_meta_l[['tcga']]$TUMOR_TYPE[meso_bulk_meta_l[['tcga']]$TUMOR_TYPE == 'Epithelioid Mesothelioma'] = 'Epithelioid'
+meso_bulk_meta_l[['tcga']]$TUMOR_TYPE[meso_bulk_meta_l[['tcga']]$TUMOR_TYPE == 'Sarcomatoid Mesothelioma'] = 'Sarcomatoid'
 
-meso_bulk_meta_l[['mesomics']][meso_bulk_meta_l[['mesomics']] == 'MMS'] = 'Sarcomatoid'
-meso_bulk_meta_l[['mesomics']][meso_bulk_meta_l[['mesomics']] == 'MME'] = 'Epithelioid'
-meso_bulk_meta_l[['mesomics']][meso_bulk_meta_l[['mesomics']] == 'MMB'] = 'Biphasic'
+meso_bulk_meta_l[['mesomics']]$Type[meso_bulk_meta_l[['mesomics']]$Type == 'MMS'] = 'Sarcomatoid'
+meso_bulk_meta_l[['mesomics']]$Type[meso_bulk_meta_l[['mesomics']]$Type == 'MME'] = 'Epithelioid'
+meso_bulk_meta_l[['mesomics']]$Type[meso_bulk_meta_l[['mesomics']]$Type == 'MMB'] = 'Biphasic'
 
 meso_bulk_meta_l[['bueno']]$ConsensusCluster = factor (meso_bulk_meta_l[['bueno']]$ConsensusCluster, levels = c('Sarcomatoid','Biphasic-S','Biphasic-E','Epithelioid'))
 meso_bulk_meta_l[['tcga']]$TUMOR_TYPE = factor (meso_bulk_meta_l[['tcga']]$TUMOR_TYPE, levels = c('Sarcomatoid','Biphasic','Epithelioid'))
@@ -199,8 +202,11 @@ colnames(meso_bulk_meta_l[['bueno']])[colnames (meso_bulk_meta_l[['bueno']]) == 
 colnames(meso_bulk_meta_l[['bueno']])[colnames (meso_bulk_meta_l[['bueno']]) == 'Status'] = 'status'
 colnames (meso_bulk_meta_l[['tcga']])[colnames (meso_bulk_meta_l[['tcga']]) == 'DEATH_EVENT'] = 'status'
 colnames (meso_bulk_meta_l[['tcga']])[colnames (meso_bulk_meta_l[['tcga']]) == 'OS_MONTHS'] = 'census'
+colnames (meso_bulk_meta_l[['mesomics']])[colnames (meso_bulk_meta_l[['mesomics']]) == 'Survival.Censor'] = 'status'
+colnames (meso_bulk_meta_l[['mesomics']])[colnames (meso_bulk_meta_l[['mesomics']]) == 'Survival.Time'] = 'census'
 
 #meso_bulk_meta_l[['tcga']]$status = ifelse (meso_bulk_meta_l[['tcga']]$status == '1:DECEASED',1,0)
+meso_bulk_meta_l[['mesomics']]$status = ifelse (meso_bulk_meta_l[['mesomics']]$status == 'dead', 1,0)
 meso_bulk_meta_l[['bueno']]$status = ifelse (meso_bulk_meta_l[['bueno']]$status == 'd', 1,0)
 
 ### Query bulk data ####
@@ -215,11 +221,12 @@ studies = c('bueno','tcga','mesomics')
 
 
 # Make gene modules overlapping megahubs regions in P11 ####
-all_genes = genes(TxDb.Hsapiens.UCSC.hg38.knownGene)
+all_genes = genes (TxDb.Hsapiens.UCSC.hg38.knownGene)
 genes_in_region = all_genes$gene_id[subjectHits(findOverlaps (region, all_genes))]
 module_l = list(chr18_q23 = as.data.frame(org.Hs.egSYMBOL)[match (genes_in_region, as.data.frame(org.Hs.egSYMBOL)[,1]),'symbol'])
 module_l = c(MBP = 'MBP')
-module_l = list(HOXB13 = c('HOXB13','HOXC13'), HOXC13 = 'HOXC13',sarc='AXL')
+module_l = c(TXNL4A = 'TXNL4A')
+module_l = list(HOXB13 = 'HOXB13', HOXC13 = 'HOXC13',sarc='AXL')
 
 # Run genes on bulk datasets
 stat_testL2 = list()
@@ -276,55 +283,69 @@ for (mod_name in names(module_l))
 ##################################################################
 cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds')))
 
-your.gene1 = 'MESP1'
-your.gene2 = head(cnmf_spectra_unique[['cNMF20']],50)
+# Load P11 megahubs regions ####
+region = readRDS ('../tumor_compartment/scatac_ArchR/P11_chr18_region.rds')
 
+# Make gene modules overlapping megahubs regions in P11 ####
+all_genes = genes(TxDb.Hsapiens.UCSC.hg38.knownGene)
+genes_in_region = all_genes$gene_id[subjectHits(findOverlaps (region, all_genes))]
+genes_in_region = list(chr18_q23 = as.data.frame(org.Hs.egSYMBOL)[match (genes_in_region, as.data.frame(org.Hs.egSYMBOL)[,1]),'symbol'])
+#genes_in_region = split (genes_in_region[[1]], genes_in_region)
+
+#
+your.gene1 = 'HOXB13'
+your.gene1 = c('CALB2','ITLN1','UPK3B')
+your.gene2 = head(cnmf_spectra_unique[['cNMF20']],50)
+your.gene2 = genes_in_region[[1]]
+your.gene2 = 'TXNL4A'
+your.gene2 = genes_in_region[[48]]
+your.gene2 = 'HOXA10'
 corr_res = list()
 #study = c('bueno_immune_corrected','tcga_immune_corrected','mesomics_immune_corrected')
-study = c('bueno_rpkm','tcga','mesomics')
-by_histology=FALSE
-for (blk in study)
+studies = c('bueno','tcga','mesomics')
+by_histology=TRUE
+for (study in studies)
   {
-  meso_bulk = meso_bulk_l[[blk]] 
-  meso_bulk_meta = meso_bulk_meta_l[[blk]]
+  meso_bulk = meso_bulk_l[[study]] 
+  meso_bulk_meta = meso_bulk_meta_l[[study]]
 
-  if (length(your.gene1) > 1) gene_exp1 = colMeans(meso_bulk[rownames(meso_bulk) %in% your.gene1,,drop=F]) else  
+  if (length(your.gene1) > 1) gene_exp1 = colMeans(meso_bulk[rownames(meso_bulk) %in% your.gene1,,drop=F]) else
   gene_exp1 = as.vector (unlist (meso_bulk[your.gene1,,drop=F]))
   if (length(your.gene2) > 1) gene_exp2 = colMeans(meso_bulk[rownames(meso_bulk) %in% your.gene2,,drop=F]) else  
   gene_exp2 = as.vector (unlist (meso_bulk[your.gene2,,drop=F]))
 
   exp_df = data.frame (your.gene1 = gene_exp1, your.gene2 = gene_exp2)
+  exp_df$subtype = meso_bulk_meta$subtype
   rownames (exp_df) = colnames (meso_bulk)
-  exp_df$histology = meso_bulk_meta[match (rownames(exp_df), names(meso_bulk_meta))]
-  exp_df = exp_df[!is.na(exp_df$histology),]
+  exp_df = exp_df[!is.na(exp_df$subtype),]
   if (by_histology) {
-  corr_res[[blk]] = ggscatter (
+  corr_res[[study]] = ggscatter (
             exp_df, 
             x = 'your.gene1', 
             y = 'your.gene2',
             #palette = bulk_palette 
             shape=16,
-            color = 'histology',
+            color = 'subtype',
             add = "reg.line", conf.int = FALSE, 
-            cor.coef = TRUE, cor.method = "pearson",
+            cor.coef = TRUE, cor.method = "spearman",
             xlab = paste(your.gene1, collapse=' '), ylab = paste(your.gene2, collapse=' '),
-            title = paste0(blk,'(n=',nrow(exp_df),')'), fullrange = TRUE) + 
+            title = paste0(study,'(n=',nrow(exp_df),')'), fullrange = TRUE) + 
             scale_fill_manual (values=bulk_palette) + 
             scale_color_manual (values=bulk_palette) +
-            facet_wrap (~histology, drop=TRUE, scales = 'free_x', ncol=length (unique(exp_df$histology))) +
+            facet_wrap (~subtype, drop=TRUE, scales = 'free_x', ncol=length (unique(exp_df$subtype))) +
             NoLegend()
   }else {
-  corr_res[[blk]] = ggscatter (
+  corr_res[[study]] = ggscatter (
             exp_df, 
             x = 'your.gene1',
             y = 'your.gene2',
             #palette = bulk_palette 
             shape=16,
-            color = 'histology',
+            color = 'subtype',
             add = "reg.line", conf.int = FALSE, 
-            cor.coef = TRUE, cor.method = "pearson",
+            cor.coef = TRUE, cor.method = "spearman",
             xlab = paste(your.gene1, collapse=' '), ylab = paste(your.gene2, collapse=' '),
-            title = paste0(blk,'(n=',nrow(exp_df),')'), fullrange = TRUE) + 
+            title = paste0(study,'(n=',nrow(exp_df),')'), fullrange = TRUE) + 
             scale_fill_manual (values=bulk_palette) + 
             scale_color_manual (values=bulk_palette) +
             NoLegend()
@@ -409,8 +430,9 @@ rownames (tcga_mat) = unname (sapply (rownames(tcga_mat), function(x) unlist (st
 #tcga_mat = rowMeans (tcga_mat)
 
 
-
-
+###########################
+### Survival Analysis #####
+###########################
 
 # Load P11 megahubs regions ####
 region = readRDS ('../tumor_compartment/scatac_ArchR/P11_chr18_region.rds')
@@ -421,9 +443,12 @@ genes_in_region = all_genes$gene_id[subjectHits(findOverlaps (region, all_genes)
 genes_in_region = list(chr18_q23 = as.data.frame(org.Hs.egSYMBOL)[match (genes_in_region, as.data.frame(org.Hs.egSYMBOL)[,1]),'symbol'])
 genes_in_region = split (genes_in_region[[1]], genes_in_region)
 
-genes_in_region = split (module_l,module_l)
+module_l = genes_in_region
+#genes_in_region = split (module_l,module_l)
 
-
+# HOX genes ####
+module_l = rownames(meso_bulk_l[[1]])[grep ('^HOX',rownames(meso_bulk_l[[1]]))]
+module_l = split (module_l, module_l)
 
 # Make metadata for survival analysis ####
 # Define module of genes to check ####
@@ -432,37 +457,40 @@ selected_TFs = read.csv ('../tumor_compartment/scatac_ArchR/Active_TFs.csv')$x
 module_l = split (selected_TFs, selected_TFs)
 
 #### Check chromatin regulators and genetic drivers genes ####
-chromatin_regulators = c('SETD5, ASH1L, CREBBP, PRDM2, KDM2B, KMT2D, EZH2, SETDB1')
-chromatin_regulators = unlist(strsplit (chromatin_regulators, ', '))
-genetic_drivers = c('BAP1, NF2, CDKN2A, CDKN2B, TP53, LATS2, SETD2, FAT4, PTCH1')
-genetic_drivers = unlist(strsplit (genetic_drivers, ', '))
-chromatin_regulators2 = c('LATS1, DDX3X, ULK2, RYR2, CFAP45, SETDB1, DDX51, SF3B1, TRAF7, PTEN, RBFOX1, CSMD1, MTAP, TTC28, PCDH15, USH2A, CNTNAP2, DNAH1, KCNH7, PTK2, ROBO2, DLG2, PBRM1, PTPRD, ANTXR2, CTNNA3, LINGO2, LRP1B, PLCB1, UNC79, WWOX')
-chromatin_regulators2 = unlist (strsplit (chromatin_regulators2, ', '))
-genetic_drivers = unlist(strsplit (genetic_drivers, ', '))
-module_l = unique (c(chromatin_regulators, genetic_drivers, chromatin_regulators2))
-module_l = split (module_l, module_l)
+# chromatin_regulators = c('SETD5, ASH1L, CREBBP, PRDM2, KDM2B, KMT2D, EZH2, SETDB1')
+# chromatin_regulators = unlist(strsplit (chromatin_regulators, ', '))
+# genetic_drivers = c('BAP1, NF2, CDKN2A, CDKN2B, TP53, LATS2, SETD2, FAT4, PTCH1')
+# genetic_drivers = unlist(strsplit (genetic_drivers, ', '))
+# chromatin_regulators2 = c('LATS1, DDX3X, ULK2, RYR2, CFAP45, SETDB1, DDX51, SF3B1, TRAF7, PTEN, RBFOX1, CSMD1, MTAP, TTC28, PCDH15, USH2A, CNTNAP2, DNAH1, KCNH7, PTK2, ROBO2, DLG2, PBRM1, PTPRD, ANTXR2, CTNNA3, LINGO2, LRP1B, PLCB1, UNC79, WWOX')
+# chromatin_regulators2 = unlist (strsplit (chromatin_regulators2, ', '))
+# genetic_drivers = unlist(strsplit (genetic_drivers, ', '))
+# module_l = unique (c(chromatin_regulators, genetic_drivers, chromatin_regulators2))
+# module_l = split (module_l, module_l)
 
 
 meso_bulk_meta_l2 = meso_bulk_meta_l
-meso_bulk_meta_l2 = lapply (seq_along(meso_bulk_l)[1:2], function(x) 
+meso_bulk_meta_l2 = lapply (seq_along(meso_bulk_l), function(x) 
   {
    tmp = lapply (module_l, function(y) colMeans (meso_bulk_l[[x]][rownames(meso_bulk_l[[x]]) %in% y,,drop=F]))
    tmp = do.call (cbind, tmp)
+   colnames (tmp) = gsub('-','_',colnames(tmp))
    tmp = tmp[,apply(tmp, 2, function(t) !any(is.na(t)))]
    meso_bulk_meta_l2[[x]] = as.data.frame (meso_bulk_meta_l2[[x]])
    meso_bulk_meta_l2[[x]] = cbind (meso_bulk_meta_l2[[x]], tmp)
    meso_bulk_meta_l2[[x]]
   })
-names (meso_bulk_meta_l2) = c('bueno','tcga')
+names (meso_bulk_meta_l2) = c('bueno','tcga','mesomics')
+#survival_name = 'activeTFs'
+#survival_name = 'megahub'
+survival_name = 'HOXs'
 
 
-### Survival Analysis ####
 
 # Run Cox hazard ratio regression survival analysis ####
 # Set variables per dataset to use
 low='1st Qu.'
 high='3rd Qu.'  
-studies = c('bueno','tcga')
+studies = c('bueno','tcga','mesomics')
 cfit_study = list()
 cox_l = list()
 sc_p = list()
@@ -470,6 +498,8 @@ plot_study= list()
 for (study in studies)
     {
     cfit = list()
+    module_l = lapply (module_l, function(x) gsub('-','_',x))
+    names (module_l) = gsub('-','_',names(module_l))
     mods = colnames(meso_bulk_meta_l2[[study]])[colnames(meso_bulk_meta_l2[[study]]) %in% unlist(module_l)]
     for (mod in mods)
         {
@@ -549,16 +579,15 @@ for (study in names (cfit_study))
     theme_void() +
     theme(axis.text.x = element_text(face = 'bold'))
     
-    pdf (paste0('Plots/cox_regression_',study,'.pdf'), height=8,5)
+    pdf (paste0('Plots/cox_regression_',study,'_',survival_name,'.pdf'), height=8,5)
     print (forest + tab + plot_layout(ncol = 2, widths = c(1, 3)))
     dev.off()
-    pdf (paste0('Plots/cox_regression_',study,'_stratified.pdf'), height = 2.8,3)
+    pdf (paste0('Plots/cox_regression_',study,'_stratified_',survival_name,'.pdf'), height = 2.8,3)
     print (plot_study[[study]])
     dev.off()
   }
 
-
 # Export tables
-lapply (studies, function(study) write.csv (cfit_study[[study]], paste0('cox_regression_results_',study,'.csv')))
+lapply (studies, function(study) write.csv (cfit_study[[study]], paste0('cox_regression_results_',study,'_',survival_name,'.csv')))
 
 

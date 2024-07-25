@@ -1,0 +1,30 @@
+
+packages = c(
+ 'Signac',
+ 'Seurat',
+ 'biovizBase',
+ 'ggplot2',
+ 'patchwork',
+ 'scATACutils',
+ 'SummarizedExperiment',
+ 'epiAneufinder',
+ 'JASPAR2020',
+ 'TFBSTools',
+ 'TxDb.Hsapiens.UCSC.hg38.knownGene',
+ 'EnsDb.Hsapiens.v86',
+ 'gplots',
+ 'regioneR',
+ 'ComplexHeatmap',
+ 'ArchR',
+ 'BSgenome.Hsapiens.UCSC.hg38',
+ 'tidyverse',
+ 'ggrepel',
+ 'RColorBrewer',
+ 'hdWGCNA',
+ 'biomaRt',
+ 'GenomicFeatures',
+ 'GenomicFeatures',
+ 'org.Hs.eg.db',
+ 'TxDb.Hsapiens.UCSC.hg38.knownGene'
+)
+lapply(packages, require, character.only = TRUE)
