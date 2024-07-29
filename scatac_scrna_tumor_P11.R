@@ -1,7 +1,11 @@
 
 ####### ANALYSIS of P11 TUMOR #######
 set.seed(1234)
-source (file.path ('..','..','PM_scATAC','load_packages.R')
+source (file.path ('..','..','PM_scATAC','load_packages.R'))
+source ('../../PM_scATAC/useful_functions.R')
+source ('../../PM_scATAC/ggplot_aestetics.R')
+source ('../../PM_scATAC/scATAC_functions.R')
+source ('../../PM_scATAC/palettes.R')
 
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_scrna_P11'
 dir.create (file.path(projdir,'Plots'), recursive =T)
@@ -9,57 +13,209 @@ setwd (projdir)
 projdir_scatac = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
 
 #devtools::install_github("immunogenomics/presto") #needed for DAA
-source ('../../PM_scATAC/useful_functions.R')
-source ('../../PM_scATAC/ggplot_aestetics.R')
-source ('../../PM_scATAC/scATAC_functions.R')
-source ('../../PM_scATAC/palettes.R')
 
 set.seed(1234)
 addArchRThreads (threads = 8) 
 addArchRGenome ("Hg38")
 
 # Load scATAC ####
-if (!file.exists ('Save-ArchR-Project.rds')) 
-  { source (file.path('..','..','PM_scATAC','scatac_tumor_create_ArchRobj.R'))
-  } else {
  archp = loadArchRProject (projdir_scatac)   
-  }
+  
 
 # Load scRNA ####
-srt = readRDS (file.path('..','scrna','srt.rds'))
-#sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
+srt = readRDS (file.path ('..','..','main','scrna','srt.rds'))
+srt = srt[,srt$sampleID == 'P11']
+srt = NormalizeData (object = srt, normalization.method = "LogNormalize", scale.factor = 10000)
 
+nfeat = 3000
+srt = FindVariableFeatures (srt, selection.method = "vst", nfeat = nfeat)
+srt = ScaleData (srt)	
+srt = RunPCA (srt, features = VariableFeatures (object = srt), npcs = ifelse(ncol(srt) <= 30,ncol(srt)-1,30), ndims.print = 1:5, nfeat.print = 5, verbose = FALSE)
+
+reductionName = 'umap'
+reductionSave = 'pca'
+reductionGraphKnn = 'RNA_knn'
+reductionGraphSnn = 'RNA_snn' 
+
+srt = RunUMAP (object = srt, reduction = reductionSave, dims = 1:30)
+	
+pdf (file.path ('Plots','celltypes_umap.pdf'))
+DimPlot (srt, group.by = 'celltype_simplified', reduction = 'umap')
+dev.off()
+
+	
+#### Run cNMF ####
+nfeat = 5000
+force=F
+k_list = c(5:30)
+k_selections = c(5:30)
+k_selection = 25
+cores= 100
+
+cnmf_name = 'scrna_p11'
+cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
+dir.create (file.path(cnmf_out,'Plots'), recursive=T)
+
+### RUN consensus NMF ####
+# conda create --yes --channel bioconda --channel conda-forge --channel defaults python=3.7 fastcluster matplotlib numpy palettable pandas scipy 'scikit-learn>=1.0' pyyaml 'scanpy>=1.8' -p /ahg/regevdata/projects/ICA_Lung/Bruno/conda/cnmf && conda clean --yes --all # Create environment, cnmf_env, containing required packages
+# conda activate cnmf
+# pip install cnmf
+vf = VariableFeatures (srt)
+if (!file.exists(paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt')))
+	{
+	# Extract and save count and data matrices from seurat object	
+	count_mat = t(srt@assays$RNA@counts[vf,])
+	norm_mat = t(srt@assays$RNA@data[vf,])
+	if (!file.exists (paste0('cNMF/counts_nmf_',nfeat,'.txt')) | force) write.table (count_mat, paste0('cNMF/counts_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
+	if (!file.exists (paste0('cNMF/norm_nmf_',nfeat,'.txt')) | force) write.table (norm_mat, paste0('cNMF/norm_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
+	
+	## Format k_list variable to be passed correctly to bash script
+	message ('submit cNMF job')
+	if(length(k_list) > 1) 
+		{
+		k_list_formatted = paste (k_list, collapse=' ')	
+		k_list_formatted = shQuote (k_list_formatted)
+		}
+	
+	
+	# Run cNMF prepare script
+	system (paste0('chmod +x ../../PM_scATAC/cnmf_prepare_job.sh'), wait=FALSE) 
+	system (paste0('bash ',file.path('..','..','PM_scATAC/cnmf_prepare_job.sh'),' ', paste0(projdir,'/'),' ', k_list_formatted,' ', nfeat, ' ', cnmf_out, ' ', cores), wait=TRUE)
+	
+	# Submitting cNMF factorization job
+	system (paste0('chmod +x ../../PM_scATAC/cnmf_factorization_parallel.sh'), wait=FALSE)
+	system (paste0 ('qsub -t 1-',cores,' ','../../PM_scATAC/cnmf_factorization_parallel.sh ', paste0(projdir,'/'),' ', cnmf_out, ' ', cores))
+	
+	# Run script to combine K iterations generated in previous script
+	system (paste0('chmod +x ../../PM_scATAC/cnmf_combine_job.sh'), wait=FALSE)
+	system (paste0('bash ','../../PM_scATAC/cnmf_combine_job.sh ', paste0(projdir,'/'), ' ',cnmf_out), wait=TRUE) # combine cnmf factors
+	
+	
+	# Run cNMF bash script
+	system (paste0('chmod +x ','../../PM_scATAC/cnmf_consensus_job.sh'), wait=FALSE)
+	system (paste0('qsub ','../../PM_scATAC/cnmf_consensus_job.sh ', paste0(projdir,'/'), ' ', cnmf_out,' ', k_selection), wait=FALSE)
+	} else {
+	cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
+	}
+
+# Format NMF results ####
+# Assign genes uniquely to cNMF modules based on spectra values
+cnmf_spectra = t(cnmf_spectra)
+max_spectra = apply (cnmf_spectra, 1, which.max)
+
+top_nmf_genes = Inf
+cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
+      {
+      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
+      tmp = tmp[order(-tmp[,1]),,drop=F]
+      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
+      head(rownames(tmp),top_nmf_genes)
+      })
+names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
+
+saveRDS (cnmf_spectra_unique, paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds'))
+write.csv (patchvecs (cnmf_spectra_unique), paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.csv'))
+
+top_nmf_genes = Inf
+cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
+      {
+      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
+      tmp = tmp[order(-tmp[,1]),,drop=F]
+      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
+      head(rownames(tmp),top_nmf_genes)
+      })
+names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
+
+# Add module score of cNMF modules ####
+if (!all (names(cnmf_spectra_unique) %in% colnames (srt@meta.data)))
+	{
+	srt = ModScoreCor (
+	        seurat_obj = srt, 
+	        geneset_list = cnmf_spectra_unique, 
+	        cor_threshold = NULL, 
+	        pos_threshold = NULL, # threshold for fetal_pval2
+	        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+
+	}
+
+srt$cNMF = 'cNMF'
+ccomp_df = srt@meta.data[,c(names(cnmf_spectra_unique),'sampleID','celltype_simplified'), drop=FALSE]
+      #ccomp_df = aggregate (ccomp_df, by=as.list(srt_wgcna@meta.data[,metaGroupNames,drop=F]), mean)    
+bp1 = lapply (names(cnmf_spectra_unique), function(x) {
+            ggplot (ccomp_df, aes_string (x= 'celltype_simplified', y= x)) +
+        #geom_violin (trim=TRUE, aes_string (fill = metaGroupNames[3])) +
+        #geom_violin (aes_string(fill = metaGroupNames[3])) +
+        geom_boxplot(width=0.5, color="black", alpha=0.2) +
+        #geom_bar (stats='identity') +
+        #geom_jitter (color="black", size=0.4, alpha=0.9) +
+        theme_classic() + 
+        #scale_fill_manual (values= module_pal) + 
+        ggtitle (paste(x,'mod score')) + 
+        theme (axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))  + NoLegend()
+      })
+
+  
+png (file.path(cnmf_out,'Plots',paste0('cNMF_module_scores_boxplots_',k_selection,'nfeat_',nfeat,'.png')),5000,5000,res=300)
+print (wrap_plots (bp1))
+dev.off()
+
+metaGroupNames = c('celltype_simplified')
+  umap_df = data.frame (srt[[reductionName]]@cell.embeddings, srt@meta.data[,c(names(cnmf_spectra_unique),metaGroupNames)])
+  umap_p1 = lapply (names(cnmf_spectra_unique), function(x) ggplot(data = umap_df) + 
+  geom_point (mapping = aes_string (x = colnames(umap_df)[1], y= colnames(umap_df)[2], color = x), size = .1) + 
+  scale_colour_gradientn (colours = rev(brewer.pal (n = 11, name = "RdBu")),limits=c(-max (abs(umap_df[,x])), max (abs(umap_df[,x])))) +
+  ggtitle (x) + 
+  #facet_wrap (as.formula(paste("~", metaGroupNames[3]))) + 
+  theme_classic() +
+  theme_void())
+  
+pdf (paste0(cnmf_out,'/Plots/cNMF_module_scores_umap_',k_selection,'.pdf'),24,25)
+print (wrap_plots (umap_p1))
+dev.off()
+
+enricher_universe = vf
+#do.fgsea = TRUE
+gmt_annotations = c(
+'h.all.v7.4.symbol.gmt',#,
+'c5.bp.v7.1.symbol.gmt',
+'c3.tft.v7.1.symbol.gmt'
+)
+gmt_annotation = gmt_annotations[3]
+if (!file.exists (paste0('cNMF_normalized/',cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds')) | force)
+  {
+    gmt.file = paste0 ('../../PM_scATAC/files/',gmt_annotation)
+    pathways = read.gmt (gmt.file)
+    EnrichRResCluster = list()
+    for (i in names(cnmf_spectra_unique))
+      {
+      message (paste ('EnrichR running module',i)) 
+      sig_genes = cnmf_spectra_unique[[i]]
+      if (!any (sig_genes %in% pathways$gene)) next
+      egmt = enricher (sig_genes, TERM2GENE=pathways, universe = enricher_universe)
+      egmt@result$ID = stringr::str_trunc (egmt@result$ID, 50)
+      EnrichRResCluster[[i]] = egmt@result
+      }
+    EnrichRResAll = EnrichRResCluster
+    }
+  saveRDS (EnrichRResAll, paste0(cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds'))
+  } else {
+  EnrichRResAll = readRDS (paste0(cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds'))
+  }
+  pvalAdjTrheshold = 0.05
+  top_pathways = 10
+  EnrichRes_dp = dotGSEA (enrichmentsTest_list = EnrichRResAll, type = 'enrich', padj_threshold = pvalAdjTrheshold, top_pathways= top_pathways)
+  pdf (paste0(cnmf_out, '/Plots/EnrichR_',i,'_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'_dotplots.pdf'), width = 8 + length(length (cnmf_spectra_unique))/10, height = 15)
+  print (EnrichRes_dp)
+  dev.off()
+
+	
 ### Test correlation of chr18 mega hubs regions from P11 with other genes ####
 
 # Load metacells object ####
-if (!file.exists (file.path('..','scrna','metacells.rds'))
-	{
-	srt <- SetupForWGCNA(
-	  srt,
-	  gene_select = "fraction", # the gene selection approach
-	  fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
-	  wgcna_name = "metacells" # the name of the hdWGCNA experiment
-	)
-	# construct metacells  in each group
-	srt <- MetacellsByGroups(
-	  seurat_obj = srt,
-	  group.by = c("sampleID"), # specify the columns in seurat_obj@meta.data to group by
-	  reduction = 'umap', # select the dimensionality reduction to perform KNN on
-	  k = 50, # nearest-neighbors parameter
-	  max_shared = 25, # maximum number of shared cells between two metacells
-	  ident.group = 'sampleID' # set the Idents of the metacell seurat object
-	)
-	
-	# normalize metacell expression matrix:
-	srt <- NormalizeMetacells (srt)
-	metacells = GetMetacellObject (srt)
-	saveRDS (metacells, 'metacells.rds')
-	} else {
-	metacells = readRDS ('metacells.rds')	
-	}
+metacells = readRDS (file.path('..','scrna','metacells.rds'))
 
 # Load P11 megahubs regions ####
-region = readRDS ('../scatac_ArchR/P11_chr18_region.rds')
+region = readRDS (file.path ('..','scatac_ArchR','P11_chr18_region.rds'))
 
 # Make gene modules overlapping megahubs regions in P11 ####
 all_genes = genes(TxDb.Hsapiens.UCSC.hg38.knownGene)
@@ -71,7 +227,7 @@ metacells = ModScoreCor (
     geneset_list = genes_in_region, 
     cor_threshold = NULL, 
     pos_threshold = NULL, # threshold for fetal_pval2
-    listName = 'mut', outdir = paste0(projdir,'Plots/'))
+    listName = 'mut', outdir = NULL)
 
 # check how it looks on UMAP ####
 srt = ModScoreCor (
@@ -79,11 +235,11 @@ srt = ModScoreCor (
     geneset_list = genes_in_region, 
     cor_threshold = NULL, 
     pos_threshold = NULL, # threshold for fetal_pval2
-    listName = 'mut', outdir = paste0(projdir,'Plots/'))
+    listName = 'mut', outdir = NULL)
 
 # Show mega hubs region and other P11 specific genes ####
 reductionName = 'umap'
-pdf ('Plots/chr18_q23_umap.pdf', width =10, height = 5)
+pdf (file.path('Plots','chr18_q23_umap.pdf'), width =10, height = 5)
 wrap_plots (
 	DimPlot (srt, group.by = 'sampleID'), 
 	fp (srt, 'chr18_q23', reduction = reductionName)[[1]],
@@ -94,6 +250,8 @@ dev.off()
 
 
 ### Correlate megahubs region with all other genes in P11 metacells ####
+srt = readRDS (file.path ('..','scrna','srt.rds'))
+
 ccomp_df = metacells@meta.data[,'chr18_q23', drop=F]
 metacells_assay = metacells@assays$RNA@layers$data
 rownames (metacells_assay) = rownames(srt)
@@ -212,7 +370,7 @@ metacells_assay = metacells@assays$RNA@layers$data
 rownames (metacells_assay) = rownames(srt)
 metacells@meta.data[,gene] = metacells_assay[gene, ]
 
-### Restrict above analysis only on metacells high for megahubs in P11 ####
+### Restrict above analysis only on metacells high for HOXB13 in P11 ####
 y = 'P11'
 summary (metacells@meta.data[,gene])
 metacells_assay_P11s = metacells_assay[,metacells$sampleID == y & metacells@meta.data[,gene] > 0.03]
@@ -221,10 +379,6 @@ res_p11s = res_p11s[order (-res_p11s[,1]),]
 #res_p11s = res_p11s[!names(res_p11s) %in% genes_in_region[[1]]]
 
 write.csv (res_p11s, 'correlated_genes_p11s_HOXB13.csv')
-
-pdf (file.path ('Plots','chr18_q23_ZKSCAN5_scatter.pdf'))
-plot (x = metacells_assay_P11s['ZKSCAN5',], y = ccomp_df_P11s)
-dev.off()
 
 # Check Proliferation index of HOX + cluster vs others ####
 pdf (file.path ('Plots','cellcycle_fplot.pdf'))
@@ -250,6 +404,7 @@ dev.off()
 library (presto)
 
 #sample_names_rna = c('P1','P14','P13','P3','P12','P5','P11','P4','P8','P14','HU37','HU62')
+if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 mMat_P11 = mMat[,archp$Sample2 == 'P11']

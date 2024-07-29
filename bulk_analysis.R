@@ -16,7 +16,6 @@ packages = c(
   'RColorBrewer',
   'ggrepel',
   'gplots',
-  'wesanderson',
   'EnhancedVolcano',
   'rstatix',
   'tidyr',
@@ -142,34 +141,6 @@ if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM
 msm_meta2 = msm_meta2[match(colnames(msm_mat), msm_meta2$Sample), ]
 msm_meta2 = msm_meta2[, 1:96]
 
-# #### Correct for immune infiltration using limma
-# bueno_meta3 = bueno_meta2 
-# bueno_meta3 = cbind (bueno_meta3, data.frame (PTPRC = rowMeans(t(log2(bueno_mat+1)[c('PTPRC'),]))))
-# bueno_meta3 = cbind (bueno_meta3, data.frame (VWF = rowMeans(t(log2(bueno_mat+1)[c('VWF'),]))))
-# bueno_meta3 = cbind (bueno_meta3, data.frame (CD3D = rowMeans(t(log2(bueno_mat+1)[c('CD3D'),]))))
-
-# tcga_meta3 = tcga_meta
-# tcga_meta3 = cbind (tcga_meta3, data.frame (PTPRC = rowMeans(t(log2(as.data.frame (tcga_mat)+1)[c('PTPRC'),]))))
-# tcga_meta3 = cbind (tcga_meta3, data.frame (VWF = rowMeans(t(log2(as.data.frame (tcga_mat)+1)[c('VWF'),]))))
-# tcga_meta3 = cbind (tcga_meta3, data.frame (CD3D = rowMeans(t(log2(as.data.frame (tcga_mat)+1)[c('CD3D'),]))))
-
-# mesomics_meta3 = msm_meta
-# mesomics_meta3 = cbind (mesomics_meta3, data.frame (PTPRC = rowMeans(t(log2(as.data.frame (msm)+1)[c('PTPRC'),]))))
-# mesomics_meta3 = cbind (mesomics_meta3, data.frame (VWF = rowMeans(t(log2(as.data.frame (msm)+1)[c('VWF'),]))))
-# mesomics_meta3 = cbind (mesomics_meta3, data.frame (CD3D = rowMeans(t(log2(as.data.frame (msm)+1)[c('CD3D'),]))))
-
-# bueno_mat_immune_corrected = removeBatchEffect(log2(as.matrix(bueno_mat)+1), covariates=bueno_meta3[,'PTPRC'])
-# bueno_mat_endo_corrected = removeBatchEffect(log2(as.matrix(bueno_mat)+1), covariates=bueno_meta3[,'VWF'])
-# bueno_mat_tcells_corrected = removeBatchEffect(log2(as.matrix(bueno_mat)+1), covariates=bueno_meta3[,'CD3D'])
-
-# tcga_mat_immune_corrected = removeBatchEffect(log2(as.matrix(tcga_mat)+1), covariates=tcga_meta3[,'PTPRC'])
-# tcga_mat_endo_corrected = removeBatchEffect(log2(as.matrix(tcga_mat)+1), covariates=tcga_meta3[,'VWF'])
-# tcga_mat_tcells_corrected = removeBatchEffect(log2(as.matrix(tcga_mat)+1), covariates=tcga_meta3[,'CD3D'])
-
-# msm_mat_immune_corrected = removeBatchEffect(log2(as.matrix(msm)+1), covariates=mesomics_meta3[,'PTPRC'])
-# msm_mat_endo_corrected = removeBatchEffect(log2(as.matrix(msm)+1), covariates=mesomics_meta3[,'VWF'])
-# msm_mat_tcells_corrected = removeBatchEffect(log2(as.matrix(msm)+1), covariates=mesomics_meta3[,'CD3D'])
-
 ### Make list including all the bulk data ####
 meso_bulk_l = list (
   bueno = log2(bueno_mat[,rownames(bueno_meta)] + 1),
@@ -278,9 +249,9 @@ for (mod_name in names(module_l))
     }
 
 
-##################################################################
-# Correlation analyses between two genes or mean of set of genes 
-##################################################################
+#####################################################################
+# Correlation analyses between two genes or mean of set of genes ####
+#####################################################################
 cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds')))
 
 # Load P11 megahubs regions ####
@@ -300,10 +271,11 @@ your.gene2 = genes_in_region[[1]]
 your.gene2 = 'TXNL4A'
 your.gene2 = genes_in_region[[48]]
 your.gene2 = 'HOXA10'
+your.gene2 = 'BAP1'
 corr_res = list()
 #study = c('bueno_immune_corrected','tcga_immune_corrected','mesomics_immune_corrected')
 studies = c('bueno','tcga','mesomics')
-by_histology=TRUE
+by_histology=FALSE
 for (study in studies)
   {
   meso_bulk = meso_bulk_l[[study]] 

@@ -1,8 +1,4 @@
-TF_db='Motif'
-if (!exists ('mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
-mSE = mSE[, archp$cellNames]
-rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
-rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
+if (!exists ('mSE')) mSE = fetch_mat (archp, 'Motif')
     
 seGroupMotif <- getGroupSE(ArchRProj = archp, useMatrix = "MotifMatrix", groupBy = "Clusters")
 seZ <- seGroupMotif[rowData(seGroupMotif)$seqnames=="z",]

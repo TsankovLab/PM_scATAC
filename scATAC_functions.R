@@ -1,3 +1,17 @@
+
+
+# Retreive matrix from ArchR object, fix barcode order and names
+fetch_mat = function(archp = NULL, mat = 'Motif')
+  {
+  mat = ArchR::getMatrixFromProject (archp, useMatrix = paste0(mat,'Matrix'))
+  mat = mat[, archp$cellNames]
+  rowData(mat)$name = gsub ('_.*','',rowData(mat)$name)
+  rowData(mat)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mat)$name)
+  return (mat)
+  }
+
+
+
 pbknn = function(SE = NULL, KNN)
   {
   Mat = assay (SE)
@@ -749,7 +763,7 @@ scCNA = function(windows, fragments, neighbors = 100, LFC = 1.5, FDR = 0.1, forc
    rowRanges = windowSummary
  )
  colnames(se) <- colnames(counts)
-
+ rownames(se) = as.character (windowSummary)
  return(se)
 }
 

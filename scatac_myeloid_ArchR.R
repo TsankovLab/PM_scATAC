@@ -46,15 +46,11 @@ archp = loadArchRProject (projdir)
 
 # Add metadata ####
 archp$status = ifelse (grepl ('^P',archp$Sample2), 'tumor','normal')  
-archp$project = ifelse (grepl ('^P', archp$Sample2), 'PM','normal')
 
-trim_clusters = FALSE
-if (trim_clusters) 
-{
+## Subset only for tumor samples ####
+archp = archp[archp$Sample2 %in% c('P1','P10','P11','P12','P13','P14','P3','P4','P5','P8')]
 
 ## Reduce dimension and harmonize ####
-
-  # Dimensionality reduction and clustering
   varfeat = 25000
   LSI_method = 2
   archp = addIterativeLSI (ArchRProj = archp,
@@ -73,7 +69,7 @@ if (trim_clusters)
     ArchRProj = archp,
     reducedDims = "IterativeLSI",
     name = "Harmony_project",
-    groupBy = c('project', 'Sample2'), force=TRUE
+    groupBy = c('Sample2'), force=TRUE
 )
 
 archp = addUMAP (ArchRProj = archp, 
@@ -101,7 +97,7 @@ umap_p5 = plotEmbedding (ArchRProj = archp,
   colorBy = "cellColData", name = "Clusters_H",
    embedding = "UMAP_H")
   
-  pdf (file.path('Plots','celltype_umap_harmony_on_project_sample.pdf'),5,5)
+  pdf (file.path('Plots','celltype_umap_harmony_sample_umap.pdf'),5,5)
   print (umap_p1)
   print (umap_p2)
   print (umap_p3)
@@ -109,30 +105,29 @@ umap_p5 = plotEmbedding (ArchRProj = archp,
   print (umap_p5)
   dev.off()
 
-## Further remove outlier clusters ####
-archp = archp[!archp$Clusters_H %in% c('C1')]
+# Remove doublets ####
+archp = archp[archp$Clusters_H != 'C3']
 
+# Dimensionality reduction and clustering
+varfeat = 25000
+LSI_method = 2
+archp = addIterativeLSI (ArchRProj = archp,
+  useMatrix = "TileMatrix", name = "IterativeLSI",
+  force = TRUE, LSIMethod = LSI_method,
+  varFeatures = varfeat)
 
-  # Dimensionality reduction and clustering
-  varfeat = 25000
-  LSI_method = 2
-  archp = addIterativeLSI (ArchRProj = archp,
-    useMatrix = "TileMatrix", name = "IterativeLSI",
-    force = FALSE, LSIMethod = LSI_method,
-    varFeatures = varfeat)
+archp = addClusters (input = archp, resolution = 3,
+  reducedDims = "IterativeLSI", maxClusters = 100,
+  force = TRUE)
+archp = addUMAP (ArchRProj = archp, 
+  reducedDims = "IterativeLSI",
+  force = TRUE)
 
-  archp = addClusters (input = archp, resolution = 3,
-    reducedDims = "IterativeLSI", maxClusters = 100,
-    force = TRUE)
-  archp = addUMAP (ArchRProj = archp, 
-    reducedDims = "IterativeLSI",
-    force = TRUE)
-
-  archp = addHarmony (
-    ArchRProj = archp,
-    reducedDims = "IterativeLSI",
-    name = "Harmony_sample",
-    groupBy = c('Sample2'), force=TRUE
+archp = addHarmony (
+  ArchRProj = archp,
+  reducedDims = "IterativeLSI",
+  name = "Harmony_sample",
+  groupBy = c('Sample2'), force=TRUE
 )
 
 archp = addUMAP (ArchRProj = archp, 
@@ -145,164 +140,64 @@ archp = addClusters (input = archp,
     force = TRUE)
 
 
-  umap_p3 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "Sample2",
-     embedding = "UMAP_H")
-  umap_p4 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "celltype",
-     embedding = "UMAP_H")
-  umap_p5 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "Clusters_H",
-     embedding = "UMAP_H")
-  
-  pdf (file.path('Plots','celltype_umap_harmony_on_project_sample.pdf'),5,5)
-  print (umap_p3)
-  print (umap_p4)
-  print (umap_p5)
-  dev.off()
+umap_p3 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Sample2",
+   embedding = "UMAP_H")
+umap_p5 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Clusters_H",
+   embedding = "UMAP_H")
+
+pdf (file.path('Plots','celltype_umap_harmony_on_project_sample.pdf'),5,5)
+print (umap_p3)
+print (umap_p5)
+dev.off()
 
 
 # Myeloid markers ####
-tnk_markers = c('C1QA','LYZ')
+meso_markers = c('C1QA','APOE','IL1B')
 archp = addImputeWeights (archp)
 p <- plotEmbedding(
     ArchRProj = archp,
     colorBy = "GeneScoreMatrix", 
-    name = tnk_markers, 
+    name = meso_markers, 
+    size=1,
     embedding = "UMAP_H",
     pal = palette_expression,
     imputeWeights = getImputeWeights(archp)
 )
 
-#archp$celltype[archp$Clusters == 'C30'] = 'Fibroblasts_WT1'
-#p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
-
-pdf (file.path('Plots','myeloid_markers_fplots.pdf'), width = 25, height = 25)
-print (p)
-dev.off()
-
-
-### Refine annotation ####
-archp$celltype2 = 0
-archp$celltype2[archp$Clusters_H %in% c('C3')] = 'NK_FGFBP2'
-archp$celltype2[archp$Clusters_H %in% c('C2')] = 'NK'
-archp$celltype2[archp$Clusters_H %in% c('C11')] = 'Tregs'
-archp$celltype2[archp$Clusters_H %in% c('C12','C13','C5')] = 'CD4'
-archp$celltype2[archp$Clusters_H %in% c('C10','C4','C6','C7','C8','C9')] = 'CD8'
-
-p <- plotEmbedding(
-    ArchRProj = archp,
-    colorBy = "cellColData", 
-    name = 'celltype2', 
-    embedding = "UMAP_H"#,
-    #pal = palette_expression
-)
-
-pdf (file.path('Plots','celltype2_umap.pdf'), width = 5, height = 5)
-print (p)
+pdf (file.path('Plots','myeloid_markers_fplots.pdf'), width = 8, height = 5)
+wrap_plots (p, ncol=3)
 dev.off()
 
 
 ### Call peaks on celltypes ####
-run_peakCall = TRUE
-if (run_peakCall)
-  {
-  metaGroupName = 'Clusters_H'
-  archp = addGroupCoverages (
-    ArchRProj = archp, 
-    groupBy = metaGroupName,  
-    force = FALSE,
-    minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
-    maxCells = 500,
-    minReplicates = 2,
-    sampleRatio = 0.8,
-    useLabels = TRUE)
-  
-  archp = addReproduciblePeakSet (
-      archp,
-      groupBy= metaGroupName,
-      peakMethod = 'Macs2',
-      reproducibility = "1",
-      maxPeaks = 500000, 
-      minCells=20,
-      force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower
-  archp = addPeakMatrix (archp)
-  
-  archp = saveArchRProject (archp, load=TRUE)
-  
-  metaGroupNames = c('TSSEnrichment','nFrags','ReadsInTSS','FRIP')  
-    umap_p12 = lapply (metaGroupNames, function(x) plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
-     name = x, embedding = "UMAP"))
-      
-  pdf (paste0(projdir,'/Plots/qc_umap_after_filtering.pdf'), 15,15)
-  wrap_plots (umap_p12, ncol=5)
-  dev.off()
-  }
+metaGroupName = 'Clusters_H'
+force=FALSE
+if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) 
+source (file.path('..','..','PM_scATAC','callPeaks.R')
 
 ### chromVAR analysis ####
-run_chromVAR = TRUE
-
-if (run_chromVAR)
-  {  
-  archp = addBgdPeaks (archp, force= FALSE)
-  archp = addMotifAnnotations (ArchRProj = archp,
-      motifSet = "cisbp",
-      #motifSet = 'JASPAR2020',
-      #name = "JASPAR2020_Motif",
-      force=TRUE)
-  archp = addDeviationsMatrix (
-    ArchRProj = archp, 
-    peakAnnotation = "Motif",
-    force = TRUE)
-  archp = saveArchRProject (archp, load=TRUE)
-  }
+force=FALSE
+if (!all(file.exists(file.path('Annotations',
+  c('Motif-Matches-In-Peaks.rds',
+    'Motif-Positions-In-Peaks.rds',
+    'Motif-In-Peaks-Summary.rds')))))
+source (file.path ('..','PM_scATAC','chromVAR.R'))
   
-
-# Find activating and repressing TFs ####
-
-# Load motif matrix and correct TF names ####  
-devMethod = 'ArchR'
- if (devMethod == 'ArchR')
-    {
-    TF_db='Motif'
-    mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
-    mSE = mSE[, archp$cellNames]
-    rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
-    rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
-    }
-
-# Run correlation of deviations with gene score to find active TF ####
-metaGroupName = "Clusters_H"  
-if (!file.exists ('TF_activators_genescore.rds'))
+# Find activating and repressing TFs #### 
+if (!file.exists ('TF_activators_genescore.rds')) 
   {
-  seGroupMotif <- getGroupSE(ArchRProj = archp, useMatrix = "MotifMatrix", groupBy = metaGroupName)
-  seZ <- seGroupMotif[rowData(seGroupMotif)$seqnames=="z",]
-  rowData(seZ)$maxDelta <- lapply(seq_len(ncol(seZ)), function(x){
-    rowMaxs(assay(seZ) - assay(seZ)[,x])
-  }) %>% Reduce("cbind", .) %>% rowMaxs
-  corGSM_MM <- correlateMatrices(
-      ArchRProj = archp,
-      useMatrix1 = "GeneScoreMatrix",
-      useMatrix2 = "MotifMatrix",
-      reducedDims = "IterativeLSI"
-  )
-  corGSM_MM = corGSM_MM[!grepl ('-AS',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-DT',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-OT',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-RAB5IF',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-IT2',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-C8orf76',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = na.omit (corGSM_MM)
-  saveRDS (corGSM_MM, 'TF_activators_genescore.rds')
+    source (file.path('..','PM_scATAC','activeTFs.R'))
   } else {
-  corGSM_MM = readRDS ('TF_activators_genescore.rds') 
+    corGSM_MM = readRDS ('TF_activators_genescore.rds') 
   }
 
 
 ### Co-expression of TFs to identify TF modules #### 
 
 # # Get deviation matrix ####
-if (!any (ls() == 'mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = 'MotifMatrix', logFile=NULL)
+if (!exists ('mSE')) mSE = fetch_mat (archp, 'Motif')
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 
@@ -385,136 +280,6 @@ dev.off()
 
 
 
-# Recluster only using meso samples ####
-archp_sub = archp[archp$Sample2 %in% c('P1','P10','P11','P12','P13','P14','P3','P4','P5','P8')]
-
-  varfeat = 25000
-  LSI_method = 2
-  archp_sub = addIterativeLSI (ArchRProj = archp_sub,
-    useMatrix = "TileMatrix", name = "IterativeLSI",
-    force = FALSE, LSIMethod = LSI_method,
-    varFeatures = varfeat)
-
-  archp_sub = addHarmony (
-    ArchRProj = archp_sub,
-    reducedDims = "IterativeLSI",
-    name = "Harmony_sample",
-    groupBy = c('Sample2'), force=TRUE
-)
-
-archp_sub = addUMAP (ArchRProj = archp_sub, 
-    reducedDims = "Harmony_sample", name='UMAP_H',
-    force = TRUE)
-
-archp_sub = addClusters (input = archp_sub,
-    reducedDims = "Harmony_sample",
-    name='Clusters_H',
-    force = TRUE)
-
-  umap_p3 = plotEmbedding (ArchRProj = archp_sub, 
-    colorBy = "cellColData", name = "Sample2",
-     embedding = "UMAP_H",
-     pal = palette_sample)
-  umap_p4 = plotEmbedding (ArchRProj = archp_sub, 
-    colorBy = "cellColData", name = "celltype",
-     embedding = "UMAP_H"
-     )
-  umap_p5 = plotEmbedding (ArchRProj = archp_sub, 
-    colorBy = "cellColData", name = "Clusters_H",
-     embedding = "UMAP_H")
-  
-  pdf (file.path('Plots','celltype_umap_signac_filtered_harmony_on_project3.pdf'),5,5)
-  print (umap_p3)
-  print (umap_p4)
-  print (umap_p5)
-  dev.off()
-
-# Remove doublets ####
-archp_sub = archp_sub[archp_sub$Clusters_H != 'C5']
-  varfeat = 25000
-  LSI_method = 2
-  archp_sub = addIterativeLSI (ArchRProj = archp_sub,
-    useMatrix = "TileMatrix", name = "IterativeLSI",
-    force = TRUE, LSIMethod = LSI_method,
-    varFeatures = varfeat)
-
-  archp_sub = addHarmony (
-    ArchRProj = archp_sub,
-    reducedDims = "IterativeLSI",
-    name = "Harmony_sample",
-    groupBy = c('Sample2'), force=TRUE
-)
-
-archp_sub = addUMAP (ArchRProj = archp_sub, 
-    reducedDims = "Harmony_sample", name='UMAP_H',
-    force = TRUE)
-
-archp_sub = addClusters (input = archp_sub,
-    reducedDims = "Harmony_sample",
-    name='Clusters_H',
-    force = TRUE)
-
-archp_sub = archp_sub[archp_sub$Clusters_H != 'C1']
-  varfeat = 25000
-  LSI_method = 2
-  archp_sub = addIterativeLSI (ArchRProj = archp_sub,
-    useMatrix = "TileMatrix", name = "IterativeLSI",
-    force = TRUE, LSIMethod = LSI_method,
-    varFeatures = varfeat)
-
-  archp_sub = addHarmony (
-    ArchRProj = archp_sub,
-    reducedDims = "IterativeLSI",
-    name = "Harmony_sample",
-    groupBy = c('Sample2'), force=TRUE
-)
-
-archp_sub = addUMAP (ArchRProj = archp_sub, 
-    reducedDims = "Harmony_sample", name='UMAP_H',
-    force = TRUE)
-
-archp_sub = addClusters (input = archp_sub,
-    reducedDims = "Harmony_sample",
-    name='Clusters_H',
-    force = TRUE)
-  umap_p3 = plotEmbedding (ArchRProj = archp_sub, 
-    colorBy = "cellColData", name = "Sample2",
-     embedding = "UMAP_H",
-     pal = palette_sample)
-  umap_p4 = plotEmbedding (ArchRProj = archp_sub, 
-    colorBy = "cellColData", name = "celltype",
-     embedding = "UMAP_H"
-     )
-  umap_p5 = plotEmbedding (ArchRProj = archp_sub, 
-    colorBy = "cellColData", name = "Clusters_H",
-     embedding = "UMAP_H")
-  
-  pdf (file.path('Plots','celltype_umap_signac_filtered_harmony_on_project3.pdf'),5,5)
-  print (umap_p3)
-  print (umap_p4)
-  print (umap_p5)
-  dev.off()
-
-# Myeloid markers ####
-meso_markers = c('C1QA','APOE','IL1B')
-archp_sub = addImputeWeights (archp_sub)
-p <- plotEmbedding(
-    ArchRProj = archp_sub,
-    colorBy = "GeneScoreMatrix", 
-    name = meso_markers, 
-    size=1,
-    embedding = "UMAP_H",
-    pal = palette_expression,
-    imputeWeights = getImputeWeights(archp_sub)
-)
-
-#archp$celltype[archp$Clusters == 'C30'] = 'Fibroblasts_WT1'
-#p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
-
-pdf (file.path('Plots','myeloid_markers_fplots_only_meso.pdf'), width = 8, height = 5)
-wrap_plots (p, ncol=3)
-dev.off()
-
 
 
 run_GS_analysis = TRUE
@@ -527,7 +292,7 @@ if (run_GS_analysis)
   if (!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force)
     {
     DAG_list = getMarkerFeatures (
-      ArchRProj = archp_sub, 
+      ArchRProj = archp, 
       testMethod = "wilcoxon",
             #useGroups = "ClusterA",
             #bgdGroups = "Clusters1B",
@@ -572,17 +337,17 @@ if (run_GS_analysis)
     })
   DAG_df = Reduce (rbind ,DAG_top_list)
   
-  if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp_sub, useMatrix = 'GeneScoreMatrix')
-  gsSE = gsSE[, archp_sub$cellNames]
+  if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
+  gsSE = gsSE[, archp$cellNames]
   gsMat = assays (gsSE)[[1]]
   rownames (gsMat) = rowData (gsSE)$name
   gsMat_mg = gsMat[rownames (gsMat) %in% DAG_df$gene, ]
   gsMat_mg = as.data.frame (t(gsMat_mg))
-  gsMat_mg$metaGroup = as.character(archp_sub@cellColData[,metaGroupName])
+  gsMat_mg$metaGroup = as.character(archp@cellColData[,metaGroupName])
   gsMat_mg = aggregate (.~ metaGroup, gsMat_mg, mean)
   rownames (gsMat_mg) = gsMat_mg[,1]
   gsMat_mg = gsMat_mg[,-1]
-  gsMat_mg = gsMat_mg[names(table (archp_sub@cellColData[,metaGroupName])[table (archp_sub@cellColData[,metaGroupName]) > 50]),]
+  gsMat_mg = gsMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
   DAG_hm = Heatmap (t(scale(gsMat_mg)), 
           row_labels = colnames (gsMat_mg),
           column_title = paste('top',top_genes),
@@ -607,10 +372,10 @@ print(DAG_hm)
 dev.off()
 }
 
-archp_sub$celltype = 0
-archp_sub$celltype[archp_sub$Clusters_H %in% c('C5','C6','C7')] = 'Monocytes'
-archp_sub$celltype[archp_sub$Clusters_H %in% c('C1','C2','C3','C4')] = 'Macs'
-umap_p6 = plotEmbedding (ArchRProj = archp_sub, 
+archp$celltype = 0
+archp$celltype[archp$Clusters_H %in% c('C5','C6','C7')] = 'Monocytes'
+archp$celltype[archp$Clusters_H %in% c('C1','C2','C3','C4')] = 'Macs'
+umap_p6 = plotEmbedding (ArchRProj = archp, 
     colorBy = "cellColData", name = "celltype",
      embedding = "UMAP_H")
   
@@ -625,8 +390,8 @@ devMethod = 'ArchR'
  if (devMethod == 'ArchR')
     {
     TF_db='Motif'
-    mSE = ArchR::getMatrixFromProject (archp_sub, useMatrix = paste0(TF_db,'Matrix'))
-    mSE = mSE[, archp_sub$cellNames]
+    mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
+    mSE = mSE[, archp$cellNames]
     rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
     rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
     }
@@ -634,13 +399,13 @@ devMethod = 'ArchR'
 metaGroupName='celltype'
 if (!file.exists ('TF_activators_genescore.rds'))
   {
-  seGroupMotif <- getGroupSE(ArchRProj = archp_sub, useMatrix = "MotifMatrix", groupBy = metaGroupName)
+  seGroupMotif <- getGroupSE(ArchRProj = archp, useMatrix = "MotifMatrix", groupBy = metaGroupName)
   seZ <- seGroupMotif[rowData(seGroupMotif)$seqnames=="z",]
   rowData(seZ)$maxDelta <- lapply(seq_len(ncol(seZ)), function(x){
     rowMaxs(assay(seZ) - assay(seZ)[,x])
   }) %>% Reduce("cbind", .) %>% rowMaxs
   corGSM_MM <- correlateMatrices(
-      ArchRProj = archp_sub,
+      ArchRProj = archp,
       useMatrix1 = "GeneScoreMatrix",
       useMatrix2 = "MotifMatrix",
       reducedDims = "IterativeLSI"
@@ -670,7 +435,7 @@ if (run_chromVAR_analysis)
   if (!file.exists (paste0('DAM_',metaGroupName,'.rds')) | force)
     {
     DAM_list = getMarkerFeatures (
-      ArchRProj = archp_sub, 
+      ArchRProj = archp, 
       testMethod = "wilcoxon",
             #useGroups = "ClusterA",
             #bgdGroups = "Clusters1B",
@@ -722,8 +487,8 @@ if (run_chromVAR_analysis)
  if (devMethod == 'ArchR')
     {
     TF_db='Motif'
-    if (!exists ('mSE')) mSE = ArchR::getMatrixFromProject (archp_sub, useMatrix = paste0(TF_db,'Matrix'))
-    mSE = mSE[, archp_sub$cellNames]
+    if (!exists ('mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
+    mSE = mSE[, archp$cellNames]
     rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
     rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
     }
@@ -733,11 +498,11 @@ if (run_chromVAR_analysis)
   rownames (mMat) = rowData (mSE)$name
   mMat_mg = mMat[rownames (mMat) %in% DAM_df$gene, ]
   mMat_mg = as.data.frame (t(mMat_mg))
-  mMat_mg$metaGroup = as.character (archp_sub@cellColData[,metaGroupName])
+  mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
   mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
   rownames (mMat_mg) = mMat_mg[,1]
   mMat_mg = mMat_mg[,-1]
-  mMat_mg = mMat_mg[names(table (archp_sub@cellColData[,metaGroupName])[table (archp_sub@cellColData[,metaGroupName]) > 50]),]
+  mMat_mg = mMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
   DAM_hm = Heatmap (t(scale(mMat_mg)), 
           row_labels = colnames (mMat_mg),
           column_title = paste('top',top_genes),
@@ -764,16 +529,16 @@ dev.off()
 }
 
 tf_markers = c('POU2F1','MAFF','JDP2','FOSB','FOS','BACH1','NFEL2L2','NFE2')
-markerMotifs = getFeatures (archp_sub, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
+markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs = grep ("z:", markerMotifs, value = TRUE)
 #archp = addImputeWeights (archp)
 TF_p = plotEmbedding(
-    ArchRProj = archp_sub, 
+    ArchRProj = archp, 
     colorBy = "MotifMatrix", 
     name = sort(markerMotifs), 
     embedding = "UMAP_H",
     pal = palette_deviation,
-    imputeWeights = getImputeWeights(archp_sub)
+    imputeWeights = getImputeWeights(archp)
 )
 
 pdf (file.path ('Plots','top_TF_markers_Tregs_meso_only.pdf'), width = 30, height=18)
@@ -784,9 +549,9 @@ dev.off()
 
 ### Co-expression of TFs #### 
 metaGroupName = 'Sample2'
-if (!any (ls() == 'mSE')) mSE = ArchR::getMatrixFromProject (archp_sub, useMatrix = 'MotifMatrix', logFile=NULL)
-mSE = mSE[, archp_sub$cellNames]
-all (colnames(mSE) == rownames(archp_sub))
+if (!any (ls() == 'mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = 'MotifMatrix', logFile=NULL)
+mSE = mSE[, archp$cellNames]
+all (colnames(mSE) == rownames(archp))
 
 # # Get deviation matrix ####
 mMat = assays (mSE)[[1]]
@@ -823,20 +588,20 @@ pdf (file.path ('Plots','TF_modules_meso_only.pdf'), width = 4,height=3)
 cor_mMat_hm
 dev.off()
 
-tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),rownames(archp_sub@cellColData)]))
+tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),rownames(archp@cellColData)]))
 names (tf_modules) = paste0('mod_',unique(km$cluster))
 tf_modules = do.call (cbind, tf_modules)
-archp_sub@cellColData = archp_sub@cellColData[!colnames(archp_sub@cellColData) %in% paste0('mod_',unique(km$cluster))]
-archp_sub@cellColData = cbind (archp_sub@cellColData, tf_modules)
+archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
+archp@cellColData = cbind (archp@cellColData, tf_modules)
 
-archp_sub = addImputeWeights (archp_sub)
+archp = addImputeWeights (archp)
 TF_p = lapply (paste0('mod_',unique(km$cluster)), function(x) plotEmbedding (
-    ArchRProj = archp_sub,
+    ArchRProj = archp,
     colorBy = "cellColData",
     name = x, 
     pal = palette_deviation,
     #useSeqnames='z',
-    imputeWeights = getImputeWeights(archp_sub),
+    imputeWeights = getImputeWeights(archp),
     embedding = "UMAP_H"))
 
 pdf (file.path ('Plots','TF_modules_umap_meso_only.pdf'), width = 30, height=14)
@@ -853,9 +618,9 @@ library (viridis)
 tf_modules = lapply (unique (km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
 names (tf_modules) = paste0 ('mod_',unique(km$cluster))
 tf_modules = as.data.frame (do.call (cbind, tf_modules))
-tf_modules$Sample = archp_sub$Sample2
-tf_modules$celltype = archp_sub$celltype
-tf_modules$celltype2 = archp_sub$celltype2
+tf_modules$Sample = archp$Sample2
+tf_modules$celltype = archp$celltype
+tf_modules$celltype2 = archp$celltype2
 
 # Plot
 rp = lapply (paste0 ('mod_',unique(km$cluster)), function(x) 

@@ -23,13 +23,14 @@ packages = c(
   'BSgenome.Hsapiens.UCSC.hg38')
 lapply(packages, require, character.only = TRUE)
 
-# Load function (JGranja)
-source ('../PM_scATAC/scATAC_functions.R')
-
 ####### START ANALYSIS #######
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/per_sample_QC_signac'
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
+
+# Load function (JGranja)
+source (file.path('..','PM_scATAC','scATAC_functions.R'))
+
 
 # combine fragments files from different channels of the normal RPL 
 #system ('cat /ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_1/RPL_280_neg_1/outs/fragments.tsv.gz \
@@ -311,6 +312,8 @@ dir.create (projdir_cnv)
 # Get GRanges of bins excluding black list regions
 ws = 10e6
 ss = 5e6
+ws = 10e5
+ss = 10e5
 if (!file.exists (file.path (projdir_cnv, paste0 ('windows_',ws,'_',ss,'.rds'))))
   {
   windows = makeWindows (genome = BSgenome.Hsapiens.UCSC.hg38, blacklist = blacklist,
