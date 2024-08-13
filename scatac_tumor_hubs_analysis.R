@@ -838,7 +838,7 @@ pdf (file.path ('Plots', 'scatacDatasets_overlap_DAH_sampleP11_heatmap.pdf'),wid
 ht
 dev.off()
 
-# Plot only fetal mesothelium
+# Plot only fetal mesothelium ####
 ht = Heatmap (
   # prop_sample_df, 
   t(scale(t(peaks_ov_mat[c('rawlins_fetal_lung_Earlymeso',

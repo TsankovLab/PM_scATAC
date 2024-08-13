@@ -373,12 +373,38 @@ metacells@meta.data[,gene] = metacells_assay[gene, ]
 ### Restrict above analysis only on metacells high for HOXB13 in P11 ####
 y = 'P11'
 summary (metacells@meta.data[,gene])
-metacells_assay_P11s = metacells_assay[,metacells$sampleID == y & metacells@meta.data[,gene] > 0.03]
+metacells_assay_P11s = metacells_assay[,metacells$sampleID == y & metacells@meta.data[,gene] > 0.5]
+
+
+pdf (file.path ('Plots','HOXB13_metacells_scatter.pdf'))
+plot (x = metacells_assay_P11s['HOXB13',], y = metacells_assay_P11s['NFATC1',])
+dev.off()
+
+# Double check the metacells selection chosed ####
+HOXB13_cells_selection = unlist(lapply (
+	metacells$cells_merged[metacells$sampleID == y & 
+	metacells@meta.data[,gene] > 0.5], function(x) unlist(strsplit(x, ','))))
+srt$HOXB13_cells_selection = colnames(srt) %in% HOXB13_cells_selection
+
+pdf (file.path ('Plots','HOXB13_cells_selection_umap.pdf'))
+DimPlot (srt, group.by = 'HOXB13_cells_selection')
+fp (srt, c('MBP','NFATC1'))
+dev.off()
+
+
+
+
 res_p11s = cor (t(metacells_assay_P11s), t(metacells_assay_P11s)[,gene], method= 'pearson')
 res_p11s = res_p11s[order (-res_p11s[,1]),]
+res_p11s = res_p11s[!is.na(res_p11s)]
 #res_p11s = res_p11s[!names(res_p11s) %in% genes_in_region[[1]]]
 
 write.csv (res_p11s, 'correlated_genes_p11s_HOXB13.csv')
+
+# Run Enrichment on correlated genes ####
+ranked_vector = res_p11s
+source (file.path('..','..','PM_scATAC','fGSEA_enrichment.R'))
+
 
 # Check Proliferation index of HOX + cluster vs others ####
 pdf (file.path ('Plots','cellcycle_fplot.pdf'))
@@ -412,7 +438,7 @@ P11_clusters = archp$Clusters[archp$Sample2 == 'P11']
 P11_clusters = ifelse (P11_clusters == 'C14','P11_small','P11_large')
 p11_dev_rna = wilcoxauc (mMat_P11 , y = P11_clusters)
 p11_dev_rna = p11_dev_rna[p11_dev_rna$group == 'P11_large',]
-head (dev[order(p11_dev_rna$logFC),],20)
+head (p11_dev_rna[order(p11_dev_rna$logFC),],20)
 p11_dev_rna[p11_dev_rna$feature == 'NFATC1',]
 # Make volcano plot showing also scRNA RNA expression
 pdf (paste0('Plots/scrna_clusters_umap.pdf'), 15,15)

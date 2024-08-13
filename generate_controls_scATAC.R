@@ -125,6 +125,7 @@ archp_prj$celltype = gsub ('-','_',archp_prj$celltype)
 archp_prj$project = gsub("^\\d+|\\d+$", "", archp_prj$Sample)    
 archp_prj$celltype_project = paste0(archp_prj$project,'_', archp_prj$celltype)
 table (archp_prj$celltype_project[grep ('meso', archp_prj$celltype_project, ignore.case = T)])
+table (archp_prj$celltype_project[grep ('bingren_pan_Adult_lung', archp_prj$celltype_project, ignore.case = T)])
 
 archp_prj = addIterativeLSI (
 ArchRProj = archp_prj, 

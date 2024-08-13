@@ -268,14 +268,15 @@ your.gene1 = 'HOXB13'
 your.gene1 = c('CALB2','ITLN1','UPK3B')
 your.gene2 = head(cnmf_spectra_unique[['cNMF20']],50)
 your.gene2 = genes_in_region[[1]]
-your.gene2 = 'TXNL4A'
+your.gene2 = 'MBP'
 your.gene2 = genes_in_region[[48]]
 your.gene2 = 'HOXA10'
 your.gene2 = 'BAP1'
-corr_res = list()
 #study = c('bueno_immune_corrected','tcga_immune_corrected','mesomics_immune_corrected')
+corr_res = list()
 studies = c('bueno','tcga','mesomics')
-by_histology=FALSE
+by_histology=F
+filter_low_exp = 0
 for (study in studies)
   {
   meso_bulk = meso_bulk_l[[study]] 
@@ -290,6 +291,8 @@ for (study in studies)
   exp_df$subtype = meso_bulk_meta$subtype
   rownames (exp_df) = colnames (meso_bulk)
   exp_df = exp_df[!is.na(exp_df$subtype),]
+  
+  exp_df = exp_df[exp_df[,1] >= filter_low_exp & exp_df[,2] >= filter_low_exp,]
   if (by_histology) {
   corr_res[[study]] = ggscatter (
             exp_df, 
