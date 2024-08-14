@@ -2,7 +2,6 @@
 packages = c(
  'Signac',
  'Seurat',
- 'biovizBase',
  'ggplot2',
  'patchwork',
  'scATACutils',
@@ -23,8 +22,8 @@ packages = c(
  'hdWGCNA',
  'biomaRt',
  'GenomicFeatures',
- 'GenomicFeatures',
  'org.Hs.eg.db',
- 'TxDb.Hsapiens.UCSC.hg38.knownGene'
+ 'rstatix',
+ 'ggpubr'
 )
 lapply(packages, require, character.only = TRUE)

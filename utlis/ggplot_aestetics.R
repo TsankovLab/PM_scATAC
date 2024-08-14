@@ -57,3 +57,19 @@ gtheme_italic_y = theme(
     #panel.grid.major = element_blank(),
     #panel.grid.minor = element_blank()
   )
+
+
+# Boxplots / violins ####
+bxp = geom_boxplot (
+    linewidth = .2,
+    width=1,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.3, alpha=0.7
+     ) 
+
+vlp = geom_violin (trim=TRUE,size=2,
+    width=1,
+    scale='width',
+    linewidth = .2, alpha=0.7)
+

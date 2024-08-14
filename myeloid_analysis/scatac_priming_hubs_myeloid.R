@@ -24,7 +24,10 @@ packages = c(
   'BSgenome.Hsapiens.UCSC.hg38',
   'tidyverse',
   'ggrepel',
-  'RColorBrewer')
+  'RColorBrewer',
+  'rstatix',
+  'ggpubr')
+
 lapply(packages, require, character.only = TRUE)
 
 ####### ANALYSIS of Myeloid compartment #######
@@ -123,7 +126,7 @@ metaGroupNames = c('celltype_simplified','celltype','celltype')
 #metaGroupName = 'Clusters_H'
 
 hubs_mat_c = list()
-if (!file.exists(file.path ('hubs_mat_combined.rds'))
+if (!file.exists(file.path ('hubs_mat_combined.rds')))
   {
   for (i in seq(archp_obj))
     {
@@ -197,7 +200,7 @@ archp_obj = c('archp_pbmc_t_mono','archp_pbmc_h_mono')
 metaGroupNames = c('celltype_sample','celltype_sample')
 
 hubs_mat_c = list()
-if (!file.exists(file.path ('hubs_mat_pbmc_sample_combined.rds'))
+if (!file.exists(file.path ('hubs_mat_pbmc_sample_combined.rds')))
   {
   for (i in seq(archp_obj))
     {
@@ -226,10 +229,10 @@ if (!file.exists(file.path ('hubs_mat_pbmc_sample_combined.rds'))
   hubs_mat_c = readRDS ('hubs_mat_pbmc_sample_combined.rds')
   }
 
-hubs_mat_df = do.call (cbind, hubs_mat_c)
-t_res = sapply (seq(nrow(hubs_mat_df)), function (x) 
+#hubs_mat_df = do.call (cbind, hubs_mat_c)
+t_res = sapply (seq(nrow(hubs_mat_c[[1]])), function (x) 
   t.test (hubs_mat_c[[1]][x, grep ('CD14', colnames(hubs_mat_c[[1]]))], hubs_mat_c[[2]][x, grep ('CD14', colnames(hubs_mat_c[[2]]))])$p.value)
-lfc_res = sapply (seq(nrow(hubs_mat_df)), function (x) 
+lfc_res = sapply (seq(nrow(hubs_mat_c[[1]])), function (x) 
   log2(mean(hubs_mat_c[[1]][x, grep ('CD14', colnames(hubs_mat_c[[1]]))])+1) - log2(mean(hubs_mat_c[[2]][x, grep ('CD14', colnames(hubs_mat_c[[2]]))])+1))
 
 t_res_df = data.frame (row.names = hubs_obj$hubs_id, pval = t_res, padj = p.adjust (t_res), LFC= lfc_res)
@@ -273,6 +276,65 @@ pdf (file.path ('Plots', 'PBMC_hubs_volcano.pdf'),height=3,width=4)
 vp
 dev.off()
 
+# Show boxplots for top DAH ####
+x = rownames(t_res_df)[t_res_df$padj < 0.05]
+
+
+bp_l = lapply (x, function(y) {
+  cd14_pbmc_tumor = hubs_mat_c[[1]][y, grep ('CD14', colnames(hubs_mat_c[[1]]))]
+  cd14_pbmc_healthy = hubs_mat_c[[2]][y, grep ('CD14', colnames(hubs_mat_c[[2]]))]
+  
+  top_dah = data.frame (
+  hub_acc = c(cd14_pbmc_tumor,cd14_pbmc_healthy),
+  pbmc = c(rep ('tumor', length(cd14_pbmc_tumor)),rep ('healthy', length(cd14_pbmc_healthy))))
+
+  bp = ggplot (top_dah, aes (x = pbmc, y = hub_acc)) + 
+  bxp + 
+  geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+  gtheme
+
+  stat.test = bp$data %>%
+  t_test(reformulate ('pbmc', 'hub_acc')) %>%
+  adjust_pvalue (method = "fdr") %>%
+  add_significance ()
+  stat.test = stat.test %>% add_xy_position (x = 'pbmc', step.increase=.4)
+  bp = bp + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
+  bracket.nudge.y = 0.1, hide.ns = T,
+  label = "p.adj.signif") + NoLegend()
+  })
+pdf (file.path ('Plots','top_DAH_boxplots.pdf'),height=2.3,width=5.5)
+wrap_plots (bp_l, ncol = length(x))
+dev.off()
+
+# Run motif enrichment of peaks in top DAH ####
+tf_enr_l = list()
+
+tf_match = getMatches (archp_pbmc_t)
+bg_peaks = getPeakSet (archp_pbmc_t)
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+bg_peakSet = rowRanges (tf_match)[queryHits(findOverlaps(tf_match,bg_peaks))]
+hub_regions = hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]
+hub_regions_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, hub_regions))]
+#tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+hub_regions_TF =  hyperMotif (
+  selected_peaks = hub_regions_peaks, 
+  motifmatch = tf_match)
+
+head (hub_regions_TF)
+
+# Check if HUB3 region are mapped back in the hg19 in pbmc_h to exclude DAH is artifact of different alignments ####
+library ("liftOver")
+path = system.file (package="liftOver", "extdata", "hg38ToHg19.over.chain")
+ch = import.chain(path)
+hub3_hg19 = hubs_obj$hubsCollapsed[3]
+seqlevelsStyle(hub3_hg19) = "UCSC"  # necessary
+hub3_hg19 = unlist (liftOver(hub3_hg19, ch))
+blacklist_hg19 = read.table ('hg19-blacklist.v2.bed', sep='\t')
+colnames(blacklist_hg19) = c('seqnames','start','end','annotation')
+blacklist_hg19 = makeGRangesFromDataFrame (blacklist_hg19, keep.extra.columns=T)
+findOverlaps (blacklist_hg19, hub3_hg19) # No overlaps with blacklisted regions in hg19
+
+# Check PBMC from ArchR tutorial dataset ####
 
 
 
