@@ -1,4 +1,45 @@
+conda activate meso_scatac
+use UGER
+R
 
+set.seed(1234)
+
+packages = c(
+  'Signac',
+  'Seurat',
+  'biovizBase',
+  'ggplot2',
+  'patchwork',
+  'scATACutils',
+  'SummarizedExperiment',
+  'epiAneufinder',
+  'JASPAR2020',
+  'TFBSTools',
+  'TxDb.Hsapiens.UCSC.hg38.knownGene',
+  'EnsDb.Hsapiens.v86',
+  'gplots',
+  'regioneR',
+  'ComplexHeatmap',
+  'ArchR',
+  'BSgenome.Hsapiens.UCSC.hg38',
+  'tidyverse',
+  'ggrepel',
+  'RColorBrewer')
+lapply(packages, require, character.only = TRUE)
+
+####### ANALYSIS of Myeloid compartment #######
+projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells'
+dir.create (file.path (projdir,'Plots'), recursive =T)
+setwd (projdir)
+
+
+#devtools::install_github("immunogenomics/presto") #needed for DAA
+source ('../PM_scATAC/useful_functions.R')
+source ('../PM_scATAC/ggplot_aestetics.R')
+source ('../PM_scATAC/scATAC_functions.R')
+source ('../PM_scATAC/palettes.R')
+
+# Load ArchR project ####
 archp = loadArchRProject (projdir)
 
 # Add metadata ####
@@ -243,12 +284,26 @@ dev.off()
 archp$celltype = 0
 archp$celltype = ifelse (archp$Clusters_H == 'C4','Monocytes','Macs')
 
+archp$celltype2 = 0
+archp$celltype2 = ifelse (archp$Clusters_H == 'C4','Monocytes','Macs')
+archp$celltype2[archp$celltype2 == 'Macs'] = paste0('Macs',archp$Clusters_H[archp$celltype2 == 'Macs'])
+
+
 umap_p5 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Sample",
+  pal = palette_sample,
+   embedding = "UMAP_H")
+
+umap_p6 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "celltype",
    embedding = "UMAP_H")
 
-pdf (file.path('Plots','harmony_celltype_umap.pdf'),5,5)
-print (umap_p5)
+umap_p4 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "celltype2",
+   embedding = "UMAP_H")
+
+pdf (file.path('Plots','harmony_celltype_umap.pdf'),5,width = 10)
+wrap_plots (umap_p6, umap_p5,umap_p4)
 dev.off()
 
 
@@ -293,9 +348,9 @@ positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0.1]
 mMat = mMat[positive_TF,]
 
 # Differential Accessed motifs ####
-metaGroupName = "Clusters_H"
-force = FALSE
-source (file.path('..','scripts','DAM.R'))
+metaGroupName = "celltype2"
+force=FALSE
+source (file.path('..','PM_scATAC/DAM.R'))
 
 # Correlate TF against each others and set number of kmeans clusters ####
 mMat_cor = cor (as.matrix(t(mMat)), method = 'pearson')
