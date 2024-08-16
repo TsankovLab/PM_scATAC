@@ -1,22 +1,23 @@
 
 ####### ANALYSIS of P11 TUMOR #######
 set.seed(1234)
-source (file.path ('..','..','PM_scATAC','load_packages.R'))
-source ('../../PM_scATAC/useful_functions.R')
-source ('../../PM_scATAC/ggplot_aestetics.R')
-source ('../../PM_scATAC/scATAC_functions.R')
-source ('../../PM_scATAC/palettes.R')
 
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_scrna_P11'
-dir.create (file.path(projdir,'Plots'), recursive =T)
-setwd (projdir)
 projdir_scatac = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
 
-#devtools::install_github("immunogenomics/presto") #needed for DAA
+dir.create (file.path (projdir,'Plots'), recursive =T)
+setwd (projdir)
 
-set.seed(1234)
-addArchRThreads (threads = 8) 
-addArchRGenome ("Hg38")
+# Load utils functions palettes and packages ####
+source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
+source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
+source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','palettes.R'))
+
+# Set # of threads and genome reference ####
+addArchRThreads(threads = 8) 
+addArchRGenome("hg38")
 
 # Load scATAC ####
  archp = loadArchRProject (projdir_scatac)   

@@ -42,9 +42,8 @@ sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14')
 # Load scRNA ####
 if (!file.exists ('srt.rds'))
 	{
-	srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/reproduction2/scRNA/GSE190597_srt_tumor.rds')
-	srt$celltype_simplified_mal = as.character (srt$celltype_simplified)
-	
+	#srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/reproduction2/scRNA/GSE190597_srt_tumor.rds')
+	srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/srt.rds')
 	# Import P14
 	srt_p14 = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/MPM_naive_p14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds')
 	srt_p14$celltype_simplified = srt_p14$celltype

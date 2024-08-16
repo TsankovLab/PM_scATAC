@@ -1,9 +1,13 @@
 
-# Load functions for hub detection
-source ('../../PM_scATAC/knnGen.R')
-source ('../../PM_scATAC/addCoax.R')
-source ('../../PM_scATAC/Hubs_finder.R')
-source ('../../PM_scATAC/hubs_track.R')
+# Load functions for hub detection ####
+source (file.path('..','PM_scATAC','utils','knnGen.R'))
+source (file.path('..','PM_scATAC','utils','addCoax.R'))
+source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
+source (file.path('..','PM_scATAC','utils','hubs_track.R'))
+
+# Set # of threads and genome reference ####
+addArchRThreads(threads = 8) 
+addArchRGenome("hg38")
 
 # Export bigiwg files ####
 metaGroupName = 'Sample2'

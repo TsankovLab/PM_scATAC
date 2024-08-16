@@ -1,8 +1,8 @@
-# Load functions for hub detection
-source ('../PM_scATAC/knnGen.R')
-source ('../PM_scATAC/addCoax.R')
-source ('../PM_scATAC/Hubs_finder.R')
-source ('../PM_scATAC/hubs_track.R')
+# Load functions for hub detection ####
+source (file.path('..','PM_scATAC','utils','knnGen.R'))
+source (file.path('..','PM_scATAC','utils','addCoax.R'))
+source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
+source (file.path('..','PM_scATAC','utils','hubs_track.R'))
 
 
 if (makeBW)
@@ -129,19 +129,19 @@ metaGroupName = 'celltype3'
 if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
-    ArchRProj = archp_sub))   
-  hubsSample_mat = matrix (ncol = length(unique(archp_sub@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsSample_mat) = unique(archp_sub@cellColData[,metaGroupName])
+    ArchRProj = archp))   
+  hubsSample_mat = matrix (ncol = length(unique(archp@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
+  colnames (hubsSample_mat) = unique(archp@cellColData[,metaGroupName])
   rownames (hubsSample_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (unique(archp_sub@cellColData[,metaGroupName])))
-  for (sam in unique(archp_sub@cellColData[,metaGroupName]))
+  pb =progress::progress_bar$new(total = length (unique(archp@cellColData[,metaGroupName])))
+  for (sam in unique(archp@cellColData[,metaGroupName]))
     {
     pb$tick()  
-    fragments_in_sample = fragments[fragments$RG %in% rownames(archp_sub@cellColData)[as.character(archp_sub@cellColData[,metaGroupName]) == sam]]  
+    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == sam]]  
     fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
     hubsSample_mat[,sam] = fragments_in_sample_in_hubs
     }
-  frags_in_sample = sapply (unique(archp_sub@cellColData[,metaGroupName]), function(x) sum (archp_sub$nFrags[as.character(archp_sub@cellColData[,metaGroupName]) == x]))
+  frags_in_sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) sum (archp$nFrags[as.character(archp@cellColData[,metaGroupName]) == x]))
   hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
   saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
   } else {
@@ -164,28 +164,69 @@ pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), 
 hm
 dev.off()
 
+# Annotate also exhausted CD8 cells and generate heatmap of hubs x metagroup ####
+cd8_ct = read.csv (file.path('..','..','CD8','scatac_ArchR','barcode_annotation.csv')) # get annotation from subclustered CD8 cells
+archp$celltype3_ext = archp$celltype3
+archp$celltype3_ext[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
+archp$celltype3_ext[archp$celltype3_ext %in% c('C1','C2','C4')] = 'CD8'
+metaGroupName = 'celltype3_ext'
 
+if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
+  {
+  if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
+    ArchRProj = archp))   
+  hubsSample_mat = matrix (ncol = length(unique(archp@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
+  colnames (hubsSample_mat) = unique(archp@cellColData[,metaGroupName])
+  rownames (hubsSample_mat) = hubs_obj$hubs_id
+  pb =progress::progress_bar$new(total = length (unique(archp@cellColData[,metaGroupName])))
+  for (sam in unique(archp@cellColData[,metaGroupName]))
+    {
+    pb$tick()  
+    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == sam]]  
+    fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
+    hubsSample_mat[,sam] = fragments_in_sample_in_hubs
+    }
+  frags_in_sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) sum (archp$nFrags[as.character(archp@cellColData[,metaGroupName]) == x]))
+  hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
+  saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
+  } else {
+  hubsSample_mat = readRDS (file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))  
+  }
+hubsSample_mat = as.data.frame (hubsSample_mat)
 
-
+ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
+hm = Heatmap (
+  scale (t(hubsSample_mat)), 
+#  top_annotation = ha, 
+  column_names_gp = gpar(fontsize = 0),
+  show_column_dend = F,
+  #row_dend_width = unit(5,'mm'),
+  row_dend_side = 'left',
+  col = rev(palette_hubs_accessibility),
+  border=T,
+  name = 'Hubs')
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=2.2)
+hm
+dev.off()
 
 # Generate matrix of fragment counts of hubs x barcodes ####
 if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))))
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
-    ArchRProj = archp_sub))    
-  hubsCell_mat = matrix (ncol = length(rownames(archp_sub@cellColData)), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsCell_mat) = rownames(archp_sub@cellColData)
+    ArchRProj = archp))    
+  hubsCell_mat = matrix (ncol = length(rownames(archp@cellColData)), nrow = length(hubs_obj$hubsCollapsed))
+  colnames (hubsCell_mat) = rownames(archp@cellColData)
   rownames (hubsCell_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (rownames(archp_sub@cellColData)))
-  for (cell in rownames(archp_sub@cellColData)) 
+  pb =progress::progress_bar$new(total = length (rownames(archp@cellColData)))
+  for (cell in rownames(archp@cellColData)) 
     {
     pb$tick()  
     fragments_in_cell = fragments[fragments$RG %in% cell]  
     fragments_in_cell_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_cell)
     hubsCell_mat[,cell] = fragments_in_cell_in_hubs
     }
-  all (colnames (hubsCell_mat) == rownames(archp_sub@cellColData))  
-  hubsCell_mat = t(t(hubsCell_mat) * (10^6 / archp_sub$nFrags)) # scale
+  all (colnames (hubsCell_mat) == rownames(archp@cellColData))  
+  hubsCell_mat = t(t(hubsCell_mat) * (10^6 / archp$nFrags)) # scale
   saveRDS (hubsCell_mat, file.path (hubs_dir,paste0('hubs_cells_mat.rds')))
   } else {
   hubsCell_mat = readRDS (file.path (hubs_dir,paste0('hubs_cells_mat.rds')))  
@@ -194,11 +235,11 @@ hubsCell_mat = as.data.frame (hubsCell_mat)
 
 
 
-# Compute differential hub accessibility DHA ####
+# Compute differential hub accessibility to identify DAH in Tregs ####
 library (presto)
 metaGroupName = 'celltype3'
-all (colnames(hubsCell_mat) == rownames(archp_sub@cellColData))
-res = wilcoxauc (log2(hubsCell_mat+1), as.character (archp_sub@cellColData[,metaGroupName]))
+all (colnames(hubsCell_mat) == rownames(archp@cellColData))
+res = wilcoxauc (log2(hubsCell_mat+1), as.character (archp@cellColData[,metaGroupName]))
 
 res_l = lapply (split (res, res$group), function(x){
   tmp = x[x$logFC > 0,]
@@ -215,73 +256,43 @@ HUB84 HUB499 HUB1324 HUB575 HUB178 HUB733 HUB429 HUB369 HUB242 HUB602
 
 ### Call peaks on celltypes ####
 metaGroupName = 'celltype3'
-archp_sub = addGroupCoverages (
-  ArchRProj = archp_sub, 
-  groupBy = metaGroupName,  
-  force = FALSE,
-  minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
-  maxCells = 500,
-  minReplicates = 2,
-  sampleRatio = 0.8,
-  useLabels = TRUE)
-
-archp_sub = addReproduciblePeakSet (
-    archp_sub,
-    groupBy= metaGroupName,
-    peakMethod = 'Macs2',
-    reproducibility = "1",
-    maxPeaks = 500000, 
-    minCells=20,
-    force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower
-archp_sub = addPeakMatrix (archp_sub)
+force=FALSE
+if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) 
+source (file.path('..','PM_scATAC','callPeaks.R'))
   
 ### TF Enrichment in hubs in each cell type ####
 tf_enr_l = list()
-for (ct in unique(archp_sub@cellColData[,metaGroupName]))
+for (ct in unique(archp@cellColData[,metaGroupName]))
 {
-tf_match = getMatches (archp_sub)
+tf_match = getMatches (archp)
 bg_peaks = readRDS (file.path('PeakCalls',paste0(ct,'-reproduciblePeaks.gr.rds')))
 colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
 bg_peakSet = rowRanges (tf_match)[queryHits(findOverlaps(tf_match,bg_peaks))]
-mega_hubs = hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% head(res_l[[ct]]$feature,100))]
-mega_hubs_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, mega_hubs))]
+hubs_regions = hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% head(res_l[[ct]]$feature,100))]
+hubs_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, hubs_regions))]
 #tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
-mega_hubs_TF =  hyperMotif (
-  selected_peaks = mega_hubs_peaks, 
+hubs_regions_TF =  hyperMotif (
+  selected_peaks = hubs_peaks, 
   motifmatch = tf_match)
 
-tf_enr_l[[ct]] = mega_hubs_TF
+tf_enr_l[[ct]] = hubs_regions_TF
 }
 names (tf_enr_l)
-
-
-# Check hub size distribution between normal and tumor ####
-#res$width = width(hubs_obj$hubsCollapsed)[match (res$feature, hubs_obj$hubs_id)]
-vp = ggplot (size_comp_df, aes(x=group, y=logFC)) +
-    geom_boxplot() + 
-    facet_wrap (~ celltype) +
-    ggtitle ('Hub size') + gtheme
-
-pdf (file.path (hubs_dir, 'Plots','DAH_size.pdf'),4,4)
-vp
-dev.off()
-
-
 
 
 
 
 tf_markers = c('FOXP3','MAFF','JDP2','FOSB','FOS','BACH1','NFEL2L2','NFE2')
-markerMotifs = getFeatures (archp_sub, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
+markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs = grep ("z:", markerMotifs, value = TRUE)
 #archp = addImputeWeights (archp)
 TF_p = plotEmbedding(
-    ArchRProj = archp_sub, 
+    ArchRProj = archp, 
     colorBy = "MotifMatrix", 
     name = sort(markerMotifs), 
     embedding = "UMAP_H",
     pal = rev (palette_deviation),
-    imputeWeights = getImputeWeights(archp_sub)
+    imputeWeights = getImputeWeights(archp)
 )
 
 pdf (file.path ('Plots','top_TF_markers_Tregs_meso_only.pdf'), width = 30, height=18)
@@ -289,11 +300,28 @@ wrap_plots (TF_p, ncol=4)
 dev.off()
 
 
+# Compute differential hub accessibility between NK cells subsets ####
+library (presto)
+metaGroupName = 'celltype3'
+all (colnames(hubsCell_mat) == rownames(archp@cellColData))
+
+hubsCell_mat_nk = hubsCell_mat[,as.character (archp@cellColData[,metaGroupName]) %in% c('NK_FGFBP2','NK_KLRC1')]
+nk_groups = as.character (archp@cellColData[,metaGroupName])[as.character (archp@cellColData[,metaGroupName]) %in% c('NK_FGFBP2','NK_KLRC1')]
+res = wilcoxauc (log2(hubsCell_mat_nk+1), nk_groups)
+
+res_l = lapply (split (res, res$group), function(x){
+  tmp = x[x$logFC > 0,]
+  tmp = tmp[order (tmp$pval),]
+  tmp
+})
+
+head (res_l[['NK_KLRC1']],10)
 
 
-### Order cells by FOXP3 expression and find hubs that correlate with it ####
-archp_sub = addImputeWeights (archp_sub)
-seGS <- getMatrixFromProject (archp_sub)
+
+### Order cells using trajectory from CD4 to Tregs and find hubs that correlate with it ####
+archp = addImputeWeights (archp)
+seGS <- getMatrixFromProject (archp)
 #celltype_markers = c('FOXP3',rowData (seGS)$name[grep ('FOXP3', rowData (seGS)$name)])
 celltype_markers = c('FOXP3','ILRA2','CTLA4')
 seGS = seGS[rowData (seGS)$name %in% celltype_markers,]
@@ -302,11 +330,8 @@ rownames(matGS) = rowData (seGS)$name
 #rownames (matGS) = celltype_markers
 
 
-
-
-
-archp_sub = addTrajectory(
-    ArchRProj = archp_sub, 
+archp = addTrajectory(
+    ArchRProj = archp, 
     name = "Treg_maturation", 
     groupBy = "Clusters_H",
     trajectory = c('C7','C3','C2'), 
@@ -314,13 +339,13 @@ archp_sub = addTrajectory(
     force = FALSE
 )
 
-p = plotTrajectory(archp_sub, trajectory = "Treg_maturation", colorBy = "cellColData", name = "Treg_maturation", embedding = 'UMAP_H')
+p = plotTrajectory (archp, trajectory = "Treg_maturation", colorBy = "cellColData", name = "Treg_maturation", embedding = 'UMAP_H')
 pdf (file.path ('Plots','Treg_maturation_trajectory.pdf'))
 p
 dev.off()
 
-trajMM  <- getTrajectory(ArchRProj = archp_sub, name = "Treg_maturation", useMatrix = "MotifMatrix", log2Norm = FALSE)
-trajGS  <- getTrajectory(ArchRProj = archp_sub, name = "Treg_maturation", useMatrix = "GeneScoreMatrix", log2Norm = FALSE)
+trajMM  <- getTrajectory(ArchRProj = archp, name = "Treg_maturation", useMatrix = "MotifMatrix", log2Norm = FALSE)
+trajGS  <- getTrajectory(ArchRProj = archp, name = "Treg_maturation", useMatrix = "GeneScoreMatrix", log2Norm = FALSE)
 p1 <- plotTrajectoryHeatmap(trajMM, pal = palette_deviation)
 p2 <- plotTrajectoryHeatmap(trajGS, pal = palette_expression)
 
@@ -330,16 +355,16 @@ p2
 dev.off()
 
 # Get pseudotime scores and bin them ####
-pseudotime_scores = archp_sub$Treg_maturation
-names (pseudotime_scores) = rownames(archp_sub@cellColData)
+pseudotime_scores = archp$Treg_maturation
+names (pseudotime_scores) = rownames(archp@cellColData)
 pseudotime_scores = na.omit (pseudotime_scores)
 pseudotime_scores = pseudotime_scores[order(pseudotime_scores)]
 
 pseudotime_scores_binned = paste0('PT',ceiling(seq_along(pseudotime_scores)/400))
 names (pseudotime_scores_binned) = names (pseudotime_scores)
 
-archp_sub$pseudotime_binned = pseudotime_scores_binned[match(rownames(archp_sub@cellColData), names(pseudotime_scores))]
-archp_sub2 = archp_sub[!is.na(archp_sub$pseudotime_binned)]
+archp$pseudotime_binned = pseudotime_scores_binned[match(rownames(archp@cellColData), names(pseudotime_scores))]
+archp2 = archp[!is.na(archp$pseudotime_binned)]
 
 # Generate matrix of fragment counts using pseudotime bins ####
 metaGroupName = 'pseudotime_binned'
@@ -347,19 +372,19 @@ force = TRUE
 if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))) | force)
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
-    ArchRProj = archp_sub))   
-  hubsSample_mat = matrix (ncol = length(unique(archp_sub2@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsSample_mat) = unique(archp_sub2@cellColData[,metaGroupName])
+    ArchRProj = archp))   
+  hubsSample_mat = matrix (ncol = length(unique(archp2@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
+  colnames (hubsSample_mat) = unique(archp2@cellColData[,metaGroupName])
   rownames (hubsSample_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (unique(archp_sub2@cellColData[,metaGroupName])))
-  for (sam in unique(archp_sub2@cellColData[,metaGroupName]))
+  pb =progress::progress_bar$new(total = length (unique(archp2@cellColData[,metaGroupName])))
+  for (sam in unique(archp2@cellColData[,metaGroupName]))
     {
     pb$tick()  
-    fragments_in_sample = fragments[fragments$RG %in% rownames(archp_sub2@cellColData)[as.character(archp_sub2@cellColData[,metaGroupName]) == sam]]  
+    fragments_in_sample = fragments[fragments$RG %in% rownames(archp2@cellColData)[as.character(archp2@cellColData[,metaGroupName]) == sam]]  
     fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
     hubsSample_mat[,sam] = fragments_in_sample_in_hubs
     }
-  frags_in_sample = sapply (unique(archp_sub2@cellColData[,metaGroupName]), function(x) sum (archp_sub2$nFrags[as.character(archp_sub2@cellColData[,metaGroupName]) == x]))
+  frags_in_sample = sapply (unique(archp2@cellColData[,metaGroupName]), function(x) sum (archp2$nFrags[as.character(archp2@cellColData[,metaGroupName]) == x]))
   hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
   saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
   } else {
@@ -369,7 +394,7 @@ hubsSample_mat = as.data.frame (hubsSample_mat)
 
 
 # Correlate hubs vs binned pseudotime score ####
-pseudotime_binned_avg = unlist(lapply (split (archp_sub2$Treg_maturation, archp_sub2$pseudotime_binned), mean))
+pseudotime_binned_avg = unlist(lapply (split (archp2$Treg_maturation, archp2$pseudotime_binned), mean))
 
 hubsSample_mat_cor = as.data.frame (t(cor (pseudotime_binned_avg, t(hubsSample_mat[,names(pseudotime_binned_avg)]))), method='spearman')
 top_cor_hubs = rownames(head (hubsSample_mat_cor[order(-hubsSample_mat_cor[,1]), ,drop=F],100))
@@ -408,7 +433,7 @@ exp_bigwig = T
 if (exp_bigwig)
   {
   getGroupBW(
-    ArchRProj = archp_sub2,
+    ArchRProj = archp2,
     groupBy = metaGroupName,
     normMethod = "ReadsInTSS",
     tileSize = 100,
@@ -421,17 +446,17 @@ if (exp_bigwig)
   }
 }
 
-# Select HUBs to show on IGV ####
+# Select HUBs to show on IGV along CD4 > Treg pseudotime ####
 HUB135 HUB219 HUB531 HUB396 HUB1198 HUB620 HUB532 HUB90 HUB1223 HUB257 
 
 
 ### TF Enrichment in hubs in each cell type ####
 metaGroupName = 'celltype3'
 tf_enr_l = list()
-# for (ct in unique(archp_sub@cellColData[,metaGroupName]))
+# for (ct in unique(archp@cellColData[,metaGroupName]))
 # {
 ct = 'Tregs'
-tf_match = getMatches (archp_sub)
+tf_match = getMatches (archp)
 bg_peaks = readRDS (file.path('PeakCalls',paste0(ct,'-reproduciblePeaks.gr.rds')))
 colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
 bg_peakSet = rowRanges (tf_match)[queryHits(findOverlaps(tf_match,bg_peaks))]
@@ -452,186 +477,48 @@ head (tf_enr_l[[ct]],20)
 
 
 
+# Compute differential hub accessibility between CD8 exhausted and rest of CD8 ####
+library (presto)
+cd8_ct = read.csv (file.path('..','..','CD8','scatac_ArchR','barcode_annotation.csv')) # get annotation from subclustered CD8 cells
+archp$celltype3_ext = archp$celltype3
+archp$celltype3_ext[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
+archp$celltype3_ext[archp$celltype3_ext %in% c('C1','C2','C4')] = 'CD8'
+metaGroupName = 'celltype3_ext'
+all (colnames(hubsCell_mat) == rownames(archp@cellColData))
+
+hubsCell_mat_cd8 = hubsCell_mat[,as.character (archp@cellColData[,metaGroupName]) %in% c('CD8','CD8_exhausted')]
+cd8_groups = as.character (archp@cellColData[,metaGroupName])[as.character (archp@cellColData[,metaGroupName]) %in% c('CD8','CD8_exhausted')]
+res = wilcoxauc (log2(hubsCell_mat_cd8+1), cd8_groups)
+
+res_l = lapply (split (res, res$group), function(x){
+  tmp = x[x$logFC > 0,]
+  tmp = tmp[order (tmp$pval),]
+  tmp
+})
+
+head (res_l[['CD8_exhausted']],10)
+
+### TF Enrichment in hubs in each cell type ####
+tf_enr_l = list()
+
+tf_match = getMatches (archp)
+bg_peaks = readRDS (file.path('PeakCalls',paste0(ct,'-reproduciblePeaks.gr.rds')))
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+bg_peakSet = rowRanges (tf_match)[queryHits(findOverlaps(tf_match,bg_peaks))]
+mega_hubs = hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% head(res_l[[ct]]$feature,100))]
+mega_hubs_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, mega_hubs))]
+#tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+mega_hubs_TF =  hyperMotif (
+  selected_peaks = mega_hubs_peaks, 
+  motifmatch = tf_match)
+
+tf_enr_l[[ct]] = mega_hubs_TF
+}
+names (tf_enr_l)
 
 
-
-# differential hub t-test on sample normal vs tumor ####
-# Generate matrix of fragment counts of hubs x metagroup ####
-archp_sub$celltype_status_sample = paste0(archp_sub$celltype_status,'_',archp_sub$Sample2)
-keep_samples = names(table (archp_sub$celltype_status_sample)[table (archp_sub$celltype_status_sample) > 10])
-
-metaGroupName = 'celltype_status_sample'
-if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
-  {
-  if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
-    ArchRProj = archp_sub))   
-  hubsSample_mat = matrix (ncol = length(unique(archp_sub@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsSample_mat) = unique(archp_sub@cellColData[,metaGroupName])
-  rownames (hubsSample_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (unique(archp_sub@cellColData[,metaGroupName])))
-  for (sam in unique(archp_sub@cellColData[,metaGroupName]))
-    {
-    pb$tick()  
-    fragments_in_sample = fragments[fragments$RG %in% rownames(archp_sub@cellColData)[as.character(archp_sub@cellColData[,metaGroupName]) == sam]]  
-    fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
-    hubsSample_mat[,sam] = fragments_in_sample_in_hubs
-    }
-  frags_in_sample = sapply (unique(archp_sub@cellColData[,metaGroupName]), function(x) sum (archp_sub$nFrags[as.character(archp_sub@cellColData[,metaGroupName]) == x]))
-  hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
-  saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
-  } else {
-  hubsSample_mat = readRDS (file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))  
-  }
-hubsSample_mat = as.data.frame (hubsSample_mat)
-
-hubsSample_mat = hubsSample_mat[, keep_samples]
-
-meta_group = c('NK','T_cells')
-res_l = list()
-for (i in meta_group)
-  {
-  hubsSample_mat_df = log2(hubsSample_mat[, grepl (i, colnames(hubsSample_mat))]+1)
-  res = sapply (seq(nrow(hubsSample_mat_df)), function(x) t.test (
-    hubsSample_mat_df[x,grepl ('tumor',colnames(hubsSample_mat_df))],
-    hubsSample_mat_df[x,grepl ('normal',colnames(hubsSample_mat_df))])$p.value)
-  lfc = sapply (seq(nrow(hubsSample_mat_df)), function(x) rowMeans(hubsSample_mat_df[x,grepl ('tumor',colnames(hubsSample_mat_df))]) - rowMeans(hubsSample_mat_df[x,grepl ('normal',colnames(hubsSample_mat_df))]))
-  res_l[[i]] = data.frame(
-    hub = rownames(hubsSample_mat_df), 
-    pval = res,
-    padj = p.adjust (res), 
-    logFC = lfc, 
-    celltype = i)
-  }
-head (res_l[[2]][order(res_l[[2]]$padj),],30)
-
-## Plot volcano plots ####
-res = do.call (rbind, res_l)
-res = res[order(res$padj), ]
-logfcThreshold = 1
-pvalAdjTrheshold = 0.05
-res$sig = ifelse (abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold, 1,0)
-res$sig = res$sig * sign (res$logFC)
-res$sig = as.character (res$sig)
-res_filtered = res[abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold,]
-res_filtered = head (res_filtered$hub[order (-abs(res_filtered$logFC))],50)
-res$labels = ''
-res$labels[match (res_filtered, res$hub)] = res_filtered
-vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
-     geom_point(size=1, shape=19, aes (color = sig), alpha=.5) +
-     geom_vline(xintercept = logfcThreshold, linetype="dotted", 
-                 color = "grey20", size=1) +
-     geom_vline(xintercept = -logfcThreshold, linetype="dotted", 
-                 color = "grey20", size=1) +
-     geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dotted", 
-                 color = "grey20", size=1) + 
-     geom_text_repel (size=2, data = res, aes(label = labels)) + 
-     ggtitle ('Hubs differential accessibility') +
-     #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
-     scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + theme_light() +
-     facet_wrap (.~celltype, ncol=4)
-
-pdf (file.path (hubs_dir, 'Plots', 'DAH_volcano_ttest.pdf'),width = 6,height = 3)
-print (vp)
-dev.off()  
-
-
-# Generate matrix of fragment counts of hubs x barcodes ####
-metaGroupName = 'celltype_status'
-if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_',metaGroupName,'_mat.rds'))))
-  {
-  fragments = unlist (getFragmentsFromProject (
-    ArchRProj = archp_sub))    
-  hubsCell_mat = matrix (ncol = length(rownames(archp_sub@cellColData)), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsCell_mat) = rownames(archp_sub@cellColData)
-  rownames (hubsCell_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (rownames(archp_sub@cellColData)))
-  for (cell in rownames(archp_sub@cellColData)) 
-    {
-    pb$tick()  
-    fragments_in_cell = fragments[fragments$RG %in% cell]  
-    fragments_in_cell_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_cell)
-    hubsCell_mat[,cell] = fragments_in_cell_in_hubs
-    }
-  all (colnames (hubsCell_mat) == rownames(archp_sub@cellColData))  
-  hubsCell_mat = t(t(hubsCell_mat) * (10^6 / archp_sub$nFrags)) # scale
-  saveRDS (hubsCell_mat, file.path (hubs_dir,paste0('hubs_cells_',metaGroupName,'_mat.rds')))
-  } else {
-  hubsCell_mat = readRDS (file.path (hubs_dir,paste0('hubs_cells_',metaGroupName,'_mat.rds')))  
-  }
-hubsCell_mat = as.data.frame (hubsCell_mat)
-
-
-
-
-## Plot volcano plots ####
-res = size_comp_df
-logfcThreshold = 1
-pvalAdjTrheshold = 0.05
-res$sig = ifelse (abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold, 1,0)
-res$sig = res$sig * sign (res$logFC)
-res$sig = as.character (res$sig)
-res_filtered = res[abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold,]
-res_filtered = head (res_filtered$feature[order (-abs(res_filtered$logFC))],50)
-res$labels = ''
-res$labels[match (res_filtered, res$feature)] = res_filtered
-vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
-     geom_point(size=1, shape=19, aes (color = sig), alpha=.5) +
-     geom_vline(xintercept = logfcThreshold, linetype="dotted", 
-                 color = "grey20", size=1) +
-     geom_vline(xintercept = -logfcThreshold, linetype="dotted", 
-                 color = "grey20", size=1) +
-     geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dotted", 
-                 color = "grey20", size=1) + 
-     geom_text_repel (size=2, data = res, aes(label = labels)) + 
-     ggtitle ('Hubs differential accessibility') +
-     #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
-     scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + theme_light() +
-     facet_wrap (.~celltype, ncol=4)
-
-pdf (file.path (hubs_dir, 'Plots', 'DAH_volcano.pdf'),width = 14,height = 4)
-print (vp)
-dev.off()  
-
-
-
-# check hubs that are up across all normal vs tumor ####
-wlc_res_pos = lapply (wlc_res, function(x) x[x$logFC > 0,])
-wlc_res_pos = do.call (rbind, wlc_res_pos)
-head (table (wlc_res_pos$feature)[order(-table (wlc_res_pos$feature))])
-
-wlc_res_neg = lapply (wlc_res, function(x) x[x$logFC < 0,])
-wlc_res_neg = do.call (rbind, wlc_res_neg)
-head (table (wlc_res_neg$feature)[order(-table (wlc_res_neg$feature))])
-
-wlc_res_t = wlc_res[['T_cells']]
-head (wlc_res_t[order(wlc_res_t$logFC),],20)
-
-
-
-
-
-p2 <- plotGroups(
-    ArchRProj = archp_sub, 
-    groupBy = metaGroupName2, 
-    colorBy = "cellColData", 
-    name = "TSSEnrichment",
-    plotAs = "violin",
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-p1 <- plotGroups(
-    ArchRProj = archp_sub, 
-    groupBy = metaGroupName2, 
-    colorBy = "cellColData", 
-    name = "nFrags",
-    plotAs = "violin",
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-pdf (file.path ('Plots','QC-Sample-Statistics.pdf'), height=5)
-wrap_plots (p1, p2)
-dev.off()
-
-
-
-
+# Check DAH between NK KLRC1+ and CD8 exhausted to find commonalities ####
+cd8_ct = read.csv (file.path('..','..','CD8','scatac_ArchR','barcode_annotation.csv')) # get annotation from subclustered CD8 cells
+archp$celltype3_ext = archp$celltype3
+archp$celltype3_ext[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
+archp$celltype3_ext[archp$celltype3_ext %in% c('C1','C2','C4')] = 'CD8'

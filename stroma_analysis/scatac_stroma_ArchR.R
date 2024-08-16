@@ -2,45 +2,27 @@ conda activate meso_scatac
 use UGER
 R
 
-set.seed(1234)
-
-packages = c(
-  'Signac',
-  'Seurat',
-  'biovizBase',
-  'ggplot2',
-  'patchwork',
-  'scATACutils',
-  'SummarizedExperiment',
-  'epiAneufinder',
-  'JASPAR2020',
-  'TFBSTools',
-  'TxDb.Hsapiens.UCSC.hg38.knownGene',
-  'EnsDb.Hsapiens.v86',
-  'gplots',
-  'regioneR',
-  'ComplexHeatmap',
-  'ArchR',
-  'BSgenome.Hsapiens.UCSC.hg38',
-  'tidyverse',
-  'ggrepel',
-  'RColorBrewer')
-lapply(packages, require, character.only = TRUE)
-
 ####### ANALYSIS of TUMOR compartment #######
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/stroma/scatac_ArchR'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
-#devtools::install_github("immunogenomics/presto") #needed for DAA
-source ('../../PM_scATAC/useful_functions.R')
-source ('../../PM_scATAC/ggplot_aestetics.R')
-source ('../../PM_scATAC/scATAC_functions.R')
-source ('../../PM_scATAC/palettes.R')
+# Load utils functions palettes and packages ####
+source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
+source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
+source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','palettes.R'))
 
-set.seed (1234)
-addArchRThreads (threads = 8) 
-addArchRGenome ("Hg38")
+# Load functions for hub detection ####
+source (file.path('..','PM_scATAC','utils','knnGen.R'))
+source (file.path('..','PM_scATAC','utils','addCoax.R'))
+source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
+source (file.path('..','PM_scATAC','utils','hubs_track.R'))
+
+# Set # of threads and genome reference ####
+addArchRThreads(threads = 8) 
+addArchRGenome("hg38")
   
 sample_names = c(
     # Tumor  
@@ -213,93 +195,29 @@ archp = addClusters (input = archp,
   archp = loadArchRProject (projdir)
   }
 
-### Run peak calling on celltype annotation ####
-run_peakCall = FALSE
 
-if (run_peakCall)
-  {
-  ### Call peaks on celltypes ###
-  metaGroupName = 'Clusters_H'
-  archp = addGroupCoverages (
-    ArchRProj = archp, 
-    groupBy = metaGroupName,  
-    force = FALSE,
-    minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
-    maxCells = 500,
-    minReplicates = 2,
-    sampleRatio = 0.8,
-    useLabels = TRUE)
-  
-  archp = addReproduciblePeakSet (
-      archp,
-      groupBy= metaGroupName,
-      peakMethod = 'Macs2',
-      reproducibility = "1",
-      maxPeaks = 500000, 
-      minCells=20,
-      force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower
-  archp = addPeakMatrix (archp)
-  
-  archp = saveArchRProject (archp, load=TRUE)
-  }
+### Call peaks on celltypes ####
+metaGroupName = 'Clusters_H'
+force=TRUE
+if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) 
+source (file.path('..','PM_scATAC','callPeaks.R'))
 
 ### chromVAR analysis ####
-run_chromVAR = FALSE
-if (run_chromVAR)
-  {    
-  archp = addBgdPeaks (archp, force= TRUE)
-  archp = addMotifAnnotations (ArchRProj = archp,
-      motifSet = "cisbp",
-      #motifSet = 'JASPAR2020',
-      #name = "JASPAR2020_Motif",
-      force=TRUE)
-  archp = addDeviationsMatrix (
-    ArchRProj = archp, 
-    peakAnnotation = "Motif",
-    force = TRUE
-  )
+force=FALSE
+if (!all(file.exists(file.path('Annotations',
+  c('Motif-Matches-In-Peaks.rds',
+    'Motif-Positions-In-Peaks.rds',
+    'Motif-In-Peaks-Summary.rds')))))
+source (file.path ('..','PM_scATAC','chromVAR.R'))
   
-  archp = saveArchRProject (ArchRProj = archp,  
-      load = TRUE)
-  }
-
-# Find activating and repressing TFs ####
-run_activeTF = FALSE
-
-devMethod = 'ArchR'
- if (devMethod == 'ArchR')
-    {
-    TF_db='Motif'
-    mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
-    mSE = mSE[, archp$cellNames]
-    rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
-    rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
-    }
-  
-if (!file.exists ('TF_activators_genescore.rds'))
+# Find activating and repressing TFs #### 
+if (!file.exists ('TF_activators_genescore.rds')) 
   {
-  seGroupMotif <- getGroupSE(ArchRProj = archp, useMatrix = "MotifMatrix", groupBy = "Clusters")
-  seZ <- seGroupMotif[rowData(seGroupMotif)$seqnames=="z",]
-  rowData(seZ)$maxDelta <- lapply(seq_len(ncol(seZ)), function(x){
-    rowMaxs(assay(seZ) - assay(seZ)[,x])
-  }) %>% Reduce("cbind", .) %>% rowMaxs
-  corGSM_MM <- correlateMatrices(
-      ArchRProj = archp,
-      useMatrix1 = "GeneScoreMatrix",
-      useMatrix2 = "MotifMatrix",
-      reducedDims = "IterativeLSI"
-  )
-  corGSM_MM = corGSM_MM[!grepl ('-AS',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-DT',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-OT',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-RAB5IF',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-IT2',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-C8orf76',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = na.omit (corGSM_MM)
-  saveRDS (corGSM_MM, 'TF_activators_genescore.rds')
+    source (file.path('..','PM_scATAC','activeTFs.R'))
   } else {
-  corGSM_MM = readRDS ('TF_activators_genescore.rds') 
+    corGSM_MM = readRDS ('TF_activators_genescore.rds') 
   }
+
 
 
 ### Co-expression of TFs #### 

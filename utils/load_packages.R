@@ -24,6 +24,7 @@ packages = c(
  'GenomicFeatures',
  'org.Hs.eg.db',
  'rstatix',
- 'ggpubr'
+ 'ggpubr',
+ 'presto'
 )
 lapply(packages, require, character.only = TRUE)

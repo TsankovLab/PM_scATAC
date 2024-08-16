@@ -2,30 +2,30 @@
 conda activate meso_scatac
 R
 
-# Load packages
-packages = c('ArchR','rGREAT','igraph','karyoploteR','Seurat','ggpubr','org.Hs.eg.db',
-  'TxDb.Hsapiens.UCSC.hg38.knownGene','EnsDb.Hsapiens.v86','gplots','ggrepel','patchwork','ComplexHeatmap',
-  'RColorBrewer','ggrepel','gplots')
-lapply(packages, require, character.only = TRUE)
-
-#devtools::install_github("immunogenomics/presto") #needed for DAA
-#source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/useful_functions.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scATAC_functions.R')
-
-# Load functions for hub detection
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/knnGen.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/addCoAx.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/Hubs_finder.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/hubs_track.R')
-
 set.seed(1234)
-addArchRThreads(threads = 8) 
-addArchRGenome("hg38")
 
 # Load last istance
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/AS_human_lung_scatac/analysis/pbmc_myeloid/'
-dir.create (paste0(projdir,'Plots/'), recursive=T)
-setwd(projdir)
+dir.create (file.path (projdir,'Plots'), recursive =T)
+setwd (projdir)
+
+# Load utils functions palettes and packages ####
+source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
+source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
+source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','palettes.R'))
+
+# Load functions for hub detection ####
+source (file.path('..','PM_scATAC','utils','knnGen.R'))
+source (file.path('..','PM_scATAC','utils','addCoax.R'))
+source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
+source (file.path('..','PM_scATAC','utils','hubs_track.R'))
+
+# Set # of threads and genome reference ####
+addArchRThreads(threads = 8) 
+addArchRGenome("hg38")
+
 
 #### 
 meta_pbmc = read.csv ('/ahg/regevdata/projects/ICA_Lung/Bruno/AS_human_lung_scatac/analysis/pbmc/meta_pbmc.csv')

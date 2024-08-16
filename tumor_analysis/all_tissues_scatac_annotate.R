@@ -1,3 +1,5 @@
+### Pass cell type annotation to scatac datasets ####
+
 archp$celltype = 0
 
 # Map Tsankov cell type annotation ####

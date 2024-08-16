@@ -1,47 +1,29 @@
 conda activate meso_scatac
 R
 
-
-packages = c(
-  'Signac',
-  'Seurat',
-  'biovizBase',
-  'ggplot2',
-  'patchwork',
-  'scATACutils',
-  'SummarizedExperiment',
-  'epiAneufinder',
-  'JASPAR2020',
-  'TFBSTools',
-  'TxDb.Hsapiens.UCSC.hg38.knownGene',
-  'EnsDb.Hsapiens.v86',
-  'gplots',
-  'regioneR',
-  'ComplexHeatmap',
-  'ArchR',
-  'BSgenome.Hsapiens.UCSC.hg38',
-  'tidyverse',
-  'ggrepel',
-  'RColorBrewer',
-  'org.Hs.eg.db')
-lapply(packages, require, character.only = TRUE)
-
+set.seed(1234)
 
 ####### ANALYSIS of TUMOR compartment #######
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/pbmc_normal/scatac_ArchR'
-dir.create (file.path(projdir,'Plots'), recursive =T)
+dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
+# Load utils functions palettes and packages ####
+source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
+source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
+source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','palettes.R'))
 
-#devtools::install_github("immunogenomics/presto") #needed for DAA
-source ('../../PM_scATAC/useful_functions.R')
-source ('../../PM_scATAC/ggplot_aestetics.R')
-source ('../../PM_scATAC/scATAC_functions.R')
-source ('../../PM_scATAC/palettes.R')
+# Load functions for hub detection ####
+source (file.path('..','PM_scATAC','utils','knnGen.R'))
+source (file.path('..','PM_scATAC','utils','addCoax.R'))
+source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
+source (file.path('..','PM_scATAC','utils','hubs_track.R'))
 
-set.seed(1234)
-addArchRThreads (threads = 8)
-addArchRGenome ("Hg38")
+# Set # of threads and genome reference ####
+addArchRThreads(threads = 8) 
+addArchRGenome("hg38")
 
 
 if (!file.exists ('Save-ArchR-Project.rds')) 

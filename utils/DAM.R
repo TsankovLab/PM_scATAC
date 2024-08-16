@@ -35,7 +35,7 @@
   names (DAM_list2) = names (DAM_list)
   FDR_threshold = 1e-3
   meandiff_threshold = 0
-  top_genes = 3
+  top_genes = 5
   DAM_top_list = DAM_list2[sapply (DAM_list2, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$MeanDiff) > meandiff_threshold,]) > 0)]
   DAM_top_list = lapply (seq_along(DAM_top_list), function(x) {
     res = DAM_top_list[[x]]

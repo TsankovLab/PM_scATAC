@@ -4,44 +4,25 @@ R
 
 set.seed(1234)
 
-packages = c(
-  'Signac',
-  'Seurat',
-  'biovizBase',
-  'ggplot2',
-  'patchwork',
-  'scATACutils',
-  'SummarizedExperiment',
-  'epiAneufinder',
-  'JASPAR2020',
-  'TFBSTools',
-  'TxDb.Hsapiens.UCSC.hg38.knownGene',
-  'EnsDb.Hsapiens.v86',
-  'gplots',
-  'regioneR',
-  'ComplexHeatmap',
-  'ArchR',
-  'BSgenome.Hsapiens.UCSC.hg38',
-  'tidyverse',
-  'ggrepel',
-  'RColorBrewer',
-  'rstatix',
-  'ggpubr')
-
-lapply(packages, require, character.only = TRUE)
-
-####### ANALYSIS of Myeloid compartment #######
+####### ANALYSIS of Myeloid and PBMC hubs #######
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/priming_hubs'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
-#devtools::install_github("immunogenomics/presto") #needed for DAA
-source (file.path('..','..','PM_scATAC','useful_functions.R'))
-source (file.path('..','..','PM_scATAC','ggplot_aestetics.R'))
-source (file.path('..','..','PM_scATAC','scATAC_functions.R'))
-source (file.path('..','..','PM_scATAC','palettes.R'))
+# Load utils functions palettes and packages ####
+source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
+source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
+source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','palettes.R'))
 
-set.seed (1234)
+# Load functions for hub detection ####
+source (file.path('..','PM_scATAC','utils','knnGen.R'))
+source (file.path('..','PM_scATAC','utils','addCoax.R'))
+source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
+source (file.path('..','PM_scATAC','utils','hubs_track.R'))
+
+
 addArchRThreads (threads = 8) 
 addArchRGenome ("Hg38")
 
@@ -322,17 +303,32 @@ hub_regions_TF =  hyperMotif (
 
 head (hub_regions_TF)
 
-# Check if HUB3 region are mapped back in the hg19 in pbmc_h to exclude DAH is artifact of different alignments ####
-library ("liftOver")
-path = system.file (package="liftOver", "extdata", "hg38ToHg19.over.chain")
-ch = import.chain(path)
-hub3_hg19 = hubs_obj$hubsCollapsed[3]
-seqlevelsStyle(hub3_hg19) = "UCSC"  # necessary
-hub3_hg19 = unlist (liftOver(hub3_hg19, ch))
+# Check if HUBs region are mapped back in the hg19 in pbmc_h to exclude DAH is artifact of different alignments ####
+
+for (hubid in rownames(t_res_df))
+  {
+  library ("liftOver")
+  path = system.file (package="liftOver", "extdata", "hg38ToHg19.over.chain")
+  ch = import.chain(path)
+  hub_hg19 = hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id == hubid)]
+  seqlevelsStyle(hub_hg19) = "UCSC"  # necessary
+  hub_hg19 = unlist (liftOver(hub_hg19, ch))
+  
+    library ("liftOver")
+    if(!file.exists ("hg19ToHg38.over.chain")) 
+      {
+      download.file("https://hgdownload.soe.ucsc.edu/gbdb/hg19/liftOver/hg19ToHg38.over.chain.gz", "hg19ToHg38.over.chain.gz")
+      system("gzip -d hg19ToHg38.over.chain.gz")
+      }
+    z <- import.chain ("hg19ToHg38.over.chain")
+    #seqlevelsStyle (fragments_normal_flt) = "UCSC"  # necessary
+    hub_hg19_hg38 = unlist (liftOver(hub_hg19, z))
+  identical (hubs_obj$hubsCollapsed[hubid], hub3_hg19_hg38)
+
 blacklist_hg19 = read.table ('hg19-blacklist.v2.bed', sep='\t')
 colnames(blacklist_hg19) = c('seqnames','start','end','annotation')
 blacklist_hg19 = makeGRangesFromDataFrame (blacklist_hg19, keep.extra.columns=T)
-findOverlaps (blacklist_hg19, hub3_hg19) # No overlaps with blacklisted regions in hg19
+findOverlaps (blacklist_hg19, hub_hg19) # No overlaps with blacklisted regions in hg19
 
 # Check PBMC from ArchR tutorial dataset ####
 

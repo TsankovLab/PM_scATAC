@@ -3,47 +3,27 @@ use UGER
 conda activate meso_scatac
 R
 
-set.seed(1234)
-
-packages = c(
-  'Signac',
-  'Seurat',
-  'biovizBase',
-  'ggplot2',
-  'patchwork',
-  'scATACutils',
-  'SummarizedExperiment',
-  'epiAneufinder',
-  'JASPAR2020',
-  'TFBSTools',
-  'TxDb.Hsapiens.UCSC.hg38.knownGene',
-  'EnsDb.Hsapiens.v86',
-  'gplots',
-  'regioneR',
-  'ComplexHeatmap',
-  'ArchR',
-  'BSgenome.Hsapiens.UCSC.hg38',
-  'tidyverse',
-  'ggrepel',
-  'RColorBrewer')
-lapply(packages, require, character.only = TRUE)
-
 ####### ANALYSIS of TUMOR compartment #######
 projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/all_tissues_ArchR'
-datadir = '/broad/hptmp/mbairakd/data/bed_files'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
-#devtools::install_github("immunogenomics/presto") #needed for DAA
-source ('../../PM_scATAC/useful_functions.R')
-source ('../../PM_scATAC/ggplot_aestetics.R')
-source ('../../PM_scATAC/scATAC_functions.R')
-source ('../../PM_scATAC/palettes.R')
+# Load utils functions palettes and packages ####
+source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
+source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
+source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
+source (file.path('..','..','PM_scATAC','utils','palettes.R'))
 
-set.seed (1234)
-addArchRThreads (threads = 8) 
-addArchRGenome ("Hg38")
+# Load functions for hub detection ####
+source (file.path('..','PM_scATAC','utils','knnGen.R'))
+source (file.path('..','PM_scATAC','utils','addCoax.R'))
+source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
+source (file.path('..','PM_scATAC','utils','hubs_track.R'))
 
+# Set # of threads and genome reference ####
+addArchRThreads(threads = 8) 
+addArchRGenome("hg38")
    
 fragment_paths = c(
   #file.path(datadir,'JShendure_scATAC', 'migrated_to_hg38', list.files (file.path (datadir, 'JShendure_scATAC','migrated_to_hg38'), pattern = 'bgz$')),
