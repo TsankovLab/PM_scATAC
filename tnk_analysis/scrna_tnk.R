@@ -198,6 +198,14 @@ pdf (file.path('Plots',paste0('Tregs_TFs.pdf')))
 VlnPlot (srt, features = c('POU2F3','POU2F2'), group.by = 'celltype2')
 dev.off()
 
+pdf (file.path('Plots',paste0('Tregs_TFs.pdf')))
+VlnPlot (srt, features = c('PRF1','GZMB','KLRC1'), group.by = 'celltype2')
+dev.off()
+
+pdf (file.path('Plots',paste0('NK_T_EXT.pdf')), width=12)
+VlnPlot (srt, features = c('SPRY1','SFTPB','NR4A3','NR2F2'), group.by = 'celltype2', split.by='sampleID')
+dev.off()
+
 
 
 

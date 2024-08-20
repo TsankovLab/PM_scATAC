@@ -56,6 +56,10 @@
   
   DAM_df$gene = gsub ('_.*','',DAM_df$gene)
   DAM_df$gene = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", DAM_df$gene)
+  
+  # # Get deviation matrix ####
+  if (!exists ('mSE')) mSE = fetch_mat (archp, 'Motif')
+
   mMat = assays (mSE)[[1]]
   rownames (mMat) = rowData (mSE)$name
   mMat_mg = mMat[DAM_df$gene, ]

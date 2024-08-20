@@ -73,7 +73,7 @@ plotBrowserTrack2 <- function(
   baseSize = 7,
   scTileSize = 0.5,
   scCellsMax = 100,
-  borderWidth = 0.4,
+  borderWidth = 0.3,
   tickWidth = 0.4,
   facetbaseSize = 7,
   geneAnnotation = getGeneAnnotation(ArchRProj),
@@ -176,7 +176,7 @@ plotBrowserTrack2 <- function(
         title = title,
         useGroups = useGroups,
         tstart = tstart,
-        logFile = logFile) + theme(plot.margin = unit(c(0.35, 0.75, 0.35, 0.75), "cm"))
+        logFile = logFile) + theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
     }
     
     ##########################################################
@@ -202,7 +202,7 @@ plotBrowserTrack2 <- function(
         title = title,
         useGroups = useGroups,
         tstart = tstart,
-        logFile = logFile) + theme(plot.margin = unit(c(0.35, 0.75, 0.35, 0.75), "cm"))
+        logFile = logFile) + theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
     }
 
     ##########################################################
@@ -217,7 +217,7 @@ plotBrowserTrack2 <- function(
             facetbaseSize = facetbaseSize,
             hideX = TRUE, 
             title = "Peaks",
-            logFile = logFile) + theme(plot.margin = unit(c(0.1, 0.75, 0.1, 0.75), "cm"))
+            logFile = logFile) + theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
       }
     }
 
@@ -234,7 +234,7 @@ plotBrowserTrack2 <- function(
             hideX = TRUE, 
             hideY = TRUE,
             title = "Loops",
-            logFile = logFile) + theme(plot.margin = unit(c(0.1, 0.75, 0.1, 0.75), "cm"))
+            logFile = logFile) + theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
       }
     }
      ##########################################################
@@ -250,7 +250,7 @@ plotBrowserTrack2 <- function(
             hideX = TRUE, 
             hideY = TRUE,
             title = "Hubs",
-            logFile = logFile) + theme(plot.margin = unit(c(0.1, 0.75, 0.1, 0.75), "cm"))
+            logFile = logFile) + theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
       }
     }
 
@@ -264,7 +264,7 @@ plotBrowserTrack2 <- function(
         region = region[x], 
         facetbaseSize = facetbaseSize,
         title = "Genes",
-        logFile = logFile) + theme(plot.margin = unit(c(0.1, 0.75, 0.1, 0.75), "cm"))
+        logFile = logFile) + theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
     }
 
     ##########################################################
@@ -312,7 +312,7 @@ plotBrowserTrack2 <- function(
           tryCatch({
             print(plotList[[i]])
           }, error = function(f){
-            .logError(f, fn = names(plotList)[i], info = "", errorList = NULL, logFile = logFile)
+            #.logError(f, fn = names(plotList)[i], info = "", errorList = NULL, logFile = logFile)
           })
         }
         .logError(e, fn = "ggAlignPlots", info = "", errorList = NULL, logFile = logFile)
@@ -350,8 +350,8 @@ plotBrowserTrack2 <- function(
   threads = 1, 
   ylim = NULL,
   baseSize = 7,
-  borderWidth = 0.4,
-  tickWidth = 0.4,
+  borderWidth = 0.3,
+  tickWidth = 0,
   facetbaseSize = 7,
   geneAnnotation = getGeneAnnotation(ArchRProj),
   title = "",
@@ -419,15 +419,17 @@ plotBrowserTrack2 <- function(
                 baseRectSize = borderWidth,
                 baseLineSize = tickWidth,
                 legendPosition = "right",
-                axisTickCm = 0.1) +
+                axisTickCm = 0) +
     theme(panel.spacing= unit(0, "lines"),
           axis.title.x=element_blank(),
           axis.text.y=element_blank(),
           axis.ticks.y=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
           strip.text = element_text(
             size = facetbaseSize, 
             color = "black", 
-            margin = margin(0,0.35,0,0.35, "cm")),
+            margin = margin(0,0,0,0, "cm")),
             strip.text.y = element_text(angle = 0),
           strip.background = element_rect(color="black")) +
     guides(fill = FALSE, colour = FALSE) + ggtitle(title)
@@ -646,14 +648,14 @@ plotBrowserTrack2 <- function(
   geneAnnotation = NULL, 
   region = NULL, 
   baseSize = 9, 
-  borderWidth = 0.4, 
+  borderWidth = 0.3, 
   title = "Genes",
-  geneWidth = 2, 
-  exonWidth = 4, 
+  geneWidth = 1, 
+  exonWidth = 1.5, 
   labelSize = 2,
   facetbaseSize,
-  colorMinus = "dodgerblue2",
-  colorPlus = "red",
+  colorMinus = "grey22",
+  colorPlus = "brown",
   logFile = NULL
   ){
 
@@ -728,7 +730,8 @@ plotBrowserTrack2 <- function(
       #################################################
       #Theme
       #################################################
-      theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = borderWidth) +
+      #theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = borderWidth) +
+      theme_void() +
       theme(axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank()) +
       theme(axis.title.y=element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank()) +
       theme(legend.text = element_text(size = baseSize), strip.text.y = element_text(size = facetbaseSize, angle = 0)) +
@@ -740,7 +743,7 @@ plotBrowserTrack2 <- function(
     #Add Labels if There are Genes with this orientation!
     if(length(which(genesO$strand!="-")) > 0){
       p <- p + ggrepel::geom_label_repel(data=genesO[which(genesO$strand!="-"),], 
-        aes(x = start, y = cluster, label = symbol, color = strand, fill = NA), 
+        aes(x = start, y = cluster, label = symbol, color = strand),fill = 'white', 
           segment.color = "grey", nudge_x = -0.01*(end(region) - start(region)), nudge_y = -0.25, 
           size = labelSize, direction = "x")
     }
@@ -748,7 +751,7 @@ plotBrowserTrack2 <- function(
     #Add Labels if There are Genes with this orientation!
     if(length(which(genesO$strand=="-")) > 0){
       p <- p + ggrepel::geom_label_repel(data=genesO[which(genesO$strand=="-"),], 
-        aes(x = end, y = cluster, label = symbol, color = strand, fill = NA), 
+        aes(x = end, y = cluster, label = symbol, color = strand),,fill = 'white', 
           segment.color = "grey", nudge_x = +0.01*(end(region) - start(region)), nudge_y = 0.25, 
           size = labelSize, direction = "x")
     }
@@ -790,7 +793,7 @@ plotBrowserTrack2 <- function(
   baseSize = 9, 
   facetbaseSize = NULL,
   featureWidth = 2, 
-  borderWidth = 0.4, 
+  borderWidth = 0.3, 
   hideX = FALSE, 
   hideY = FALSE,
   logFile = NULL
@@ -846,8 +849,9 @@ plotBrowserTrack2 <- function(
       ylab("") + xlab("") + 
       scale_x_continuous(limits = c(start(region), end(region)), expand = c(0,0)) +
       scale_color_manual(values = pal) +
+      theme_void() + 
       theme(legend.text = element_text(size = baseSize)) + 
-      theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = borderWidth) +
+      theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = 0) +
       guides(color = FALSE, fill = FALSE) + theme(strip.text.y = element_text(size = facetbaseSize, angle = 0), strip.background = element_blank())
 
   }else{
@@ -857,7 +861,8 @@ plotBrowserTrack2 <- function(
     p <- ggplot(data = df, aes(start, end)) + 
       geom_point() +
       facet_grid(facet~.) +
-      theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = borderWidth) +
+      #theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = borderWidth) +
+      theme_void() +
       scale_x_continuous(limits = c(start(region), end(region)), expand = c(0,0)) +
       theme(axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank()) +
       theme(axis.title.y=element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank())
@@ -1026,10 +1031,10 @@ hubsTracks <- function(
   region = NULL, 
   title = "HubTrack", 
   pal = NULL,
-  baseSize = 9, 
+  baseSize = 5, 
   facetbaseSize = 9,
   featureWidth = 2, 
-  borderWidth = 0.4, 
+  borderWidth = 0.1, 
   hideX = FALSE, 
   hideY = FALSE,
   logFile = NULL
@@ -1088,17 +1093,24 @@ hubsTracks <- function(
       }
 
       p <- ggplot(data = data.frame(hubsO), aes(x = x, y = y, group = id, color = value)) + 
-        geom_line() +
+        geom_line(size=0.2) +
         facet_grid(name ~ .) +
         ylab("") + 
         coord_cartesian(ylim = c(-100,0)) +
         scale_x_continuous(limits = c(start(region), end(region)), expand = c(0,0)) +
         scale_color_gradientn(colors = pal, limits = c(valueMin, valueMax)) +
-        theme(legend.text = element_text(size = baseSize)) +
-        theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = borderWidth, legendPosition = "right") +
-        theme(strip.text.y = element_text(size = facetbaseSize, angle = 0), strip.background = element_blank(),
-          legend.box.background = element_rect(color = NA)) +
-        guides(color= guide_colorbar(barwidth = 0.75, barheight = 3))
+        guides(color= guide_colorbar(barwidth = 0.75, barheight = 3)) +
+        #theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = borderWidth, legendPosition = "right") +
+        theme_void() +
+        theme(
+        legend.text = element_text(size = baseSize),
+        #legendPosition = "right",
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
       }
     return (p)
     }
@@ -1247,7 +1259,7 @@ hubsTracks <- function(
             strip.text = element_text(
               size = facetbaseSize, 
               color = "black", 
-              margin = margin(0,0.35,0,0.35, "cm")),
+              margin = margin(0,0,0,0, "cm")),
               strip.text.y = element_text(angle = 0),
             strip.background = element_rect(color="black")) +
       guides(fill = FALSE, colour = FALSE) + ggtitle(title)
@@ -1353,17 +1365,17 @@ hubsTracks <- function(
         strip.text = element_text(
           size = facetbaseSize, 
           color = "black", 
-          margin = margin(0,0.35,0,0.35, "cm")),
+          margin = margin(0,0,0,0, "cm")),
           strip.text.y = element_text(angle = 0),
         strip.background = element_rect(color="black")) +
-    theme(plot.margin = unit(c(0.35, 0.15, 0.35, 0.15), "cm")) +
+    theme(plot.margin = unit(c(0, 0, 0, 0), "cm")) +
     ggtitle(title)
 
   if(any(tolower(names(plotList)) %in% "bulktrack")){
 
     idx <- which(tolower(names(plotList)) == "bulktrack")
     
-    p <- plotList[[idx]] + featurePlot + plot_spacer()
+    p <- plotList[[idx]] + featurePlot
     
     plotList[idx] <- NULL
     
@@ -1382,7 +1394,7 @@ hubsTracks <- function(
 
     idx <- which(tolower(names(plotList)) == "sctrack")
     
-    p <- plotList[[idx]] + featurePlot + plot_spacer()
+    p <- plotList[[idx]] + featurePlot
     
     plotList[idx] <- NULL
     

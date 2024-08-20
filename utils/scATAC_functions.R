@@ -51,7 +51,7 @@ hubMatsGen = function(hubs_obj, KNN, projdir_hubs, fragments, force = FALSE)
     
     # Normalise by seq depth
     message ('Normalise by ReadsInTSS')
-    cellpool_nFrags = sapply(KNN,function(v) sum(archp$ReadsInTSS[archp$cellNames %in% v]))
+    cellpool_nFrags = sapply(KNN,function(v) sum(archp$nFrags[archp$cellNames %in% v]))
     hubsKnn_mat = t(t(hubsKnn_mat) * (10^6 /cellpool_nFrags)) # scale
 
     message ('Aggregate Hubs x knn to clusters')  

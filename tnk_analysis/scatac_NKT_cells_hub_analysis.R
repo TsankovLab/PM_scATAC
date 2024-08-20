@@ -1,17 +1,13 @@
 # Load functions for hub detection ####
-source (file.path('..','PM_scATAC','utils','knnGen.R'))
-source (file.path('..','PM_scATAC','utils','addCoax.R'))
-source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
-source (file.path('..','PM_scATAC','utils','hubs_track.R'))
-
-
-if (makeBW)
-{
+source (file.path('..','..','PM_scATAC','utils','knnGen.R'))
+source (file.path('..','..','PM_scATAC','utils','addCoax.R'))
+source (file.path('..','..','PM_scATAC','utils','Hubs_finder.R'))
+source (file.path('..','..','PM_scATAC','utils','hubs_track.R'))
 
 # Export bigiwg files ####
 archp$celltype_status = paste0(archp$celltype2, '_', archp$status)
 metaGroupName = 'celltype2'
-exp_bigwig = T
+exp_bigwig = F
 if (exp_bigwig)
   {
   getGroupBW(
@@ -26,7 +22,6 @@ if (exp_bigwig)
     logFile = createLogFile("getGroupBW")
   )
   }
-}
 
 
 if (!file.exists ('peak_regions.bed'))
@@ -39,7 +34,7 @@ if (!file.exists ('peak_regions.bed'))
 
 ### Hubs analysis #####
 metaGroupName = "Clusters_H"
-cor_cutoff = 0.3
+cor_cutoff = 0.2
 #max_dist = 12500
 max_dist = 12500
 min_peaks = 5
@@ -52,7 +47,7 @@ dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 k= 30
 metaGroupName = 'Clusters_H'
 
-force = FALSE
+force = TRUE
 if (!file.exists(file.path (hubs_dir, paste0 ('KNNs_',metaGroupName,'k_',k,'.rds'))) | force)
   {
   KNNs = knnGen (
@@ -164,6 +159,8 @@ pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), 
 hm
 dev.off()
 
+  
+
 # Annotate also exhausted CD8 cells and generate heatmap of hubs x metagroup ####
 cd8_ct = read.csv (file.path('..','..','CD8','scatac_ArchR','barcode_annotation.csv')) # get annotation from subclustered CD8 cells
 archp$celltype3_ext = archp$celltype3
@@ -198,14 +195,15 @@ ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp =
 hm = Heatmap (
   scale (t(hubsSample_mat)), 
 #  top_annotation = ha, 
-  column_names_gp = gpar(fontsize = 0),
-  show_column_dend = F,
+  column_names_gp = gpar(fontsize = 3),
+  show_column_dend = T,
+  #column_km = 2,
   #row_dend_width = unit(5,'mm'),
   row_dend_side = 'left',
   col = rev(palette_hubs_accessibility),
   border=T,
   name = 'Hubs')
-pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=2.2)
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=2.2, width = 100)
 hm
 dev.off()
 
@@ -278,8 +276,6 @@ hubs_regions_TF =  hyperMotif (
 tf_enr_l[[ct]] = hubs_regions_TF
 }
 names (tf_enr_l)
-
-
 
 
 tf_markers = c('FOXP3','MAFF','JDP2','FOSB','FOS','BACH1','NFEL2L2','NFE2')
@@ -384,7 +380,7 @@ if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.r
     fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
     hubsSample_mat[,sam] = fragments_in_sample_in_hubs
     }
-  frags_in_sample = sapply (unique(archp2@cellColData[,metaGroupName]), function(x) sum (archp2$nFrags[as.character(archp2@cellColData[,metaGroupName]) == x]))
+  frags_in_sample = sapply (unique(archp2@cellColData[,metaGroupName]), function(x) sum (archp2$ReadsInTSS[as.character(archp2@cellColData[,metaGroupName]) == x]))
   hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
   saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
   } else {
@@ -429,7 +425,7 @@ dev.off()
 
 # Export bigiwg files ####
 metaGroupName = 'pseudotime_binned'
-exp_bigwig = T
+exp_bigwig = F
 if (exp_bigwig)
   {
   getGroupBW(
@@ -479,13 +475,8 @@ head (tf_enr_l[[ct]],20)
 
 # Compute differential hub accessibility between CD8 exhausted and rest of CD8 ####
 library (presto)
-cd8_ct = read.csv (file.path('..','..','CD8','scatac_ArchR','barcode_annotation.csv')) # get annotation from subclustered CD8 cells
-archp$celltype3_ext = archp$celltype3
-archp$celltype3_ext[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
-archp$celltype3_ext[archp$celltype3_ext %in% c('C1','C2','C4')] = 'CD8'
-metaGroupName = 'celltype3_ext'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
-
+metaGroupName = 'celltype3_ext'
 hubsCell_mat_cd8 = hubsCell_mat[,as.character (archp@cellColData[,metaGroupName]) %in% c('CD8','CD8_exhausted')]
 cd8_groups = as.character (archp@cellColData[,metaGroupName])[as.character (archp@cellColData[,metaGroupName]) %in% c('CD8','CD8_exhausted')]
 res = wilcoxauc (log2(hubsCell_mat_cd8+1), cd8_groups)
@@ -497,6 +488,127 @@ res_l = lapply (split (res, res$group), function(x){
 })
 
 head (res_l[['CD8_exhausted']],10)
+
+# Plot only hubs up in exhaustion across TNK ####
+hubsSample_mat_ext = hubsSample_mat[head (res_l[['CD8_exhausted']],100)$feature,]
+#ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
+hm = Heatmap (
+  scale (t(hubsSample_mat_ext)), 
+#  top_annotation = ha, 
+  column_names_gp = gpar(fontsize = 5),
+  column_names_rot = 45,
+  show_column_dend = F,
+  #row_dend_width = unit(5,'mm'),
+  row_dend_side = 'left',
+  col = rev(palette_hubs_accessibility),
+  border=T,
+  name = 'Hubs')
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_Ext_up_heatmap.pdf')), height=2.2,width=10)
+hm
+dev.off()
+
+# Plot NR4A3 deviation has showing HUB31 higher in KLRC1 and CD8 exhausted cells ####
+tf_markers = c('NR4A3')
+markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
+markerMotifs = grep ("z:", markerMotifs, value = TRUE)
+#archp = addImputeWeights (archp)
+TF_p = plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "MotifMatrix", 
+    name = sort(markerMotifs), 
+    embedding = "UMAP_H",
+    pal = palette_deviation,
+    imputeWeights = getImputeWeights(archp)
+)
+
+# Check expression of NR4A3 ####
+metaGroupName = 'celltype3_ext'
+#metaGroupName = 'Sample'
+tf = c('NR4A3')
+if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+ext_tf = data.frame (
+TF = mMat[tf,],
+celltype =as.character(archp@cellColData[,metaGroupName]),
+sample = archp$Sample)
+
+ct_order = unlist(lapply(split (ext_tf, ext_tf$celltype), function(x) mean(x$TF)))
+ext_tf$celltype = factor (ext_tf$celltype, levels = names(ct_order)[order(-ct_order)])
+metaGroup = 'Sample'
+ext_tf_agr = aggregate (ext_tf[,1,drop=F], by = list(celltype= ext_tf$celltype, sample = ext_tf$sample), mean)
+
+bp = ggplot (ext_tf_agr, aes (x = celltype, y = TF)) + 
+geom_boxplot (aes (fill=celltype),
+    linewidth = .2,
+    width=.8,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.3, alpha=0.7
+     ) + 
+# geom_violin (aes (fill=celltype), trim=TRUE,size=2,
+#     width=1,
+#     scale='width',
+#     linewidth = .2, alpha=0.7) +
+scale_fill_manual (values= palette_tnk_cells) + 
+#geom_point (position='identity', alpha=.2, color="grey44", size=.1) +
+gtheme
+
+stat.test = bp$data %>%
+t_test(reformulate ('celltype', 'TF')) %>%
+adjust_pvalue (method = "fdr") %>%
+add_significance ()
+stat.test = stat.test %>% add_xy_position (x = 'celltype', step.increase=.4)
+bp = bp + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
+bracket.nudge.y = -0.1, hide.ns = T,
+label = "p.adj.signif") + NoLegend()
+
+pdf (file.path ('Plots',paste0(tf,'_boxplots.pdf')),height=3.3,width=2.5)
+bp
+dev.off()
+
+ 
+  metaGroupName = 'celltype3_ext2'
+  markers = 'SPRY1'
+  #celltype_markers = c('WT1','CALB2','GATA4','MSLN','KRT5','KRT18','ITLN1','HP','SOX9')
+archp$celltype3_ext2 =  archp$celltype3_ext
+archp$celltype3_ext2[archp$celltype3_ext2 == 'CD4'] =  c('C1_CD4')
+archp$celltype3_ext2[archp$celltype3_ext2 == 'CD8'] =  c('C2_CD8')
+archp$celltype3_ext2[archp$celltype3_ext2 == 'NK_FGFBP2'] =  c('C3_NK_FGFBP2')
+archp$celltype3_ext2[archp$celltype3_ext2 == 'Tregs'] =  c('C4_Tregs')
+archp$celltype3_ext2[archp$celltype3_ext2 == 'CD8_exhausted'] =  c('C5_CD8_exhausted')
+archp$celltype3_ext2[archp$celltype3_ext2 == 'NK_KLRC1'] =  c('C6_NK_KLRC1')
+palette_tnk_cells_ext2 = palette_tnk_cells
+names (palette_tnk_cells_ext2) = c('C2_CD8','C1_CD4','C4_Tregs','TFH','C5_CD8_exhausted',
+  'C3_NK_FGFBP2','C6_NK_KLRC1','NKlike_Tcells')
+meso_markers <- plotBrowserTrack2 (
+    ArchRProj = archp, 
+    sizes = c(6, 1, 1, 1,1),
+    groupBy = metaGroupName, 
+    geneSymbol = markers,
+    normMethod = "ReadsInTSS",
+    plotSummary = c("bulkTrack", "featureTrack", 
+        #"loopTrack", 
+      "geneTrack", "hubTrack"),
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+    upstream = 10000,
+    pal = palette_tnk_cells_ext2,
+    #ylim=c(0,0.1),
+    downstream = 100000,
+    #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+    loops = getCoAccessibility (archp, corCutOff = 0.2),
+    #  returnLoops = TRUE),
+    useGroups= NULL,
+    hubs = hubs_obj$peakLinks
+)
+plotPDF (meso_markers, ArchRProj = archp, width=5,height=3, name =paste0(paste(markers, collapse='_'),'_coveragePlots.pdf'))
+
+
+
+
+
 
 ### TF Enrichment in hubs in each cell type ####
 tf_enr_l = list()

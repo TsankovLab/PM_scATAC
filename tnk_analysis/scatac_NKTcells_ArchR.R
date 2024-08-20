@@ -187,7 +187,8 @@ archp = addClusters (input = archp,
     colorBy = "cellColData", name = "Sample2", labelMeans =F,
      embedding = "UMAP_H", pal = palette_sample)
   umap_p4 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "celltype3",
+    colorBy = "cellColData", name = "celltype3_ext", 
+    pal = palette_tnk_cells,
      embedding = "UMAP_H",labelMeans=FALSE)
   umap_p5 = plotEmbedding (ArchRProj = archp, 
     colorBy = "cellColData", name = "Clusters_H",
@@ -236,8 +237,6 @@ archp$celltype3[archp$Clusters_H %in% c('C2')] = 'Tregs'
 archp$celltype3[archp$Clusters_H %in% c('C3','C4','C7')] = 'CD4'
 archp$celltype3[archp$Clusters_H %in% c('C1','C8','C9','C10','C11')] = 'CD8'
 
-
-
 umap_p6 = plotEmbedding (ArchRProj = archp, 
     colorBy = "cellColData", name = "celltype3",
      embedding = "UMAP_H")
@@ -246,6 +245,23 @@ pdf (file.path('Plots','celltype_umap_signac_filtered_harmony_on_project_meso_on
 print (umap_p4)
 print (umap_p5)
 print (umap_p6)
+dev.off()
+
+# Check expression of GZMB PRF1 and KLRC1 ####
+metaGroupName = 'celltype3'
+markers = c('GZMB','PRF1','KLRC1')
+p2 <- plotGroups(
+    ArchRProj = archp, 
+    groupBy = metaGroupName, 
+    colorBy = "GeneScoreMatrix", 
+    name = markers,
+    plotAs = "violin",
+    alpha = 0.4,
+    addBoxPlot = TRUE
+   )
+
+pdf (file.path ('Plots','NK_cytotoxicity_markers.pdf'))
+p2
 dev.off()
 
 
@@ -271,11 +287,9 @@ if (!file.exists ('TF_activators_genescore.rds'))
     corGSM_MM = readRDS ('TF_activators_genescore.rds') 
   }
 
-# # Get deviation matrix ####
-if (!exists ('mSE')) mSE = fetch_mat (archp, 'Motif')
 
 # Differential Accessed motifs ####
-metaGroupName = "celltype3"
+metaGroupName = "celltype3_ext"
 force=TRUE
 source (file.path('..','..','PM_scATAC','utils','DAM.R'))
 
@@ -346,23 +360,6 @@ draw (DAM_hm + TF_exp_selected_hm + TF_exp_selected_hm2)
 dev.off()
 
 
-
-tf_markers = c('TOX','FOXP3')
-markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
-markerMotifs = grep ("z:", markerMotifs, value = TRUE)
-#archp = addImputeWeights (archp)
-TF_p = plotEmbedding(
-    ArchRProj = archp, 
-    colorBy = "MotifMatrix", 
-    name = sort(markerMotifs), 
-    embedding = "UMAP_H",
-    pal = palette_deviation,
-    imputeWeights = getImputeWeights(archp)
-)
-
-pdf (file.path ('Plots','top_TF_markers_Tregs_meso_only.pdf'), width = 30, height=18)
-wrap_plots (TF_p, ncol=4)
-dev.off()
 
 
 
