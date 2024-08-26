@@ -6,10 +6,10 @@ library (Seurat)
 library (scran)
 library (ggplot2)
 library (RColorBrewer)
-library(patchwork)
+library (patchwork)
 library (clusterProfiler)
 library (hdWGCNA)
-library(ComplexHeatmap)
+library (ComplexHeatmap)
 library (fgsea)
 library (circlize)
 library (tidyverse)
@@ -81,7 +81,7 @@ if (!file.exists ('srt.rds'))
 
 	srt = FindNeighbors (object = srt, reduction = reductionSave, dims = 1:15, k.param = 30,
                               verbose = TRUE)
-	srt = FindClusters (srt, resolution = .8, verbose = T, n.start = 100)
+	srt = FindClusters (srt, resolution = 1, verbose = T, n.start = 100)
 
 	reductionName = 'umap'
 	fps = fp (srt, gene = c('CD3D','KLRC1','FGFBP2','CD8A','CD4','FOXP3','CXCL13','CTLA4','PDCD1','CXCR5','MKI67'))
@@ -173,17 +173,18 @@ dev.off()
 
 # Annotate cells ####
 srt$celltype2 = 0
-srt$celltype2[srt$seurat_clusters == 11] = 'Tregs'
-srt$celltype2[srt$seurat_clusters == 12] = 'Proliferating'
-srt$celltype2[srt$seurat_clusters == 8] = 'NK_KLRC1'
-srt$celltype2[srt$seurat_clusters == 8] = 'NK_KLRC1'
-srt$celltype2[srt$seurat_clusters %in% c(2,9,7,6)] = 'CD8'
-srt$celltype2[srt$seurat_clusters %in% c(0,3,5,1,10)] = 'CD4'
-srt$celltype2[srt$seurat_clusters %in% c(4)] = 'NK_FGFBP2'
+srt$celltype2[srt$RNA_snn_res.0.8 == 11] = 'Tregs'
+srt$celltype2[srt$RNA_snn_res.0.8 == 12] = 'Proliferating'
+srt$celltype2[srt$RNA_snn_res.0.8 == 8] = 'NK_KLRC1'
+srt$celltype2[srt$RNA_snn_res.0.8 %in% c(2,9,7,6)] = 'CD8'
+srt$celltype2[srt$RNA_snn_res.1 %in% c(6)] = 'CD8_exhausted'
+srt$celltype2[srt$RNA_snn_res.0.8 %in% c(0,3,5,1,10)] = 'CD4'
+srt$celltype2[srt$RNA_snn_res.0.8 %in% c(4)] = 'NK_FGFBP2'
 
 dp = DimPlot(srt, group.by = 'celltype2')
 pdf (file.path('Plots',paste0('celltype_new_dimplot.pdf')))
 dp
+DimPlot (srt, group.by = 'RNA_snn_res.1', label=T)
 dev.off()
 
 
@@ -207,7 +208,211 @@ VlnPlot (srt, features = c('SPRY1','SFTPB','NR4A3','NR2F2'), group.by = 'celltyp
 dev.off()
 
 
+pdf (file.path('Plots',paste0('NK_T_EXT_TFs_featureplot.pdf')))
+reductionName = 'umap'
+fp (srt, gene = c('NR4A3','SPRY1','NR2F2'))
+dev.off()
 
+
+dp = DotPlot (srt,
+  features = c('NR4A1','NR4A2','NR4A3','TOX','TOX2','IRF1'),
+  #col = palette_gene_expression2,
+  group.by = 'celltype2') + gtheme_italic
+pdf (file.path('Plots','TNK_exhaustion_markers_dotplot.pdf'), height=2.6, width=4.6)
+dp
+dev.off()  
+
+dp = DotPlot (srt,
+  features = c('GZMB', 'PRF1', 'GZMH', 'GZMK', 'KLRC1','NCAM1'),
+  #col = palette_gene_expression2,
+  group.by = 'celltype2') + gtheme_italic
+pdf (file.path('Plots','TNK_exhaustion_markers_dotplot.pdf'), height=2.6, width=5)
+dp
+dev.off()  
+
+
+
+# Run correlation to target TF to identify possible regulators ####
+library (hdWGCNA)
+selected_TF = 'NR4A2'
+
+if (!file.exists ('metacells.rds'))
+	{
+	srt <- SetupForWGCNA(
+	  srt,
+	  gene_select = "fraction", # the gene selection approach
+	  fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
+	  wgcna_name = "metacells" # the name of the hdWGCNA experiment
+	)
+	# construct metacells  in each group
+	srt <- MetacellsByGroups(
+	  seurat_obj = srt,
+	  group.by = c("celltype2"), # specify the columns in seurat_obj@meta.data to group by
+	  reduction = 'umap', # select the dimensionality reduction to perform KNN on
+	  k = 50, # nearest-neighbors parameter
+	  max_shared = 25, # maximum number of shared cells between two metacells
+	  ident.group = 'celltype2' # set the Idents of the metacell seurat object
+	)
+	
+	# normalize metacell expression matrix:
+	srt <- NormalizeMetacells (srt)
+	metacells = GetMetacellObject (srt)
+	saveRDS (metacells, 'metacells.rds')
+	} else {
+	metacells = readRDS ('metacells.rds')	
+	}
+
+# metacells = metacells[activeTFs[[2]], ]
+# cor_TF_l = list()
+# for (sam in unique(metacells$sampleID))
+#   {
+#   cor_TF_l[[sam]] = cor (t(as.matrix(metacells@assays$RNA@layers$data[,metacells$sampleID == sam])))
+#   rownames (cor_TF_l[[sam]]) = activeTFs[[2]]
+#   colnames (cor_TF_l[[sam]]) = activeTFs[[2]]
+#   cor_TF_l[[sam]][is.na(cor_TF_l[[sam]])] = 0
+#   cor_TF_l[[sam]] = Heatmap (cor_TF_l[[sam]], name = sam,
+#     row_names_gp = gpar(fontsize = 5),
+#     column_names_gp = gpar(fontsize = 5))
+#   }
+
+# pdf (paste0 ('Plots/selected_TF_exp_corr_heatmaps.pdf'), width = 8,height=9)
+# cor_TF_l
+# dev.off()
+
+#
+#metacells = GetMetacellObject (srt)
+# vf = VariableFeatures (FindVariableFeatures (metacells, nfeat=5000))
+# metacells_assay = metacells@assays$RNA@layers$data
+# rownames (metacells_assay) = rownames(srt)
+# metacells_assay = metacells_assay[unique(c(vf, selected_TF)),]
+
+# enricher_universe = vf
+# #do.fgsea = TRUE
+# gmt_annotations = c(
+# 'h.all.v7.4.symbols.gmt',#,
+# 'c5.bp.v7.1.symbol.gmt'
+# )
+
+# samplesID = unique(metacells$celltype2)
+# gmt_annotation = gmt_annotations[2]
+# force = F
+# top_genes= 300
+# if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_top_genes_',top_genes,'.rds')) | force)
+# 	{
+# 	TF_cor_sample = list()
+# 	for (sam in samplesID)
+# 	  {
+# 	  metacells_assay_sample = metacells_assay[,metacells$celltype2 == sam]
+# 	  TF_cor_sample[[sam]] = lapply (selected_TF, function(x) 
+# 	  	{
+# 	  	tc_cor = t(cor (metacells_assay_sample[x,], t(metacells_assay_sample)))
+# 	  	tc_cor = setNames (tc_cor[,1], rownames (tc_cor))
+# 	  	tc_cor[is.na(tc_cor)] = 0
+# 	  	tc_cor = tc_cor[order(-tc_cor)]
+# 	  	gmt.file = file.path ('..','..','PM_scATAC','files',gmt_annotation)
+# 	  	pathways = read.gmt (gmt.file)
+# 	  	#pathways = split (pathways$gene, pathways$term)
+# 	    message (paste ('EnrichR running module',x)) 
+# 	    egmt = enricher(head (names(tc_cor),top_genes), TERM2GENE=pathways, universe = enricher_universe)
+# 	    egmt@result
+# 	    })
+# 	   #EnrichRResAll[[ann]] = EnrichRResCluster    
+# 	    # fgseaRes = fgseaMultilevel (pathways, 
+# 		# 			tc_cor#, 
+# 		# 			#minSize=15, 
+# 		# 			#maxSize=1500,
+# 		# 			#BPPARAM = NULL
+# 		# 			)
+# 		# fgseaResCol = collapsePathways (fgseaRes, stats = tc_cor, pathway = pathways)
+# 		# fgseaRes[fgseaRes$pathway %in% fgseaResCol$mainPathways]
+# 		}
+# 	saveRDS (TF_cor_sample, paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_top_genes_',top_genes,'.rds'))
+# 	} else {
+# 	TF_cor_sample = readRDS (paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_top_genes_',top_genes,'.rds'))
+# 	}
+
+# samplesID
+
+
+# head (TF_cor_sample[[7]][[1]],10)
+
+ct = c('CD8','CD8_exhausted','CD4','NK_FGFBP2','NK_KLRC1','Tregs')
+selected_TF = 'NR4A2'
+cor_ct = lapply (ct, function(x) 
+	{
+	metacells_assay = metacells@assays$RNA@layers$data
+	rownames (metacells_assay) = rownames(srt)
+	metacells_assay_sample = metacells_assay[,metacells$celltype2 == x]
+	tc_cor = t(cor (metacells_assay_sample[selected_TF,], t(metacells_assay_sample), method='spearman'))
+	tc_cor = setNames (tc_cor[,1], rownames (tc_cor))
+	tc_cor[is.na(tc_cor)] = 0
+	head (tc_cor,5000)
+	#tc_cor
+	tc_cor[order(-tc_cor)]
+	})
+names(cor_ct) = ct
+head (cor_ct[['CD8_exhausted']]['CTLA4'],100)
+head (cor_ct[['NK_KLRC1']]['RUNX3'],100)
+
+cor_ct_df = do.call (cbind, cor_ct)
+cor_ct_df = cor (cor_ct_df)
+rownames(cor_ct_df) = ct
+colnames(cor_ct_df) = ct
+cor_ct_df
+
+pdf (file.path ('Plots',paste0(selected_TF,'_cor.pdf')))
+
+# Correlate to inhibitory molecules in CD8 and NK  ####
+# Import TFs from ATAC
+tfs = readRDS (file.path ('..','scatac_ArchR','Annotations','Motif-Matches-In-Peaks.rds'))
+tfs = colnames(tfs)
+tfs = gsub ('_.*','',tfs)
+tfs = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", tfs)
+
+selected_TF = 'PDCD1'
+ct = 'CD8_exhausted'
+cor_cd8 = lapply (ct, function(x) 
+	{
+	metacells_assay = metacells@assays$RNA@layers$data
+	rownames (metacells_assay) = rownames(srt)
+	metacells_assay_sample = metacells_assay[,metacells$celltype2 == x]
+	tc_cor = t(cor (metacells_assay_sample[selected_TF,], t(metacells_assay_sample), method='spearman'))
+	tc_cor = setNames (tc_cor[,1], rownames (tc_cor))
+	tc_cor[is.na(tc_cor)] = 0
+	head (tc_cor,5000)
+	#tc_cor
+	tc_cor = tc_cor[tfs]
+	tc_cor[order(-tc_cor)]
+	})
+head (cor_cd8[[1]],100)
+cor_cd8[[1]]['NR4A2']
+cor_cd8[[1]] = na.omit (cor_cd8[[1]])
+
+selected_TF = 'KLRC1'
+ct = 'NK_KLRC1'
+cor_nk = lapply (ct, function(x) 
+	{
+	metacells_assay = metacells@assays$RNA@layers$data
+	rownames (metacells_assay) = rownames(srt)
+	metacells_assay_sample = metacells_assay[,metacells$celltype2 == x]
+	tc_cor = t(cor (metacells_assay_sample[selected_TF,], t(metacells_assay_sample), method='spearman'))
+	tc_cor = setNames (tc_cor[,1], rownames (tc_cor))
+	tc_cor[is.na(tc_cor)] = 0
+	head (tc_cor,5000)
+	#tc_cor
+	tc_cor = tc_cor[tfs]
+	tc_cor[order(-tc_cor)]
+	})
+cor_nk[[1]]
+cor_nk[[1]]['NR4A2']
+cor_nk[[1]] = na.omit (cor_nk[[1]])
+intersect (head (names(cor_nk[[1]]),100), head (names(cor_cd8[[1]]),100))
+
+# Export table
+write.csv (data.frame (
+	row.names = names(cor_cd8[[1]]),
+	cd8 = cor_cd8[[1]],
+	nk = cor_nk[[1]][names(cor_cd8[[1]])]), 'nk_cd8_ext_cor.csv')
 
 
 

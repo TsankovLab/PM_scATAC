@@ -47,7 +47,7 @@ dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 k= 30
 metaGroupName = 'Clusters_H'
 
-force = TRUE
+force = FALSE
 if (!file.exists(file.path (hubs_dir, paste0 ('KNNs_',metaGroupName,'k_',k,'.rds'))) | force)
   {
   KNNs = knnGen (
@@ -118,55 +118,15 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))  
   }
 
-
-# Generate matrix of fragment counts of hubs x metagroup ####
-metaGroupName = 'celltype3'
-if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
-  {
-  if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
-    ArchRProj = archp))   
-  hubsSample_mat = matrix (ncol = length(unique(archp@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsSample_mat) = unique(archp@cellColData[,metaGroupName])
-  rownames (hubsSample_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (unique(archp@cellColData[,metaGroupName])))
-  for (sam in unique(archp@cellColData[,metaGroupName]))
-    {
-    pb$tick()  
-    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == sam]]  
-    fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
-    hubsSample_mat[,sam] = fragments_in_sample_in_hubs
-    }
-  frags_in_sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) sum (archp$nFrags[as.character(archp@cellColData[,metaGroupName]) == x]))
-  hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
-  saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
-  } else {
-  hubsSample_mat = readRDS (file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))  
-  }
-hubsSample_mat = as.data.frame (hubsSample_mat)
-
-ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
-hm = Heatmap (
-  scale (t(hubsSample_mat)), 
-#  top_annotation = ha, 
-  column_names_gp = gpar(fontsize = 0),
-  show_column_dend = F,
-  #row_dend_width = unit(5,'mm'),
-  row_dend_side = 'left',
-  col = rev(palette_hubs_accessibility),
-  border=T,
-  name = 'Hubs')
-pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=2.2)
-hm
-dev.off()
-
-  
+  ## Bind peak2genes results with hubs links ####
+hubs_obj$peakLinks
+p2gl = getPeak2GeneLinks (archp, corCutOff = 0.2)[[1]]
+elementMetadata(p2gl) = elementMetadata(p2gl)[,-ncol(elementMetadata(p2gl))]
+colnames(elementMetadata(p2gl)) = 'value'
+hubs_obj$peakLinks2 = unlist(GRangesList(c(hubs_obj$peakLinks, p2gl)))
 
 # Annotate also exhausted CD8 cells and generate heatmap of hubs x metagroup ####
-cd8_ct = read.csv (file.path('..','..','CD8','scatac_ArchR','barcode_annotation.csv')) # get annotation from subclustered CD8 cells
-archp$celltype3_ext = archp$celltype3
-archp$celltype3_ext[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
-archp$celltype3_ext[archp$celltype3_ext %in% c('C1','C2','C4')] = 'CD8'
-metaGroupName = 'celltype3_ext'
+metaGroupName = 'celltype2'
 
 if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
   {
@@ -197,7 +157,7 @@ hm = Heatmap (
 #  top_annotation = ha, 
   column_names_gp = gpar(fontsize = 3),
   show_column_dend = T,
-  #column_km = 2,
+  #column_km = 5,
   #row_dend_width = unit(5,'mm'),
   row_dend_side = 'left',
   col = rev(palette_hubs_accessibility),
@@ -206,6 +166,40 @@ hm = Heatmap (
 pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=2.2, width = 100)
 hm
 dev.off()
+
+# Compare with similarity using all peaks called ####
+if (!exists('pSE')) pSE = ArchR::getMatrixFromProject (archp, 'PeakMatrix')
+pSE = pSE[,rownames(archp@cellColData)]
+metaGroupName = 'celltype2'
+pmat = assays(pSE)[[1]]
+pmat_l = list()
+for (i in unique(archp@cellColData[,metaGroupName])) 
+  {
+  pmat_l[[i]] = data.frame (i = rowMeans (pmat[,as.character(archp@cellColData[,metaGroupName]) == i]))
+  colnames(pmat_l[[i]]) = i
+  }
+pmat_agr = do.call (cbind, pmat_l)
+rownames(pmat_agr) = as.character(rowRanges(pSE))
+pmat_agr_cor = cor (pmat_agr)
+
+hm = Heatmap (
+  scale (t(pmat_agr)), 
+#  top_annotation = ha, 
+  column_names_gp = gpar(fontsize = 0),
+  show_column_dend = T,
+  #column_km = 2,
+  #row_dend_width = unit(5,'mm'),
+  row_dend_side = 'left',
+  col = rev(palette_hubs_accessibility),
+  border=T,
+  name = 'peaks')
+pdf (file.path (hubs_dir,'Plots',paste0('peaks_',metaGroupName,'_heatmap.pdf')), height=2.2, width = 100)
+hm
+dev.off()
+
+
+
+
 
 # Generate matrix of fragment counts of hubs x barcodes ####
 if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))))
@@ -476,7 +470,7 @@ head (tf_enr_l[[ct]],20)
 # Compute differential hub accessibility between CD8 exhausted and rest of CD8 ####
 library (presto)
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
-metaGroupName = 'celltype3_ext'
+metaGroupName = 'celltype2'
 hubsCell_mat_cd8 = hubsCell_mat[,as.character (archp@cellColData[,metaGroupName]) %in% c('CD8','CD8_exhausted')]
 cd8_groups = as.character (archp@cellColData[,metaGroupName])[as.character (archp@cellColData[,metaGroupName]) %in% c('CD8','CD8_exhausted')]
 res = wilcoxauc (log2(hubsCell_mat_cd8+1), cd8_groups)
@@ -487,28 +481,49 @@ res_l = lapply (split (res, res$group), function(x){
   tmp
 })
 
-head (res_l[['CD8_exhausted']],10)
+head (res_l[['CD8_exhausted']],200)
 
 # Plot only hubs up in exhaustion across TNK ####
-hubsSample_mat_ext = hubsSample_mat[head (res_l[['CD8_exhausted']],100)$feature,]
+hubsSample_mat_ext = hubsSample_mat[res_l[['CD8_exhausted']]$feature[res_l[['CD8_exhausted']]$padj < 0.00001],]
+hubsSample_mat_ext = hubsSample_mat[head(res_l[['CD8_exhausted']]$feature,500),]
 #ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
-hm = Heatmap (
+hm = draw(Heatmap (
   scale (t(hubsSample_mat_ext)), 
 #  top_annotation = ha, 
-  column_names_gp = gpar(fontsize = 5),
+  column_names_gp = gpar(fontsize = 3),
   column_names_rot = 45,
   show_column_dend = F,
+  column_km = 5,
   #row_dend_width = unit(5,'mm'),
   row_dend_side = 'left',
   col = rev(palette_hubs_accessibility),
   border=T,
-  name = 'Hubs')
-pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_Ext_up_heatmap.pdf')), height=2.2,width=10)
+  name = 'Hubs'))
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_Ext_up_heatmap.pdf')), height=2.2,width=5)
 hm
 dev.off()
 
+hm@cellColData  
+### TF Enrichment in hubs high in KLRC1+ and CD8 exhausted ####
+tf_enr_l = list()
+selected_hubs = hubs_obj$hubsCollapsed[unlist(c(column_order(hm)[[2]],column_order(hm)[[3]]))]
+selected_hubs = hubs_obj$hubsCollapsed[grep ('SPRY1', hubs_obj$hubsCollapsed$gene)]
+tf_match = getMatches (archp)
+ct = 'CD8'
+bg_peaks = readRDS (file.path('PeakCalls',paste0(ct,'-reproduciblePeaks.gr.rds')))
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+bg_peakSet = rowRanges (tf_match)[queryHits(findOverlaps(tf_match,bg_peaks))]
+
+selected_hubs_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, selected_hubs))]
+#tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+selected_hubs_TF =  hyperMotif (
+  selected_peaks = selected_hubs_peaks, 
+  motifmatch = tf_match)
+head (selected_hubs_TF,30)
+
 # Plot NR4A3 deviation has showing HUB31 higher in KLRC1 and CD8 exhausted cells ####
 tf_markers = c('NR4A3')
+tf_markers = c('NR4A2')
 markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs = grep ("z:", markerMotifs, value = TRUE)
 #archp = addImputeWeights (archp)
@@ -522,9 +537,9 @@ TF_p = plotEmbedding(
 )
 
 # Check expression of NR4A3 ####
-metaGroupName = 'celltype3_ext'
+metaGroupName = 'celltype2'
 #metaGroupName = 'Sample'
-tf = c('NR4A3')
+tf = c('NR4A2')
 if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
@@ -568,16 +583,18 @@ bp
 dev.off()
 
  
-  metaGroupName = 'celltype3_ext2'
+  metaGroupName = 'celltype3'
   markers = 'SPRY1'
+  markers = 'NR4A2'
+  markers = 'TOX2'
   #celltype_markers = c('WT1','CALB2','GATA4','MSLN','KRT5','KRT18','ITLN1','HP','SOX9')
-archp$celltype3_ext2 =  archp$celltype3_ext
-archp$celltype3_ext2[archp$celltype3_ext2 == 'CD4'] =  c('C1_CD4')
-archp$celltype3_ext2[archp$celltype3_ext2 == 'CD8'] =  c('C2_CD8')
-archp$celltype3_ext2[archp$celltype3_ext2 == 'NK_FGFBP2'] =  c('C3_NK_FGFBP2')
-archp$celltype3_ext2[archp$celltype3_ext2 == 'Tregs'] =  c('C4_Tregs')
-archp$celltype3_ext2[archp$celltype3_ext2 == 'CD8_exhausted'] =  c('C5_CD8_exhausted')
-archp$celltype3_ext2[archp$celltype3_ext2 == 'NK_KLRC1'] =  c('C6_NK_KLRC1')
+archp$celltype3 =  archp$celltype2
+archp$celltype3[archp$celltype3 == 'CD4'] =  c('C1_CD4')
+archp$celltype3[archp$celltype3 == 'CD8'] =  c('C2_CD8')
+archp$celltype3[archp$celltype3 == 'NK_FGFBP2'] =  c('C3_NK_FGFBP2')
+archp$celltype3[archp$celltype3 == 'Tregs'] =  c('C4_Tregs')
+archp$celltype3[archp$celltype3 == 'CD8_exhausted'] =  c('C5_CD8_exhausted')
+archp$celltype3[archp$celltype3 == 'NK_KLRC1'] =  c('C6_NK_KLRC1')
 palette_tnk_cells_ext2 = palette_tnk_cells
 names (palette_tnk_cells_ext2) = c('C2_CD8','C1_CD4','C4_Tregs','TFH','C5_CD8_exhausted',
   'C3_NK_FGFBP2','C6_NK_KLRC1','NKlike_Tcells')
@@ -592,45 +609,41 @@ meso_markers <- plotBrowserTrack2 (
       "geneTrack", "hubTrack"),
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-    upstream = 10000,
+    upstream = 50000,
     pal = palette_tnk_cells_ext2,
     #ylim=c(0,0.1),
-    downstream = 100000,
+    downstream = 200000,
     #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
     #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
-    loops = getCoAccessibility (archp, corCutOff = 0.2),
+    loops = getCoAccessibility (archp, corCutOff = 0.25),
     #  returnLoops = TRUE),
     useGroups= NULL,
-    hubs = hubs_obj$peakLinks
+    hubs = hubs_obj$peakLinks2
 )
 plotPDF (meso_markers, ArchRProj = archp, width=5,height=3, name =paste0(paste(markers, collapse='_'),'_coveragePlots.pdf'))
 
+metaGroupName = 'celltype2'
+top_dah = data.frame (
+gene = srt@assays$RNA@data[markers,],
+group = srt@meta.data[,metaGroupName])
+top_dah$group = factor (top_dah$group, levels = 
+  rev (c('CD4','CD8','NK_FGFBP2','Tregs','CD8_exhausted',
+  'NK_KLRC1','TFH')))
+top_dah = na.omit(top_dah)
+bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
+vlp + 
+bxpv + 
+scale_fill_manual (values = palette_tnk_cells) +
+#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+gtheme_no_rot
 
-
-
-
-
-### TF Enrichment in hubs in each cell type ####
-tf_enr_l = list()
-
-tf_match = getMatches (archp)
-bg_peaks = readRDS (file.path('PeakCalls',paste0(ct,'-reproduciblePeaks.gr.rds')))
-colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-bg_peakSet = rowRanges (tf_match)[queryHits(findOverlaps(tf_match,bg_peaks))]
-mega_hubs = hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% head(res_l[[ct]]$feature,100))]
-mega_hubs_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, mega_hubs))]
-#tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
-mega_hubs_TF =  hyperMotif (
-  selected_peaks = mega_hubs_peaks, 
-  motifmatch = tf_match)
-
-tf_enr_l[[ct]] = mega_hubs_TF
-}
-names (tf_enr_l)
+pdf (file.path ('Plots', paste0('scrna_',markers,'_boxplots.pdf')), height=4, width=4)
+bp
+dev.off()
 
 
 # Check DAH between NK KLRC1+ and CD8 exhausted to find commonalities ####
 cd8_ct = read.csv (file.path('..','..','CD8','scatac_ArchR','barcode_annotation.csv')) # get annotation from subclustered CD8 cells
-archp$celltype3_ext = archp$celltype3
-archp$celltype3_ext[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
-archp$celltype3_ext[archp$celltype3_ext %in% c('C1','C2','C4')] = 'CD8'
+archp$celltype2 = archp$celltype3
+archp$celltype2[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
+archp$celltype2[archp$celltype2 %in% c('C1','C2','C4')] = 'CD8'

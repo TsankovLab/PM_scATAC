@@ -88,8 +88,12 @@ palette_celltypes_normal = setNames(brewer.pal(11,'Paired'),rev(c('AT1','AT2','B
 palette_expression = rev (as.character(paletteer::paletteer_c("grDevices::Purple-Blue",100)))
 
 palette_deviation = paletteer::paletteer_c("grDevices::PuRd",20)
+palette_deviation = paletteer::paletteer_c("grDevices::PuRd",20)
 palette_deviation_centered = colorRamp2(c(-4,-2,0,2,4), c(palette_deviation[1],palette_deviation[45],palette_deviation[50],palette_deviation[55],palette_deviation[100]))
+palette_deviation_centered = colorRamp2(c(-1,0,0,1,2,3,4), c('white','white','grey','#F69322FF','#C73370FF','purple','black'))
+palette_deviation_fun = function(x) {return (colorRamp2(c(-max(abs(x)),-max(abs(x)/2), 0,max(abs(x)/2),max(abs(x))), c('white','white','white','#C73370FF','purple')))}
 palette_enrichment = rev (as.character(paletteer::paletteer_c("grDevices::Purples 3",100)))
 palette_hubs_accessibility = paletteer_c("ggthemes::Classic Orange-White-Blue",20)
 palette_pseudotime = colorRamp2(c(-4,0,4), c('white','white','black'))
+palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('white','white','black'))
 

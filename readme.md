@@ -42,7 +42,9 @@ install.packages ('RColorBrewer')
 install.packages ('survminer')
 #devtools::install_github("ricardo-bion/ggradar")
 BiocManager::install("RTCGA")
-BiocManager::install("liftOver")
+BiocManager::install("liftOver")  
+install.packages("scCustomize")  
+
 
 
 
