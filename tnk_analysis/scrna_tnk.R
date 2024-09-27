@@ -22,11 +22,11 @@ dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
-source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
-source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
-source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','palettes.R'))
+source (file.path('..','..','git_repo','utils','load_packages.R'))
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
 
 sample_names = c(
     'P1', # p786
@@ -230,6 +230,13 @@ pdf (file.path('Plots','TNK_exhaustion_markers_dotplot.pdf'), height=2.6, width=
 dp
 dev.off()  
 
+dp = DotPlot (srt,
+  features = c('NR4A2','JUND','RUNX3','EOMES','JUN','JUNB','FOSB','REL','IRF1'),
+  #col = palette_gene_expression2,
+  group.by = 'celltype2') + gtheme_italic
+pdf (file.path('Plots','TNK_exhaustion_markers_dotplot.pdf'), height=2.6, width=5)
+dp
+dev.off()  
 
 
 # Run correlation to target TF to identify possible regulators ####
@@ -261,80 +268,6 @@ if (!file.exists ('metacells.rds'))
 	} else {
 	metacells = readRDS ('metacells.rds')	
 	}
-
-# metacells = metacells[activeTFs[[2]], ]
-# cor_TF_l = list()
-# for (sam in unique(metacells$sampleID))
-#   {
-#   cor_TF_l[[sam]] = cor (t(as.matrix(metacells@assays$RNA@layers$data[,metacells$sampleID == sam])))
-#   rownames (cor_TF_l[[sam]]) = activeTFs[[2]]
-#   colnames (cor_TF_l[[sam]]) = activeTFs[[2]]
-#   cor_TF_l[[sam]][is.na(cor_TF_l[[sam]])] = 0
-#   cor_TF_l[[sam]] = Heatmap (cor_TF_l[[sam]], name = sam,
-#     row_names_gp = gpar(fontsize = 5),
-#     column_names_gp = gpar(fontsize = 5))
-#   }
-
-# pdf (paste0 ('Plots/selected_TF_exp_corr_heatmaps.pdf'), width = 8,height=9)
-# cor_TF_l
-# dev.off()
-
-#
-#metacells = GetMetacellObject (srt)
-# vf = VariableFeatures (FindVariableFeatures (metacells, nfeat=5000))
-# metacells_assay = metacells@assays$RNA@layers$data
-# rownames (metacells_assay) = rownames(srt)
-# metacells_assay = metacells_assay[unique(c(vf, selected_TF)),]
-
-# enricher_universe = vf
-# #do.fgsea = TRUE
-# gmt_annotations = c(
-# 'h.all.v7.4.symbols.gmt',#,
-# 'c5.bp.v7.1.symbol.gmt'
-# )
-
-# samplesID = unique(metacells$celltype2)
-# gmt_annotation = gmt_annotations[2]
-# force = F
-# top_genes= 300
-# if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_top_genes_',top_genes,'.rds')) | force)
-# 	{
-# 	TF_cor_sample = list()
-# 	for (sam in samplesID)
-# 	  {
-# 	  metacells_assay_sample = metacells_assay[,metacells$celltype2 == sam]
-# 	  TF_cor_sample[[sam]] = lapply (selected_TF, function(x) 
-# 	  	{
-# 	  	tc_cor = t(cor (metacells_assay_sample[x,], t(metacells_assay_sample)))
-# 	  	tc_cor = setNames (tc_cor[,1], rownames (tc_cor))
-# 	  	tc_cor[is.na(tc_cor)] = 0
-# 	  	tc_cor = tc_cor[order(-tc_cor)]
-# 	  	gmt.file = file.path ('..','..','PM_scATAC','files',gmt_annotation)
-# 	  	pathways = read.gmt (gmt.file)
-# 	  	#pathways = split (pathways$gene, pathways$term)
-# 	    message (paste ('EnrichR running module',x)) 
-# 	    egmt = enricher(head (names(tc_cor),top_genes), TERM2GENE=pathways, universe = enricher_universe)
-# 	    egmt@result
-# 	    })
-# 	   #EnrichRResAll[[ann]] = EnrichRResCluster    
-# 	    # fgseaRes = fgseaMultilevel (pathways, 
-# 		# 			tc_cor#, 
-# 		# 			#minSize=15, 
-# 		# 			#maxSize=1500,
-# 		# 			#BPPARAM = NULL
-# 		# 			)
-# 		# fgseaResCol = collapsePathways (fgseaRes, stats = tc_cor, pathway = pathways)
-# 		# fgseaRes[fgseaRes$pathway %in% fgseaResCol$mainPathways]
-# 		}
-# 	saveRDS (TF_cor_sample, paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_top_genes_',top_genes,'.rds'))
-# 	} else {
-# 	TF_cor_sample = readRDS (paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_top_genes_',top_genes,'.rds'))
-# 	}
-
-# samplesID
-
-
-# head (TF_cor_sample[[7]][[1]],10)
 
 ct = c('CD8','CD8_exhausted','CD4','NK_FGFBP2','NK_KLRC1','Tregs')
 selected_TF = 'NR4A2'
@@ -409,10 +342,14 @@ cor_nk[[1]] = na.omit (cor_nk[[1]])
 intersect (head (names(cor_nk[[1]]),100), head (names(cor_cd8[[1]]),100))
 
 # Export table
-write.csv (data.frame (
+nk_cd8_ext_cor = data.frame (
 	row.names = names(cor_cd8[[1]]),
 	cd8 = cor_cd8[[1]],
-	nk = cor_nk[[1]][names(cor_cd8[[1]])]), 'nk_cd8_ext_cor.csv')
+	nk = cor_nk[[1]][names(cor_cd8[[1]])])
+write.csv (nk_cd8_ext_cor, 'nk_cd8_ext_cor.csv')
+
+nk_cd8_ext_cor$mean_cor = rowMeans (nk_cd8_ext_cor)
+head (nk_cd8_ext_cor[order(-nk_cd8_ext_cor$mean_cor),],20)
 
 
 

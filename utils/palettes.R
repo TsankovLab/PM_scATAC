@@ -54,8 +54,6 @@ palette_cnv_fun = colorRamp2(c(-.5,0,.5), palette_cnv)
 
 ov_pal = rev(paletteer::paletteer_c("grDevices::Purple-Blue",100))
 
-palette_module_correlation = paletteer::paletteer_c("pals::kovesi.diverging_bwr_40_95_c42",100)
-palette_module_correlation_fun = colorRamp2(c(-1,0,1), c('#2B5C8AFF','white','#9E3D22FF'))
 
 # Set palette
 palette_bulk = setNames (as.character(paletteer::paletteer_d("rcartocolor::ArmyRose")[c(1,2,5,7,3,1,7)]), c('Epithelioid','Biphasic-E','Biphasic-S','Sarcomatoid','Biphasic','E_score','S_score'))
@@ -97,3 +95,9 @@ palette_hubs_accessibility = paletteer_c("ggthemes::Classic Orange-White-Blue",2
 palette_pseudotime = colorRamp2(c(-4,0,4), c('white','white','black'))
 palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('white','white','black'))
 
+palette_expression_correlation = paletteer::paletteer_c("ggthemes::Green-Blue-White Diverging",100)
+palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#24693DFF','#F6F9FCFF','#4F7FAAFF'))
+
+palette_deviation_correlation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
+palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#727C83FF','#FDFDFDFF','#AE123AFF'))
+#palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#2B5C8AFF','white','#9E3D22FF'))

@@ -9,17 +9,17 @@ dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
-source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
-source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
-source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','palettes.R'))
+source (file.path('..','..','git_repo','utils','load_packages.R'))
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
 
 # Load functions for hub detection ####
-source (file.path('..','PM_scATAC','utils','knnGen.R'))
-source (file.path('..','PM_scATAC','utils','addCoax.R'))
-source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
-source (file.path('..','PM_scATAC','utils','hubs_track.R'))
+source (file.path('..','git_repo','utils','knnGen.R'))
+source (file.path('..','git_repo','utils','addCoax.R'))
+source (file.path('..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
 addArchRThreads(threads = 8) 
@@ -155,14 +155,14 @@ if (!all(file.exists(file.path('Annotations',
   c('Motif-Matches-In-Peaks.rds',
     'Motif-Positions-In-Peaks.rds',
     'Motif-In-Peaks-Summary.rds')))))
-source (file.path('..','..','PM_scATAC','chromVAR.R'))
+source (file.path('..','..','git_repo','utils','chromVAR.R'))
 
 
 
 # Find activating and repressing TFs #### 
 if (!file.exists ('TF_activators_genescore.rds')) 
   {
-    source (file.path('..','..','PM_scATAC','activeTFs.R'))
+    source (file.path('..','..','git_repo','utils','activeTFs.R'))
   } else {
     corGSM_MM = readRDS ('TF_activators_genescore.rds') 
   }

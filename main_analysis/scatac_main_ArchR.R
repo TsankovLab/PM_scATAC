@@ -637,7 +637,7 @@ if (run_chromVAR_analysis)
     })
   DAM_df = Reduce (rbind ,DAM_top_list)
   
-  devMethod = 'ArchR'
+devMethod = 'ArchR'
  if (devMethod == 'ArchR')
     {
     TF_db='Motif'
@@ -704,9 +704,9 @@ dev.off()
 
 ### Co-expression of TFs #### 
 metaGroupName = 'celltype_revised'
-if (!any (ls() == 'mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = 'MotifMatrix', logFile=NULL)
-mSE = mSE[, archp$cellNames]
-all (colnames(mSE) == rownames(archp))
+if (!any (ls() == 'mSE')) mSE = fetch_mat (archp, 'Motif')
+
+all (colnames(mSE) == rownames(archp@cellColData))
 
 # # Get deviation matrix ####
 mMat = assays (mSE)[[1]]

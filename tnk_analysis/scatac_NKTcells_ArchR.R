@@ -10,11 +10,11 @@ dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
-source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
-source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
-source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','palettes.R'))
+source (file.path('..','..','git_repo','utils','load_packages.R'))
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
 
 # Set # of threads and genome reference ####
 addArchRThreads(threads = 8) 
@@ -260,7 +260,7 @@ dev.off()
 # Check expression of GZMB PRF1 and KLRC1 ####
 metaGroupName = 'celltype2'
 archp = addImputeWeights (archp)
-markers = c('GZMA','GZMB','PRF1','PDCD1','CTLA4','TIGIT','KLRC1')
+markers = c('GZMA','GZMB','PRF1','PDCD1','HAVCR2','CTLA4','TIGIT','KLRC1')
 p2 <- plotGroups(
     ArchRProj = archp, 
     groupBy = metaGroupName, 
@@ -564,16 +564,18 @@ mMat_mg = t (mMat_mg)
 
 ext_vs_ctx_mean = rowMeans (mMat_mg[,c('CD8_exhausted','NK_KLRC1')])
 ext_vs_ctx_mean = ext_vs_ctx_mean[order (-ext_vs_ctx_mean)]
-selected_TF = names(head(ext_vs_ctx_mean,100))
+selected_ext_TF = names(ext_vs_ctx_mean[names(ext_vs_ctx_mean) %in% tf_ext])
+
+write.csv (selected_ext_TF, 'top_TF_dual_ext.csv')
 #mMat_mg = mMat_mg[names (DAM_list),]
 
-ps = log2(as.data.frame (AverageExpression (srt, features = selected_TF, group.by = metaGroupName)[[1]]) +1)
+ps = log2(as.data.frame (AverageExpression (srt, features = selected_ext_TF, group.by = metaGroupName)[[1]]) +1)
 colnames (ps) = gsub ('-','_',colnames(ps))
 #ps = ps[, colnames(DAM_hm@matrix)]
-ps_tf = ps[selected_TF,c('CD8_exhausted','NK_KLRC1')]
+ps_tf = ps[selected_ext_TF,c('CD8_exhausted','NK_KLRC1')]
 ps_tf_mean = rowMeans(ps_tf)
 top_exp_tf = head(names(ps_tf_mean)[order(-ps_tf_mean)],10)
-mMat_mg = mMat_mg[selected_TF,c('CD8_exhausted','NK_KLRC1')]
+mMat_mg = mMat_mg[selected_ext_TF,c('CD8_exhausted','NK_KLRC1')]
 
 # Import table of cor tfs to KLRC1 and PDCD1 in nk and cd8
 nk_cd8_ext_cor = read.csv (file.path('..','scrna','nk_cd8_ext_cor.csv'), row.names=1)
@@ -604,13 +606,13 @@ TF_hm = Heatmap (mMat_mg,
           #column_km = 20,
           #col = pals_heatmap[[5]],
           cluster_columns=F,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 0, fontface = 'italic'),
+          row_names_gp = gpar(fontsize = 2, fontface = 'italic'),
           column_names_gp = gpar(fontsize = 8),
           column_names_rot = 45,
           name = 'chromVAR',
           #rect_gp = gpar(col = "white", lwd = .5),
           border=TRUE,
-          col = palette_deviation_fun (mMat_mg[selected_TF,])#,
+          col = palette_deviation_fun (mMat_mg[selected_ext_TF,])#,
           #width = unit(1, "cm")
           #right_annotation = motif_ha
           )
@@ -634,7 +636,7 @@ TF_hm = Heatmap (mMat_mg,
 #         border=T,
 #         width = unit(2, "cm"))
 
-pdf (file.path ('Plots','chromvar_rna_expression_NK_CD8_EXT_heatmaps.pdf'), width = 3,height=3)
+pdf (file.path ('Plots','chromvar_rna_expression_NK_CD8_EXT_heatmaps.pdf'), width = 3,height=8)
 draw (TF_hm)# + TF_exp_selected_hm2)
 dev.off()
    
@@ -836,8 +838,129 @@ ps_sp
 dev.off()
 
 
+# Compare similarity of celltypes ATAC vs RNA ####
+
+
+# # Get deviation matrix ####
+if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+
+# Subset only for expressed TFs ####
+metaGroupName = 'celltype2'
+ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
+min_exp = 0.1
+ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
+selected_TF = rownames(ps)[rowSums(ps) > 0]
+mMat = mMat[selected_TF,]
+mMat = as.data.frame (t(mMat))
+mMat$metaGroup = as.character (archp@cellColData[,metaGroupName])
+mMat = aggregate (.~ metaGroup, mMat, mean)
+rownames (mMat) = mMat[,1]
+mMat = mMat[,-1]
+          
+
+mMat_cor = cor (t(mMat))
+hm_dev = draw (Heatmap (mMat_cor, 
+  rect_gp = gpar(type = "none"),
+  clustering_distance_rows='pearson' ,
+  clustering_distance_columns = 'pearson', 
+  col=palette_deviation_cor_fun, 
+  border=F,
+  ,
+  cell_fun = function(j, i, x, y, w, h, fill) {
+        if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+            grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+        }}))
+
+pdf (file.path('Plots','celltypes_similarity_triangle_deviations_heatmap.pdf'),width = 4,height=3.2)
+print (hm_dev)
+dev.off()
+
+# correlate cell types using selected TF in scrna ####
+metaGroupName = 'celltype2'
+nfeats = selected_TF
+ps = log2(as.data.frame (AverageExpression (srt, features = nfeats, group.by = metaGroupName)[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+ps = ps[,rownames(mMat)]
+ps_cor = cor (t(scale(t(ps))))
+ps_cor
+
+ps_cor = ps_cor[row_order(hm_dev),row_order(hm_dev)]
+ps_cor = ps_cor[rev(seq(nrow(ps_cor))),rev(seq(nrow(ps_cor)))]
+# triangle heatmap
+#ps_cor = ps_cor[rownames(ps_cor) != 'Proliferating', colnames(ps_cor) != 'Proliferating']
+hm = draw (Heatmap (ps_cor, 
+  rect_gp = gpar(type = "none"),
+  cluster_columns = F,
+  cluster_rows = F,
+  #clustering_distance_rows='pearson' ,
+  #clustering_distance_columns = 'pearson', 
+  col=palette_expression_cor_fun, 
+  border=F,
+  ,
+  cell_fun = function(j, i, x, y, w, h, fill) {
+        if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+            grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+        }}))
+pdf (file.path('Plots','celltypes_similarity_triangle_expression_heatmap.pdf'),width = 3.7,height=3)
+print (hm)
+dev.off()
 
 
 
+#### Load Additional Libraries ####
+library(dplyr)
+library(correlation)
+library(ggcorrplot)
+
+#### Create Correlation Matrix ####
+#### Plot It ####
+cor_rna = ggcorrplot(ps_cor, 
+           type = "upper",
+           lab = T,colors = c('#24693DFF','#FCFDFEFF','#2A5783FF'),
+           show.diag = F) + theme_void()
+
+cor_dev = ggcorrplot(mMat_cor, 
+           type = "lower",
+           lab = T, col = c('#AE123AFF','#FFF7F6FF','#4F5864FF'),
+           show.diag = T) + theme_void()
+
+pdf (file.path('Plots','celltypes_similarity_triangle_expression_heatmap.pdf'),width = 3.7,height=3)
+cor_rna
+cor_dev
+dev.off()
 
   
+# correlate cell types using variable genes in scrna ####
+metaGroupName = 'celltype2'
+nfeats = selected_TF
+ps = log2(as.data.frame (AverageExpression (srt, features = VariableFeatures(srt), group.by = metaGroupName)[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+ps = ps[,rownames(mMat)]
+ps_cor = cor (t(scale(t(ps))))
+#ps_cor = cor (ps)
+ps_cor
+
+ps_cor = ps_cor[row_order(hm_dev),row_order(hm_dev)]
+ps_cor = ps_cor[rev(seq(nrow(ps_cor))),rev(seq(nrow(ps_cor)))]
+# triangle heatmap
+#ps_cor = ps_cor[rownames(ps_cor) != 'Proliferating', colnames(ps_cor) != 'Proliferating']
+hm = draw (Heatmap (ps_cor, 
+  rect_gp = gpar(type = "none"),
+  cluster_columns = F,
+  cluster_rows = F,
+  #clustering_distance_rows='pearson' ,
+  #clustering_distance_columns = 'pearson', 
+  col=palette_expression_cor_fun, 
+  border=F,
+  ,
+  cell_fun = function(j, i, x, y, w, h, fill) {
+        if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+            grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+        }}))
+pdf (file.path('Plots','celltypes_similarity_triangle_variable_features_expression_heatmap.pdf'),width = 3.7,height=3)
+print (hm)
+dev.off()
+
+

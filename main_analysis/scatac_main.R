@@ -34,10 +34,10 @@ setwd (projdir)
 
 
 #devtools::install_github("immunogenomics/presto") #needed for DAA
-source ('../../PM_scATAC/useful_functions.R')
-source ('../../PM_scATAC/ggplot_aestetics.R')
-source ('../../PM_scATAC/scATAC_functions.R')
-source ('../../PM_scATAC/palettes.R')
+source ('../../git_repo/utils/useful_functions.R')
+source ('../../git_repo/utils/ggplot_aestetics.R')
+source ('../../git_repo/utils/scATAC_functions.R')
+source ('../../git_repo/utils/palettes.R')
 
 set.seed(1234)
 addArchRThreads (threads = 8) 
@@ -383,7 +383,7 @@ if (run_peakCall)
 run_chromVAR = TRUE
 
 if (run_chromVAR)
-  {  
+  {
   archp = addBgdPeaks (archp, force= FALSE)
   archp = addMotifAnnotations (ArchRProj = archp, 
       motifSet = "cisbp", 

@@ -1,9 +1,9 @@
 
 # Load functions for hub detection ####
-source (file.path('..','PM_scATAC','utils','knnGen.R'))
-source (file.path('..','PM_scATAC','utils','addCoax.R'))
-source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
-source (file.path('..','PM_scATAC','utils','hubs_track.R'))
+source (file.path('..','..','git_repo','utils','knnGen.R'))
+source (file.path('..','..','git_repo','utils','addCoax.R'))
+source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
 addArchRThreads(threads = 8) 
@@ -866,7 +866,7 @@ dev.off()
 
 
 # Overlap hubs with CNV data from TCGA to prioritize oncogenic hubs ####
-source ('../../PM_scATAC/compile_TCGA_CNV_data.R')
+source ('../../git_repo/tumor_analysis/compile_TCGA_CNV_data.R')
 
 cnv_hubs = matrix (ncol = length(meso_CNV_gr_hg38), nrow = length(hubs_obj$hubsCollapsed))
 rownames (cnv_hubs) = as.character(hubs_obj$hubsCollapsed)
@@ -882,7 +882,7 @@ for (pat in seq_along(meso_CNV_gr_hg38))
   cnv_hubs[,pat][cnv_hubs[,pat] > loss & cnv_hubs[,pat] < gain] = 0
   }
 cnv_hubs_sum = rowMeans (cnv_hubs)
-cnv_hubs_df = data.frame(hub = factor (names(cnv_hubs_sum), levels = names(cnv_hubs_sum)[order (-cnv_hubs_sum)]), cnv = cnv_hubs_sum)
+cnv_hubs_df = data.frame (hub = factor (names(cnv_hubs_sum), levels = names(cnv_hubs_sum)[order (-cnv_hubs_sum)]), cnv = cnv_hubs_sum)
 rownames (cnv_hubs_df) = hubs_obj$hubs_id[match(cnv_hubs_df$hub, as.character(hubs_obj$hubsCollapsed))]
 
 bp = ggplot (cnv_hubs_df, aes (x = hub, y = cnv)) + 
@@ -971,7 +971,7 @@ res_filtered = head (res_filtered$feature[order (-res_filtered$cnv)], 30)
 
 ## Generate circos plot for showing hubs on recurrent CNVs ####
 # source script to load TCGA_CNV data
-source ('../../PM_scATAC/compile_TCGA_CNV_data.R')
+source (file.path('..','..','git_repo','tumor_analysis','compile_TCGA_CNV_data.R'))
 
 # Add labels of hubs in top amplified regions and differentially accessed in tumors ####
 cnv_hubs_df2 = cnv_hubs_df2[cnv_hubs_df2$avgExpr_sign > 1, ]
@@ -1057,4 +1057,81 @@ head (hubs_obj$hubs_id[order (-mut_density_hubs)],10)
 
 
 
+### Find common oncogenic hubs  
+# # Compute differential hub accessibility DHA of subsampled tumors vs normal ####
+library (presto)
+archp$status = ifelse (archp$Sample2 == 'normal_pleura','normal','tumor')
+# Subsample
+tumor_barcodes_sub = unlist(lapply (unique(archp$Sample2), function(x) sample (rownames(archp@cellColData)[archp$Sample2 == x], 100 , replace=TRUE)))
+tumor_barcodes_sub = unique (tumor_barcodes_sub)
+res = wilcoxauc (log2(hubsCell_mat[,tumor_barcodes_sub]+1), archp$status[match(tumor_barcodes_sub, rownames(archp@cellColData))])
+res = res[res$group == 'tumor',]
+head (res [order(-res$logFC),],10)
+
+# Run DAH each tumor vs normal and then take intersection
+dah_comp = as.list(unique (archp$Sample2))
+dah_comp = lapply (dah_comp, function(x)  c(x, 'normal_pleura'))
+dah_comp = dah_comp[-11]
+res = lapply (dah_comp, function(x) wilcoxauc (log2(hubsCell_mat[,archp$Sample2 %in% x]+1), archp$status[archp$Sample2 %in% x]))
+
+head (res[[1]][order(res[[1]]$padj),])
+
+# Plot CNV vs DAH ####
+cnv_hubs_df = cbind (cnv_hubs_df, res[match(rownames(cnv_hubs_df), res$feature),])
+cnv_hubs_df$avgExpr_sign = cnv_hubs_df$avgExpr * sign (cnv_hubs_df$logFC)
+cnv_hubs_df$label = ''
+cnv_hubs_df = na.omit (cnv_hubs_df)
+cnv_hubs_df$label[cnv_hubs_df$cnv > 0 & cnv_hubs_df$logFC > 2] = rownames(cnv_hubs_df)[cnv_hubs_df$cnv > 0 & cnv_hubs_df$logFC > 2]
+sp = ggplot (cnv_hubs_df, aes (x = cnv, y = logFC, label=label)) + 
+geom_point () + theme_light() + geom_text_repel()
+
+pdf (file.path('Plots','hubs_overlapping_CNV_DAH.pdf'))
+sp
+dev.off()
+
+
+
+# Add labels of hubs in top amplified regions and differentially accessed in tumors ####
+cnv_hubs_df2 = cnv_hubs_df#[cnv_hubs_df$avgExpr_sign > 1, ]
+cnv_hubs_df2 = cnv_hubs_df2[order(-cnv_hubs_df2$logFC),]
+head (cnv_hubs_df2)
+cnv_hubs = rbind (head (cnv_hubs_df2,20), tail (cnv_hubs_df2,20))
+cnv_hubs$seqnames = sapply (as.character(cnv_hubs$hub), function(x) unlist(strsplit(x, '\\:'))[1])
+cnv_hubs$start = sapply (as.character(cnv_hubs$hub), function(x) unlist(strsplit(x, '\\-'))[1])
+cnv_hubs$start = as.numeric(sapply (as.character(cnv_hubs$start), function(x) unlist(strsplit(x, '\\:'))[2]))
+cnv_hubs$end = as.numeric(sapply (as.character(cnv_hubs$hub), function(x) unlist(strsplit(x, '\\-'))[2]))
+cnv_hubs = cnv_hubs[,c('seqnames','start','end','feature')]
+cnv_hubs$logFC = res$logFC[match(rownames(cnv_hubs), res$feature)]
+cnv_hubs = cnv_hubs[cnv_hubs$seqnames != 'chrX',]
+
+# hubs track
+cnv_hubs_df_track = cnv_hubs_df
+cnv_hubs_df_track$seqnames = sapply (as.character(cnv_hubs_df_track$hub), function(x) unlist(strsplit(x, '\\:'))[1])
+cnv_hubs_df_track$start = sapply (as.character(cnv_hubs_df_track$hub), function(x) unlist(strsplit(x, '\\-'))[1])
+cnv_hubs_df_track$start = as.numeric(sapply (as.character(cnv_hubs_df_track$start), function(x) unlist(strsplit(x, '\\:'))[2]))
+cnv_hubs_df_track$end = as.numeric(sapply (as.character(cnv_hubs_df_track$hub), function(x) unlist(strsplit(x, '\\-'))[2]))
+cnv_hubs_df_track = cnv_hubs_df_track[,c('seqnames','start','end','logFC')]
+
+col_fun = colorRamp2(c(-1, 0, 1), c("green", "white", "red"))
+dah_pal = c('TRUE' = 'purple','FALSE' = 'darkgreen')
+
+pdf (file.path ('Plots','CNV_hubs_circos.pdf'), 5,5)
+circos.initializeWithIdeogram (species = "hg38", chromosome.index= paste0('chr',1:22))
+circos.genomicTrack (cnv_mat_avg,
+    panel.fun = function(region, value, ...) {
+        circos.genomicRect(region, value, ytop.column = 1, ybottom = 0, bg.border = rep(0, 22),
+            col = ifelse(value[[1]] > 0, "red", "blue"), border=NA, ...)
+        #circos.lines(CELL_META$cell.xlim, c(0, 0), lty = 2, col = "#00000040")
+})
+# circos.genomicTrack (cnv_hubs_df_track,
+#     panel.fun = function(region, value, ...) {
+#         circos.genomicRect(region, value, ytop.column = 1, ybottom = 0, 
+#             col = ifelse(value[[1]] > 0, "red", "blue"), border=NA, ...)
+#         #circos.lines(CELL_META$cell.xlim, c(0, 0), lty = 2, col = "#00000040")
+# })
+# circos.genomicHeatmap(cnv_hubs_df_track, col = col_fun, side = "inside", border = "white")
+circos.genomicLabels(cnv_hubs, labels.column = 4, side = "inside",
+    col = dah_pal[as.character(cnv_hubs[[5]] > 0)], line_col = 'grey22',padding = 0.6, cex=0.5)
+
+dev.off()
 
