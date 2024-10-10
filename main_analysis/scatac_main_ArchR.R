@@ -28,16 +28,16 @@ packages = c(
 lapply(packages, require, character.only = TRUE)
 
 ####### ANALYSIS of TUMOR compartment #######
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 
 #devtools::install_github("immunogenomics/presto") #needed for DAA
-source ('../../PM_scATAC/useful_functions.R')
-source ('../../PM_scATAC/ggplot_aestetics.R')
-source ('../../PM_scATAC/scATAC_functions.R')
-source ('../../PM_scATAC/palettes.R')
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
 
 set.seed (1234)
 addArchRThreads (threads = 8) 
@@ -65,265 +65,17 @@ sample_names = c(
 
 # Load RNA
 srt = readRDS ('../scrna/srt.rds')
+srt$celltype_simplified2[srt$celltype_simplified2 == 'pDC'] = 'pDCs'
 sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
 
-# Load last istance
-if (!file.exists ('Save-ArchR-Project.rds'))
-   {
-    # Fix the fragment file of multiome sample by removing the header 
-    #system ('zcat atac_fragments.tsv.gz | grep -v ^\# | bgzip > atac_fragments_fixed.tzv.gz')
-    
-    fragment_paths =c(
-    '/ahg/regevdata/projects/lungCancerBueno/10x/191121/scATAC_Pt_mesothelioma_CD45_neg_cellranger_atac_v1.2/138_ATACseq_CD45_neg_Lung_ATAC/outs/fragments.tsv.gz',
-    '/ahg/regevdata/projects/lungCancerBueno/10x/200128/scATAC_Pt811_mesothelioma_CD45pos_neg_cellranger_atac_v1.2/161_ATACseq_Pt811_mesothelioma_CD45pos_CD45neg_ATAC/outs/fragments.tsv.gz',
-    '/ahg/regevdata/projects/lungCancerBueno/10x/200331/10X_Single_Cell_ATAC/wangy33.u.hpc.mssm.edu/10X_Single_Cell_RNA/TD01218_Robby_AlexTsankov/202_ATAC_826CD45pos_826CD45neg/outs/fragments.tsv.gz',  
-    '/ahg/regevdata/projects/lungCancerBueno/10x/200721/scATAC_Pt846/10X_Single_Cell_RNA/TD01729_AlexTsankov/846-MesoPool-CD45-pos-CD45-neg-nuclei/outs/fragments.tsv.gz',
-    '/ahg/regevdata/projects/lungCancerBueno/10x/200911/scATAC_Pt848/10X_Single_Cell_ATAC/TD01814_AlexTsankov/848/outs/fragments.tsv.gz',
-    '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_10/230510/P10_scATAC/cellranger_output/ALTS03_Zhao6ATAC_0_v1/fragments.tsv.gz',
-    '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_11/230714/ZHAO8mesotheliomaATAC/cellranger_output/ALTS04_Zhao8ATAC_0_v1/fragments.tsv.gz',
-    '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_12/230718/ZHAO9mesotheliomaATAC/cellranger_output/ALTS04_Zhao9ATAC_0_v1/fragments.tsv.gz',
-    '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_13/231018/ZHAO12mesotheliomaATAC/cellranger_output/ALTS04_Zhao12ATAC_0_v1/fragments.tsv.gz',
-    '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_14/240109/ZHAO13mesotheliomaATAC/cellranger_output/ALTS04_Zhao13ATAC_0_v1/fragments.tsv.gz'#,#,
-    #'/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_1/RPL_280_neg_1/outs/fragments.tsv.gz',
-    #'/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_2/RPL_280_neg_2/outs/fragments.tsv.gz',
-    #'/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_Epi_1/RPL_Epi_1/outs/fragments.tsv.gz',
-    #'/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_Epi_2/RPL_Epi_2/outs/fragments.tsv.gz'#,
-    #"/ahg/regevdata/projects/ICA_Lung/10x/200116/wangy33.u.hpc.mssm.edu/10X_Single_Cell_RNA/TD01396_AlexTsankov/aDcd45n/outs/fragments.tsv.gz"
-    )
-     
-    
-    ArrowFiles_dir = '/ahg/regevdata/projects/ICA_Lung/Bruno/ArrowFiles/'
-    if (!all (paste0(sample_names,'.arrow') %in% list.files(ArrowFiles_dir)))
-      {
-      #setwd (projdir)  
-      ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
-      sampleNames = sample_names,
-      minTSS = 4, #Dont set this too high because you can always increase later
-      minFrags = 1000,
-      maxFrags = Inf,
-      addTileMat = TRUE,
-      addGeneScoreMat = TRUE,
-      force = TRUE,
-      subThreading = T
-      )
-      } else {
-      ArrowFiles = paste0(ArrowFiles_dir, paste0(sample_names,'.arrow'))
-      }
-
-  archp = ArchRProject (
-    ArrowFiles = ArrowFiles, 
-    outputDirectory = projdir,
-    copyArrows = FALSE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
-  )
-  
-  ### Subset ArchR object only for cells retained in Signac analysis ####
-  cell_annotation = read.csv ('../../per_sample_QC_signac/cell_annotation.csv')
-  colnames (cell_annotation) = c('barcode','celltype')
-  cell_annotation$barcode = sub ('\\.','#', cell_annotation$barcode)
-  
-  archp$celltype = cell_annotation$celltype[match(rownames(archp@cellColData), cell_annotation$barcode)]
-  archp$celltype[archp$celltype == 'Myeloid'] = 'MonoMac'
-  archp$celltype[archp$celltype == 'pDC'] = 'pDCs'
-  archp = archp[!is.na(archp$celltype)]
-  archp = archp[archp$celltype != 'bad_quality']
-  
-  #archp = archp[rownames(archp) %in% keep_barcodes]
-  
-  ### QC plots ####
-  p1 = plotFragmentSizes(ArchRProj = archp, groupBy = 'Sample', pal = palette_sample)
-  p2 = plotTSSEnrichment(ArchRProj = archp, groupBy = 'Sample', pal = palette_sample)
-
-  p3 <- plotGroups(
-    ArchRProj = archp, 
-    groupBy = "Sample", 
-    colorBy = "cellColData", 
-    name = "TSSEnrichment",
-    plotAs = "violin",
-    pal = palette_sample,
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-
-  p4 <- plotGroups(
-    ArchRProj = archp, 
-    groupBy = "Sample", 
-    colorBy = "cellColData", 
-    name = "nFrags",
-    plotAs = "violin",
-    pal = palette_sample,
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-
-  pdf (file.path ('Plots', 'QC_plots.pdf'))
-  wrap_plots (p1, p2 ,p3, p4)
-  dev.off()
-
-
-  # Dimensionality reduction and clustering
-  varfeat = 25000
-  LSI_method = 2
-  archp = addIterativeLSI (ArchRProj = archp,
-    useMatrix = "TileMatrix", name = "IterativeLSI",
-    force = TRUE, LSIMethod = LSI_method,
-    varFeatures = varfeat)
-
-#   archp = addHarmony (
-#     ArchRProj = archp,
-#     reducedDims = "IterativeLSI",
-#     name = "Harmony",
-#     groupBy = "Sample", force=FALSE
-# )
-
-# archp = addUMAP (ArchRProj = archp, 
-#     reducedDims = "Harmony", name='UMAP_H',
-#     force = TRUE)
-
-# archp = addClusters (input = archp,
-#     reducedDims = "Harmony",
-#     name='Clusters_H',
-#     force = TRUE)
-
-  archp = addClusters (input = archp, resolution = 3,
-    reducedDims = "IterativeLSI", maxClusters = 100,
-    force = TRUE)
-  archp = addUMAP (ArchRProj = archp, 
-    reducedDims = "IterativeLSI",
-    force = TRUE)
-  archp = addTSNE (ArchRProj = archp, 
-    reducedDims = "IterativeLSI",
-    force = TRUE)
-  
-  #archp = saveArchRProject (archp)
-
-  umap_p1 = plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
-   name = "Sample", embedding = "UMAP")
-  umap_p2 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "celltype",
-     embedding = "UMAP")
-  umap_p3 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "nFrags",
-     embedding = "UMAP")
-  umap_p4 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "TSSEnrichment",
-     embedding = "UMAP")
-  umap_p5 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "Clusters",
-     embedding = "UMAP")
-  
-  pdf (file.path('Plots','celltype_umap_signac_filtered.pdf'),12,12)
-  print (umap_p1)
-  print (umap_p2)
-  print (umap_p3)
-  print (umap_p4)
-  print (umap_p5)
-  dev.off()
-  
-  plotPDF (umap_p1, umap_p2, umap_p3, umap_p4,
-   name = paste0('Plot-UMAP-Sample-Clusters_',LSI_method,'_',length(rownames(archp)),'_varfeat_',varfeat,'.pdf'),
-          ArchRProj = archp, addDOC = FALSE, width = 5, height = 5,logFile=NULL)
-  
-  tsne_p1 = plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
-   name = "Sample", embedding = "TSNE")
-  tsne_p2 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "celltype",
-     embedding = "TSNE")
-  tsne_p3 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "nFrags",
-     embedding = "TSNE")
-  tsne_p4 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "TSSEnrichment",
-     embedding = "TSNE")
-  
-  pdf (file.path('Plots','celltype_tsne_signac_filtered2.pdf'))
-  print (tsne_p1)
-  print (tsne_p2)
-  print (tsne_p3)
-  print (tsne_p4)
-  dev.off()
-  
-  archp = saveArchRProject (archp, load = T)
-  
-  } else {
-  archp = loadArchRProject (projdir)
-  }
+archp = loadArchRProject (projdir)
 
 sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14','P10')
 archp$Sample2 = archp$Sample
 archp$Sample2 = factor (archp$Sample2, levels = sarc_order)
 
-# Plot gene score of cell type markers ####
-meso_markers = read.csv ('/ahg/regevdata/projects/ICA_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
-meso_markers = meso_markers[meso_markers != 'IGHM']
-meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
-archp = addImputeWeights (archp)
-p <- plotEmbedding(
-    ArchRProj = archp, 
-    colorBy = "GeneScoreMatrix", 
-    name = meso_markers, 
-    embedding = "UMAP",
-    imputeWeights = getImputeWeights(archp)
-)
-
-pdf (file.path('Plots','marker_genes_feature_plots.pdf'), width = 25, height = 25)
-print (wrap_plots (p, ncol = 8))
-dev.off()
-
-
-### Further remove low quality / doublets clusters ####
-#low_quality_clusters = c('C63','C62','C50','C61','C56','C2')
-low_quality_clusters = c('C36','C43','C53','C54','C49','C55','C52')
-table (archp$celltype[!archp$Clusters %in% low_quality_clusters], archp$Sample[!archp$Clusters %in% low_quality_clusters])
-
-archp = archp[!archp$Clusters %in% low_quality_clusters]
-  
-  #archp = archp[rownames(archp) %in% keep_barcodes]
-  
-  # Dimensionality reduction and clustering
-  varfeat = 25000
-  LSI_method = 2
-  archp = addIterativeLSI (ArchRProj = archp,
-    useMatrix = "TileMatrix", name = "IterativeLSI",
-    force = TRUE, LSIMethod = LSI_method,
-    varFeatures = varfeat)
-
-  archp = addClusters (input = archp, resolution = 3,
-    reducedDims = "IterativeLSI", maxClusters = 100,
-    force = TRUE)
-  archp = addClusters (input = archp, resolution = 20,
-    name = 'Clusters_20',
-    reducedDims = "IterativeLSI", maxClusters = 100,
-    force = TRUE)
-  archp = addUMAP (ArchRProj = archp, 
-    reducedDims = "IterativeLSI",
-    force = TRUE)
-  archp = addTSNE (ArchRProj = archp, 
-    reducedDims = "IterativeLSI",
-    force = TRUE)
-  
-  archp = saveArchRProject (archp)
-
-  umap_p1 = plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
-   name = "Sample", embedding = "UMAP")
-  umap_p2 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "celltype",
-     embedding = "UMAP")
-  umap_p3 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "Clusters",
-     embedding = "UMAP")
-  umap_p4 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "Clusters_20",
-     embedding = "UMAP")
-  
-  pdf (file.path('Plots','celltype_umap_signac_filtered_2.pdf'),22,22)
-  print (umap_p1)
-  print (umap_p2)
-  print (umap_p3)
-  print (umap_p4)
-  dev.off()
-  
 ### Gene score based analysis ####
-run_GS_analysis = TRUE
+run_GS_analysis = FALSE
 
 if (run_GS_analysis)
   {
@@ -411,44 +163,6 @@ dev.off()
 
 
 
-# Re-annotate clusters ####
-archp$celltype_revised = archp$celltype
-archp$celltype_revised[archp$Clusters %in% c('C11')] = 'Mesothelium'
-archp$celltype_revised[archp$Clusters %in% c('C20')] = 'SmoothMuscle'
-archp$celltype_revised[archp$Clusters %in% c('C21','C23','C24')] = 'Fibroblasts'
-archp$celltype_revised[archp$Clusters %in% c('C28')] = 'Alveolar'
-archp$celltype_revised[archp$Clusters %in% c('C15','C16','C7','C8','C9','C25','C12','C13','C14','C4','C5','C6','C1','C2','C3','C27')] = 'Malignant'
-archp$celltype_revised[archp$Clusters %in% c('C17','C18','C19')] = 'Endothelial'
-archp$celltype_revised[archp$Clusters %in% c('C26')] = 'bad_quality' # Further remove suspected low quality cluster C26 ####
-archp$celltype_revised[archp$Clusters_20 %in% c('C28','C29','C32','C33','C31','C26','C24','C23','C25','C30','C27','C41','C44','C42','C43','C45','C39','C38','C22','C37')] = 'T_cells'
-archp$celltype_revised[archp$Clusters_20 %in% c('C34','C35','C36','C40')] = 'NK'
-archp$celltype_revised[archp$Clusters %in% c('C29','C30','C33','C32','C36','C34','C35','C31')] = 'Myeloid'
-archp$celltype_revised[archp$Clusters %in% c('C53')] = 'pDCs'
-archp$celltype_revised[archp$Clusters %in% c('C54')] = 'Plasma'
-archp$celltype_revised[archp$Clusters %in% c('C58','C57','C56','C55')] = 'B_cells'
-
-
-
-# Further remove low quality clusters ####
-archp = archp[archp$celltype_revised != 'bad_quality']
-
-umap_p1 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "celltype_revised",
-   embedding = "UMAP",
-   pal = palette_celltype_simplified,
-   labelMeans = FALSE)
-
-umap_p2 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "Sample2",
-   embedding = "UMAP",
-   pal = palette_sample,
-   labelMeans = FALSE)
-
-pdf (file.path ('Plots','celltype_revised_umap.pdf'))
-umap_p1
-umap_p2
-dev.off()
-
 
 # Plot gene score of cell type markers ####
 meso_markers = read.csv ('/ahg/regevdata/projects/ICA_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
@@ -470,10 +184,6 @@ pdf (file.path('Plots','marker_genes_feature_plots_3.pdf'), width = 25, height =
 print (wrap_plots (p, ncol = 8))
 dev.off()
 
-archp = saveArchRProject (archp)
-
-# Export cell annotation ####
-write.csv (data.frame (barcode = rownames(archp@cellColData), celltype = archp$celltype_revised), 'barcode_annotation.csv')
 
 ### Run peak calling on celltype annotation ####
 # Add tumor sample info in celltype metagroup
@@ -579,7 +289,7 @@ if (!file.exists ('TF_activators_genescore.rds'))
 
 
 ### ChromVAR based analysis ####
-run_chromVAR_analysis = TRUE
+run_chromVAR_analysis = FALSE
 
 if (run_chromVAR_analysis)
   {
@@ -612,10 +322,24 @@ if (run_chromVAR_analysis)
     saveRDS (DAM_list, paste0 ('DAM_',metaGroupName,'.rds'))    
     } else {
     DAM_list = readRDS (paste0('DAM_',metaGroupName,'.rds'))
+    DAM_list = lapply (DAM_list, function(x) {x$gene = gsub ('_.*','',x$gene); x})
+    DAM_list = lapply (DAM_list, function(x) {x$gene = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", x$gene); x})    
     }
   
-  active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > 0.1]
-  DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_genes,])
+  # Filter by active genes as computed by correlation with gene score
+  # active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > -Inf]
+  # DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_genes,])
+
+  # Filter by genes minimally expressed from scRNA (in at least 1 celltype) ####
+  ps = log2(as.data.frame (AverageExpression (srt, 
+    features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
+    group.by = 'celltype_simplified2')[[1]]) +1)
+  min_exp = 0.1
+  ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
+  selected_TF = rownames(ps)[rowSums(ps) > 0]
+
+  DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% selected_TF,])
+
   names (DAM_list2) = names (DAM_list)
   FDR_threshold = 1e-3
   meandiff_threshold = 0
@@ -683,24 +407,6 @@ print(DAM_hm)
 dev.off()
 }
 
-# Find shared TF across celltypes ####
-tf_name2 = unlist(sapply (c('SOX9','TWIST1','MESP1','NKX2-5'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
-tf_name2 = paste0('z:',tf_name2)
-archp = addImputeWeights (archp)
-TF_p = plotEmbedding (
-    ArchRProj = archp,
-    colorBy = "MotifMatrix",
-    name = tf_name2, 
-    useSeqnames='z',
-    col = palette_deviation,    
-    embedding = "UMAP",
-    imputeWeights = getImputeWeights(archp)
-    )
-
-pdf (file.path ('Plots','TF_umap.pdf'), width = 20,height=6)
-wrap_plots (TF_p, ncol=5)
-dev.off()
-
 
 ### Co-expression of TFs #### 
 metaGroupName = 'celltype_revised'
@@ -712,9 +418,15 @@ all (colnames(mSE) == rownames(archp@cellColData))
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 
-# Subset only for positively correlated TF with genescore ####
-positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0.1]
-mMat = mMat[positive_TF,]
+# Filter by genes minimally expressed from scRNA (in at least 1 celltype) ####
+ps = log2(as.data.frame (AverageExpression (srt, 
+  features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
+  group.by = 'celltype_simplified2')[[1]]) +1)
+min_exp = 0.1
+ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
+selected_TF = rownames(ps)[rowSums(ps) > 0]
+# positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0.1]
+mMat = mMat[selected_TF,]
 
 # mMat_agg = as.data.frame (t(mMat))
 # mMat_agg$metaGroup = as.character (archp_meta[,metaGroupName])
@@ -734,12 +446,13 @@ mMat_cor = cor (as.matrix(t(mMat)), method = 'pearson')
 # tf_name = rownames(mMat_cor)[row_filt]
 km = kmeans (mMat_cor, centers=20)
 
+pdf (file.path ('Plots','TF_modules.pdf'), width = 4,height=3)
 cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
   #left_annotation = ha,
   #rect_gp = gpar(type = "none"),
   clustering_distance_rows='euclidean' ,
   clustering_distance_columns = 'euclidean', 
-  col=palette_module_correlation_fun, 
+  col=palette_deviation_correlation, 
   row_split = km$cluster,
   column_split = km$cluster,
   #row_km=2, 
@@ -753,10 +466,67 @@ cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
   #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
   #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
 #        }}))
+dev.off()
 
 pdf (file.path ('Plots','TF_modules.pdf'), width = 4,height=3)
 cor_mMat_hm
 dev.off()
+
+# Make heatmap of TF by cell types ####
+pan_TF = c('TGIF2','TGIF1','NFKB2','SNAI2','TWIST2','HMGA2')
+ha = HeatmapAnnotation (celltype = archp$celltype_revised, col = list(celltype = palette_celltype_simplified))
+ha2 = rowAnnotation (foo = anno_mark(at = match(pan_TF,rownames(mMat2)), 
+    labels = pan_TF, labels_gp = gpar(fontsize = 6, fontface = 'italic')))
+mMat = as.matrix (mMat)
+mMat2 = mMat
+mMat2[mMat2 > 1] = 1
+mMat2[mMat2 < -1] = -1
+pdf (file.path ('Plots','TF_modules_celltypes_heatmap.pdf'), width = 4,height=3)
+cor_mMat_hm = draw (Heatmap (t(scale(t(mMat2))),# row_km=15,
+  top_annotation = ha,
+  right_annotation = ha2,
+  #left_annotation = ha,
+  #rect_gp = gpar(type = "none"),
+  clustering_distance_rows='pearson' ,
+  clustering_distance_columns = 'pearson', 
+  col=palette_deviation_cor_fun, 
+  #column_split = km$cluster,
+  row_km=3, 
+  #column_km=2,
+#  right_annotation = ha,
+  border=T,
+  row_names_gp = gpar(fontsize = 0),
+  column_names_gp = gpar(fontsize = 0)))#,
+  # ,
+  # cell_fun = function(j, i, x, y, w, h, fill) {
+  #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+  #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#        }}))
+dev.off()
+
+pdf (file.path ('Plots','TF_modules_celltypes_heatmap.pdf'), width = 8,height=4)
+cor_mMat_hm
+dev.off()
+
+
+# Find shared TF across celltypes ####
+tf_name2 = unlist(sapply (c('TGIF2','TGIF1','TWIST2','NFKB2','HMGA2'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
+tf_name2 = paste0('z:',tf_name2)
+archp = addImputeWeights (archp)
+TF_p = plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "MotifMatrix",
+    name = tf_name2, 
+    useSeqnames='z',
+    pal = rev (palette_deviation),    
+    embedding = "UMAP",
+    imputeWeights = getImputeWeights(archp)
+    )
+
+pdf (file.path ('Plots','pan_TF_fplots.pdf'), width = 30,height=16)
+wrap_plots (TF_p, ncol=5)
+dev.off()
+
 
 tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
 names (tf_modules) = paste0('mod_',unique(km$cluster))

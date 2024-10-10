@@ -742,46 +742,4 @@ srt_TF = RunUMAP (srt_TF, n.components = 3, n.neighbors = 20)
 
 cor_TF_umap <- umap(cor_TF, config=umap.defaults)
 
-# CRC fetal signature score across samples
-fetal_sigs = read.csv ('/ahg/regevdata/projects/ICA_Lung/Bruno/guccione_prj/final_fetal_sigs.csv')
-fetal_sigs = as.list (fetal_sigs)
-srt = ModScoreCor (
-	        seurat_obj = srt, 
-	        geneset_list = fetal_sigs, 
-	        cor_threshold = NULL, 
-	        pos_threshold = NULL, # threshold for fetal_pval2
-	        listName = 'fetal_', outdir = paste0(projdir,'Plots/'))
-
-ccomp_df = srt@meta.data[,c(names(fetal_sigs),'sampleID'), drop=FALSE]
-      #ccomp_df = aggregate (ccomp_df, by=as.list(srt_wgcna@meta.data[,metaGroupNames,drop=F]), mean)    
-bp1 = lapply (names(fetal_sigs), function(x) {
-            ggplot (ccomp_df, aes_string (x= 'sampleID', y= x)) +
-        #geom_violin (trim=TRUE, aes_string (fill = metaGroupNames[3])) +
-        geom_violin (aes_string(fill = 'sampleID')) +
-        geom_boxplot(width=0.5, color="black", alpha=0.2) +
-        #geom_bar (stats='identity') +
-        #geom_jitter (color="black", size=0.4, alpha=0.9) +
-        theme_classic() + 
-        scale_fill_manual (values= palette_sample) + 
-        ggtitle (paste(x,'mod score')) + 
-        theme (axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))  + NoLegend()
-      })
-
-  
-png (file.path('Plots',paste0('fetal_score_sampleID_boxplot.png')),5000,5000,res=300)
-print (wrap_plots (bp1))
-dev.off()
-
-png (file.path('Plots',paste0('fetal_score_sampleID_featp.png')),height=2000,5000,res=300)
-reductionName = 'umap'
-wrap_plots (
-	fp (srt, gene = 'fetal2', reduction = reductionName)[[1]],
-	fp (srt, gene = 'fetal3', reduction = reductionName)[[1]],
-	fp (srt, gene = 'fetal4', reduction = reductionName)[[1]],
-	fp (srt, gene = 'TACSTD2', reduction = reductionName)[[1]],
-	fp (srt, gene = 'HOXB13', reduction = reductionName)[[1]],
-	DimPlot (srt, group.by = 'sampleID', cols = palette_sample,label=T))
-dev.off()
-
-
 

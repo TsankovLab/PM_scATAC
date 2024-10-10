@@ -4,7 +4,7 @@ R
 set.seed(1234)
 
 ####### ANALYSIS of TUMOR compartment #######
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
@@ -16,31 +16,32 @@ source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 source (file.path('..','..','git_repo','utils','palettes.R'))
 
 # Load functions for hub detection ####
-source (file.path('..','git_repo','utils','knnGen.R'))
-source (file.path('..','git_repo','utils','addCoax.R'))
-source (file.path('..','git_repo','utils','Hubs_finder.R'))
-source (file.path('..','git_repo','utils','hubs_track.R'))
+source (file.path('..','..','git_repo','utils','knnGen.R'))
+source (file.path('..','..','git_repo','utils','addCoax.R'))
+source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads(threads = 8) 
+addArchRThreads(threads = 1) 
 addArchRGenome("hg38")
 
 if (!file.exists ('Save-ArchR-Project.rds')) 
-  { source ('../../PM_scATAC/scatac_tumor_create_ArchRobj.R')
+  { source (file.path('..','..','PM_scATAC','scatac_tumor_create_ArchRobj.R'))
   } else {
  archp = loadArchRProject (projdir)   
   }
 
 # Load RNA ####
-srt = readRDS ('../scrna/srt.rds')
-sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
-
-
+srt = readRDS (file.path('..','scrna','srt.rds'))
+sarc_order = read.csv (file.path('..','scrna','cnmf20_sarcomatoid_sample_order.csv'), row.names=1)
+sarc_order = sarc_order[! sarc_order$sampleID %in% c('HU37','HU62'),]
+sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
+archp$Sample2 = factor (archp$Sample2, levels = sarc_order$sampleID)
 
 # Run genescore DAG ####
 metaGroupName = "Clusters"
 force=FALSE
-if(!file.exists (paste0('DAG_',metaGroupName,'.rds') | force) source ('../../PM_scATAC/DAG.R')
+if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source ('../../PM_scATAC/DAG.R')
 
 celltype_markers = c('WT1','CALB2','RUNX2','TCF3','SOX9','MESP1','HMGA1','TWIST1','SNAI2')
 archp = addImputeWeights (archp)
@@ -171,7 +172,7 @@ if (!file.exists ('TF_activators_genescore.rds'))
 
 ### Co-expression of TFs #### 
 metaGroupName = 'Sample2'
-if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 all (colnames(mSE) == rownames(archp))
 
 # # Get deviation matrix ####
@@ -186,27 +187,35 @@ mMat_cor = cor (as.matrix(t(mMat)), method = 'pearson')
 
 km = kmeans (mMat_cor, centers=5)
 
+pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
 cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
   #left_annotation = ha,
   #rect_gp = gpar(type = "none"),
   clustering_distance_rows='euclidean' ,
   clustering_distance_columns = 'euclidean', 
-  col=palette_module_correlation_fun, 
+  col=palette_deviation_cor_fun, 
   row_split = km$cluster,
   column_split = km$cluster,
   #row_km=2, 
   #column_km=2,
 #  right_annotation = ha,
-  border=F,
-  row_names_gp = gpar(fontsize = 0),
-  column_names_gp = gpar(fontsize = 0)))#,
+  border=T,
+#   ,
+  row_names_gp = gpar(fontsize = 0), 
+  column_names_gp = gpar(fontsize = 0)
+# cell_fun = function(j, i, x, y, w, h, fill) {# THIS DOESNT WORK NEED TO USE LAYER_FUN
+#         if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+#             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#         }}
+  ))
   # ,
   # cell_fun = function(j, i, x, y, w, h, fill) {
   #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
   #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
 #        }}))
+dev.off()
 
-pdf (file.path ('Plots','TF_modules.pdf'), width = 4,height=3)
+pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
 cor_mMat_hm
 dev.off()
 
@@ -272,8 +281,7 @@ dev.off()
 # dev.off()
 
 
-
-# Try with ridge plots ####
+# ridge plots of TF modules ####
 library(ggridges)
 library(ggplot2)
 library(viridis)
@@ -282,16 +290,72 @@ tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$clu
 names (tf_modules) = paste0('mod_',unique(km$cluster))
 tf_modules = as.data.frame (do.call (cbind, tf_modules))
 tf_modules$Sample = archp$Sample2
+# sapply (rownames(tf_modules), function(x) unlist(strsplit (x, '\\#'))[1]) == archp$Sample2
+tf_modules = gather (tf_modules, module, expression,1:5)
+tf_modules$module = factor (tf_modules$module, levels = paste0('mod_',names (row_order (cor_mMat_hm))))
 
 # Plot
-rp = lapply (paste0('mod_',unique(km$cluster)), function(x) 
-  ggplot(tf_modules, aes_string(x = x, y = 'Sample', fill = '..x..')) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, alpha=.5) +
-  paletteer::scale_fill_paletteer_c("grDevices::PuRd", direction=-1) +
-    theme_classic())
-pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 20,height=3)
-wrap_plots (rp, ncol=5)
+# rp = lapply (paste0('mod_',unique(km$cluster)), function(x) 
+#   ggplot(tf_modules,  aes_string(x='Sample', y=x, fill='..x..')) +
+
+#   geom_vridgeline(stat="ydensity", trim=FALSE, alpha = 0.85, scale = 2, width=.10) +
+#   palette_deviation_ggplot_fill +
+#     theme_classic())
+# pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 20,height=3)
+# wrap_plots (rp, ncol=5)
+# dev.off()
+
+
+dp = ggplot (tf_modules) +
+  geom_density(aes(x=expression,fill=Sample),
+                      alpha = 0.4) +
+  # geom_vline(aes(xintercept = mean, group = tf_modules, linetype = Sample),
+  #            data = combined_sla_means) +
+  facet_wrap (~module, nrow = 5, scales = 'free',strip.position = "left") +
+  scale_fill_manual (values = palette_sample) +
+  gtheme_no_rot
+
+pdf (file.path ('Plots','TF_modules_ridge_plots2.pdf'), width = 7,height=8)
+dp
 dev.off()
+
+# violin plots of TF modules ####
+# tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+# names (tf_modules) = paste0('mod_',unique(km$cluster))
+# tf_modules = as.data.frame (do.call (cbind, tf_modules))
+# tf_modules$Sample = archp$Sample2
+# tf_modules = gather (tf_modules, module, expression,1:5)
+
+# box = ggplot (tf_modules, aes_string (x= 'Sample', y= 'expression')) +
+#   geom_violin (trim=TRUE, aes_string (fill = 'Sample'),size=2,
+#     width=1,
+#     scale='width',
+#     linewidth = .2, alpha=0.7) +
+#   geom_boxplot (aes_string(fill = 'expression'),
+#     linewidth = .2,
+#     width=0.2,
+#     outlier.alpha = 0.2,
+#     outlier.size = 1,
+#      size=0.3, alpha=0.7
+#      ) +
+#   gtheme + 
+#   facet_wrap (~module, nrow = 5) + 
+# #  palette_deviation_ggplot_fill + 
+#   NoLegend()
+  
+# pdf(file.path('Plots','TF_modules_boxplots.pdf'),width=3,height = 8) #width = 10, height = 11,
+# print (box)
+# dev.off()
+
+
+# rp = lapply (paste0('mod_',unique(km$cluster)), function(x) 
+#   ggplot(tf_modules, aes_string(x = x, y = 'Sample', fill = '..x..')) +
+#   geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, alpha=.5) +
+#   palette_deviation_ggplot_fill +
+#     theme_classic())
+# pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 20,height=3)
+# wrap_plots (rp, ncol=5)
+# dev.off()
 
 
 # Check expression of SOX9 and others - SOX9 should cluster with module 5 but it doesnt probably cause of low accuracy of deviation ####

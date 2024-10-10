@@ -22,7 +22,6 @@ packages = c(
   'corrplot',
   'scales',
   'ggExtra',
-  'chromvar',
   'limma',
   'ape',
   'dendextend',
@@ -32,7 +31,7 @@ lapply(packages, require, character.only = TRUE)
 
 set.seed(1234)
 # Set directory
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/'
 system (paste('mkdir -p',paste0(projdir,'Plots/')))
 setwd(projdir)
 
@@ -43,7 +42,7 @@ bulk_palette = setNames (as.character(paletteer::paletteer_d("rcartocolor::ArmyR
 
 
 #### Import TCGA ####
-if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/meso_tcga_RSEM_cleaned.rds'))
+if (!file.exists ('meso_tcga_RSEM_cleaned.rds'))
   {
   # load ('/ahg/regevdata/projects/lungCancerBueno/Results/TCGAsubtypes/Cancer_All/Results/gcdata.merge.Rda')
   # gcdata.merge_meso = subset (gcdata.merge, meso_histology %in% c('MESO.E','MESO.NOS','MESO.S','MESO.BP')) 
@@ -52,7 +51,7 @@ if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM
   
   
   ## Load TCGA data ###
-  tcga_mat = read.table ('/ahg/regevdata/projects/ICA_Lung/Bruno/TCGA/MESO.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt', sep='\t', header=T)
+  tcga_mat = read.table ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/TCGA/MESO.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt', sep='\t', header=T)
   rownames (tcga_mat) = tcga_mat[,1]
   tcga_mat = tcga_mat[,grep ('raw_count', tcga_mat[1,])]
   tcga_mat = tcga_mat[-1,]
@@ -74,23 +73,23 @@ if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM
   # tcga_mat = tcga_mat[,tcga_meta$TUMOR_TYPE != 'Diffuse Malignant Mesothelioma (NOS)']
   # tcga_meta = tcga_meta[tcga_meta$TUMOR_TYPE != 'Diffuse Malignant Mesothelioma (NOS)',]
   
-  saveRDS (tcga_mat, '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/meso_tcga_RSEM_cleaned.rds')
-  saveRDS (tcga_meta, '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/meso_tcga_meta_cleaned.rds')
+  saveRDS (tcga_mat, 'meso_tcga_RSEM_cleaned.rds')
+  saveRDS (tcga_meta, 'meso_tcga_meta_cleaned.rds')
   
   # Check if it is seq-depth normalized
   pdf ('tcga_raw.pdf')
   print(boxplot (log2(as.matrix(tcga_mat))))
   dev.off()
   } else {
-tcga_mat = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/meso_tcga_RSEM_cleaned.rds')
-tcga_meta = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/meso_tcga_meta_cleaned.rds')  
+tcga_mat = readRDS ('meso_tcga_RSEM_cleaned.rds')
+tcga_meta = readRDS ('meso_tcga_meta_cleaned.rds')  
 }
 
 #### Import Bueno ####
-if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/bueno_rpkm_cleaned.rds'))
+if (!file.exists ('bueno_rpkm_cleaned.rds'))
   {
   # Import bueno from my folder
-  bueno_mat = read.table ('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/bueno_data/bueno_meso_rpkm_rnaseq.txt', header=T, sep= '\t')
+  bueno_mat = read.table ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/bueno_data/bueno_meso_rpkm_rnaseq.txt', header=T, sep= '\t')
   bueno_mat = bueno_mat[!duplicated(bueno_mat[,1]),]
   rownames (bueno_mat) = bueno_mat[,1]
   bueno_mat = bueno_mat[,-1]
@@ -103,9 +102,9 @@ if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM
   bueno_meta2 = setNames (bueno_meta$ConsensusCluster,rownames(bueno_meta))
   bueno_mat = bueno_mat[,names(bueno_meta2)]
   
-  saveRDS (bueno_meta, '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/bueno_meta_cli.rds')
-  saveRDS (bueno_meta2, '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/bueno_meta_cleaned.rds')
-  saveRDS (bueno_mat, '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/bueno_rpkm_cleaned.rds')
+  saveRDS (bueno_meta, 'bueno_meta_cli.rds')
+  saveRDS (bueno_meta2, 'bueno_meta_cleaned.rds')
+  saveRDS (bueno_mat, 'bueno_rpkm_cleaned.rds')
     
     
   # Check if it is seq-depth normalized
@@ -113,14 +112,14 @@ if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM
   print (boxplot (log2(bueno_mat)))
   dev.off()
   } else {
-  bueno_meta = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/bueno_meta_cli.rds')    
-  bueno_meta2 = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/bueno_meta_cleaned.rds')
-  bueno_mat = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/bueno_rpkm_cleaned.rds')
+  bueno_meta = readRDS ('bueno_meta_cli.rds')    
+  bueno_meta2 = readRDS ('bueno_meta_cleaned.rds')
+  bueno_mat = readRDS ('bueno_rpkm_cleaned.rds')
   }
 
 
 #### Import MESOMICS ####
-if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/mesomics_data.rds'))
+if (!file.exists ('mesomics_data.rds'))
   {
   msm_mat = read.table ('/ahg/regevdata/projects/ICA_Lung/Wooseung/Mesothelioma/Data/Expression/TPM_COnverted_GeneCount.tsv')
   #msm = log2(msm+1)
@@ -130,11 +129,11 @@ if (!file.exists ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM
   msm_meta = msm_meta[msm_meta$Sample %in% colnames (msm),]
   msm_mat = msm_mat[, msm_meta$Sample]
   all (colnames (msm_mat) == msm_meta$Sample)
-  saveRDS (msm_mat,'/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/mesomics_data.rds')
-  saveRDS (msm_meta,'/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/Mesothelioma_SampleInfo.txt')
+  saveRDS (msm_mat,'mesomics_data.rds')
+  saveRDS (msm_meta,'Mesothelioma_SampleInfo.txt')
   } else {
-  msm_mat = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/mesomics_data.rds')
-  msm_meta = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/Mesothelioma_SampleInfo.txt')
+  msm_mat = readRDS ('mesomics_data.rds')
+  msm_meta = readRDS ('Mesothelioma_SampleInfo.txt')
   msm_meta2 = read.csv ('mesomics_SamplesOverview.csv')
   }
 
@@ -180,6 +179,18 @@ colnames (meso_bulk_meta_l[['mesomics']])[colnames (meso_bulk_meta_l[['mesomics'
 meso_bulk_meta_l[['mesomics']]$status = ifelse (meso_bulk_meta_l[['mesomics']]$status == 'dead', 1,0)
 meso_bulk_meta_l[['bueno']]$status = ifelse (meso_bulk_meta_l[['bueno']]$status == 'd', 1,0)
 
+# Add scS score as meta variable ####
+nfeat = 5000
+k_selection = 25
+cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds')))
+sarc_score = head (cnmf_spectra_unique[[20]],20)
+
+meso_bulk_meta_l = lapply (names(meso_bulk_meta_l), function(x) {
+  tmp = colMeans(na.omit(meso_bulk_l[[x]][rownames(meso_bulk_l[[x]]) %in% sarc_score,]))
+  meso_bulk_meta_l[[x]]$sarc_score = tmp
+  meso_bulk_meta_l[[x]]
+  })
+
 ### Query bulk data ####
 module_l = c(LAG3 = 'LAG3', HAVCR2 = 'HAVCR2', PDCD1 = 'PDCD1', TIGIT = 'TIGIT', CTLA4 = 'CTLA4')
 module_l = c(neuroendocrine1 = 'PMP2', neuroendocrine2 = 'VGF')
@@ -188,6 +199,7 @@ module_l = c(il32 = 'IL32')
 module_l = c(SNAI2 = 'SNAI2')
 module_l = c(CD90 = 'CD44', stem='CD73',stem='CD146')
 module_l = c(ELK4 = 'ELK4')
+module_l = c(HOXB13 = 'HOXB13')
 studies = c('bueno','tcga','mesomics')
 
 
@@ -265,13 +277,16 @@ genes_in_region = list(chr18_q23 = as.data.frame(org.Hs.egSYMBOL)[match (genes_i
 
 #
 your.gene1 = 'HOXB13'
-your.gene1 = c('CALB2','ITLN1','UPK3B')
-your.gene2 = head(cnmf_spectra_unique[['cNMF20']],50)
+your.gene2 = c('CALB2','ITLN1','UPK3B')
+your.gene2 = head(cnmf_spectra_unique[['cNMF20']],20)
+your.gene1 = head(cnmf_spectra_unique[['cNMF13']],20)
 your.gene2 = genes_in_region[[1]]
 your.gene2 = 'MBP'
 your.gene2 = genes_in_region[[48]]
-your.gene2 = 'HOXA10'
+your.gene2 = 'LYZ'
 your.gene2 = 'BAP1'
+your.gene2 = c('PMP2')
+your.gene2 = c('VGF')
 #study = c('bueno_immune_corrected','tcga_immune_corrected','mesomics_immune_corrected')
 corr_res = list()
 studies = c('bueno','tcga','mesomics')
@@ -328,7 +343,7 @@ for (study in studies)
   }
 }
 
-pdf (paste0 ( 'Plots/',your.gene1,'_',your.gene2,'_correlation_scatterplots2.pdf'),20,4)
+pdf (paste0 ( 'Plots/',your.gene1,'_',your.gene2,'_correlation_scatterplots2.pdf'),8,3)
 wrap_plots (corr_res, ncol=3)
 #corr_res
 dev.off()
@@ -337,6 +352,7 @@ dev.off()
 nfeat = 5000
 k_selection = 25
 cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds')))
+sarc_score = head (cnmf_spectra_unique[[20]],20)
 activeTFs = read.csv ('../tumor_compartment/scatac_ArchR/Active_TFs.csv')[[2]]
 
 
@@ -405,9 +421,22 @@ rownames (tcga_mat) = unname (sapply (rownames(tcga_mat), function(x) unlist (st
 #tcga_mat = rowMeans (tcga_mat)
 
 
+### Correlate gene with rest of genes across samples #####
+study = 'tcga'
+your.gene1 = 'HOXB13'
+your.gene2 = rownames(meso_bulk_l[[study]])
+cor_mat = as.data.frame (t(cor (t(meso_bulk_l[[study]][your.gene1,, drop=F]), t(meso_bulk_l[[study]][your.gene2,]), method = 'spearman')))
+head (cor_mat[order(-cor_mat[[1]]),, drop=F],100)
+
+
+
 ###########################
 ### Survival Analysis #####
 ###########################
+nfeat = 5000
+k_selection = 25
+cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds')))
+sarc_score = head (cnmf_spectra_unique[[20]],20)
 
 # Load P11 megahubs regions ####
 region = readRDS ('../tumor_compartment/scatac_ArchR/P11_chr18_region.rds')
@@ -424,7 +453,7 @@ module_l = genes_in_region
 # HOX genes ####
 module_l = rownames(meso_bulk_l[[1]])[grep ('^HOX',rownames(meso_bulk_l[[1]]))]
 module_l = split (module_l, module_l)
-
+module_l = lapply (cnmf_spectra_unique, function(x) head(x,20))
 # Make metadata for survival analysis ####
 # Define module of genes to check ####
 module_l = list(TCF3 = 'TCF3', PITX1 = 'PITX1', TEAD1 = 'TEAD1')
@@ -452,6 +481,7 @@ meso_bulk_meta_l2 = lapply (seq_along(meso_bulk_l), function(x)
    tmp = tmp[,apply(tmp, 2, function(t) !any(is.na(t)))]
    meso_bulk_meta_l2[[x]] = as.data.frame (meso_bulk_meta_l2[[x]])
    meso_bulk_meta_l2[[x]] = cbind (meso_bulk_meta_l2[[x]], tmp)
+   if(length(module_l) == 1) colnames(meso_bulk_meta_l2[[x]])[ncol(meso_bulk_meta_l2[[x]])] = names(module_l)
    meso_bulk_meta_l2[[x]]
   })
 names (meso_bulk_meta_l2) = c('bueno','tcga','mesomics')
@@ -475,7 +505,7 @@ for (study in studies)
     cfit = list()
     module_l = lapply (module_l, function(x) gsub('-','_',x))
     names (module_l) = gsub('-','_',names(module_l))
-    mods = colnames(meso_bulk_meta_l2[[study]])[colnames(meso_bulk_meta_l2[[study]]) %in% unlist(module_l)]
+    mods = colnames(meso_bulk_meta_l2[[study]])[colnames(meso_bulk_meta_l2[[study]]) %in% names(module_l)]
     for (mod in mods)
         {
         meta_surv = meso_bulk_meta_l2[[study]]
@@ -483,6 +513,8 @@ for (study in studies)
   
         form = as.formula (paste('Surv(as.numeric(as.character(meta_surv[,"census"])),
                             status) ~', mod, '+ strata (subtype)'))
+        # form = as.formula (paste('Surv(as.numeric(as.character(meta_surv[,"census"])),
+        #                     status) ~', mod, '+ sarc_score'))
         cfit[[mod]] = coxph(form , data=meta_surv) 
         CI <- round(exp(confint(cfit[[mod]])), 2)
         cox_df = data.frame (
@@ -505,6 +537,8 @@ for (study in studies)
 
         form = as.formula (paste('Surv(as.numeric(as.character(meta_surv[,"census"])),
                             status) ~', mod, '+ strata (subtype)'))
+        # form = as.formula (paste('Surv(as.numeric(as.character(meta_surv[,"census"])),
+        #                     status) ~', mod, '+ sarc_score'))
         cfit[[mod]] = coxph(form , data=meta_surv) 
         s = summary (cfit[[mod]])
         cox_df$P_value_S = round(s$logtest[3],2)  #s$logtest[3]
@@ -561,8 +595,23 @@ for (study in names (cfit_study))
     print (plot_study[[study]])
     dev.off()
   }
+  
 
-# Export tables
-lapply (studies, function(study) write.csv (cfit_study[[study]], paste0('cox_regression_results_',study,'_',survival_name,'.csv')))
+# Correlate HOXB13 expression with TME proportions ####
+bp_bueno = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_study/reproduction2/bulkRNA/bayesprism_bueno_theta.rds')
+bp_tcga = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_study/reproduction2/bulkRNA/bayesprism_tcga_theta.rds')
+
+bp_bueno = bp_bueno[colnames (meso_bulk_l[['bueno']]),]
+cor (t(meso_bulk_l[['bueno']]['HOXB13',]),bp_bueno, method='spearman')
+
+bp_tcga = bp_tcga[colnames (meso_bulk_l[['tcga']]),]
+bp_tcga = na.omit (bp_tcga)
+meso_bulk_tcga = meso_bulk_l[['tcga']][,rownames(bp_tcga)]
+cor (meso_bulk_tcga['HOXB13',],bp_tcga, method='spearman')
+
+
+
+
+
 
 

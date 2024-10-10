@@ -7,7 +7,7 @@ source (file.path('..','..','PM_scATAC','utils','hubs_track.R'))
 # Export bigiwg files ####
 archp$celltype_status = paste0(archp$celltype2, '_', archp$status)
 metaGroupName = 'celltype2'
-exp_bigwig = F
+exp_bigwig = T
 if (exp_bigwig)
   {
   getGroupBW(
@@ -488,7 +488,7 @@ hubsSample_mat_ext = hubsSample_mat[res_l[['CD8_exhausted']]$feature[res_l[['CD8
 hubsSample_mat_ext = hubsSample_mat[head(res_l[['CD8_exhausted']]$feature,500),]
 #ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
 hm = draw(Heatmap (
-  scale (t(hubsSample_mat_ext)), 
+  scale (t(hubsSample_mat_ext)),
 #  top_annotation = ha, 
   column_names_gp = gpar(fontsize = 3),
   column_names_rot = 45,

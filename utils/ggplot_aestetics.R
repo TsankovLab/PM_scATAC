@@ -65,14 +65,7 @@ bxp = geom_boxplot (
     width=1,
     outlier.alpha = 0.2,
     outlier.size = 1,
-     size=0.3, alpha=0.7
-     ) 
-bxpv = geom_boxplot (
-    linewidth = .2,
-    width=.2,
-    outlier.alpha = 0.2,
-    outlier.size = 1,
-     size=0.3, alpha=0.7
+     size=0.6, alpha=0.7
      ) 
 
 vlp = geom_violin (trim=TRUE,size=2,

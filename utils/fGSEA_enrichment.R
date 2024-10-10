@@ -1,7 +1,8 @@
 gmt_annotations = c(
 #'c2.cp.kegg.v7.1.symbol.gmt',
-'c2.cp.reactome.v7.1.symbol.gmt',
-'c5.bp.v7.1.symbol.gmt'
+'fetal_sigs.gmt'
+#'c2.cp.reactome.v7.1.symbol.gmt',
+#'c5.bp.v7.1.symbol.gmt',
 #'h.all.v7.1.symbol.gmt'
 )
 force = FALSE
@@ -34,7 +35,7 @@ pvalAdjTrheshold = 0.05
 					BPPARAM = NULL)
 				fgseaResCol = collapsePathways (fgseaRes, stats = ranked_vector, pathway = pathways)
 				fgseaRes[fgseaRes$pathway %in% fgseaResCol$mainPathways]
-				}
+				})
 			saveRDS (mainPathways, file.path(paste0('fGSEA_annotation_',ann,'.rds')))
 			
 			# Generate dotplot of enrichment results ####
@@ -106,10 +107,11 @@ pvalAdjTrheshold = 0.05
 	# Plot dotplot of fGSEA annotations per cluster 
 
 	lapply (seq_along(fgseaResAll_dp), function(x) {
-	pdf (file.path(projdir_deg2,'Plots',paste0('fGSEA_top_',top_pathways,'_annotation_',names (fgseaResAll_dp)[x],'_rankby_',rankby,'_dotplots.pdf')),15,8)
+	pdf (file.path('Plots',paste0('fGSEA_top_',top_pathways,'_annotation_',names (fgseaResAll_dp)[x],'_dotplots.pdf')),15,8)
 		print(fgseaResAll_dp[[x]])
 		dev.off()
 		})
+	}
 	#if (feat == 'all')
 	#	{
 	#	dhm_grob = grid.grabExpr(draw(dhm[[1]]))
@@ -120,17 +122,6 @@ pvalAdjTrheshold = 0.05
 	#		}
 	#	dev.off()			
 	#	}
-	message ('Print enrichment plots for each signficant pathway and cell type')
-	pw = 'GO_POSITIVE_REGULATION_OF_MORPHOGENESIS_OF_AN_EPITHELIUM'
-	pw = 'GO_EMBRYONIC_DIGIT_MORPHOGENESIS'
-	ep = plotEnrichment(pathways[[pw]],
-	         ranked_vector) + 
-					 labs(title='HOXB3 correlated genes')
-				
-	
-	pdf (paste0('Plots/enrichment_plots.pdf'),5,3)
-	print(ep)
-	dev.off()	
-	
+
 
 

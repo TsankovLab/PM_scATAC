@@ -2,18 +2,18 @@
 ####### ANALYSIS of P11 TUMOR #######
 set.seed(1234)
 
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_scrna_P11'
-projdir_scatac = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_epi/scATAC_PM/tumor_compartment/scatac_scrna_P11'
+projdir_scatac = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_epi/scATAC_PM/tumor_compartment/scatac_ArchR'
 
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
-source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
-source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
-source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','palettes.R'))
+source (file.path('..','..','git_repo','utils','load_packages.R'))
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
 
 # Set # of threads and genome reference ####
 addArchRThreads(threads = 8) 
@@ -39,12 +39,12 @@ reductionGraphKnn = 'RNA_knn'
 reductionGraphSnn = 'RNA_snn' 
 
 srt = RunUMAP (object = srt, reduction = reductionSave, dims = 1:30)
-	
+
 pdf (file.path ('Plots','celltypes_umap.pdf'))
 DimPlot (srt, group.by = 'celltype_simplified', reduction = 'umap')
 dev.off()
 
-	
+
 #### Run cNMF ####
 nfeat = 5000
 force=F
@@ -209,6 +209,10 @@ if (!file.exists (paste0('cNMF_normalized/',cnmf_out, '/EnrichR_cNMF_module_gene
   print (EnrichRes_dp)
   dev.off()
 
+# Plot only the malignant modules enrichments ####
+  
+
+
 	
 ### Test correlation of chr18 mega hubs regions from P11 with other genes ####
 
@@ -368,7 +372,7 @@ dev.off()
 ### Correlate HOXB13 with all other genes in P11 metacells ####
 gene = 'HOXB13'
 metacells_assay = metacells@assays$RNA@layers$data
-rownames (metacells_assay) = rownames(srt)
+rownames (metacells_assay) = rownames(metacells)
 metacells@meta.data[,gene] = metacells_assay[gene, ]
 
 ### Restrict above analysis only on metacells high for HOXB13 in P11 ####
@@ -403,10 +407,25 @@ res_p11s = res_p11s[!is.na(res_p11s)]
 write.csv (res_p11s, 'correlated_genes_p11s_HOXB13.csv')
 
 # Run Enrichment on correlated genes ####
+fetal_sigs = read.csv ('/ahg/regevdata/projects/ICA_Lung/Bruno/guccione_prj/final_fetal_sigs.csv')
+fetal_sigs = as.list (fetal_sigs)
+writeGMT (fetal_sigs, '/ahg/regevdata/projects/ICA_Lung/Bruno/DBs/GSEA_gs/human/fetal_sigs.gmt')
+
 ranked_vector = res_p11s
-source (file.path('..','..','PM_scATAC','fGSEA_enrichment.R'))
+source (file.path('..','..','git_repo','utils','fGSEA_enrichment.R'))
 
-
+    message ('Print enrichment plots for each signficant pathway and cell type')
+    pw = 'GO_POSITIVE_REGULATION_OF_MORPHOGENESIS_OF_AN_EPITHELIUM'
+    pw = 'GO_EMBRYONIC_DIGIT_MORPHOGENESIS'
+    ep = plotEnrichment(pathways[[pw]],
+             ranked_vector) + 
+                     labs(title='HOXB3 correlated genes')
+                
+    
+    pdf (paste0('Plots/enrichment_plots.pdf'),5,3)
+    print(ep)
+    dev.off()   
+    
 # Check Proliferation index of HOX + cluster vs others ####
 pdf (file.path ('Plots','cellcycle_fplot.pdf'))
 FeaturePlot (srt, feature = 'cc')
@@ -493,5 +512,66 @@ dev.off()
 HOX_module = 3
 hox_dev_rna = p11_dev_rna[p11_dev_rna$feature %in% names(km$cluster)[km$cluster == HOX_module],]
 hox_dev_rna = hox_dev_rna[order (hox_dev_rna$rna_diff),]
-head (hox_dev_rna[grep ('HOX', hox_dev_rna$feature),])
+head (hox_dev_rna [grep ('HOX', hox_dev_rna$feature),])
 
+
+
+
+
+# CRC fetal signature score across samples ####
+fetal_sigs = read.csv ('/ahg/regevdata/projects/ICA_Lung/Bruno/guccione_prj/final_fetal_sigs.csv')
+fetal_sigs = as.list (fetal_sigs)
+srt = ModScoreCor (
+            seurat_obj = srt, 
+            geneset_list = fetal_sigs, 
+            cor_threshold = NULL, 
+            pos_threshold = NULL, # threshold for fetal_pval2
+            listName = 'fetal_', outdir = paste0(projdir,'Plots/'))
+
+ccomp_df = srt@meta.data[,c(names(fetal_sigs),'sampleID'), drop=FALSE]
+      #ccomp_df = aggregate (ccomp_df, by=as.list(srt_wgcna@meta.data[,metaGroupNames,drop=F]), mean)    
+bp1 = lapply (names(fetal_sigs), function(x) {
+            ggplot (ccomp_df, aes_string (x= 'sampleID', y= x)) +
+        #geom_violin (trim=TRUE, aes_string (fill = metaGroupNames[3])) +
+        geom_violin (aes_string(fill = 'sampleID')) +
+        geom_boxplot(width=0.5, color="black", alpha=0.2) +
+        #geom_bar (stats='identity') +
+        #geom_jitter (color="black", size=0.4, alpha=0.9) +
+        theme_classic() + 
+        scale_fill_manual (values= palette_sample) + 
+        ggtitle (paste(x,'mod score')) + 
+        theme (axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))  + NoLegend()
+      })
+
+  
+png (file.path('Plots',paste0('fetal_score_sampleID_boxplot.png')),5000,5000,res=300)
+print (wrap_plots (bp1))
+dev.off()
+
+srt = FindClusters (srt)
+
+png (file.path('Plots',paste0('fetal_score_sampleID_featp.png')),height=2000,5000,res=300)
+reductionName = 'umap'
+wrap_plots (
+    fp (srt, gene = 'fetal2', reduction = reductionName)[[1]],
+    fp (srt, gene = 'fetal3', reduction = reductionName)[[1]],
+    fp (srt, gene = 'fetal4', reduction = reductionName)[[1]],
+    fp (srt, gene = 'TACSTD2', reduction = reductionName)[[1]],
+    fp (srt, gene = 'HOXB13', reduction = reductionName)[[1]],
+    DimPlot (srt, group.by = 'sampleID', cols = palette_sample,label=T),
+    DimPlot (srt, group.by = 'seurat_clusters', cols = palette_sample,label=T))
+dev.off()
+
+
+# De novo marker discovery ####
+#srt$PVLAP_deg = ifelse (srt$celltype == 'COL4A1','PLVAP','rest')
+org='human'
+enricher_universe = 'all'
+logfcThreshold = .25
+pvalAdjTrheshold = 0.01
+metaGroupName = 'seurat_clusters'
+#metaGroupName = c('celltype_simplified')
+top_pathways = 10
+top_genes = 5
+force = F
+source (file.path('..','..','git_repo','utils','DEG_standard.R'))

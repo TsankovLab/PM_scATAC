@@ -24,12 +24,12 @@ packages = c(
 lapply(packages, require, character.only = TRUE)
 
 ####### START ANALYSIS #######
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/per_sample_QC_signac'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/per_sample_QC_signac'
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load function (JGranja)
-source (file.path('..','PM_scATAC','scATAC_functions.R'))
+source (file.path('..','git_repo','utils','scATAC_functions.R'))
 
 
 # combine fragments files from different channels of the normal RPL 
@@ -401,7 +401,7 @@ dev.off()
 
 
 
-### RNA integration
+### RNA integration ####
 srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/reproduction2/scRNA/srt_tumor.rds')
 srt$celltype_simplified_mal = as.character (srt$celltype_simplified)
 srt$celltype_simplified_mal[srt$celltype_simplified == 'Malignant'] = paste0(srt$sampleID[srt$celltype_simplified == 'Malignant'], '_', srt$celltype_simplified[srt$celltype_simplified == 'Malignant'])
@@ -470,7 +470,7 @@ dm
 dev.off()
 
 
-# Run EpiAneuFinder to detect malignant clusters
+# Run EpiAneuFinder to detect malignant clusters #####
 # Remember to set multiple cores for speeding up computations. Otherwise it take > 24h per sample to run!
 ws=1e7
 for (sam in sample_names)
@@ -646,9 +646,43 @@ pdf (file.path('Plots','celltype_sample_umap3.pdf'),7,7)
 dm
 dev.off()
 
-# Export cell type annotation
+# Export cell type annotation ####
 write.csv (do.call (rbind, lapply (sgn_l, function(x) as.data.frame(x$celltype))), 'cell_annotation.csv')
 
 
+### Make heatmap of malgiant prediction and chr deletion scores ####
+library (scales)
+meta_df = lapply(sgn_l, function(x) x@meta.data)
+meta_df[['P10']]$prediction.score.Malignant = 0
+names (meta_df) = names(sgn_l) 
+sampleID = unlist(lapply (names(sgn_l), function(x) rep(x,ncol(sgn_l[[x]]))))
+malignant_cells = unlist(lapply (names(sgn_l), function(x) ifelse (sgn_l[[x]]$celltype == 'Malignant', 'Malignant','non-malignant')))
+malignant_pred = unlist(lapply (names(sgn_l), function(x) meta_df[[x]]$prediction.score.Malignant))
+meta_df = lapply(names(sgn_l), function(x) meta_df[[x]][,c('chr4','chr13','chr22')])
+meta_df = do.call (rbind, meta_df)
+# meta_df$chr4 = scale(-meta_df$chr4, to = c(0, 1))
+# meta_df$chr13 = scale(-meta_df$chr13, to = c(0, 1))
+# meta_df$chr22 = scale(-meta_df$chr22, to = c(0, 1))
 
+ha = HeatmapAnnotation (
+  mal= malignant_cells, 
+  malignant_pred = malignant_pred,
+  col=list(
+    mal = c(Malignant = 'red',`non-malignant`='white')), 
+  which = 'row')
+cnv_hm = Heatmap (meta_df, row_split = sampleID,
+  left_annotation = ha, 
+  name = ' ',
+        column_gap = unit(.8, "mm"),
+        row_gap = unit(.2, "mm"),
+        clustering_distance_rows = 'euclidean',
+        clustering_distance_columns = 'euclidean',
+        cluster_columns=F, 
+        #col = ,
+        row_names_gp = gpar(fontsize = 0), 
+        column_names_gp = gpar(fontsize = 5), 
+        border=T)
 
+pdf (file.path('Plots','malig_prediction_heatmap.pdf'),7,width=3)
+cnv_hm
+dev.off()

@@ -40,8 +40,8 @@ palette_sample = c(
 #375974
 #003c5b')
 palette_sample = c(unlist(strsplit (palette_sample, '\n')))
-palette_sample = c(as.character(paletteer::paletteer_d("impressionist.colors::la_chanson_du_chien")), 'grey','grey')
-palette_sample = setNames (palette_sample , c('P1','P13','P3','P12','P5','P11','P4','P8','P10','P14','HU62','HU37'))
+palette_sample = c(as.character(paletteer::paletteer_d("impressionist.colors::la_chanson_du_chien")), 'red','red','red')
+palette_sample = setNames (palette_sample , c('P1','P13','P3','P12','P5','P11','P4','P8','P10','P14','HU62','HU37','normal_pleura'))
 #palette_sample = setNames (as.character(paletteer::paletteer_c("pals::ocean.dense",13)))
 #palette_sample = c(palette_sample, P10 = 'grey')
 palette_sample2 = c(palette_sample[3], palette_sample[6], palette_sample[10])
@@ -85,8 +85,9 @@ palette_celltypes_normal = setNames(brewer.pal(11,'Paired'),rev(c('AT1','AT2','B
 #for (pal in ls()[grep('palette',ls())]) store_pal (list(pal = get(pal)))
 palette_expression = rev (as.character(paletteer::paletteer_c("grDevices::Purple-Blue",100)))
 
-palette_deviation = paletteer::paletteer_c("grDevices::PuRd",20)
-palette_deviation = paletteer::paletteer_c("grDevices::PuRd",20)
+#palette_deviation = paletteer::paletteer_c("grDevices::PuRd",20)
+palette_deviation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
+palette_deviation_ggplot_fill = paletteer::scale_fill_paletteer_c("ggthemes::Red-Black-White Diverging", direction=-1)
 palette_deviation_centered = colorRamp2(c(-4,-2,0,2,4), c(palette_deviation[1],palette_deviation[45],palette_deviation[50],palette_deviation[55],palette_deviation[100]))
 palette_deviation_centered = colorRamp2(c(-1,0,0,1,2,3,4), c('white','white','grey','#F69322FF','#C73370FF','purple','black'))
 palette_deviation_fun = function(x) {return (colorRamp2(c(-max(abs(x)),-max(abs(x)/2), 0,max(abs(x)/2),max(abs(x))), c('white','white','white','#C73370FF','purple')))}
@@ -97,6 +98,7 @@ palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('white','white','black'))
 
 palette_expression_correlation = paletteer::paletteer_c("ggthemes::Green-Blue-White Diverging",100)
 palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#24693DFF','#F6F9FCFF','#4F7FAAFF'))
+#palette_expression_cor = c('#24693DFF','#F6F9FCFF','#4F7FAAFF')
 
 palette_deviation_correlation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
 palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#727C83FF','#FDFDFDFF','#AE123AFF'))

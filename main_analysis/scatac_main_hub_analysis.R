@@ -1,8 +1,8 @@
 # Load functions for hub detection
-source ('../../PM_scATAC/knnGen.R')
-source ('../../PM_scATAC/addCoax.R')
-source ('../../PM_scATAC/Hubs_finder.R')
-source ('../../PM_scATAC/hubs_track.R')
+source (file.path('..','..','git_repo','utils','knnGen.R'))
+source (file.path('..','..','git_repo','utils','addCoax.R'))
+source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 
 # Export bigiwg files ####
@@ -487,6 +487,18 @@ p1 <- plotGroups(
 pdf (file.path ('Plots','QC-Sample-Statistics.pdf'), height=5)
 wrap_plots (p1, p2)
 dev.off()
+
+
+# Identify hubs with no annotated genes within 1MB ####
+hubs = hubs_obj$hubsCollapsed
+hubs_ext = extendGR (hubs, upstream = 1000000, downstream = 1000000)
+geneless_hubs = findOverlaps (hubs_ext, archp@geneAnnotation[[1]])
+hubs_ext[!1:length(hubs) %in% unique(queryHits(geneless_hubs))]
+
+
+
+
+
 
 
 

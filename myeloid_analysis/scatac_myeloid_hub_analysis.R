@@ -1,8 +1,8 @@
 # Load functions for hub detection ####
-source (file.path('..','PM_scATAC','utils','knnGen.R'))
-source (file.path('..','PM_scATAC','utils','addCoax.R'))
-source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
-source (file.path('..','PM_scATAC','utils','hubs_track.R'))
+source (file.path('..','git_repo','utils','knnGen.R'))
+source (file.path('..','git_repo','utils','addCoax.R'))
+source (file.path('..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','git_repo','utils','hubs_track.R'))
 
 
 
