@@ -40,7 +40,7 @@ source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 source (file.path('..','..','git_repo','utils','palettes.R'))
 
 set.seed (1234)
-addArchRThreads (threads = 8) 
+addArchRThreads (threads = 1) 
 addArchRGenome ("Hg38")
 
 sample_names = c(
@@ -165,7 +165,7 @@ dev.off()
 
 
 # Plot gene score of cell type markers ####
-meso_markers = read.csv ('/ahg/regevdata/projects/ICA_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
+meso_markers = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
 meso_markers = meso_markers[meso_markers != 'IGHM']
 meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
 archp = addImputeWeights (archp)

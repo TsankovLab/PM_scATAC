@@ -1,19 +1,25 @@
 #!/bin/bash
-#$ -M bgiotti@broadinstitute.org
-#$ -N CNMF_factorization
-#$ -cwd 
-#$ -q broad
-#$ -l h_vmem=2g
-#$ -pe smp 1
-#$ -binding linear:1
-#$ -l h_rt=12:00:00
-#$ -e CNMF_factorization.err
+#BSUB -J cnmf)factorization
+#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -q premium
+#BSUB -n 1
+#BSUB -R rusage[mem=2000]
+#BSUB -R span[hosts=1]
+#BSUB -W 3:00
+#BSUB -o %J.stdout
+#BSUB -eo %J.stderr
+#BSUB -L /bin/bash
 
-source /broad/software/scripts/useuse
+ml anaconda3/2022.10
+
+source activate cnmf
+
+#source /broad/software/scripts/useuse
 #use .anaconda3-5.3.1
-use Anaconda
+#use Anaconda
 
-source activate /ahg/regevdata/projects/ICA_Lung/Bruno/conda/cnmf
+#source activate /ahg/regevdata/projects/ICA_Lung/Bruno/conda/cnmf
+
 projdir=${1}
 cnmf_out=${2}
 cores=${3}
