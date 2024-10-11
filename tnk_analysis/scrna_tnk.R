@@ -400,12 +400,12 @@ if (!file.exists(paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.co
 	
 	
 	# Run cNMF prepare script
-	system (paste0('chmod +x ../../PM_scATAC/cnmf_prepare_job.sh'), wait=FALSE) 
-	system (paste0('bash ','../../PM_scATAC/cnmf_prepare_job.sh ', projdir,' ', k_list_formatted,' ', nfeat, ' ', cnmf_out, ' ', cores), wait=TRUE)
+	system (paste0('chmod +x ../../../git_repo/utils/cnmf_prepare_job.sh'), wait=FALSE) 
+	system (paste0('bash ','../../../git_repo/utils/cnmf_prepare_job.sh ', projdir,' ', k_list_formatted,' ', nfeat, ' ', cnmf_out, ' ', cores), wait=TRUE)
 	
 	# Submitting cNMF factorization job
-	system (paste0('chmod +x ../../PM_scATAC/cnmf_factorization_parallel.sh'), wait=FALSE)
-	system (paste0 ('qsub -t 1-',cores,' ','../../PM_scATAC/cnmf_factorization_parallel.sh ', projdir,' ', cnmf_out, ' ', cores))
+	system (paste0('chmod +x ../../../git_repo/utils/cnmf_factorization_parallel.sh'), wait=FALSE)
+	system (paste0 ('bsub -P acc_Tsankov_Normal_Lung -J cnmf_factorization_[1-',cores,'] ','../../../git_repo/utils/cnmf_factorization_parallel.sh ', projdir,' ', cnmf_out, ' ', cores))
 	
 	# Run script to combine K iterations generated in previous script
 	system (paste0('chmod +x ../../PM_scATAC/cnmf_combine_job.sh'), wait=FALSE)

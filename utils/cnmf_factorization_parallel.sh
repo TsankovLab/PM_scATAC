@@ -43,11 +43,11 @@ echo $cnmf_out
 
 # Run cNMF
 # cnmf prepare --output-dir ./ --name $cnmf_out -c counts_nmf_${nfeat}.txt -k $k_list --n-iter 100 --seed 14 --tpm norm_nmf_${nfeat}.txt --numgenes $nfeat --total-workers 4 #--genes $genes_file #
-echo $SGE_TASK_ID
+echo $LSB_JOBINDEX
 
 cd ${projdir}/${cnmf_out}
 
-cnmf factorize --output-dir ./ --name cnmf --worker-index $SGE_TASK_ID --total-workers $cores
+cnmf factorize --output-dir ./ --name cnmf --worker-index $LSB_JOBINDEX --total-workers $cores
 
 # cnmf factorize --output-dir ./ --name $cnmf_out --worker-index --worker-index $SGE_TASK_ID
 # cnmf combine --output-dir ./ --name $cnmf_out
