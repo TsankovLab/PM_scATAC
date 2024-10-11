@@ -37,7 +37,7 @@ echo $cores
 #cnmf_dir="cNMF_${k_list}_${nfeat}"
 
 #k_list=' ' read -ra vector_array <<< "$k_list"
-cd ${projdir}${cnmf_out}
+cd ${projdir}/${cnmf_out}
 
 # Run cNMF
 #cnmf prepare --output-dir ./ --name cnmf -c ../counts_nmf_${nfeat}.txt -k $k_list --n-iter 100 --seed 14 --tpm ../norm_nmf_${nfeat}.txt --numgenes $nfeat --total-workers $cores #--genes $genes_file #
