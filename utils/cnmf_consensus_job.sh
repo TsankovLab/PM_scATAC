@@ -24,6 +24,6 @@ projdir=${1}
 cnmf_out=${2}
 k_selection=${3}
 
-cd $projdir$cnmf_out
+cd $projdir/$cnmf_out
 
 cnmf consensus --output-dir ./ --name cnmf --components $k_selection --local-density-threshold 0.3 --show-clustering
