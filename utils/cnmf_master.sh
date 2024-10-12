@@ -22,7 +22,7 @@ source activate cnmf
 
 projdir=${1}
 cnmf_out=${2}
-repodir = ${3]}
+repodir=${3]}
 nfeat=${4}
 k_list=${5}
 cores=${6}
@@ -38,7 +38,19 @@ cd ${projdir}/${cnmf_out}
 cnmf prepare --output-dir ./ --name cnmf -c ../counts_nmf_${nfeat}.txt -k $k_list --n-iter 100 --seed 14 --numgenes $nfeat --total-workers $cores #--genes $genes_file #
 
 chmod +x $git_repo/utils/cnmf_factorization_parallel.sh
-bsub -P acc_Tsankov_Normal_Lung -J cnmf_factorization [1-$cores] $git_repo/utils/cnmf_factorization_parallel.sh $projdir $cnmf_out $cores
+job_id=$(bsub -P acc_Tsankov_Normal_Lung -J cnmf_factorization [1-$cores] $git_repo/utils/cnmf_factorization_parallel.sh $projdir $cnmf_out $cores | awk '{print $2}' | sed 's/<//g' | sed 's/>//g')
+
+
+while true; do
+  job_status=$(bjobs $job_id 2>&1)
+  if [[ $job_status == *"DONE"* ]] || [[ $job_status == *"EXIT"* ]]; then
+    echo "Job $job_id finished."
+    break
+  else
+    echo "Waiting for job $job_id to finish..."
+    sleep 10  # Wait for 10 seconds before checking again
+  fi
+done
 
 cnmf combine --output-dir ./ --name cnmf
 cnmf k_selection_plot --output-dir ./ --name cnmf
