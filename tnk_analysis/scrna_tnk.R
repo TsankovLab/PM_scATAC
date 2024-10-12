@@ -1,5 +1,5 @@
 conda activate meso_scatac
-use UGER # Add this before running R to be able to run cNMF scripts using UGER 
+# use UGER # Add this before running R to be able to run cNMF scripts using UGER 
 
 R
 library (Seurat)
@@ -353,16 +353,19 @@ head (nk_cd8_ext_cor[order(-nk_cd8_ext_cor$mean_cor),],20)
 
 #### Run cNMF on NK KLRC1+ and CD8 exhausted ####
 srt2 = srt
-srt = srt2[, srt$celltype2 == 'NK_KLRC1']
+srt = srt2[, srt$celltype2 == 'NK_KLRC1' & srt$sampleID %in% 'P1']
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
+setwd (projdir)
 dir.create (file.path('NK_KLRC1','Plots'), recursive=TRUE)
 setwd ('NK_KLRC1')
+projdir = file.path (projdir,'NK_KLRC1')
 
 #### Run cNMF ####
 nfeat = 5000
 force=F
 k_list = c(5:30)
 k_selections = c(5:30)
-k_selection = 25
+k_selection = 10
 cores= 100
 
 sce = SingleCellExperiment (list(counts=srt@assays$RNA@counts, logcounts = srt@assays$RNA@data),
@@ -408,13 +411,12 @@ if (!file.exists(paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.co
 	system (paste0 ('bsub -P acc_Tsankov_Normal_Lung -J cnmf_factorization_[1-',cores,'] ','../../../git_repo/utils/cnmf_factorization_parallel.sh ', projdir,' ', cnmf_out, ' ', cores))
 	
 	# Run script to combine K iterations generated in previous script
-	system (paste0('chmod +x ../../PM_scATAC/cnmf_combine_job.sh'), wait=FALSE)
-	system (paste0('bash ','../../PM_scATAC/cnmf_combine_job.sh ', projdir, ' ',cnmf_out), wait=TRUE) # combine cnmf factors
-	
+	system (paste0('chmod +x ../../../git_repo/utils/cnmf_combine_job.sh'), wait=FALSE)
+	system (paste0('bash ','../../../git_repo/utils/cnmf_combine_job.sh ', projdir, ' ',cnmf_out), wait=TRUE) # combine cnmf factors
 	
 	# Run cNMF bash script
-	system (paste0('chmod +x ','../../PM_scATAC/cnmf_consensus_job.sh'), wait=FALSE)
-	system (paste0('qsub ','../../PM_scATAC/cnmf_consensus_job.sh ', projdir, ' ', cnmf_out,' ', k_selection), wait=FALSE)
+	system (paste0('chmod +x ','../../../git_repo/utils/cnmf_consensus_job.sh'), wait=FALSE)
+	system (paste0('bsub -P acc_Tsankov_Normal_Lung ','../../../git_repo/utils/cnmf_consensus_job.sh ', projdir, ' ', cnmf_out,' ', k_selection), wait=FALSE)
 	} else {
 	cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
 	}
@@ -437,7 +439,7 @@ names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
 saveRDS (cnmf_spectra_unique, paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds'))
 write.csv (patchvecs(cnmf_spectra_unique), paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.csv'))
 
-top_nmf_genes = 50
+top_nmf_genes = 200
 cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
       {
       tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
@@ -446,6 +448,7 @@ cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x)
       head(rownames(tmp),top_nmf_genes)
       })
 names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
+#saveRDS (cnmf_spectra_unique, paste0(cnmf_out,'/cnmf_genelist_',k_selection,'.rds'))
 
 # Add module score of cNMF modules ####
 if (!all (names(cnmf_spectra_unique) %in% colnames (srt@meta.data)))
@@ -479,5 +482,153 @@ bp1 = lapply (names(cnmf_spectra_unique), function(x) {
 png (file.path(cnmf_out,'Plots',paste0('cNMF_module_scores_boxplots_',k_selection,'nfeat_',nfeat,'.png')),5000,5000,res=300)
 print (wrap_plots (bp1))
 dev.off()
+
+
+
+
+
+#### Run cNMF on CD8 exhausted ####
+srt = srt2
+srt2 = srt
+srt = srt2[, srt$celltype2 == 'CD8_exhausted' & srt$sampleID %in% 'P1']
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
+setwd (projdir)
+projdir = file.path (projdir,'CD8_exhausted')
+dir.create (file.path('CD8_exhausted','Plots'), recursive=TRUE)
+setwd ('CD8_exhausted')
+
+#### Run cNMF ####
+nfeat = 5000
+force=F
+k_list = c(5:30)
+k_selections = c(5:30)
+k_selection = 10
+cores= 100
+cnmf_name = 'CD8_exhausted'
+cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
+dir.create (file.path(cnmf_out,'Plots'), recursive=T)
+repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+
+### RUN consensus NMF ####
+# conda create --yes --channel bioconda --channel conda-forge --channel defaults python=3.7 fastcluster matplotlib numpy palettable pandas scipy 'scikit-learn>=1.0' pyyaml 'scanpy>=1.8' -p /ahg/regevdata/projects/ICA_Lung/Bruno/conda/cnmf && conda clean --yes --all # Create environment, cnmf_env, containing required packages
+# conda activate cnmf
+# pip install cnmf
+if (!file.exists(paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt')))
+	{
+	# Extract and save count and data matrices from seurat object	
+	count_mat = t(srt@assays$RNA@counts[vf,])
+	norm_mat = t(srt@assays$RNA@data[vf,])
+	if (!file.exists (paste0('cNMF/counts_nmf_',nfeat,'.txt')) | force) write.table (count_mat, paste0('cNMF/counts_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
+	if (!file.exists (paste0('cNMF/norm_nmf_',nfeat,'.txt')) | force) write.table (norm_mat, paste0('cNMF/norm_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
+	
+	## Format k_list variable to be passed correctly to bash script
+	message ('submit cNMF job')
+	if(length(k_list) > 1) 
+		{
+		k_list_formatted = paste (k_list, collapse=' ')	
+		k_list_formatted = shQuote (k_list_formatted)
+		}
+	system (paste0('chmod +x ',file.path(repodir,'utils','cnmf_master.sh')), wait=FALSE) 
+	source (file.path(repodir,'utils','cnmf_master.sh'))
+
+	} else {
+	cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
+	}
+
+# Format NMF results ####
+# Assign genes uniquely to cNMF modules based on spectra values
+cnmf_spectra = t(cnmf_spectra)
+max_spectra = apply (cnmf_spectra, 1, which.max)
+
+top_nmf_genes = Inf
+cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
+      {
+      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
+      tmp = tmp[order(-tmp[,1]),,drop=F]
+      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
+      head(rownames(tmp),top_nmf_genes)
+      })
+names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
+
+saveRDS (cnmf_spectra_unique, paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds'))
+write.csv (patchvecs(cnmf_spectra_unique), paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.csv'))
+
+top_nmf_genes = 200
+cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
+      {
+      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
+      tmp = tmp[order(-tmp[,1]),,drop=F]
+      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
+      head(rownames(tmp),top_nmf_genes)
+      })
+names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
+saveRDS (cnmf_spectra_unique, paste0(cnmf_out,'/cnmf_genelist_',k_selection,'.rds'))
+
+# Add module score of cNMF modules ####
+if (!all (names(cnmf_spectra_unique) %in% colnames (srt@meta.data)))
+	{
+	srt = ModScoreCor (
+	        seurat_obj = srt, 
+	        geneset_list = cnmf_spectra_unique, 
+	        cor_threshold = NULL, 
+	        pos_threshold = NULL, # threshold for fetal_pval2
+	        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+
+	}
+
+srt$cNMF = 'cNMF'
+ccomp_df = srt@meta.data[,c(names(cnmf_spectra_unique),'sampleID'), drop=FALSE]
+      #ccomp_df = aggregate (ccomp_df, by=as.list(srt_wgcna@meta.data[,metaGroupNames,drop=F]), mean)    
+bp1 = lapply (names(cnmf_spectra_unique), function(x) {
+            ggplot (ccomp_df, aes_string (x= 'sampleID', y= x)) +
+        #geom_violin (trim=TRUE, aes_string (fill = metaGroupNames[3])) +
+        #geom_violin (aes_string(fill = metaGroupNames[3])) +
+        geom_boxplot(width=0.5, color="black", alpha=0.2) +
+        #geom_bar (stats='identity') +
+        #geom_jitter (color="black", size=0.4, alpha=0.9) +
+        theme_classic() + 
+        #scale_fill_manual (values= module_pal) + 
+        ggtitle (paste(x,'mod score')) + 
+        theme (axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))  + NoLegend()
+      })
+
+  
+png (file.path(cnmf_out,'Plots',paste0('cNMF_module_scores_boxplots_',k_selection,'nfeat_',nfeat,'.png')),5000,5000,res=300)
+print (wrap_plots (bp1))
+dev.off()
+
+
+
+
+
+# Compare cNMFs ####
+cnmf_nk = readRDS (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/NK_KLRC1/cnmf_genelist_10_nfeat_5000.rds'))
+names (cnmf_nk) = paste0('nk_',names(cnmf_nk))
+sapply (cnmf_nk, function(x) 'NR4A2' %in% x)
+cnmf_cd8ext = readRDS (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/CD8_exhausted/cnmf_genelist_10_nfeat_5000.rds'))
+names (cnmf_cd8ext) = paste0('cd8ext_',names(cnmf_cd8ext))
+sapply (cnmf_cd8ext, function(x) 'NR4A2' %in% x)
+
+cnmf_nk = lapply (cnmf_nk, function(x) head (x, 200))
+cnmf_cd8ext = lapply (cnmf_cd8ext, function(x) head (x, 200))
+cnmf_cd8ext[[6]][cnmf_cd8ext[[6]] %in% cnmf_nk[[4]]]
+ov_mat = ovmat (c(cnmf_nk, cnmf_cd8ext), compare_lists = list(names(cnmf_nk),names(cnmf_cd8ext)))
+
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
+setwd (projdir)
+pdf (file.path ('Plots','compare_cnmfs_NK_KLRC1_CD8exhausted.pdf'),5,5)
+ov_mat
+dev.off()
+
+
+srt = srt2
+dp = DotPlot (srt,
+  features = c('NR4A2','SPRY1','CTNNB1','NFATC1','ID2','NFKB2'),
+  #col = palette_gene_expression2,
+  group.by = 'celltype2') + gtheme_italic
+pdf (file.path('Plots','TNK_exhaustion_markers_dotplot.pdf'), height=2.6, width=4.6)
+dp
+dev.off()  
+
 
 

@@ -81,7 +81,7 @@ if (run_GS_analysis)
   {
   # Find DAG ####
   metaGroupName = "Clusters"
-  force = TRUE
+  force = FALSE
   if (!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force)
     {
     DAG_list = getMarkerFeatures (
@@ -166,8 +166,9 @@ dev.off()
 
 # Plot gene score of cell type markers ####
 meso_markers = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
+meso_markers = c(meso_markers, 'IGLL5')
 meso_markers = meso_markers[meso_markers != 'IGHM']
-meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
+#meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
 archp = addImputeWeights (archp)
 p <- plotEmbedding(
     ArchRProj = archp,
