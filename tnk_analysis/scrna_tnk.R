@@ -510,59 +510,10 @@ dir.create (file.path(cnmf_out,'Plots'), recursive=T)
 repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 
 ### RUN consensus NMF ####
-# conda create --yes --channel bioconda --channel conda-forge --channel defaults python=3.7 fastcluster matplotlib numpy palettable pandas scipy 'scikit-learn>=1.0' pyyaml 'scanpy>=1.8' -p /ahg/regevdata/projects/ICA_Lung/Bruno/conda/cnmf && conda clean --yes --all # Create environment, cnmf_env, containing required packages
-# conda activate cnmf
-# pip install cnmf
-if (!file.exists(paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt')))
-	{
-	# Extract and save count and data matrices from seurat object	
-	count_mat = t(srt@assays$RNA@counts[vf,])
-	norm_mat = t(srt@assays$RNA@data[vf,])
-	if (!file.exists (paste0('cNMF/counts_nmf_',nfeat,'.txt')) | force) write.table (count_mat, paste0('cNMF/counts_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
-	if (!file.exists (paste0('cNMF/norm_nmf_',nfeat,'.txt')) | force) write.table (norm_mat, paste0('cNMF/norm_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
-	
-	## Format k_list variable to be passed correctly to bash script
-	message ('submit cNMF job')
-	if(length(k_list) > 1) 
-		{
-		k_list_formatted = paste (k_list, collapse=' ')	
-		k_list_formatted = shQuote (k_list_formatted)
-		}
-	system (paste0('chmod +x ',file.path(repodir,'utils','cnmf_master.sh')), wait=FALSE) 
-	source (file.path(repodir,'utils','cnmf_master.sh'))
+source (file.path ('..','..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
 
-	} else {
-	cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
-	}
 
-# Format NMF results ####
-# Assign genes uniquely to cNMF modules based on spectra values
-cnmf_spectra = t(cnmf_spectra)
-max_spectra = apply (cnmf_spectra, 1, which.max)
 
-top_nmf_genes = Inf
-cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
-      {
-      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
-      tmp = tmp[order(-tmp[,1]),,drop=F]
-      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
-      head(rownames(tmp),top_nmf_genes)
-      })
-names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
-
-saveRDS (cnmf_spectra_unique, paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds'))
-write.csv (patchvecs(cnmf_spectra_unique), paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.csv'))
-
-top_nmf_genes = 200
-cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
-      {
-      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
-      tmp = tmp[order(-tmp[,1]),,drop=F]
-      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
-      head(rownames(tmp),top_nmf_genes)
-      })
-names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
-saveRDS (cnmf_spectra_unique, paste0(cnmf_out,'/cnmf_genelist_',k_selection,'.rds'))
 
 # Add module score of cNMF modules ####
 if (!all (names(cnmf_spectra_unique) %in% colnames (srt@meta.data)))

@@ -31,6 +31,7 @@ if (!file.exists (file.path('cNMF',paste0('norm_nmf_',nfeat,'.txt'))) | force)
 # pip install cnmf
 if (!all(file.exists(file.path(cnmf_out,'cnmf',paste0('cnmf.spectra.k_',k_selections,'.dt_0_3.consensus.txt')))))
 	{
+	message ('Run cNMF...')	
 	# Extract and save count and data matrices from seurat object	
 	## Format k_list variable to be passed correctly to bash script
 	message ('submit cNMF job')
@@ -46,6 +47,7 @@ if (!all(file.exists(file.path(cnmf_out,'cnmf',paste0('cnmf.spectra.k_',k_select
 	system (paste0('bash ',file.path(repodir,'utils','cnmf_master.sh '), projdir,' ',cnmf_out,' ',repodir,' ',nfeat,' ',k_list_formatted,' ', cores), wait=TRUE)
 	
 	} else {
+	message ('Found spectra files...')		
 	cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
 	}
 
