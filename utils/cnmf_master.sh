@@ -16,7 +16,7 @@ source activate cnmf
 
 projdir=${1}
 cnmf_out=${2}
-repodir=${3]}
+repodir=${3}
 nfeat=${4}
 k_list=${5}
 cores=${6}
