@@ -42,8 +42,8 @@ if (!all(file.exists(file.path(cnmf_out,'cnmf',paste0('cnmf.spectra.k_',k_select
 	
 	
 	# Run cNMF prepare script
-	system (paste0('chmod +x ',paste0(repodir,'/git_repo/utils/cnmf_master.sh')), wait=FALSE) 
-	system (paste0('bash ',paste0(repodir,'/git_repo/utils/cnmf_master.sh '), projdir,' ',cnmf_out,' ',repodir,' ',nfeat,' ',k_list_formatted,' ', cores), wait=TRUE)
+	system (paste0('chmod +x ',file.path(repodir,'utils','cnmf_master.sh')), wait=FALSE) 
+	system (paste0('bash ',file.path(repodir,'utils','cnmf_master.sh '), projdir,' ',cnmf_out,' ',repodir,' ',nfeat,' ',k_list_formatted,' ', cores), wait=TRUE)
 	
 	} else {
 	cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
