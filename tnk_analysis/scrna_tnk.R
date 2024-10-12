@@ -352,7 +352,7 @@ nk_cd8_ext_cor$mean_cor = rowMeans (nk_cd8_ext_cor)
 head (nk_cd8_ext_cor[order(-nk_cd8_ext_cor$mean_cor),],20)
 
 srt_orig = srt
-#### Run cNMF on NK KLRC1+ and CD8 exhausted ####
+#### Run cNMF on NK KLRC1+ ####
 srt = srt_orig[, srt_orig$celltype2 == 'NK_KLRC1' & srt_orig$sampleID %in% 'P1']
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
 setwd (projdir)
@@ -367,15 +367,15 @@ k_list = c(5:30)
 k_selections = c(5:30)
 cores= 100
 cnmf_name = 'NK_KLRC1'
-cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
-dir.create (file.path(cnmf_out,'Plots'), recursive=T)
+
+
 repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 
 ### RUN consensus NMF ####
 source (file.path ('..','..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
 
 ### Import and format spectra files ####
-k_selection = 5
+k_selection = 15
 source (file.path ('..','..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
 
 
@@ -405,24 +405,25 @@ repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/g
 source (file.path ('..','..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
 
 ### Import and format spectra files ####
-k_selection = 5
+k_selection = 30
 source (file.path ('..','..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
 
 
 
 
 # Compare cNMFs ####
-k_selection = 10
+k_selection = 15
 cnmf_nk = readRDS (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/NK_KLRC1/cnmf_genelist_',k_selection,'_nfeat_5000.rds'))
 names (cnmf_nk) = paste0('nk_',names(cnmf_nk))
 sapply (cnmf_nk, function(x) 'NR4A2' %in% x)
+k_selection = 30
 cnmf_cd8ext = readRDS (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/CD8_exhausted/cnmf_genelist_',k_selection,'_nfeat_5000.rds'))
 names (cnmf_cd8ext) = paste0('cd8ext_',names(cnmf_cd8ext))
 sapply (cnmf_cd8ext, function(x) 'NR4A2' %in% x)
 
-cnmf_nk = lapply (cnmf_nk, function(x) head (x, 200))
-cnmf_cd8ext = lapply (cnmf_cd8ext, function(x) head (x, 200))
-cnmf_cd8ext[[6]][cnmf_cd8ext[[6]] %in% cnmf_nk[[4]]]
+cnmf_nk = lapply (cnmf_nk, function(x) head (x, 500))
+cnmf_cd8ext = lapply (cnmf_cd8ext, function(x) head (x, 500))
+cnmf_cd8ext[[5]][cnmf_cd8ext[[5]] %in% cnmf_nk[[5]]] %in% a 
 ov_mat = ovmat (c(cnmf_nk, cnmf_cd8ext), compare_lists = list(names(cnmf_nk),names(cnmf_cd8ext)))
 
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
