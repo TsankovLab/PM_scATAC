@@ -14,12 +14,6 @@ ml anaconda3/2022.10
 
 source activate cnmf
 
-#source /broad/software/scripts/useuse
-#use .anaconda3-5.3.1
-#use Anaconda
-
-#source activate /ahg/regevdata/projects/ICA_Lung/Bruno/conda/cnmf
-
 projdir=${1}
 cnmf_out=${2}
 repodir=${3]}
@@ -27,12 +21,7 @@ nfeat=${4}
 k_list=${5}
 cores=${6}
 
-#env >> ~/job_env
-#set >> ~/job_env
-
 # Run cNMF
-# cnmf prepare --output-dir ./ --name $cnmf_out -c counts_nmf_${nfeat}.txt -k $k_list --n-iter 100 --seed 14 --tpm norm_nmf_${nfeat}.txt --numgenes $nfeat --total-workers 4 #--genes $genes_file #
-#echo $SGE_TASK_ID
 cd ${projdir}/${cnmf_out}
 
 cnmf prepare --output-dir ./ --name cnmf -c ../counts_nmf_${nfeat}.txt -k $k_list --n-iter 100 --seed 14 --numgenes $nfeat --total-workers $cores #--genes $genes_file #
@@ -40,7 +29,7 @@ cnmf prepare --output-dir ./ --name cnmf -c ../counts_nmf_${nfeat}.txt -k $k_lis
 chmod +x $repodir/utils/cnmf_factorization_parallel.sh
 job_id=$(bsub -P acc_Tsankov_Normal_Lung -J cnmf_factorization [1-$cores] $repodir/utils/cnmf_factorization_parallel.sh $projdir $cnmf_out $cores | awk '{print $2}' | sed 's/<//g' | sed 's/>//g')
 
-
+### While loop to wait until factorization job array is completed
 while true; do
   job_status=$(bjobs $job_id 2>&1)
   if [[ $job_status == *"DONE"* ]] || [[ $job_status == *"EXIT"* ]]; then
@@ -56,6 +45,8 @@ cnmf combine --output-dir ./ --name cnmf
 cnmf k_selection_plot --output-dir ./ --name cnmf
 
 cnmf consensus --output-dir ./ --name cnmf --components $k_list --local-density-threshold 0.3 --show-clustering	
+
+echo "cNMF jobs completed!"
 
 ## Using UGER
 # logdir = '.'

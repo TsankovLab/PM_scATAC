@@ -45,37 +45,6 @@ if (!all(file.exists(file.path(cnmf_out,'cnmf',paste0('cnmf.spectra.k_',k_select
 	# Run cNMF prepare script
 	system (paste0('chmod +x ',file.path(repodir,'utils','cnmf_master.sh')), wait=FALSE) 
 	system (paste0('bash ',file.path(repodir,'utils','cnmf_master.sh '), projdir,' ',cnmf_out,' ',repodir,' ',nfeat,' ',k_list_formatted,' ', cores), wait=TRUE)
-	
 	} else {
-	message ('Found spectra files...')		
-	cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
-	}
-
-# Format NMF results ####
-# Assign genes uniquely to cNMF modules based on spectra values
-cnmf_spectra = t(cnmf_spectra)
-max_spectra = apply (cnmf_spectra, 1, which.max)
-
-top_nmf_genes = Inf
-cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
-      {
-      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
-      tmp = tmp[order(-tmp[,1]),,drop=F]
-      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
-      head(rownames(tmp),top_nmf_genes)
-      })
-names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
-
-saveRDS (cnmf_spectra_unique, paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds'))
-write.csv (patchvecs(cnmf_spectra_unique), paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.csv'))
-
-top_nmf_genes = 200
-cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
-      {
-      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
-      tmp = tmp[order(-tmp[,1]),,drop=F]
-      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
-      head(rownames(tmp),top_nmf_genes)
-      })
-names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
-saveRDS (cnmf_spectra_unique, paste0(cnmf_out,'/cnmf_genelist_',k_selection,'.rds'))
+	message ('cnmf spectra files aready generated!'')	
+	}	
