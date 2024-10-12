@@ -9,7 +9,6 @@ sce = SingleCellExperiment (list(counts=srt@assays$RNA@counts, logcounts = srt@a
 	nfeat = 5000
 	vf = getTopHVGs (sce, n=nfeat)
 
-cnmf_name = 'CD8_exhausted'
 cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
 dir.create (file.path(cnmf_out,'Plots'), recursive=T)
 

@@ -28,4 +28,5 @@ cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x)
       head(rownames(tmp),top_nmf_genes)
       })
 names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
-saveRDS (cnmf_spectra_unique, paste0(cnmf_out,'/cnmf_genelist_',k_selection,'.rds'))
+
+message ('cnmf results in cnmf_spectra_unique object')
