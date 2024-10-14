@@ -65,3 +65,8 @@ chrombpnet bias pipeline \
         -o bias_model \
         -fp k562
 
+### Run it as a job
+chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/chrombpnet_tutorial_job.sh
+#bsub -P acc_Tsankov_Normal_Lung -W 24:00 /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/chrombpnet_tutorial_job.sh
+bsub </sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/chrombpnet_tutorial_job.sh
+

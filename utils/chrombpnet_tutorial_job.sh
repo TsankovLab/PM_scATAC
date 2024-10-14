@@ -24,7 +24,7 @@ source activate chrombpnet
 
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet/tutorial/
 
-rm -r bias_model
+#rm -r bias_model
 
 chrombpnet bias pipeline \
         -ibam data/downloads/merged.bam \
@@ -35,6 +35,6 @@ chrombpnet bias pipeline \
         -n data/output_negatives.bed \
         -fl data/splits/fold_0.json \
         -b 0.5 \
-        -o bias_model \
+        -o bias_model_tutorial_gpu \
         -fp k562
 

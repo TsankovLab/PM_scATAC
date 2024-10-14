@@ -54,3 +54,7 @@ chrombpnet bias pipeline \
         -o bias_model/ \
         -fp tnk
 
+# Run as a job
+chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombpnet_bias_NKT.sh
+bsub </sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombpnet_bias_NKT.sh
+
