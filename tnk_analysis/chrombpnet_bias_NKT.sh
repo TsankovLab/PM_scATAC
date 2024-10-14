@@ -1,5 +1,5 @@
 #!/bin/bash
-#BSUB -J bias_model_tutorial
+#BSUB -J bias_model_NKT
 #BSUB -P acc_Tsankov_Normal_Lung
 #BSUB -q gpu
 #BSUB -n 4
