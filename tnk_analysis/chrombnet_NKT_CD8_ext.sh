@@ -32,7 +32,7 @@ chrombpnet pipeline \
   -c ../../../../../chromBPnet/hg38.chrom.sizes \
   -p peakset_CD8_exhausted.bed \
   -n  output_negatives.bed \
-  -fl /path/to/fold_0.json \
+  -fl splits/fold_0.json \
   -b bias_model/tnk_bias.h5 \ 
   -o CD8_ext_model/
 
