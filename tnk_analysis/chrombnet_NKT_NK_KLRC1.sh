@@ -2,7 +2,7 @@
 #BSUB -J chrbp_model_KRLC1
 #BSUB -P acc_Tsankov_Normal_Lung
 #BSUB -q gpu
-#BSUB -n 4
+#BSUB -n 8
 #BSUB -W 24:00
 #BSUB -gpu num=1
 #BSUB -R v100

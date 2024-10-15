@@ -8,9 +8,10 @@ metaGroupName = 'celltype2'
 if (!exists ('fragments')) fragments = unlist(getFragmentsFromProject (archp))
 if (!file.exists (file.path('chromBPnet',paste0('fragments_NKT_cells.tsv')))) write.table (fragments, file.path('chromBPnet',paste0('fragments_NKT_cells.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
 
-for (metagroup in as.character(archp@cellColData[,metaGroupName]))
+force = TRUE
+for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
   {
-  if (!file.exists(paste0('fragments_',metagroup,'.tsv')))
+  if (!file.exists(paste0('fragments_',metagroup,'.tsv')) | force)
     {  
     #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
     fragments_metagroup = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]]
