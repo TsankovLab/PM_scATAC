@@ -52,5 +52,30 @@ install.packages("scCustomize")
 install.packages("ggpubr")  
 
 
+### Run cNMF scripts on LSF batch submission ###   
+Scripts to run cNMF are in utils and include:  
+cnmf_prepare_inputs.R  
+cnmf_master.sh  
+cnmf_factorization_parallel.sh  
+cnmf_format_spectra_files.R  
+
+#### Run cNMF ####  
+nfeat = 5000  # specify number of features to use  
+force=F # force re-running when output already present  
+k_list = c(5:30) # number of K to compute  
+k_selections = c(5:30) # number of K to compute  
+cores= 100 # specify number of cores for array job  
+cnmf_name = 'CD8_exhausted' # specify name of cnmf run  
+cnmf_out = path/to/output # path to cnmf output  
+git_repo = path/to/git_repo # path to git repo  
+
+### RUN consensus NMF from R ####  
+source (file.path ('git_repo','utils','cnmf_prepare_inputs.R')) #  source cNMF to prepare count matrices and run cnmf algorithm  
+
+### Import and format spectra files in R ####
+k_selection = 30   # select a K after examining error / performance cNMF plot
+source (file.path ('git_repo','utils','cnmf_format_spectra_files.R'))
+
+
 
 
