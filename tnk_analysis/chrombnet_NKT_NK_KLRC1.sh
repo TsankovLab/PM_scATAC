@@ -1,5 +1,5 @@
 #!/bin/bash
-#BSUB -J chrbp_model_CD8_ext
+#BSUB -J chrbp_model_KRLC1
 #BSUB -P acc_Tsankov_Normal_Lung
 #BSUB -q gpu
 #BSUB -n 4
@@ -26,13 +26,13 @@ cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells
 
 
 chrombpnet pipeline \
-    -ifrag fragments_CD8_exhausted.tsv \
+    -ifrag fragments_NK_KLRC1.tsv \
     -d "ATAC" \
     -g ../../../../../genome_references/hg38.genome.fa \
     -c ../../../../../chromBPnet/hg38.chrom.sizes \
-    -p peakset_CD8_exhausted.bed \
+    -p peakset_NK_KLRC1.bed \
     -n  output_negatives.bed \
     -fl splits/fold_0.json \
     -b bias_model/models/tnk_bias.h5 \
-    -o CD8_ext_model/
+    -o KRLC1_model/
 
