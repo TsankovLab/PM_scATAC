@@ -26,13 +26,13 @@ cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells
 
 
 chrombpnet pipeline \
-  -ifrag fragments_CD8_exhausted.tsv \ # only one of ibam, ifrag or itag is accepted
-  -d "ATAC" \
-  -g ../../../../../genome_references/hg38.genome.fa \
-  -c ../../../../../chromBPnet/hg38.chrom.sizes \
-  -p peakset_CD8_exhausted.bed \
-  -n  output_negatives.bed \
-  -fl splits/fold_0.json \
-  -b bias_model/tnk_bias.h5 \ 
-  -o CD8_ext_model/
+    -ifrag fragments_CD8_exhausted.tsv \
+    -d "ATAC" \
+    -g ../../../../../genome_references/hg38.genome.fa \
+    -c ../../../../../chromBPnet/hg38.chrom.sizes \
+    -p peakset_CD8_exhausted.bed \
+    -n  output_negatives.bed \
+    -fl splits/fold_0.json \
+    -b bias_model/tnk_bias.h5 \
+    -o CD8_ext_model/
 
