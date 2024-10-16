@@ -2,9 +2,9 @@
 #BSUB -J chrbp_model_KLRC1_contribution
 #BSUB -P acc_Tsankov_Normal_Lung
 #BSUB -q gpu
-#BSUB -n 8
+#BSUB -n 16
 #BSUB -W 24:00
-#BSUB -gpu num=8
+#BSUB -gpu num=1
 #BSUB -R v100
 #BSUB -R rusage[mem=32000]
 #BSUB -R span[hosts=1]
