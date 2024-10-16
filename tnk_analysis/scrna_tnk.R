@@ -444,3 +444,56 @@ dev.off()
 
 
 
+# Compare NKT pseudobulks to peakset of exhausted CD8 from mouse from Miller et al ####
+ext_ps = read.csv ('../ext_peakset_Miller.csv')
+colnames (ext_ps)
+ext_ps = ext_ps[,c(1:4,23)]
+ext_ps = ext_ps[order(-ext_ps[,5]),]
+ext_ps = ext_ps[ext_ps[,5] > 1,]
+ext_ps_gr = GRanges (ext_ps)
+
+library (liftOver)
+download.file("https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz", "mm10ToHg38.over.chain.gz")
+system("gzip -d mm10ToHg38.over.chain.gz")
+#system (paste0('wget (https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz)', '-P', getwd()))
+
+ch = import.chain ('mm10ToHg38.over.chain')
+#seqlevelsStyle(hub_hg19) = "UCSC"  # necessary
+ext_hg38 = unlist (liftOver(ext_ps_gr, ch))
+
+ext_hg38_sub = head (ext_hg38,5000)
+ext_hg38_sub = resize (ext_hg38_sub, 1, "center")
+ext_hg38_sub = extendGR (gr = ext_hg38_sub, upstream = 3000, downstream = 3000)
+peak_windows = slidingWindows(x = ext_hg38_sub, width = 100, step = 50)
+
+metaGroupName = 'celltype2'
+for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
+  {
+  if (!file.exists(paste0('ext_peaks_windows_',metagroup,'.tsv')) | force)
+    {  
+    #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
+    fragments_metagroup = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]]
+    fragments_metagroup_counts = lapply (peak_windows, function(x) countOverlaps (x, fragments_metagroup))
+    fragments_metagroup_counts_df = do.call (cbind, fragments_metagroup_counts)
+    write.table (fragments_metagroup, file.path('chromBPnet',paste0('fragments_',metagroup,'.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

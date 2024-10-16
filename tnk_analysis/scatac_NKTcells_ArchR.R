@@ -1215,3 +1215,71 @@ pdf (file.path ('Plots',paste0('correlation_',paste(celltype_pair,collapse='_'),
 corp
 dev.off()
 
+
+
+
+# Compare NKT pseudobulks to peakset of exhausted CD8 from mouse from Miller et al ####
+if (!exists('fragments')) fragments = getFragmentsFromProject (archp)
+fragments = unlist(fragments)
+ext_ps = read.csv ('../ext_peakset_Miller.csv')
+
+ext_ps = ext_ps[,c(1:4,23)]
+ext_ps = ext_ps[order(ext_ps[,5]),]
+ext_ps = ext_ps[ext_ps[,5] < 0,]
+ext_ps_gr = GRanges (ext_ps)
+
+library (liftOver)
+download.file("https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz", "mm10ToHg38.over.chain.gz")
+system("gzip -d mm10ToHg38.over.chain.gz")
+#system (paste0('wget (https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz)', '-P', getwd()))
+
+ch = import.chain ('mm10ToHg38.over.chain')
+#seqlevelsStyle(hub_hg19) = "UCSC"  # necessary
+ext_hg38 = unlist (liftOver(ext_ps_gr, ch))
+
+#ext_hg38_sub = head (ext_hg38, 1000)
+ext_hg38_ov = getPeakSet(archp)[queryHits(findOverlaps (getPeakSet(archp), ext_hg38_sub))]
+#names (ext_hg38_ov) = NULL
+# ext_hg38_sub = resize (ext_hg38_sub, 1, "center")
+# ext_hg38_sub = extendGR (gr = ext_hg38_sub, upstream = 3000, downstream = 3000)
+peak_windows = slidingWindows (x = ext_hg38_ov, width = 20, step = 10)
+
+metaGroupName = 'celltype2'
+force = FALSE
+ext_l = list()
+for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
+  {
+  if (!file.exists(paste0('ext_peaks_windows_',metagroup,'.tsv')) | force)
+    {  
+    #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
+    fragments_metagroup = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]]
+    fragments_metagroup_counts = lapply (peak_windows, function(x) countOverlaps (x, fragments_metagroup))
+    fragments_metagroup_counts_df = do.call (cbind, fragments_metagroup_counts)
+    colnames (fragments_metagroup_counts_df) = as.character(ext_hg38_ov)
+    write.table (fragments_metagroup_counts_df, file.path(paste0('ext_peaks_windows_',metagroup,'.tsv')), sep='\t')
+    } else {
+  ext_l[[metagroup]] = read.table (file.path(paste0('ext_peaks_windows_',metagroup,'.tsv')), sep='\t', row.names=NULL)
+  }}
+  
+
+ext_df = do.call (rbind, ext_l)
+ext_df = apply (ext_df,c(1,2), function(x) as.numeric(x))
+pdf (file.path ('Plots','ext_peakset_miller.pdf'))
+Heatmap (t(ext_df),
+  column_split = rep (names(ext_l), each=50), 
+  cluster_rows=F, 
+  cluster_columns=F)
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+

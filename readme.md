@@ -50,6 +50,7 @@ BiocManager::install("RTCGA")
 BiocManager::install("liftOver")  
 install.packages("scCustomize")  
 install.packages("ggpubr")  
+BiocManager::install("liftOver")
 
 
 ### Run cNMF scripts on LSF batch submission ###   

@@ -67,6 +67,15 @@ chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git
 bsub </sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombnet_NKT_NK_KLRC1.sh
 
 
+# Get contribution score bigwigs
+cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
+MODEL_H5=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/KRLC1_model
+REGIONS=peakset_NK_KLRC1.bed
+GENOME=../../../../../genome_references/hg38.genome.fa
+CHROM_SIZES=../../../../../chromBPnet/hg38.chrom.sizes
+OUTPUT_PREFIX=KLRC1_contribution_scores/
+chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX 
+
 
 
 
