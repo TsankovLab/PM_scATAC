@@ -1275,6 +1275,86 @@ dev.off()
 
 
 
+# Compare NKT pseudobulks to peakset of exhausted CD8 from human meta-analysis Riegel et al ####
+if (!exists('fragments')) fragments = getFragmentsFromProject (archp)
+fragments = unlist(fragments)
+ext_ps = read.csv ('riegel_Text_list.csv')
+ext_clusters = c('C1','C2','C3','C4')
+ext_ps = ext_ps[ext_ps$group_name %in% ext_clusters,]
+ext_ps_gr = GRanges (ext_ps)
+
+library (liftOver)
+
+if(!file.exists('hg19ToHg38.over.chain'))
+  {
+  download.file("https://hgdownload.soe.ucsc.edu/gbdb/hg19/liftOver/hg19ToHg38.over.chain.gz", "hg19ToHg38.over.chain.gz")
+  system("gzip -d hg19ToHg38.over.chain.gz")
+  #system (paste0('wget (https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz)', '-P', getwd()))
+  }
+
+ch = import.chain ('hg19ToHg38.over.chain')
+#seqlevelsStyle(hub_hg19) = "UCSC"  # necessary
+ext_hg38 = unlist (liftOver(ext_ps_gr, ch))
+ext_hg38_sub = head (ext_hg38[ext_hg38$Log2FC > 3, ],1000)
+
+ext_hg38_sub = resize (ext_hg38_sub, 1, "center")
+ext_hg38_sub = extendGR (gr = ext_hg38_sub, upstream = 3000, downstream = 3000)
+peak_windows = slidingWindows (x = ext_hg38_sub, width = 50, step = 25)
+# peak_windows = peak_windows[sapply(peak_windows, length) == 50]
+# peak_windows_l =  lapply (1:length(peak_windows[[1]]), function(x) unlist(lapply (peak_windows, function(y) y[x])))
+
+
+metaGroupName = 'celltype2'
+force = TRUE
+ext_l = list()
+
+pb =progress::progress_bar$new(total = length (unique (as.character(archp@cellColData[,metaGroupName]))))
+if (!file.exists(paste0('riegel_ext_peaks_',metagroup,'.rds')) | force)
+  {
+  for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
+    {
+    pb$tick()            
+    #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
+    fragments_metagroup = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]]
+    fragments_metagroup_counts = lapply (peak_windows, function(x) countOverlaps (x, fragments_metagroup))
+    fragments_metagroup_counts_df = do.call (cbind, fragments_metagroup_counts)
+    fragments_metagroup_counts_df = (fragments_metagroup_counts_df / sum (archp$ReadsInTSS[as.logical(archp@cellColData[,metaGroupName] == metagroup)])) * 10e6
+    #colnames (fragments_metagroup_counts_df) = as.character(ext_hg38_ov)
+    # write.table (fragments_metagroup_counts_df, file.path(paste0('riegel_ext_peaks_windows_',metagroup,'.tsv')), sep='\t')
+    ext_l[[metagroup]] = fragments_metagroup_counts_df
+    }
+  saveRDS (ext_l, paste0('riegel_ext_peaks_',metaGroupName,'.rds'))
+  } else {
+  ext_l = readRDS (paste0('riegel_ext_peaks_',metaGroupName,'.rds'))
+  }
+
+ext_df = do.call (rbind, ext_l)
+ext_df = apply (ext_df,c(1,2), function(x) as.numeric(x))
+ext_df = as.data.frame (t(log10(ext_df+1)))
+colnames (ext_df) = rep (names(ext_l), each=240)
+rownames(ext_df) = as.character(ext_hg38_sub)
+ext_df$region = rownames(ext_df)
+rownames (ext_df) = NULL
+#palette_fragments = paletteer::paletteer_c("ggthemes::Classic Area-Brown",n=40)
+ext_df_long = gather (ext_df, coverage, celltype, 1:(ncol(ext_df)-1))
+den = ggplot(df, aes(x=weight))+
+  geom_density(color="darkblue", fill="lightblue")
+
+
+
+pdf (file.path ('Plots','ext_peakset_riegel.pdf'), height=4,width=6)
+Heatmap (ext_df,
+#  column_split = , 
+  column_split=factor(rep (names(ext_l), each=240), levels=c('NK_FGFBP2','CD4','CD8','NK_KLRC1','CD8_exhausted','Tregs')),
+  cluster_rows=F,
+  column_title_gp = gpar(
+fontsize = 8),
+  col = palette_fragments, 
+  cluster_columns=F,
+  border=T)
+dev.off()
+
+
 
 
 

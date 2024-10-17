@@ -13,11 +13,11 @@
 #BSUB -L /bin/bash
 
 ml anaconda3/2022.10
-ml cuda/11.7.0;
-ml cudnn/8.9.5-11;
-ml proxies;
-ml java/11.0.2;
-
+ml cuda/11.7.0
+ml cudnn/8.9.5-11
+ml proxies
+ml java/11.0.2
+ml tensorrt/8.5.3.1
 
 source activate chrombpnet
 

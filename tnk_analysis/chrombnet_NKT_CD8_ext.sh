@@ -2,8 +2,8 @@
 #BSUB -J chrbp_model_CD8_ext
 #BSUB -P acc_Tsankov_Normal_Lung
 #BSUB -q gpu
-#BSUB -n 16
-#BSUB -W 24:00
+#BSUB -n 8
+#BSUB -W 48:00
 #BSUB -gpu num=1
 #BSUB -R v100
 #BSUB -R rusage[mem=32000]
@@ -13,10 +13,11 @@
 #BSUB -L /bin/bash
 
 ml anaconda3/2022.10
-ml cuda/11.7.0;
-ml cudnn/8.9.5-11;
-ml proxies;
-ml java/11.0.2;
+ml cuda/11.7.0
+ml cudnn/8.9.5-11
+ml proxies
+ml java/11.0.2
+ml tensorrt/8.5.3.1
 
 
 source activate chrombpnet

@@ -103,3 +103,4 @@ palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#24693DFF','#F6F9FCFF','#4
 palette_deviation_correlation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
 palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#727C83FF','#FDFDFDFF','#AE123AFF'))
 #palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#2B5C8AFF','white','#9E3D22FF'))
+palette_fragments = paletteer::paletteer_c("grDevices::Oslo",n=40)
