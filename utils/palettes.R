@@ -58,9 +58,11 @@ ov_pal = rev(paletteer::paletteer_c("grDevices::Purple-Blue",100))
 # Set palette
 palette_bulk = setNames (as.character(paletteer::paletteer_d("rcartocolor::ArmyRose")[c(1,2,5,7,3,1,7)]), c('Epithelioid','Biphasic-E','Biphasic-S','Sarcomatoid','Biphasic','E_score','S_score'))
 
-palette_t_cells = setNames (as.character (paletteer::paletteer_d("fishualize::Bodianus_rufus",5)), c('CD8','CD4','Tregs','TFH','CD8_exhausted'))
-palette_nk_cells = setNames (c("#D3E3CAFF", "#92A587FF", "#2F3525FF"), c('NK_FGFBP2','NK_KLRC1','NKlike_Tcells'))
-palette_tnk_cells = c(palette_t_cells, palette_nk_cells)
+# palette_t_cells = setNames (as.character (paletteer::paletteer_d("fishualize::Bodianus_rufus",5)), c('CD8','CD4','Tregs','TFH','CD8_exhausted'))
+# palette_nk_cells = setNames (c("#D3E3CAFF", "#92A587FF", "#2F3525FF"), c('NK_FGFBP2','NK_KLRC1','NKlike_Tcells'))
+# palette_tnk_cells = c(palette_t_cells, palette_nk_cells)
+palette_tnk_cells =setNames (as.character(paletteer::paletteer_d("tvthemes::Stark",n=6)), c('CD8','CD4','Tregs','NK_KLRC1','NK_FGFBP2','CD8_exhausted'))
+#palette_tnk_cells['CD4'] = '#F9ECE8FF'
 palette_myeloid = rev(as.character(paletteer::paletteer_d("khroma::lapaz", 256)[c(1,40,80,120,150,190,210,230)]))
 palette_protein_expression = c(low="darkblue",mid= "white",high= "darkgreen") 
 palette_feature_RNA = c('lightgrey',"#5F1415FF")
@@ -104,3 +106,4 @@ palette_deviation_correlation = paletteer::paletteer_c("ggthemes::Red-Black-Whit
 palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#727C83FF','#FDFDFDFF','#AE123AFF'))
 #palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#2B5C8AFF','white','#9E3D22FF'))
 palette_fragments = paletteer::paletteer_c("grDevices::Oslo",n=40)
+palette_fragments = paletteer::paletteer_c("grDevices::Inferno",40)

@@ -30,8 +30,26 @@
     DAM_list = readRDS (paste0('DAM_',metaGroupName,'.rds'))
     }
   
-  active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > 0.1]
-  DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_genes,])
+  # Clean TF names
+  DAM_list = lapply (DAM_list, function(x)
+       {
+       x$gene = gsub ('_.*','',x$gene)
+       x$gene = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", x$gene)
+       x
+       })
+  
+
+
+  #Get active genes from RNA
+  ps = log2(as.data.frame (AverageExpression (srt, 
+  features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
+  group.by = metaGroupName)[[1]]) +1)
+  min_exp = 0.1
+  ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
+  active_TFs = rownames(ps)[rowSums(ps) > 0]
+
+  #active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > 0.1]
+  DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])
   names (DAM_list2) = names (DAM_list)
   FDR_threshold = 1e-3
   meandiff_threshold = 0
@@ -52,10 +70,7 @@
       }
     })
   DAM_df = Reduce (rbind ,DAM_top_list)
-  
-  
-  DAM_df$gene = gsub ('_.*','',DAM_df$gene)
-  DAM_df$gene = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", DAM_df$gene)
+  active_DAM = unique(DAM_df$gene)
   
   # # Get deviation matrix ####
   if (!exists ('mSE')) mSE = fetch_mat (archp, 'Motif')
