@@ -1,5 +1,4 @@
 conda activate meso_scatac
-use UGER
 R
 
 set.seed(1234)

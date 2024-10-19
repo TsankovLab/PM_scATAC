@@ -1089,7 +1089,7 @@ hubsTracks <- function(
 
       hubsO$facet <- title
       if(is.null(pal)){
-        pal <- colorRampPalette(c("red","black"))(100)
+        pal <- colorRampPalette(c("grey88","black"))(100)
       }
 
       p <- ggplot(data = data.frame(hubsO), aes(x = x, y = y, group = id, color = value)) + 

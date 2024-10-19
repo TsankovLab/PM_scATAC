@@ -1,4 +1,8 @@
-
+#### Load hidden functions from ArchR ####
+hidden_func_names = ls(getNamespace("ArchR"), all.names = TRUE)[grep ('^\\.', ls(getNamespace("ArchR"), all.names = TRUE))]
+for (func_name in hidden_func_names) {
+  assign(func_name, getFromNamespace(func_name, "ArchR"), envir = .GlobalEnv)
+}
 
 # Retreive matrix from ArchR object, fix barcode order and names
 fetch_mat = function(archp = NULL, mat = 'Motif')

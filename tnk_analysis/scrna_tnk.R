@@ -351,8 +351,27 @@ write.csv (nk_cd8_ext_cor, 'nk_cd8_ext_cor.csv')
 nk_cd8_ext_cor$mean_cor = rowMeans (nk_cd8_ext_cor)
 head (nk_cd8_ext_cor[order(-nk_cd8_ext_cor$mean_cor),],20)
 
+
+
+
+#### Run cNMF ####
+nfeat = 5000
+force=F
+k_list = c(5:30)
+k_selections = c(5:30)
+cores= 100
+cnmf_name = 'TNK'
+cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
+dir.create (file.path(cnmf_out,'Plots'), recursive=T)
+repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+
+### RUN consensus NMF ####
+source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
+
+
+
 srt_orig = srt
-#### Run cNMF on NK KLRC1+ ####
+#### Run cNMF on NK KLRC1+ and CD8 exhausted ####
 srt = srt_orig[, srt_orig$celltype2 == 'NK_KLRC1' & srt_orig$sampleID %in% 'P1']
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
 setwd (projdir)
@@ -375,7 +394,7 @@ repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/g
 source (file.path ('..','..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
 
 ### Import and format spectra files ####
-k_selection = 15
+k_selection = 5
 source (file.path ('..','..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
 
 
@@ -405,25 +424,24 @@ repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/g
 source (file.path ('..','..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
 
 ### Import and format spectra files ####
-k_selection = 30
+k_selection = 5
 source (file.path ('..','..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
 
 
 
 
 # Compare cNMFs ####
-k_selection = 15
+k_selection = 10
 cnmf_nk = readRDS (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/NK_KLRC1/cnmf_genelist_',k_selection,'_nfeat_5000.rds'))
 names (cnmf_nk) = paste0('nk_',names(cnmf_nk))
 sapply (cnmf_nk, function(x) 'NR4A2' %in% x)
-k_selection = 30
 cnmf_cd8ext = readRDS (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/CD8_exhausted/cnmf_genelist_',k_selection,'_nfeat_5000.rds'))
 names (cnmf_cd8ext) = paste0('cd8ext_',names(cnmf_cd8ext))
 sapply (cnmf_cd8ext, function(x) 'NR4A2' %in% x)
 
-cnmf_nk = lapply (cnmf_nk, function(x) head (x, 500))
-cnmf_cd8ext = lapply (cnmf_cd8ext, function(x) head (x, 500))
-cnmf_cd8ext[[5]][cnmf_cd8ext[[5]] %in% cnmf_nk[[5]]] %in% a 
+cnmf_nk = lapply (cnmf_nk, function(x) head (x, 300))
+cnmf_cd8ext = lapply (cnmf_cd8ext, function(x) head (x, 300))
+cnmf_cd8ext[[6]][cnmf_cd8ext[[6]] %in% cnmf_nk[[4]]]
 ov_mat = ovmat (c(cnmf_nk, cnmf_cd8ext), compare_lists = list(names(cnmf_nk),names(cnmf_cd8ext)))
 
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
@@ -441,59 +459,6 @@ dp = DotPlot (srt,
 pdf (file.path('Plots','TNK_exhaustion_markers_dotplot.pdf'), height=2.6, width=4.6)
 dp
 dev.off()  
-
-
-
-# Compare NKT pseudobulks to peakset of exhausted CD8 from mouse from Miller et al ####
-ext_ps = read.csv ('../ext_peakset_Miller.csv')
-colnames (ext_ps)
-ext_ps = ext_ps[,c(1:4,23)]
-ext_ps = ext_ps[order(-ext_ps[,5]),]
-ext_ps = ext_ps[ext_ps[,5] > 1,]
-ext_ps_gr = GRanges (ext_ps)
-
-library (liftOver)
-download.file("https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz", "mm10ToHg38.over.chain.gz")
-system("gzip -d mm10ToHg38.over.chain.gz")
-#system (paste0('wget (https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz)', '-P', getwd()))
-
-ch = import.chain ('mm10ToHg38.over.chain')
-#seqlevelsStyle(hub_hg19) = "UCSC"  # necessary
-ext_hg38 = unlist (liftOver(ext_ps_gr, ch))
-
-ext_hg38_sub = head (ext_hg38,5000)
-ext_hg38_sub = resize (ext_hg38_sub, 1, "center")
-ext_hg38_sub = extendGR (gr = ext_hg38_sub, upstream = 3000, downstream = 3000)
-peak_windows = slidingWindows(x = ext_hg38_sub, width = 100, step = 50)
-
-metaGroupName = 'celltype2'
-for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
-  {
-  if (!file.exists(paste0('ext_peaks_windows_',metagroup,'.tsv')) | force)
-    {  
-    #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
-    fragments_metagroup = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]]
-    fragments_metagroup_counts = lapply (peak_windows, function(x) countOverlaps (x, fragments_metagroup))
-    fragments_metagroup_counts_df = do.call (cbind, fragments_metagroup_counts)
-    write.table (fragments_metagroup, file.path('chromBPnet',paste0('fragments_',metagroup,'.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
-    }
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

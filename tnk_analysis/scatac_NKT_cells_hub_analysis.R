@@ -1,8 +1,9 @@
 # Load functions for hub detection ####
-source (file.path('..','..','PM_scATAC','utils','knnGen.R'))
-source (file.path('..','..','PM_scATAC','utils','addCoax.R'))
-source (file.path('..','..','PM_scATAC','utils','Hubs_finder.R'))
-source (file.path('..','..','PM_scATAC','utils','hubs_track.R'))
+source (file.path('..','..','git_repo','utils','knnGen.R'))
+source (file.path('..','..','git_repo','utils','addCoax.R'))
+source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','..','git_repo','utils','hubs_track.R'))
+#source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 
 # Export bigiwg files ####
 archp$celltype_status = paste0(archp$celltype2, '_', archp$status)
@@ -596,8 +597,14 @@ archp$celltype3[archp$celltype3 == 'Tregs'] =  c('C4_Tregs')
 archp$celltype3[archp$celltype3 == 'CD8_exhausted'] =  c('C5_CD8_exhausted')
 archp$celltype3[archp$celltype3 == 'NK_KLRC1'] =  c('C6_NK_KLRC1')
 palette_tnk_cells_ext2 = palette_tnk_cells
-names (palette_tnk_cells_ext2) = c('C2_CD8','C1_CD4','C4_Tregs','TFH','C5_CD8_exhausted',
-  'C3_NK_FGFBP2','C6_NK_KLRC1','NKlike_Tcells')
+names (palette_tnk_cells_ext2) = c(
+  'C2_CD8',
+  'C1_CD4',
+  'C4_Tregs',
+  'C6_NK_KLRC1',
+  'C3_NK_FGFBP2',
+  'C5_CD8_exhausted')
+
 meso_markers <- plotBrowserTrack2 (
     ArchRProj = archp, 
     sizes = c(6, 1, 1, 1,1),
@@ -615,12 +622,15 @@ meso_markers <- plotBrowserTrack2 (
     downstream = 200000,
     #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
     #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
-    loops = getCoAccessibility (archp, corCutOff = 0.25),
+#    loops = getCoAccessibility (archp, corCutOff = 0.25),
     #  returnLoops = TRUE),
     useGroups= NULL,
     hubs = hubs_obj$peakLinks2
 )
-plotPDF (meso_markers, ArchRProj = archp, width=5,height=3, name =paste0(paste(markers, collapse='_'),'_coveragePlots.pdf'))
+plotPDF (meso_markers, ArchRProj = archp, 
+  width=5,height=3, 
+  name =paste0(paste(markers, collapse='_'),'_coveragePlots.pdf'),
+  addDOC = F)
 
 metaGroupName = 'celltype2'
 top_dah = data.frame (
