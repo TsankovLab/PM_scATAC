@@ -695,7 +695,12 @@ dotGSEA = function (
 		{
 		sig_terms = na.omit(unique(unlist(sapply (enrichmentsTest_list, function(x) x[x$p.adjust < padj_threshold,'ID']))))
 		if (length(sig_terms) == 0) return (NULL)
-		if (!is.null(top_pathways)) sig_terms = unique(as.vector(unlist (sapply (enrichmentsTest_list, function(x) na.omit(head(x[x$p.adjust < padj_threshold,'ID'], top_pathways))))))
+		if (!is.null(top_pathways)) sig_terms = unique(as.vector(unlist (sapply (enrichmentsTest_list, function(x) 
+      {
+       tmp = x[x$p.adjust < padj_threshold,'ID']
+       tmp = tmp[order(tmp)]
+       na.omit(head(tmp, top_pathways))
+      }))))
 
 		if (length(sig_terms) == 1)
 			{
@@ -742,8 +747,8 @@ mat_pvalue = -log10(as.data.frame (mat_pvalue))
 mat_pvalue$pathway = rownames (mat_pvalue)
 if (remove_ns_modules) # remove modules with no enriched pathways
 	{
-	remove_cols	= apply (mat_pvalue, 2, function(x) !all (is.na(x)))
-	mat_pvalue = mat_pvalue[, remove_cols, drop=F]
+	keep_cols	= apply (mat_pvalue, 2, function(x) !all (is.na(x)))
+	mat_pvalue = mat_pvalue[, keep_cols, drop=F]
 	mat_sizeLog = mat_sizeLog[, colnames(mat_pvalue)[colnames(mat_pvalue)!='pathway'], drop=F]
 	}
 if (type == 'fgsea')
@@ -778,7 +783,7 @@ if (type == 'enrich')
 	#gsea_df$cluster = factor (gsea_df$cluster, levels = unique(gsea_df$cluster))
 	enrich_df$pathway = factor (enrich_df$pathway, levels = unique(enrich_df$pathway))
 	p = ggplot (data = enrich_df, aes (x=cluster, y=pathway,
-	      fill= nlogPvalue, size=Count)) +
+	      fill= nlogPvalue, size=log2(Count+1))) +
 	      geom_point (shape=21, color='black') +
 	      scale_fill_distiller (palette = "Spectral") +
 	      labs (x = 'cluster', y = '-log10(pvalue)') +

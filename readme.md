@@ -51,7 +51,7 @@ BiocManager::install("liftOver")
 install.packages("scCustomize")  
 install.packages("ggpubr")  
 BiocManager::install("liftOver")
-
+install.packages ('GSA')
 
 ### Run cNMF scripts on LSF batch submission ###   
 Scripts to run cNMF are in utils and include:  

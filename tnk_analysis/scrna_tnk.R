@@ -369,6 +369,95 @@ repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/g
 source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
 
 
+### Import and format spectra files ####
+k_selection = 19
+source (file.path ('..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
+sapply (cnmf_spectra_unique, function(x) 'KLRC1' %in% x)
+cnmf_spectra_unique[[6]]
+
+
+### Run pathway enrichment on modules
+
+#### Run GSEA enrichment on each cluster DE markers ####
+genesets = lapply(cnmf_spectra_unique, function(x) head (x, 100))
+enricher_universe = VariableFeatures(srt)
+gmt_annotations = c(
+#'c2.cp.kegg.v7.1.symbol.gmt',
+#'c5.bp.v7.1.symbol.gmt',
+'h.all.v7.4.symbols.gmt'
+#'h.all.v7.1.symbol.gmt'
+)
+force=T
+if (!file.exists (file.path('Pathway_Enrichment_clusters.rds')) | force)
+	{
+	# GSEA analysis on DEG per cluster
+	EnrichRResAll = list()
+	for (ann in gmt_annotations)
+		{
+		gmt.file = file.path ('..','..','git_repo','files', ann)
+		pathways = read.gmt (gmt.file)
+		#pathways = gmtPathways (gmt.file)
+		message (paste('Compute enrichment per cluster using annotation:', ann))
+		EnrichRResCluster = list()
+		for (i in seq_along(genesets))
+			{
+			message (paste ('EnrichR running geneset',i))	
+			geneset = genesets[[i]]
+			egmt <- enricher(geneset, TERM2GENE=pathways, universe = enricher_universe)
+			EnrichRResCluster[[i]] = egmt@result
+			}
+		EnrichRResAll[[ann]] = EnrichRResCluster
+		}
+	names(EnrichRResAll) = gmt_annotations
+	saveRDS (EnrichRResAll, file.path('Pathway_Enrichment_clusters.rds'))	
+	} else {
+	EnrichRResAll = readRDS (file.path('Pathway_Enrichment_clusters.rds'))
+	}
+
+# Plot fgsea enrichments
+pvalAdjTrheshold = 0.05
+top_pathways = 50
+EnrichRes_dp = lapply (EnrichRResAll, function(x) dotGSEA (
+	enrichmentsTest_list = x, 
+	type = 'enrich', 
+	padj_threshold = pvalAdjTrheshold, 
+	top_pathways= top_pathways,
+	cluster_rows=T,
+	cluster_cols=T))
+#gmt_annotations = 'c5.bp.v7.1.symbol.gmt'
+for (ann in gmt_annotations)
+	{
+	pdf (file.path('Plots', paste0('Pathway_Enrichment_',ann,'_dotplot.pdf')), width=8, height=6)
+	print (EnrichRes_dp[[ann]])
+	dev.off()
+	}
+
+
+
+
+
+
+
+# Generate heatmap of ext TF with associated spectra ####
+# Import ext TFs
+ext_tfs = read.csv (file.path('..','scatac_ArchR','top_TF_CD8_NK_dual_ext_TF_activity_RNA.csv'))
+
+pdf (file.path('Plots','tf_ext_spectra_heatmap.pdf'), width=4)
+Heatmap (cnmf_spectra[rownames(cnmf_spectra) %in% ext_tfs[,1],],
+	col =palette_expression, 
+	row_names_gp = gpar(fontsize = 5),
+	border=T)#, row_names = gpar (fontsize=5))
+dev.off()
+
+
+
+
+
+
+
+
+
+
 
 srt_orig = srt
 #### Run cNMF on NK KLRC1+ and CD8 exhausted ####
@@ -460,5 +549,12 @@ pdf (file.path('Plots','TNK_exhaustion_markers_dotplot.pdf'), height=2.6, width=
 dp
 dev.off()  
 
+dp = DotPlot (srt,
+  features = c(rownames(srt)[grep('RUNX', rownames(srt))]),
+  #col = palette_gene_expression2,
+  group.by = 'celltype2') + gtheme_italic
+pdf (file.path('Plots','RUNX_dotplot.pdf'), height=2.6, width=7.6)
+dp
+dev.off()  
 
 

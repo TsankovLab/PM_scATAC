@@ -25,7 +25,7 @@ source activate chrombpnet
 # Get contribution score bigwigs
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
 MODEL_H5=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/CD8_model/models/chrombpnet.h5
-REGIONS=peakset_NK_CD8.bed
+REGIONS=peakset_CD8.bed
 GENOME=../../../../../genome_references/hg38.genome.fa
 CHROM_SIZES=../../../../../chromBPnet/hg38.chrom.sizes
 OUTPUT_PREFIX=CD8_contribution_scores
