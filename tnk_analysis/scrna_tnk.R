@@ -383,11 +383,11 @@ genesets = lapply(cnmf_spectra_unique, function(x) head (x, 100))
 enricher_universe = VariableFeatures(srt)
 gmt_annotations = c(
 #'c2.cp.kegg.v7.1.symbol.gmt',
-#'c5.bp.v7.1.symbol.gmt',
+'c5.bp.v7.1.symbol.gmt',
 'h.all.v7.4.symbols.gmt'
 #'h.all.v7.1.symbol.gmt'
 )
-force=T
+force=F
 if (!file.exists (file.path('Pathway_Enrichment_clusters.rds')) | force)
 	{
 	# GSEA analysis on DEG per cluster
@@ -416,7 +416,7 @@ if (!file.exists (file.path('Pathway_Enrichment_clusters.rds')) | force)
 
 # Plot fgsea enrichments
 pvalAdjTrheshold = 0.05
-top_pathways = 50
+top_pathways = 1
 EnrichRes_dp = lapply (EnrichRResAll, function(x) dotGSEA (
 	enrichmentsTest_list = x, 
 	type = 'enrich', 
@@ -427,27 +427,32 @@ EnrichRes_dp = lapply (EnrichRResAll, function(x) dotGSEA (
 #gmt_annotations = 'c5.bp.v7.1.symbol.gmt'
 for (ann in gmt_annotations)
 	{
-	pdf (file.path('Plots', paste0('Pathway_Enrichment_',ann,'_dotplot.pdf')), width=8, height=6)
+	pdf (file.path('Plots', paste0('Pathway_Enrichment_',ann,'_dotplot.pdf')), width=15, height=4)
 	print (EnrichRes_dp[[ann]])
 	dev.off()
 	}
 
 
-
-
-
-
-
 # Generate heatmap of ext TF with associated spectra ####
 # Import ext TFs
-ext_tfs = read.csv (file.path('..','scatac_ArchR','top_TF_CD8_NK_dual_ext_TF_activity_RNA.csv'))
-
-pdf (file.path('Plots','tf_ext_spectra_heatmap.pdf'), width=4)
-Heatmap (cnmf_spectra[rownames(cnmf_spectra) %in% ext_tfs[,1],],
+ext_tfs = read.csv (file.path('..','scatac_ArchR','exhausted_TF_rna.csv'))
+ext_tfs = rownames(cnmf_spectra)[rownames(cnmf_spectra) %in% ext_tfs$x]
+ext_markers = c('HAVCR2','LAG3','PDCD1','TIGIT','CTLA4')
+ext_combined = c(ext_tfs, ext_markers)
+pdf (file.path('Plots','tf_ext_spectra_heatmap.pdf'), width=4, height=4)
+Heatmap (cnmf_spectra[ext_combined,],
+	row_split = c(rep ('TFs',length(ext_tfs)), rep ('ext_markers',length(ext_markers))),
 	col =palette_expression, 
-	row_names_gp = gpar(fontsize = 5),
+	row_names_gp = gpar(fontsize = 7,fontface = 'italic'),
+	column_names_gp = gpar(fontsize = 7),
 	border=T)#, row_names = gpar (fontsize=5))
 dev.off()
+
+
+# Check spectra of exhaustion markers and NR4A2 ####
+
+
+
 
 
 

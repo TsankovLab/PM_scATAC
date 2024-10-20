@@ -93,15 +93,15 @@ bsub </sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_re
 chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chromBPnet_NKT_CD8ext_contribution.sh
 bsub </sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chromBPnet_NKT_CD8ext_contribution.sh
 
-# Get contribution scores from NK KRLC1 chrombpnet model
+# Get contribution scores from NK Tregs chrombpnet model
 chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chromBPnet_NKT_Tregs_contribution.sh
 bsub </sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chromBPnet_NKT_Tregs_contribution.sh
 
-# Get contribution scores from CD8 ext chrombpnet model
+# Get contribution scores from CD8 chrombpnet model
 chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chromBPnet_NKT_CD8_contribution.sh
 bsub </sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chromBPnet_NKT_CD8_contribution.sh
 
-# Get contribution scores from CD8 ext chrombpnet model
+# Get contribution scores from CD4 chrombpnet model
 chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chromBPnet_NKT_CD4_contribution.sh
 bsub </sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chromBPnet_NKT_CD4_contribution.sh
 
