@@ -1,5 +1,5 @@
 #!/bin/bash
-#BSUB -J chrbp_model_CD8_ext
+#BSUB -J chrBP_model
 #BSUB -P acc_Tsankov_Normal_Lung
 #BSUB -q gpu
 #BSUB -n 8
@@ -23,14 +23,19 @@ ml tensorrt/8.5.3.1
 source activate chrombpnet
 
 chromBPdir=${1}
+echo $chromBPdir
 grefdir=${2}
+echo $grefdir
 celltype=${3}
+echo $celltype
 fold_number=${4}
+echo $fold_number
 
 
 mkdir $chromBPdir
 cd $chromBPdir
 
+rm -r ${celltype}_model/fold_$fold_number/
 
 chrombpnet pipeline \
     -ifrag fragments_$celltype.tsv \
@@ -39,7 +44,7 @@ chrombpnet pipeline \
     -c $grefdir/hg38.chrom.sizes \
     -p peakset_$celltype.bed \
     -n  output_negatives.bed \
-    -fl splits/fold_$fold_number.json \
+    -fl $grefdir/folds/fold_$fold_number.json \
     -b bias_model/models/model_bias.h5 \
-    -o ${celltype}_model/$fold_number/
+    -o ${celltype}_model/fold_$fold_number/
 
