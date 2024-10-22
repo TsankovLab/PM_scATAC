@@ -62,6 +62,7 @@ palette_bulk = setNames (as.character(paletteer::paletteer_d("rcartocolor::ArmyR
 # palette_nk_cells = setNames (c("#D3E3CAFF", "#92A587FF", "#2F3525FF"), c('NK_FGFBP2','NK_KLRC1','NKlike_Tcells'))
 # palette_tnk_cells = c(palette_t_cells, palette_nk_cells)
 palette_tnk_cells =setNames (as.character(paletteer::paletteer_d("tvthemes::Stark",n=6)), c('CD8','CD4','Tregs','NK_KLRC1','NK_FGFBP2','CD8_exhausted'))
+palette_tnk_cells['NK_KLRC1'] = 'black'
 #palette_tnk_cells['CD4'] = '#F9ECE8FF'
 palette_myeloid = rev(as.character(paletteer::paletteer_d("khroma::lapaz", 256)[c(1,40,80,120,150,190,210,230)]))
 palette_protein_expression = c(low="darkblue",mid= "white",high= "darkgreen") 

@@ -448,7 +448,7 @@ hc <- hclust(d)
 pdf (file.path ('Plots',paste0('TF_',metaGroupName,'_no_km_dendrogram.pdf')), width=3, height=3.6)
 plot(hc)
 dev.off()
-
+  
 # # Generate RNA pseudobulk of matching cell types ####
 # metaGroupName = 'celltype2'
 # selected_TF = colnames(TF_hm@ht_list$chromVAR@matrix)[unlist(column_order(TF_hm)[c('2','3','4','5')])]
@@ -949,14 +949,7 @@ run_p2g = T
     )
     }
     
-#   p2g_corr = .2
-#   p2g = getPeak2GeneLinks(
-#       ArchRProj = archp,
-#       corCutOff = p2g_corr,
-#       resolution = 1,
-#       returnLoops = FALSE
-#   )
-# }  
+
 
 
 ### Plot deviation and expression of NR4A2 across samples ####
@@ -1191,60 +1184,6 @@ dev.off()
 
 
 
-# Compare NKT pseudobulks to peakset of exhausted CD8 from mouse from Miller et al ####
-if (!exists('fragments')) fragments = getFragmentsFromProject (archp)
-fragments = unlist(fragments)
-ext_ps = read.csv ('../ext_peakset_Miller.csv')
-
-ext_ps = ext_ps[,c(1:4,23)]
-ext_ps = ext_ps[order(ext_ps[,5]),]
-ext_ps = ext_ps[ext_ps[,5] < 0,]
-ext_ps_gr = GRanges (ext_ps)
-
-library (liftOver)
-download.file("https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz", "mm10ToHg38.over.chain.gz")
-system("gzip -d mm10ToHg38.over.chain.gz")
-#system (paste0('wget (https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz)', '-P', getwd()))
-
-ch = import.chain ('mm10ToHg38.over.chain')
-#seqlevelsStyle(hub_hg19) = "UCSC"  # necessary
-ext_hg38 = unlist (liftOver(ext_ps_gr, ch))
-
-#ext_hg38_sub = head (ext_hg38, 1000)
-ext_hg38_ov = getPeakSet(archp)[queryHits(findOverlaps (getPeakSet(archp), ext_hg38_sub))]
-#names (ext_hg38_ov) = NULL
-# ext_hg38_sub = resize (ext_hg38_sub, 1, "center")
-# ext_hg38_sub = extendGR (gr = ext_hg38_sub, upstream = 3000, downstream = 3000)
-peak_windows = slidingWindows (x = ext_hg38_ov, width = 20, step = 10)
-
-metaGroupName = 'celltype2'
-force = FALSE
-ext_l = list()
-for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
-  {
-  if (!file.exists(paste0('ext_peaks_windows_',metagroup,'.tsv')) | force)
-    {  
-    #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
-    fragments_metagroup = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]]
-    fragments_metagroup_counts = lapply (peak_windows, function(x) countOverlaps (x, fragments_metagroup))
-    fragments_metagroup_counts_df = do.call (cbind, fragments_metagroup_counts)
-    colnames (fragments_metagroup_counts_df) = as.character(ext_hg38_ov)
-    write.table (fragments_metagroup_counts_df, file.path(paste0('ext_peaks_windows_',metagroup,'.tsv')), sep='\t')
-    } else {
-  ext_l[[metagroup]] = read.table (file.path(paste0('ext_peaks_windows_',metagroup,'.tsv')), sep='\t', row.names=NULL)
-  }}
-  
-
-ext_df = do.call (rbind, ext_l)
-ext_df = apply (ext_df,c(1,2), function(x) as.numeric(x))
-pdf (file.path ('Plots','ext_peakset_miller.pdf'))
-Heatmap (t(ext_df),
-  column_split = rep (names(ext_l), each=50), 
-  cluster_rows=F, 
-  cluster_columns=F)
-dev.off()
-
-
 
 
 
@@ -1344,4 +1283,94 @@ fontsize = 0),
   cluster_columns=F,
   border=T)
 dev.off()
+
+
+
+
+
+### Find all peaks around ext TFs and correlate accessibility and RNA expression across celltype pseudobulks ####
+metaGroupName = 'celltype2'
+ext_TF = read.csv ('exhausted_TF_rna.csv')
+ext_TF = c('NR4A2','CBFB','RUNX2','SMARCC1','JUND') # include only those that show balanced expression between NK KLRC1 and CD8 ext
+# Get all peaks correlated with exhausted TF
+library (org.Hs.eg.db)
+gene_regions = genes (TxDb.Hsapiens.UCSC.hg38.knownGene)
+eg_sym = toTable (org.Hs.egSYMBOL)
+gene_regions$symbol = eg_sym$symbol[match(gene_regions$gene_id, eg_sym$gene_id)]
+gene_regions = gene_regions[gene_regions$symbol %in% ext_TF ]
+
+extend_region = 250000
+gene_regions_extended = GRangesList (lapply (seq_along(gene_regions), function(x) extendGR (gr = gene_regions[x], upstream = extend_region, downstream = extend_region)))
+
+gene_regions_peaks = lapply (seq_along(gene_regions), function(x) queryHits (findOverlaps(getPeakSet(archp), gene_regions_extended[x])))
+gene_regions_peaks = lapply (gene_regions_peaks, function(x) getPeakSet(archp)[x])
+
+if (!file.exists ('pMats.rds'))
+  {
+  pMats = lapply (gene_regions_peaks, function(x) getGroupSE(
+    ArchRProj = archp,
+    useMatrix = 'PeakMatrix',
+    groupBy = metaGroupName,
+    divideN = TRUE,
+    scaleTo = NULL,
+    threads = getArchRThreads(),
+    verbose = TRUE,
+    logFile = createLogFile("getGroupSE")
+  ))
+  pMats2 = lapply (seq_along(gene_regions_peaks), function(x) pMats[[x]][queryHits(findOverlaps(GRanges(rowData(pMats[[x]])), gene_regions_peaks[[x]]))])
+  pMats2 = lapply (pMats2, function(x) {tmp = assay(x); rownames(tmp) = as.character(GRanges (rowData(x))); tmp})
+  names (pMats2) = gene_regions$symbol
+  saveRDS (pMats2, 'pMats2.rds')
+  } else {
+  pMats2 = readRDS ('pMats2.rds')  
+  }
+
+
+ps = log2(as.data.frame (AverageExpression (srt, features = gene_regions$symbol, group.by = metaGroupName)[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+
+
+# Compute distance between TSS and correlated peaks ####
+library (rtracklayer)
+library (AnnotationDbi)
+gene_ids = toTable (org.Hs.egSYMBOL)$gene_id[match (ext_TF,toTable (org.Hs.egSYMBOL)$symbol)]
+mygenes.transcripts = subset (genes(TxDb.Hsapiens.UCSC.hg38.knownGene, columns=c("tx_id", "tx_name","gene_id")), gene_id %in% gene_ids)
+mygenes.tss = resize (mygenes.transcripts, width=1, fix='start')
+
+mygenes.tss$symbol = toTable (org.Hs.egSYMBOL)$symbol[match (mygenes.tss$gene_id ,toTable (org.Hs.egSYMBOL)$gene_id)]
+
+peak_gene_cor = lapply (gene_regions$symbol, function(x) cor (t(pMats2[[x]]), t(ps[x, colnames(pMats2[[x]])])))
+peak_gene_cor = lapply (peak_gene_cor, function(x) x[order(-x[,1]),,drop=F])
+names (peak_gene_cor) = gene_regions$symbol
+
+top_e = 1
+peak_gene_cor = lapply (names(peak_gene_cor), function(x) {
+  peak_gene_cor[[x]] = as.data.frame (peak_gene_cor[[x]])
+  gr = GRanges (rownames(peak_gene_cor[[x]]))
+  dis = distanceToNearest (gr,mygenes.tss[mygenes.tss$symbol == x])@elementMetadata$distance
+  pr = follow (gr,mygenes.tss[mygenes.tss$symbol == x])
+  pr[is.na(pr)] = 0
+  dis = ifelse (pr == 1, dis * -1, dis) 
+  peak_gene_cor[[x]]$distance = dis
+  peak_gene_cor[[x]]$name = ''
+  peak_gene_cor[[x]]$name[1:top_e] = head (paste0(peak_gene_cor[[x]]$distance,'e'),top_e)
+  peak_gene_cor[[x]]$max = apply(pMats2[[x]],1, max)[match(rownames(peak_gene_cor[[x]]),rownames(pMats2[[x]]))]
+  colnames(peak_gene_cor[[x]]) = c('cor','distance','name','max')
+  peak_gene_cor[[x]]
+  })
+
+names (peak_gene_cor) = gene_regions$symbol
+vp = lapply (names(peak_gene_cor), function(x)
+    {
+    ggplot (peak_gene_cor[[x]], aes(x=distance, y= cor)) +
+    geom_bar (stat = 'identity') +
+    geom_point (aes (size = max), shape=21, color='black',alpha=.5, fill = 'burlywood') +
+    ggtitle (x) + 
+    geom_text_repel (size=2.4, color='red', aes(label = name), segment.size=.2) + gtheme_no_rot
+    })
+
+pdf (file.path ('Plots','enhancers_distance_ext_TF.pdf'),width=7,height=3)
+vp
+dev.off()
+
 

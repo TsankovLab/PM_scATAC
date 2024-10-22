@@ -52,6 +52,8 @@ install.packages("scCustomize")
 install.packages("ggpubr")  
 BiocManager::install("liftOver")
 install.packages ('GSA')
+devtools::install_github("GreenleafLab/chromVARmotifs")
+BiocManager::install("compEpiTools")
 
 ### Run cNMF scripts on LSF batch submission ###   
 Scripts to run cNMF are in utils and include:  

@@ -37,6 +37,7 @@ source (file.path('..','..','git_repo','utils','useful_functions.R'))
 source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
 source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 source (file.path('..','..','git_repo','utils','palettes.R'))
+source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 set.seed (1234)
 addArchRThreads (threads = 1) 
@@ -584,6 +585,87 @@ pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_all_TF_heatmaps.p
 print(DAM_hm)
 dev.off()
 
+
+
+
+
+
+# Generate browser track of NR4A2 across all celltypes 
+  metaGroupName = 'celltype'
+  markers = 'SPRY1'
+  markers = 'NR4A2'
+  #celltype_markers = c('WT1','CALB2','GATA4','MSLN','KRT5','KRT18','ITLN1','HP','SOX9')
+pdf()
+meso_markers <- plotBrowserTrack2 (
+    ArchRProj = archp,#[!archp$celltype %in% c('NK','T_cells')], 
+    sizes = c(6, 1, 1, 1,1),
+    groupBy = metaGroupName, 
+    geneSymbol = markers,
+    normMethod = "ReadsInTSS",
+    plotSummary = c("bulkTrack", "featureTrack", 
+        #"loopTrack", 
+      "geneTrack", "hubTrack"),
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+    upstream = 50000,
+    pal = palette_celltype_simplified,
+    #ylim=c(0,0.33),
+    downstream = 200000,
+    #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+#    loops = getCoAccessibility (archp, corCutOff = 0.25),
+    #  returnLoops = TRUE),
+    useGroups= NULL,
+    hubs = NULL
+)
+dev.off()
+plotPDF (meso_markers, ArchRProj = archp, 
+  width=5,height=3, 
+  name =paste0(paste(markers, collapse='_'),'_coveragePlots.pdf'),
+  addDOC = F)
+
+
+# Show that enhancer linked to NR4A2 is only up in NK KLRC1 and CD8 exhausted across all cells ####
+nkt_ann = read.csv (file.path('..','..','NKT_cells','scatac_ArchR','barcode_annotation.csv'))
+archp$celltype2 = archp$celltype
+archp$celltype2[match(nkt_ann$barcode, rownames(archp@cellColData))] = nkt_ann$celltype
+metaGroupName = 'celltype2'  
+  pMats = getGroupSE(
+    ArchRProj = archp,
+    useMatrix = 'PeakMatrix',
+    groupBy = metaGroupName,
+    divideN = TRUE,
+    scaleTo = NULL,
+    threads = getArchRThreads(),
+    verbose = TRUE,
+    logFile = createLogFile("getGroupSE")
+  )
+enhancer_region = GRanges ('chr2:156480366-156480866')
+
+pmat_enhancer = unlist(as.data.frame (assay (pMats[queryHits(findOverlaps (GRanges(rowData(pMats)), enhancer_region)),])))
+pmat_enhancer_df = data.frame (enhancer_region = pmat_enhancer, celltype =names(pmat_enhancer))
+pmat_enhancer_df$celltype = factor (pmat_enhancer_df$celltype, pmat_enhancer_df$celltype[order(-pmat_enhancer_df$enhancer_region)])
+pdf (file.path ('Plots','eNR4F2_accessibility_barplot.pdf'), height=3, width=7)
+ep = ggplot (pmat_enhancer_df, aes (x = celltype, y = enhancer_region, fill =celltype)) + 
+geom_bar(stat = 'identity') + gtheme + scale_fill_manual (values = c(palette_tnk_cells, palette_celltype_simplified))
+ep
+dev.off()
+
+
+
+# Check expression of NR4A2 across cell types ####
+srt_tnk = readRDS (file.path('..','..','NKT_cells','scrna','srt.rds'))
+tnk_ann = srt_tnk$celltype2
+tnk_ann = tnk_ann[names(tnk_ann) %in% colnames(srt)]
+srt$celltype3 = srt$celltype
+srt$celltype3[match (names(tnk_ann), colnames(srt))] = tnk_ann
+
+srt$celltype_simplified3 = srt$celltype_simplified
+srt$celltype_simplified3[match (names(tnk_ann), colnames(srt))] = tnk_ann
+pdf(file.path ('Plots','NR4A2_dotplot.pdf'), width = 9)
+VlnPlot (srt, feature = 'NR4A2', group.by = 'celltype3', cols = c(palette_tnk_cells, palette_celltype_simplified))
+VlnPlot (srt[,!srt$celltype_simplified3 %in% c('NK','T_cells')], feature = 'NR4A2', group.by = 'celltype_simplified3', cols = c(palette_tnk_cells, palette_celltype_simplified))
+dev.off()
 
 
 
