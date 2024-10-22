@@ -32,7 +32,7 @@ fold_number=${4}
 echo $fold_number
 
 
-mkdir $chromBPdir
+#mkdir $chromBPdir
 cd $chromBPdir
 
 rm -r ${celltype}_model/fold_$fold_number/
