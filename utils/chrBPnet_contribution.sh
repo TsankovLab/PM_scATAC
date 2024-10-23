@@ -6,7 +6,7 @@
 #BSUB -W 48:00
 #BSUB -gpu num=1
 #BSUB -R v100
-#BSUB -R rusage[mem=32000]
+#BSUB -R rusage[mem=8000]
 #BSUB -R span[hosts=1]
 #BSUB -o %J.stdout
 #BSUB -eo %J.stderr

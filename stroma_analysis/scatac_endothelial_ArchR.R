@@ -128,6 +128,22 @@ archp = addClusters (input = archp,
   archp = loadArchRProject (projdir)
   }
 
+metaGroupName = 'celltype'
+exp_bigwig = T
+if (exp_bigwig)
+  {
+  getGroupBW(
+    ArchRProj = archp,
+    groupBy = metaGroupName,
+    normMethod = "ReadsInTSS",
+    tileSize = 100,
+    maxCells = 1000,
+    ceiling = 4,
+    verbose = TRUE,
+    threads = getArchRThreads(),
+    logFile = createLogFile("getGroupBW")
+  )
+  }
 
 ### Call peaks on celltypes ####
 metaGroupName = 'Clusters_H'
