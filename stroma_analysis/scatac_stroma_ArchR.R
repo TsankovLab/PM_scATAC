@@ -416,13 +416,12 @@ metaGroupName = 'celltype'
 subsetArchRProject(
   ArchRProj = archp,
   cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% 'Endothelial'],
-  outputDirectory = file.path('..','..','Endothelial'),
+  outputDirectory = file.path('..','..','Endothelial','scatac_ArchR'),
   dropCells = TRUE,
   logFile = NULL,
   threads = getArchRThreads(),
   force = TRUE
 )
-
 
 
 
