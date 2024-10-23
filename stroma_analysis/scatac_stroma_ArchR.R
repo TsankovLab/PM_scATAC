@@ -177,24 +177,17 @@ archp = addClusters (input = archp,
   dev.off()
   archp$celltype[archp$Clusters == 'C7'] = 'LEC'
 
-  pdf (file.path('Plots','celltype_umap_signac_filtered.pdf'),5,5)
-  umap_p1 = plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
-   name = "celltype", embedding = "UMAP")
-  umap_p2 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "Sample2",
-     embedding = "UMAP")
+  pdf (file.path('Plots','celltype_umap.pdf'),5,5)
   umap_p3 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "Sample2",
-     embedding = "UMAP_H")
+    colorBy = "cellColData", name = "Sample2",labelMeans =F,
+     embedding = "UMAP_H", pal = palette_sample)
   umap_p4 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "celltype",
-     embedding = "UMAP_H")
+    colorBy = "cellColData", name = "celltype",labelMeans =F,
+     embedding = "UMAP_H", pal = palette_stroma)
   umap_p5 = plotEmbedding (ArchRProj = archp, 
     colorBy = "cellColData", name = "Clusters_H",
      embedding = "UMAP_H")
 
-  print (umap_p1)
-  print (umap_p2)
   print (umap_p3)
   print (umap_p4)
   print (umap_p5)
@@ -219,7 +212,7 @@ dev.off()
 
 
 ### chromVAR analysis ####
-force=TRUE
+force=FALSE
 if (!all(file.exists(file.path('Annotations',
   c('Motif-Matches-In-Peaks.rds',
     'Motif-Positions-In-Peaks.rds',
@@ -236,7 +229,7 @@ source (file.path ('..','..','git_repo','utils','chromVAR.R'))
 
 
 # Differential Accessed motifs ####
-metaGroupName = "celltype2"
+metaGroupName = "celltype"
 force=FALSE
 source (file.path('..','..','git_repo','utils','DAM.R'))
 
@@ -251,7 +244,7 @@ mMat_mg = mMat_mg[,-1]
 mMat_mg = mMat_mg[names (DAM_list),]
 
 # Generate RNA pseudobulk of matching cell types ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype'
 #selected_TF = c(rownames(DAM_hm@matrix), 'NR4A3','NR4A2','NR4A1')
 ps = log2(as.data.frame (AverageExpression (srt, features = active_DAM, group.by = metaGroupName)[[1]]) +1)
 colnames (ps) = gsub ('-','_',colnames(ps))
@@ -327,13 +320,13 @@ mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 
 # Subset only for expressed TFs ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype'
 ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
 min_exp = 0.1
 ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
 active_TFs = rownames(ps)[rowSums(ps) > 0]
 #positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0]
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype'
 mMat = mMat[active_TFs,]
 mMat = as.data.frame (t(mMat))
 mMat$metaGroup = as.character (archp@cellColData[,metaGroupName])
@@ -341,33 +334,67 @@ mMat = aggregate (.~ metaGroup, mMat, mean)
 rownames (mMat) = mMat[,1]
 mMat = mMat[,-1]
 
-TF_hm = draw (Heatmap (scale(mMat), 
-          #row_labels = colnames (mMat_mg),
-          #column_title = paste('top',top_genes),
-          clustering_distance_columns = 'pearson',
-          clustering_distance_rows = 'pearson',
-          cluster_rows = T,
-          column_km = 20,
-          #col = pals_heatmap[[5]],
-          cluster_columns=T,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
-          column_names_gp = gpar(fontsize = 0),
-          column_names_rot = 45,
-          name = 'chromVAR',
-          #rect_gp = gpar(col = "white", lwd = .5),
-          border=TRUE,
-          col = palette_deviation_centered#,
-          #width = unit(2, "cm")
-          #right_annotation = motif_ha
-          ))
+mMat_cor = cor (as.matrix(mMat), method = 'pearson')
+km = kmeans (mMat_cor, centers=5)
 
-pdf (file.path ('Plots',paste0('TF_',metaGroupName,'heatmap.pdf')), width=8, height=1.6)
-TF_hm
+pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
+cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
+  #left_annotation = ha,
+  #rect_gp = gpar(type = "none"),
+  clustering_distance_rows='euclidean' ,
+  clustering_distance_columns = 'euclidean', 
+  col=palette_deviation_cor_fun, 
+  row_split = km$cluster,
+  column_split = km$cluster,
+  #row_km=2, 
+  #column_km=2,
+#  right_annotation = ha,
+  border=T,
+#   ,
+  row_names_gp = gpar(fontsize = 0), 
+  column_names_gp = gpar(fontsize = 0)
+# cell_fun = function(j, i, x, y, w, h, fill) {# THIS DOESNT WORK NEED TO USE LAYER_FUN
+#         if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+#             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#         }}
+  ))
+  # ,
+  # cell_fun = function(j, i, x, y, w, h, fill) {
+  #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+  #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#        }}))
 dev.off()
 
-colnames(TF_hm@ht_list$chromVAR@matrix)[unlist(column_order(TF_hm)[c('2','3','4','5')])]
-which (colnames(mMat) == 'NR4A2')
-sapply (column_order(TF_hm), function(x) 497 %in% x)
+pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
+cor_mMat_hm
+dev.off()
+
+if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+
+tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+names (tf_modules) = paste0('mod_',unique(km$cluster))
+tf_modules = do.call (cbind, tf_modules)
+archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
+archp@cellColData = cbind (archp@cellColData, tf_modules) 
+
+pdf ()
+TF_p = plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "cellColData",
+    name = paste0('mod_',unique(km$cluster)), 
+    pal = rev(palette_deviation),
+    #useSeqnames='z',
+    embedding = "UMAP")
+dev.off()
+pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 20,height=6)
+wrap_plots (TF_p, ncol=5)
+dev.off()
+
+#colnames(TF_hm@ht_list$chromVAR@matrix)[unlist(column_order(TF_hm)[c('2','3','4','5')])]
+#which (colnames(mMat) == 'NR4A2')
+#sapply (column_order(TF_hm), function(x) 497 %in% x)
 
 # Distance matrix ####
 d <- as.dist(1 - cor(t(mMat), method='pearson'))
@@ -379,3 +406,23 @@ hc <- hclust(d)
 pdf (file.path ('Plots',paste0('TF_',metaGroupName,'_no_km_dendrogram.pdf')), width=3, height=3.6)
 plot(hc)
 dev.off()
+
+
+
+
+
+# Subset Endothelial cells ####
+metaGroupName = 'celltype'
+subsetArchRProject(
+  ArchRProj = archp,
+  cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% 'Endothelial'],
+  outputDirectory = file.path('..','..','Endothelial'),
+  dropCells = TRUE,
+  logFile = NULL,
+  threads = getArchRThreads(),
+  force = TRUE
+)
+
+
+
+

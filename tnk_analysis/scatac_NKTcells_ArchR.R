@@ -261,6 +261,10 @@ pdf (file.path('Plots','celltype_umap_harmony.pdf'),5,width=8)
 print (wrap_plots (umap_p1,umap_p2))
 dev.off()
 
+# Export annotation
+write.csv (data.frame (barcode= rownames(archp@cellColData), celltype = archp$celltype2), 'barcode_annotation.csv')
+
+
 # Check expression of GZMB PRF1 and KLRC1 ####
 metaGroupName = 'celltype2'
 archp = addImputeWeights (archp)
@@ -1372,5 +1376,3 @@ vp = lapply (names(peak_gene_cor), function(x)
 pdf (file.path ('Plots','enhancers_distance_ext_TF.pdf'),width=7,height=3)
 vp
 dev.off()
-
-

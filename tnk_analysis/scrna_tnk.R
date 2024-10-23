@@ -442,7 +442,7 @@ ext_combined = c(ext_tfs, ext_markers)
 pdf (file.path('Plots','tf_ext_spectra_heatmap.pdf'), width=4, height=4)
 Heatmap (cnmf_spectra[ext_combined,],
 	row_split = c(rep ('TFs',length(ext_tfs)), rep ('ext_markers',length(ext_markers))),
-	col =palette_expression, 
+	col =palette_expression, name = ' ',
 	row_names_gp = gpar(fontsize = 7,fontface = 'italic'),
 	column_names_gp = gpar(fontsize = 7),
 	border=T)#, row_names = gpar (fontsize=5))

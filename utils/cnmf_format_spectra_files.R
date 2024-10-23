@@ -18,6 +18,7 @@ names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
 
 saveRDS (cnmf_spectra_unique, paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds'))
 write.csv (patchvecs(cnmf_spectra_unique), paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.csv'))
+write.csv (cnmf_spectra, paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'_raw.csv'))
 
 
 message ('!cnmf results in cnmf_spectra_unique and cnmf_spectra objects!')
