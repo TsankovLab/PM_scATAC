@@ -563,3 +563,22 @@ dp
 dev.off()  
 
 
+
+# Find markers per celltype ####
+DefaultAssay (srt) = 'RNA'
+Idents (srt) = 'celltype2'	
+logfcThreshold = 0.1
+degClusters = FindAllMarkers (srt, max.cells.per.ident = 1000, min.pct = .1, logfc.threshold = logfcThreshold, verbose = T)
+degClusters2 = FindMarkers (srt, 
+	ident.1 = 'CD8',ident.2 = 'CD8_exhausted',
+	max.cells.per.ident = 1000, min.pct = .1, logfc.threshold = logfcThreshold, verbose = T)
+head (degClusters2, 30)
+degClusters2 = degClusters2[order(-degClusters2$avg_log2FC), ]
+
+degClusters3 = FindMarkers (srt, 
+	ident.1 = 'NK_FGFBP2',ident.2 = 'NK_KLRC1',
+	max.cells.per.ident = 1000, min.pct = .1, logfc.threshold = logfcThreshold, verbose = T)
+degClusters3 = degClusters3[order(degClusters3$p_val_adj), ]
+head (degClusters3, 30)
+
+

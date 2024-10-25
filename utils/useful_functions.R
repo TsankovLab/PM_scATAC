@@ -234,27 +234,27 @@ patchvecs = function(vectorList)
 	}
 
 ### Function to create module score of a list gene sets (named), generate a metagroup of highest score across genesets per cell and optionally filter it based on co-expression ###
-ModScoreCor = function (seurat_obj, geneset_list, listName, cor_threshold = NULL, pos_threshold = .1, outdir)
+ModScoreCor = function (seurat_obj, geneset_list, listName, cor_threshold = NULL, pos_threshold = .1, outdir, assay = NULL)
         {        
-        require (Seurat)	
+        require (Seurat)  
         message ('Run AddModuleScore')
-        seurat_obj = AddModuleScore (seurat_obj, geneset_list)
+        seurat_obj = AddModuleScore (seurat_obj, geneset_list, assay = assay)
         seurat_obj@meta.data = seurat_obj@meta.data[, !colnames (seurat_obj@meta.data) %in% names (geneset_list)]
         colnames(seurat_obj@meta.data)[colnames(seurat_obj@meta.data) %in% paste0('Cluster',seq_along(geneset_list))] = names (geneset_list)
         message (paste('Annotate cells based on highest module score and store in column:',paste0(listName, '_r',cor_threshold,'_max')))
         if (length (geneset_list) == 1) 
-        	{
-        	seurat_obj@meta.data[, paste0(listName, '_r',cor_threshold,'_max')] = ifelse (seurat_obj@meta.data[,names (geneset_list)] > pos_threshold, 'pos','neg')
-        	pdf (paste0(outdir, listName, '_modulescore_distribution_cor_threshold_',cor_threshold,'_score_',pos_threshold,'.pdf'))
-        	hist (seurat_obj@meta.data[,names(geneset_list)])
+          {
+          seurat_obj@meta.data[, paste0(listName, '_r',cor_threshold,'_max')] = ifelse (seurat_obj@meta.data[,names (geneset_list)] > pos_threshold, 'pos','neg')
+          pdf (paste0(outdir, listName, '_modulescore_distribution_cor_threshold_',cor_threshold,'_score_',pos_threshold,'.pdf'))
+          hist (seurat_obj@meta.data[,names(geneset_list)])
           abline (v = pos_threshold)
           dev.off()
-        	} else {
-        	seurat_obj@meta.data[, paste0(listName, '_r',cor_threshold,'_max')] = sapply (seq_along(colnames(seurat_obj)), function(x) colnames(seurat_obj@meta.data[,names(geneset_list)])[which.max (seurat_obj@meta.data[x,names(geneset_list)])])        		
-        	}
+          } else {
+          seurat_obj@meta.data[, paste0(listName, '_r',cor_threshold,'_max')] = sapply (seq_along(colnames(seurat_obj)), function(x) colnames(seurat_obj@meta.data[,names(geneset_list)])[which.max (seurat_obj@meta.data[x,names(geneset_list)])])           
+          }
         if (!is.null(cor_threshold))
                 {
-                message ('cor_threshold provided! Filtering gene sets based on initial correlation to module score')	
+                message ('cor_threshold provided! Filtering gene sets based on initial correlation to module score')  
                 filtered_geneset_list = list()
                 geneset_cor_list = list()
                 for (i in names(geneset_list))
@@ -281,15 +281,15 @@ ModScoreCor = function (seurat_obj, geneset_list, listName, cor_threshold = NULL
                 seurat_obj@meta.data = seurat_obj@meta.data[, !colnames (seurat_obj@meta.data) %in% paste0(names(geneset_list),'_r',cor_threshold)]
                 colnames(seurat_obj@meta.data)[colnames(seurat_obj@meta.data) %in% paste0('Cluster',seq_along(geneset_list))] = paste0(names(geneset_list),'_r',cor_threshold)
                 if (length (geneset_list) == 1) 
-                	{
-        					seurat_obj@meta.data[, paste0(listName, '_r',cor_threshold,'_max')] = ifelse (seurat_obj@meta.data[,paste0(names(geneset_list),'_r',cor_threshold)] > pos_threshold, 'pos','neg')
-        					pdf (paste0(outdir, listName, '_modulescore_distribution_cor_threshold_',cor_threshold,'_score_',pos_threshold,'.pdf'))
-        					hist (seurat_obj@meta.data[,paste0(names(geneset_list),'_r',cor_threshold)])
-          				abline (v = pos_threshold)
-          				dev.off()
-        					} else {
-                	seurat_obj@meta.data[, paste0(listName, '_r',cor_threshold,'_max')] = sapply (seq_along(colnames(seurat_obj)), function(x) colnames(seurat_obj@meta.data[,paste0(names(geneset_list),'_r',cor_threshold)])[which.max (seurat_obj@meta.data[x,paste0(names(geneset_list),'_r',cor_threshold)])])        
-                	}
+                  {
+                  seurat_obj@meta.data[, paste0(listName, '_r',cor_threshold,'_max')] = ifelse (seurat_obj@meta.data[,paste0(names(geneset_list),'_r',cor_threshold)] > pos_threshold, 'pos','neg')
+                  pdf (paste0(outdir, listName, '_modulescore_distribution_cor_threshold_',cor_threshold,'_score_',pos_threshold,'.pdf'))
+                  hist (seurat_obj@meta.data[,paste0(names(geneset_list),'_r',cor_threshold)])
+                  abline (v = pos_threshold)
+                  dev.off()
+                  } else {
+                  seurat_obj@meta.data[, paste0(listName, '_r',cor_threshold,'_max')] = sapply (seq_along(colnames(seurat_obj)), function(x) colnames(seurat_obj@meta.data[,paste0(names(geneset_list),'_r',cor_threshold)])[which.max (seurat_obj@meta.data[x,paste0(names(geneset_list),'_r',cor_threshold)])])        
+                  }
                 }
         return (seurat_obj)
         } 

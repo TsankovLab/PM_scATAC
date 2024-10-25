@@ -163,13 +163,31 @@ if (!all(file.exists(file.path('Annotations',
     'Motif-In-Peaks-Summary.rds')))) | force)
 source (file.path ('..','..','git_repo','utils','chromVAR.R'))
   
-# # Find activating and repressing TFs #### 
-# if (!file.exists ('TF_activators_genescore.rds')) 
-#   {
-#     source (file.path('..','..','git_repo','utils','activeTFs.R'))
-#   } else {
-#     corGSM_MM = readRDS ('TF_activators_genescore.rds') 
-#   }
+
+
+# Read in peak files from scATAC studies ####
+projects = c('rawlins_fetal_lung')
+projects_peaks = lapply (seq_along(projects), function(x) {
+  bed_files = list.files (file.path('..','..','tumor_compartment','all_tissues_ArchR',projects[x],'PeakCalls'), pattern = '.rds')
+  grlist = lapply (seq_along(bed_files), 
+    function(y) readRDS (file.path('..','..','tumor_compartment','all_tissues_ArchR',projects[x],'PeakCalls',bed_files[y])))
+names (grlist) = paste0(projects[x], '_', sapply (bed_files, function(z) unlist(strsplit (z, '-'))[1]))
+grlist
+})
+projects_peaks = unlist (projects_peaks, recursive=F)
+
+#### chromVAR analysis ####
+archp = addBgdPeaks (archp, force= TRUE)
+archp = addPeakAnnotations (ArchRProj = archp, 
+     regions = projects_peaks, name = "scATAC_datasets")
+
+archp = addDeviationsMatrix (
+  ArchRProj = archp, 
+  peakAnnotation = "scATAC_datasets",
+  force = TRUE
+)
+
+
 
 
 # Differential Accessed motifs ####
@@ -350,23 +368,4 @@ hc <- hclust(d)
 pdf (file.path ('Plots',paste0('TF_',metaGroupName,'_no_km_dendrogram.pdf')), width=3, height=3.6)
 plot(hc)
 dev.off()
-
-
-
-
-
-# Subset Endothelial cells ####
-metaGroupName = 'celltype'
-subsetArchRProject(
-  ArchRProj = archp,
-  cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% 'Endothelial'],
-  outputDirectory = file.path('..','..','Endothelial'),
-  dropCells = TRUE,
-  logFile = NULL,
-  threads = getArchRThreads(),
-  force = TRUE
-)
-
-
-
 
