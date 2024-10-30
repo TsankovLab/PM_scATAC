@@ -45,7 +45,7 @@ chrombpnet prep nonpeaks -g ../../../../../genome_references/hg38.genome.fa -p p
 
 # chrombpnet prep nonpeaks -g ../../../../../genome_references/hg38.genome.fa -p peakset_all_no_blacklist_shuffled.bed -c  ../../../../../chromBPnet/hg38.chrom.sizes -fl splits/fold_0.json -br ../../../../../chromBPnet/blacklist.bed.gz -o output2
 
-# Train bias model #### I did this only on fold 0 !!
+# Train bias model #### I did this only on fold 0 
 chrombpnet bias pipeline \
         -ifrag fragments_NKT_cells.tsv \
         -d "ATAC" \
