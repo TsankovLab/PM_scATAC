@@ -54,6 +54,9 @@ BiocManager::install("liftOver")
 install.packages ('GSA')
 devtools::install_github("GreenleafLab/chromVARmotifs")
 BiocManager::install("compEpiTools")
+install.packages("harmony")  
+install.packages("zoo")  
+
 
 ### Run cNMF scripts on LSF batch submission ###   
 Scripts to run cNMF are in utils and include:  

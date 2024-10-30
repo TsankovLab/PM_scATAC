@@ -5,19 +5,19 @@ R
 set.seed(1234)
 
 ####### ANALYSIS of Myeloid compartment #######
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
-source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
-source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
-source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','palettes.R'))
+source (file.path('..','..','git_repo','utils','load_packages.R'))
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads(threads = 8) 
+addArchRThreads(threads = 1) 
 addArchRGenome("hg38")
 
 # Load ArchR project ####
@@ -308,100 +308,87 @@ if (!all(file.exists(file.path('Annotations',
     'Motif-In-Peaks-Summary.rds')))))
 source (file.path ('..','PM_scATAC','chromVAR.R'))
   
-# Find activating and repressing TFs #### 
-if (!file.exists ('TF_activators_genescore.rds')) 
-  {
-    source (file.path('..','PM_scATAC','activeTFs.R'))
-  } else {
-    corGSM_MM = readRDS ('TF_activators_genescore.rds') 
-  }
-
-
-### Co-expression of TFs to identify TF modules #### 
-
-# # Get deviation matrix ####
-if (!exists ('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-
-# Subset only for positively correlated TF with genescore ####
-positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0.1]
-mMat = mMat[positive_TF,]
 
 # Differential Accessed motifs ####
-metaGroupName = "celltype2"
+metaGroupName = "Clusters_H"
 force=FALSE
-source (file.path('..','PM_scATAC/DAM.R'))
+source (file.path('..','..','git_repo','utils','DAM.R'))
 
-# Correlate TF against each others and set number of kmeans clusters ####
-mMat_cor = cor (as.matrix(t(mMat)), method = 'pearson')
-km = kmeans (mMat_cor, centers=10)
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat_mg = mMat[active_DAM, ]
+mMat_mg = as.data.frame (t(mMat_mg))
+mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
+mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
+rownames (mMat_mg) = mMat_mg[,1]
+mMat_mg = mMat_mg[,-1]
+mMat_mg = mMat_mg[names (DAM_list),]
 
-# Generate heatmap ####
-cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
-  #left_annotation = ha,
-  #rect_gp = gpar(type = "none"),
-  clustering_distance_rows='euclidean' ,
-  clustering_distance_columns = 'euclidean', 
-  col=palette_module_correlation_fun, 
-  row_split = km$cluster,
-  column_split = km$cluster,
-  #row_km=2, 
-  #column_km=2,
-#  right_annotation = ha,
-  border=F,
-  row_names_gp = gpar(fontsize = 0),
-  column_names_gp = gpar(fontsize = 0)))#,
-  # ,
-  # cell_fun = function(j, i, x, y, w, h, fill) {
-  #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
-  #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
-#        }}))
+# Generate RNA pseudobulk of matching cell types ####
+metaGroupName = 'Clusters_H'
+#selected_TF = c(rownames(DAM_hm@matrix), 'NR4A3','NR4A2','NR4A1')
+ps = log2(as.data.frame (AverageExpression (srt, features = active_DAM, group.by = metaGroupName)[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+ps = ps[, colnames(DAM_hm@matrix)]
+ps_tf = ps[active_DAM,]
 
-pdf (file.path ('Plots','TF_modules.pdf'), width = 4,height=3)
-cor_mMat_hm
+  
+ DAM_hm = Heatmap (t(scale(mMat_mg)), 
+          row_labels = colnames (mMat_mg),
+          column_title = paste('top',top_genes),
+          clustering_distance_columns = 'euclidean',
+          clustering_distance_rows = 'euclidean',
+          cluster_rows = F,
+          #col = pals_heatmap[[5]],
+          cluster_columns=F,#col = pals_heatmap[[1]],
+          row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+          column_names_gp = gpar(fontsize = 8),
+          column_names_rot = 45,
+          name = 'chromVAR',
+          #rect_gp = gpar(col = "white", lwd = .5),
+          border=TRUE,
+          col = rev(palette_deviation),
+          width = unit(2, "cm")
+          #right_annotation = motif_ha
+          )
+
+scaled_ps = t(scale(t(ps_tf)))
+scaled_ps[is.na(scaled_ps)] = 0
+TF_exp_selected_hm = Heatmap (scaled_ps,
+        #right_annotation=tf_mark,
+        #column_split = column_split_rna,
+        cluster_rows = F, #km = 4, 
+        name = 'expression (scaled)',
+        column_gap = unit(.5, "mm"),
+        row_gap = unit(.2, "mm"),
+        clustering_distance_rows = 'euclidean',
+        clustering_distance_columns = 'euclidean',
+        cluster_columns=F, 
+        col = palette_expression,
+        row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+        column_names_gp = gpar(fontsize = 8),
+          column_names_rot = 45,
+        border=T,
+        width = unit(2, "cm"))
+
+TF_exp_selected_hm2 = Heatmap (ps_tf,
+        #right_annotation=tf_mark,
+        #column_split = column_split_rna,
+        cluster_rows = F, #km = 4, 
+        name = 'expression',
+        column_gap = unit(.5, "mm"),
+        row_gap = unit(.2, "mm"),
+        clustering_distance_rows = 'euclidean',
+        clustering_distance_columns = 'euclidean',
+        cluster_columns=F, 
+        col = palette_expression,
+        row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+        column_names_gp = gpar(fontsize = 8),
+          column_names_rot = 45,
+        border=T,
+        width = unit(2, "cm"))
+
+pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 8,height=4)
+draw (DAM_hm + TF_exp_selected_hm + TF_exp_selected_hm2)
 dev.off()
-
-# Generate UMAPs of modules expression ####
-tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),rownames(archp@cellColData)]))
-names (tf_modules) = paste0('mod_',unique(km$cluster))
-tf_modules = do.call (cbind, tf_modules)
-archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
-archp@cellColData = cbind (archp@cellColData, tf_modules)
-
-archp = addImputeWeights (archp)
-TF_p = lapply (paste0('mod_',unique(km$cluster)), function(x) plotEmbedding (
-    ArchRProj = archp,
-    colorBy = "cellColData",
-    name = x, 
-    pal = palette_deviation,
-    #useSeqnames='z',
-    imputeWeights = getImputeWeights(archp),
-    embedding = "UMAP_H"))
-
-pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 30, height=14)
-wrap_plots (TF_p, ncol=5)
-dev.off()
-
-# Generate ridge plots ####
-library (ggridges)
-library (ggplot2)
-library (viridis)
-#library(hrbrthemes)
-tf_modules = lapply (unique (km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
-names (tf_modules) = paste0 ('mod_',unique(km$cluster))
-tf_modules = as.data.frame (do.call (cbind, tf_modules))
-tf_modules$Sample = archp$Sample2
-tf_modules$celltype = archp$celltype
-tf_modules$celltype2 = archp$celltype2
-
-# Plot
-rp = lapply (paste0 ('mod_',unique(km$cluster)), function(x) 
-  ggplot(tf_modules, aes_string(x = x, y = 'Sample', fill = '..x..')) +
-  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01, alpha=.5) +
-  paletteer::scale_fill_paletteer_c("ggthemes::Orange-Blue-White Diverging", direction = -1) +
-    facet_wrap (.~celltype2) +
-    theme_classic())
-pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 30,height=8)
-wrap_plots (rp, ncol=5)
-dev.off()
+   

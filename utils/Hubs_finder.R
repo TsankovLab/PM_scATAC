@@ -33,6 +33,7 @@ hubs_finder = function (
   remove_chr = c('chrX')
   )
   {
+  require (parallel)  
   cat (paste(
     '--* Hubs Finder *--','\n',
     'Find Hubs in',group_by,'\n',

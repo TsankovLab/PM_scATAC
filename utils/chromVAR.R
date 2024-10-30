@@ -1,4 +1,4 @@
-archp = addBgdPeaks (archp, force= TRUE)
+archp = addBgdPeaks (archp, force= FALSE)
   archp = addMotifAnnotations (ArchRProj = archp, 
       motifSet = "cisbp", 
       #motifSet = 'JASPAR2020',

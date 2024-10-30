@@ -1,5 +1,5 @@
 #!/bin/bash
-#BSUB -J cnmf)factorization
+#BSUB -J cnmf_factorization
 #BSUB -P acc_Tsankov_Normal_Lung
 #BSUB -q premium
 #BSUB -n 1

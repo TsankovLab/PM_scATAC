@@ -2,6 +2,16 @@
 ### Useful functions ###
 
 
+### Derive expressed genes using pseudobulk of metagroup
+exp_genes = function(seurat_obj = srt, features = NULL, metaGroupName = NULL, min_exp = 0.1)
+ {
+  require (Seurat)
+  ps = log2(as.data.frame (AverageExpression (seurat_obj, features = features, group.by = metaGroupName)[[1]]) +1)
+  ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
+  expressed_genes = rownames(ps)[rowSums(ps) > 0]
+  return (expressed_genes)
+ }
+
 
 ### Replace hdWGCNA function fixing bug ####
 

@@ -43,3 +43,6 @@ GENOME=$grefdir/genome_references/hg38.genome.fa
 CHROM_SIZES=$grefdir/hg38.chrom.sizes
 OUTPUT_PREFIX=${celltype}_model/fold_$fold_number/${celltype}_contribution_scores
 chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX 
+
+
+

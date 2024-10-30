@@ -34,9 +34,9 @@ data.frame (fold = fold_numbers, completed = file.exists(file.path (chromBPdir, 
 message ('Submit job for chromBPnet contribution scores')	
 system (paste0('chmod +x ',file.path(repodir,'utils','chrBPnet_contribution.sh')), wait=FALSE) 
 
-if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'contribution_scores',paste0(celltype,'_contribution_scores.counts_scores.bw')))))
+if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),paste0(celltype,'_contribution_scores.counts_scores.bw')))))
 	{
-	fold_numbers_remained = fold_numbers[!file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'contribution_scores',paste0(celltype,'_contribution_scores.counts_scores.bw')))]	
+	fold_numbers_remained = fold_numbers[!file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),paste0(celltype,'_contribution_scores.counts_scores.bw')))]	
 	for (fold_number in fold_numbers_remained)
 		{
 		message (paste0('submit job for contribution fold ',fold_number))

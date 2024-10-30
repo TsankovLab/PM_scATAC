@@ -48,7 +48,7 @@ if(!file.exists ("TCGA_CNV_hg38.rds"))
 # Compute bins ####
 ws = 1e6
 ss = 5e5
-blacklist = toGRanges (paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/blacklisted_regions/ENCODE_blacklist/',"hg38-blacklist.v2.bed")) # taken from https://github.com/Boyle-Lab/Blacklist/tree/master/lists
+blacklist = toGRanges (file.path ('..','..','git_repo','files',"hg38-blacklist.v2.bed")) # taken from https://github.com/Boyle-Lab/Blacklist/tree/master/lists
 
 if (!file.exists (paste0('windows_',ws,'_',ss,'.rds')))
   {

@@ -1,4 +1,3 @@
-use UGER
 conda activate meso_scatac
 
 # projdir
@@ -13,17 +12,17 @@ R
 
 # Load packages
 
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/CCLE/'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CCLE/'
 system (paste('mkdir -p',paste0(projdir,'Plots/')))
 setwd(projdir)
 
 #devtools::install_github("immunogenomics/presto") # needed for DAA
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scrna_pipeline/useful_functions.R')
-source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scrna_pipeline/load_libraries.R')
+source (file.path('..','git_repo','utils','useful_functions.R'))
+source (file.path('..','git_repo','utils','load_packages.R'))
 #source ('/ahg/regevdata/projects/ICA_Lung/Bruno/job_scripts/ArchR_hidden_functions.R')
 
 # Import RNA expression of cell lines from https://portals.broadinstitute.org/ccle/data
-if (!file.exists (paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/CCLE/CCLE_RNAseq_rsem_genes_tpm.rds')))
+if (!file.exists (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/CCLE/CCLE_RNAseq_rsem_genes_tpm.rds')))
   {
   ccle = read.table (paste0(projdir,'CCLE_RNAseq_rsem_genes_tpm_20180929.txt'), sep='\t',header=T)
   library(biomaRt)
@@ -45,13 +44,13 @@ if (!file.exists (paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/CCL
   rownames (ccle) = ccle[,1]
   ccle = ccle[,-1]
   colnames (ccle) = gsub ('^X','', colnames (ccle))
-  saveRDS (ccle, paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/CCLE/CCLE_RNAseq_rsem_genes_tpm.rds'))
+  saveRDS (ccle, paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/CCLE/CCLE_RNAseq_rsem_genes_tpm.rds'))
   } else {
-  ccle = readRDS (paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/CCLE/CCLE_RNAseq_rsem_genes_tpm.rds'))
+  ccle = readRDS (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/CCLE/CCLE_RNAseq_rsem_genes_tpm.rds'))
   }
 
 # get cell lines annotation ####
-meta = read.table (paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/CCLE/Cell_lines_annotations_20181226.txt'), sep='\t', header=T, quote='',
+meta = read.table (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/CCLE/Cell_lines_annotations_20181226.txt'), sep='\t', header=T, quote='',
 	comment.char='#',fill = TRUE )
 meta = meta[match (colnames(ccle), meta$CCLE_ID),]
 
@@ -76,7 +75,7 @@ sarc_nmf = readRDS('../tumor_compartment/scrna/cnmf_genelist_25_nfeat_5000.rds')
 sarc_nmf = sarc_nmf[[20]]
 #check_genes = c('TWIST2','TCF3','ID3','TEAD1','PITX1','TWIST1','HIC1','PITX2','SOX9','SNAI2','OLIG3','MEF2A','MESP1','SMARCC2')
 check_genes = activeTFs[[2]]
-check_genes = c(check_genes, 'ITLN1','UPK3B','AXL','VIM','HP','KRT5','CALB2')
+check_genes = c(check_genes, 'ITLN1','UPK3B','AXL','VIM','HP','KRT5','CALB2','SOX9','SOX6','SOX5')
 cl_order = sapply (1:ncol(ccle_meso), function(x) mean (log2(ccle_meso+1)[sarc_nmf,x], na.rm=T))
 names (cl_order) = colnames(ccle_meso)
 

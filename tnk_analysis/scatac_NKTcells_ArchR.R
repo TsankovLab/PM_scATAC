@@ -1376,3 +1376,14 @@ vp = lapply (names(peak_gene_cor), function(x)
 pdf (file.path ('Plots','enhancers_distance_ext_TF.pdf'),width=7,height=3)
 vp
 dev.off()
+
+
+
+
+# Run chromBPnet 
+# Variables
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet'
+repodir='/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
+celltype='CD8'
+fold_numbers = c(0,1,2,3,4)
