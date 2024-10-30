@@ -53,9 +53,14 @@ if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('
 
 
 system (paste0('chmod +x ',file.path(repodir,'utils','TFmodisco.sh')), wait=FALSE) 
-for (fold_number in fold_numbers_remained)
+
+if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'TF_modisco','_modisco_results.h5'))))
+	{
+	fold_numbers_remained = fold_numbers[!file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),paste0(celltype,'_contribution_scores.counts_scores.bw')))]	
+	for (fold_number in fold_numbers_remained)
 		{
 		message (paste0('submit job for contribution fold ',fold_number))
+		fold_number = 4
 		#system (paste0('chmod +x ',file.path(repodir, 'utils','chrBPnet_training.sh')))
 		#paste("bsub bash -c \"/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombnet_NKT_NK_KLRC1_f3.sh, projdir)
 		#system (paste("bsub bash -c \", file.path(repodir,utils','chrBPnet_training.sh '), chromBPdir,' ',grefdir,' ',repodir,' ',celltype,' ',fold_number,'"'), wait=FALSE)
@@ -63,3 +68,9 @@ for (fold_number in fold_numbers_remained)
 		args <- paste(chromBPdir,celltype, fold_number)
 		system (paste(command, args))
 		}
+	}
+
+
+
+
+

@@ -32,5 +32,5 @@ echo $fold_number
 mkdir ${chromBPdir}/${celltype}_model/fold_${fold_number}/modisco/
 cd ${chromBPdir}/${celltype}_model/fold_${fold_number}/modisco/
 
-modisco motifs -i ../${celltype}contribution_scores.counts_scores.h5 -n 1000000 -o modisco_results.h5
+modisco motifs -i ../${celltype}_contribution_scores.counts_scores.h5 -n 1000000 -o modisco_results.h5
 modisco report -i modisco_results.h5 -o report/ -s report/
