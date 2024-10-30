@@ -22,9 +22,9 @@ source activate chrombpnet
 
 chromBPdir=${1}
 echo $chromBPdir
-celltype=${3}
+celltype=${2}
 echo $celltype
-fold_number=${4}
+fold_number=${3}
 echo $fold_number
 
 
