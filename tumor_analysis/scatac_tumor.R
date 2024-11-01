@@ -826,7 +826,7 @@ write.csv (tf_table, 'candidate_TFs_table.csv')
 nfeat=5000
 k=25
 cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
-cnmf_list = cnmf_list[names(cnmf_list) != 'cNMF16']
+cnmf_list = cnmf_list[!names(cnmf_list) %in% c( 'cNMF16','cNMF24')]
 cnmf_list = lapply (cnmf_list, function(x) head(x, 50)[head(x, 50) %in% rownames (gsMat)])
 
   archp = addModuleScore (
@@ -848,9 +848,10 @@ cnmfs = as.data.frame (t(scale (t(cnmfs))))
 
 
 # Make coexpression network for each sample using top TFs deviations ####
+sams = unique(archp$Sample3)
+sams = sams[!sams %in% c('normal_pleura','P3','P13')]
 archp_meta = as.data.frame (archp@cellColData)
-archp_meta = archp_meta[archp_meta$Sample2 != 'normal_pleura',]
-archp_meta = archp_meta[!archp_meta$Sample2 %in% c('P3','P13'),]
+archp_meta = archp_meta[!archp_meta$Sample2 %in% sams,]
 archp_meta$Sample3 = archp_meta$Sample2
 archp_meta$Sample3[archp_meta$Clusters == 'C14'] = 'P11_HOX'
 mMat = assays (mSE)[[1]]
@@ -870,12 +871,10 @@ corTF_array <- simplify2array(cor_TF_l)
 median_matrix <- apply(corTF_array, c(1, 2), mean)
 
 # Compute correlation of sarcomatoid cNMF with TFs ####
-sams = unique(archp$Sample2)
-sams = sams[!sams %in% c('normal_pleura','P3','P13')]
 cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
-cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample2 == x, ])))
+cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
 names (cnmf_mat) = sams
-tf_mat = lapply (sams, function(x) scale(mMat[,archp$Sample2 == x]))
+tf_mat = lapply (sams, function(x) scale(mMat[,archp$Sample3 == x]))
 names (tf_mat) = sams
 
 sarc_tf = lapply (sams, function(sam) cor (t(tf_mat[[sam]]), t(cnmf_mat[[sam]]['sarcomatoid.cNMF20',,drop=F])))
@@ -910,13 +909,321 @@ colnames(sarc_tf_df2) = names (tf_mat)
 sarc_tf_df2$TF = rownames(sarc_tf_df2)
 sarc_tf_df2 = gather (sarc_tf_df2, scS, score, 1:(ncol(sarc_tf_df2) - 1))
 sarc_tf_df2$TF = factor (sarc_tf_df2$TF, levels = unique(sarc_tf_df2$TF)[sarc_tf_med])
-bp = ggplot (sarc_tf_df2, aes (x = TF, y = score)) + geom_boxplot () + gtheme
+bp = ggplot (sarc_tf_df2, aes (x = TF, y = score)) + bxp + gtheme
 
-pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots.pdf'), width = 6,height=5)
+pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots.pdf'), width = 8,height=3)
 bp
 dev.off()
 
-# Plot UMAP per sample showing sarcomatoid score and correlated TFs e.g. SOX9 HIC2..
+# Try with PCA ####
+library (uwot)
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = as.matrix(mMat)#[selected_TF,])
+tf_mat = lapply (sams, function(x) t(scale(mMat[,archp$Sample3 == x ])))
+names (tf_mat) = sams
+#tf_mat = do.call (rbind,tf_mat)
+cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
+cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
+names(cnmf_mat) = sams
+
+TF_driver='SOX9'
+
+TFclass = list(
+stripeTF = c('FOSL2','BACH2','FOSB','JUND','JDP2','BACH1','FOS','JUNB','FOSL1','JUN','SMARCC1'),
+lineageTF = c(
+  'SOX5','SOX6','SOX9',
+  #rownames(mMat)[grep ('HOX',rownames(mMat))],
+  #rownames(mMat)[grep ('DLX',rownames(mMat))],
+  'GATA4',
+  #rownames(mMat)[grep ('NKX',rownames(mMat))],
+  'RUNX2'),
+emtTF = c('SNAI2','TWIST1','ZEB1','TCF3','TWIST2','HIC2','MESP1','HIC1'),
+inflTF = c('IRF2','IRF9','E2F3','E2F7'))
+
+TFclass = setNames (rep (names(TFclass), sapply (TFclass, length)),unlist(TFclass))
+TFclass = TFclass[rownames(mMat)]
+
+pca_result <- lapply (tf_mat, function(x) prcomp(t(x), center = TRUE, scale = TRUE))
+names(pca_result) = sams
+
+pca_data = lapply (sams, function (sam) 
+  {
+  tmp = as.data.frame(pca_result[[sam]]$x)[,c('PC1','PC2')]
+  umap_result = tmp
+  # umap_result <- umap(tmp, n_neighbors = 15, min_dist = 0.1, n_components = 2)
+  # umap_result = as.data.frame (umap_result)
+  # colnames(umap_result) <- c("UMAP1", "UMAP2")
+  umap_result$tf = ''
+  umap_result$tf[match (c('SOX9','SOX5','SOX6','RUNX2','GATA4'), rownames(umap_result))] = c('SOX9','SOX5','SOX6','RUNX2','GATA4')
+  #umap_result$TF = tf_mat[[sam]][,TF_driver] 
+  #umap_result$sarc = cnmf_mat[[sam]]['sarcomatoid.cNMF20',]
+  umap_result$class = TFclass
+  umap_result$class[is.na(umap_result$class)] = 'ND'
+  umap_result$class2 = umap_result$class
+  umap_result$class2[umap_result$class2 %in% c('emtTF','inflTF')] = 'nonlineageTF'
+  umap_result = umap_result[umap_result$class != 'stripeTF', ]
+  
+  ggplot(umap_result, aes(x = PC1, y = PC2, label=tf)) +#, colors=class))+#, color = sarc)) +
+  geom_point(color='grey',alpha=0.5) + gtheme +
+  geom_point(data = umap_result[umap_result$class != 'ND',], aes(color=class),alpha=0.5) +
+  geom_smooth(data = umap_result[umap_result$class != 'ND',],
+    method = "lm", se = TRUE, aes (color = class2)) + 
+  geom_point(data = umap_result[umap_result$tf != '',],size=4) +
+  geom_text_repel(data= umap_result[umap_result$tf != '',]) + 
+  labs(title = paste("UMAP - ",sam)) + 
+  scale_color_manual (values = c(ND = 'grey', emtTF = 'red', inflTF = 'blue', lineageTF= 'green',nonlineageTF = 'purple'))
+  })
+
+pdf (file.path('Plots','TF_umap.pdf'), width = 44, height = 6)
+wrap_plots (pca_data, ncol=length(sams))
+dev.off()
+
+
+# Correlate module scores with TFs ####
+if (!exists('gsSE')) gsSE = fetch_mat(archp, 'GeneScore')
+if (!exists('mSE')) gsSE = fetch_mat(archp, 'Motif')
+gsMat = assays (gsSE)[[1]]
+rownames (gsMat) = rowData (gsSE)$name
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = as.data.frame (t(as.matrix(scale(mMat[selected_TF,]))))
+
+cnmf_tf_l = list()
+for (sam in unique(archp_meta$Sample3))
+  {
+  cnmf_tf_l[[sam]] = cor (cnmfs[archp_meta$Sample3 == sam,], mMat[archp_meta$Sample3 == sam,], method = 'spearman')
+  }
+
+cnmf_tf_array = simplify2array (cnmf_tf_l)
+#any(lapply(corTF_array, function(x) any(is.na(x))))
+# Take element-wise median
+mean_matrix = apply(cnmf_tf_array, c(1, 2), mean)
+
+cnmf_tf_df = Heatmap (mean_matrix,
+  row_names_gp = gpar (fontsize = 8),
+  #rect_gp = gpar(type = "none"),
+  column_names_gp = gpar(fontsize = 8, fontface='italic'))
+
+pdf (paste0 ('Plots/selected_TF_cnmf_corr_heatmaps.pdf'), width = 6,height=5)
+cnmf_tf_df
+dev.off()
+
+
+
+
+
+
+### check correlation of sarcomatoid score to external celltypes ####
+
+# Compute correlation of sarcomatoid cNMF external celltypes ####
+archp$Sample3 = archp$Sample2
+archp$Sample3[archp$Clusters == 'C14'] = 'P11_HOX'
+
+sams = unique(archp$Sample3)
+sams = sams[!sams %in% c('normal_pleura','P3','P13')]
+cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
+cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
+names (cnmf_mat) = sams
+
+
+# # Get external matrix ####
+if (!exists('fSE')) fSE = fetch_mat (archp, 'scATAC_datasets')
+all (colnames(fSE) == rownames(archp))
+fetal_Mat = assays (fSE)[[1]]
+rownames (fetal_Mat) = rownames(rowData (fSE))
+
+fetal_Mat = lapply (sams, function(x) scale(fetal_Mat[,archp$Sample3 == x]))
+names (fetal_Mat) = sams
+
+sarc_tf = lapply (sams, function(sam) cor (t(fetal_Mat[[sam]]), t(cnmf_mat[[sam]]['sarcomatoid.cNMF8',,drop=F])))
+sarc_tf = lapply (sarc_tf, function(x) head(x[order(-x[,1]),],10))
+
+sarc_tf_df = do.call (cbind,sarc_tf)
+
+# ha1 = HeatmapAnnotation (' ' = anno_boxplot(-sarc_tf_df,axis = T, 
+#   width = unit(1.2, "cm"), outline=F, border=F,box_width = .8,
+#     gp = gpar(fill = 'white')), 
+#   which = 'row')
+
+cnmf_fetal_l = list()
+for (sam in sams)
+  {
+  cnmf_fetal_l[[sam]] = cor (t(cnmf_mat[[sam]]), t(fetal_Mat[[sam]]), method = 'spearman')
+  }
+
+fetal_array <- simplify2array(cnmf_fetal_l)
+#any(lapply(corTF_array, function(x) any(is.na(x))))
+# Take element-wise median
+median_matrix <- apply(fetal_array, c(1, 2), mean)
+
+cor_fetal_df = Heatmap (median_matrix[rownames(median_matrix) != 'sarcomatoid.cNMF9',],
+  row_names_gp = gpar(fontsize = 8),
+  #rect_gp = gpar(type = "none"),
+  column_names_gp = gpar(fontsize = 7, fontface='italic'),
+  #col = palette_deviation_cor_fun
+  )
+
+pdf (paste0 ('Plots/selected_fetal_cnmf_corr_heatmaps.pdf'), width = 36,height=5)
+cor_fetal_df
+dev.off()
+
+
+# # Get ENCODE matrix ####
+if (!exists('enSE')) enSE = fetch_mat (archp, 'ENCODE_H3K4me3')
+all (colnames(enSE) == rownames(archp))
+encode_Mat = assays (enSE)[[1]]
+rownames (encode_Mat) = rownames(rowData (enSE))
+
+cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
+cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
+names (cnmf_mat) = sams
+
+sams = unique(archp$Sample3)
+sams = sams[!sams %in% c('normal_pleura','P3','P13')]
+encode_Mat = lapply (sams, function(x) scale(encode_Mat[,archp$Sample3 == x]))
+names (encode_Mat) = sams
+
+sarc_tf = lapply (sams, function(sam) cor (t(encode_Mat[[sam]]), t(cnmf_mat[[sam]]['sarcomatoid.cNMF20',,drop=F])))
+sarc_tf = lapply (sarc_tf, function(x) head(x[order(-x[,1]),],10))
+sarc_tf_df = do.call (cbind,sarc_tf)
+
+# ha1 = HeatmapAnnotation (' ' = anno_boxplot(-sarc_tf_df,axis = T, 
+#   width = unit(1.2, "cm"), outline=F, border=F,box_width = .8,
+#     gp = gpar(fill = 'white')), 
+#   which = 'row')
+
+cnmf_encode_l = list()
+for (sam in sams)
+  {
+  cnmf_encode_l[[sam]] = cor (t(cnmf_mat[[sam]]), t(encode_Mat[[sam]]), method = 'spearman')
+  }
+
+cnmf_encode_array <- simplify2array(cnmf_encode_l)
+#any(lapply(corTF_array, function(x) any(is.na(x))))
+# Take element-wise median
+median_matrix <- apply(cnmf_encode_array, c(1, 2), mean)
+
+cor_cnmf_encode_df = Heatmap (median_matrix,
+  row_names_gp = gpar(fontsize = 8),
+  #rect_gp = gpar(type = "none"),
+  column_names_gp = gpar(fontsize = 7, fontface='italic'),
+  #col = palette_deviation_cor_fun
+  )
+
+pdf (paste0 ('Plots/ENCODE_cnmf_corr_heatmaps.pdf'), width = 10,height=7)
+cor_cnmf_encode_df
+dev.off()
+
+
+# Also plot boxplots ordered by correlation to sarcomatoid score ####
+sarc_tf_med = apply (sarc_tf_df,1, mean)
+sarc_tf_order = head (order(-sarc_tf_med),20)
+sarc_tf_med = sarc_tf_med[sarc_tf_order]
+sarc_tf_df2 = sarc_tf_df[sarc_tf_order,]
+sarc_tf_df2 = as.data.frame (sarc_tf_df2)
+colnames(sarc_tf_df2) = names (encode_Mat) 
+#sarc_tf_df2$TF = rownames(sarc_tf_df2)
+sarc_tf_df2$ENCODE_celltype = factor (names(sarc_tf_med), levels = names (sarc_tf_med))
+sarc_tf_df2 = gather (sarc_tf_df2, scS, score, 1:(ncol(sarc_tf_df2)-1))
+bp = ggplot (sarc_tf_df2, aes (x = ENCODE_celltype, y = score)) + geom_boxplot () + gtheme
+
+pdf (paste0 ('Plots/sarcomatoid_score_ENCODE_boxplots.pdf'), width = 6,height=5)
+bp
+dev.off()
+
+
+
+
+
+
+
+
+# Show sarcomatoid module ####
+#metaGroupName = "Clusters"
+#force=FALSE
+#if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source ('../../PM_scATAC/DAG.R')
+
+celltype_markers = 'sarcomatoid.cNMF20'
+
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "cellColData", 
+    name = celltype_markers, 
+    embedding = "UMAP",
+    pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+
+pdf (file.path('Plots','sarcomatoid_score_feature_plots.pdf'), width = 20, height = 20)
+print (wrap_plots (p, ncol = 4))
+dev.off()
+
+# Plot the same but scaled ####
+scaled_cnmfs = archp@cellColData[grep ('sarcomatoid',colnames(archp@cellColData))]
+scaled_cnmfs = as.data.frame (t(scale(t(scaled_cnmfs))))
+umap_df = data.frame (archp@embeddings$UMAP[[1]], scaled_cnmfs)
+umap_p1 = ggplot(data = umap_df) + 
+geom_point (aes (x = IterativeLSI.UMAP_Dimension_1, y= IterativeLSI.UMAP_Dimension_2, color = sarcomatoid.cNMF20), size = .1) + 
+scale_colour_gradientn (colours = rev(brewer.pal (n = 11, name = "RdBu")),limits=c(-max (abs(umap_df$sarcomatoid.cNMF20)), max (abs(umap_df$sarcomatoid.cNMF20)))) +
+ggtitle ('sarcomatoid_score') + 
+#facet_wrap (as.formula(paste("~", metaGroupNames[3]))) + 
+theme_classic() +
+theme_void()
+
+pdf (file.path('Plots','sarcomatoid_score_scaled_feature_plots.pdf'), width = 6, height = 6)
+umap_p1
+dev.off()
+  
+# Order cells per samples along SOX9 deviation and correlated TFs ####
+library (scales)
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+# Filter by RNA expression ####
+metaGroupName = 'sampleID'
+active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
+mMat = mMat[active_TFs, ]
+
+archp_meta = as.data.frame (archp@cellColData)
+archp_meta$Sample3 = archp_meta$Sample2
+archp_meta$Sample3[archp_meta$Clusters == 'C14'] = 'P11_HOX'
+
+all (colnames(mMat) == rownames(archp_meta))
+
+TF_driver = 'SOX9'
+top_TFs = 50
+traj_sample = list()
+for (sam in unique(archp_meta$Sample3))
+    {
+    library(zoo)
+    bin_width <- 100   # Number of observations per bin
+    overlap <- 1    
+    mMat_ordered_sample = as.data.frame(scale(mMat[,archp_meta$Sample3 == sam]))
+    mMat_ordered_sample = mMat_ordered_sample[, order(unlist(mMat_ordered_sample[TF_driver,]))]
+    cor_to_tf = order(-as.vector(cor (t(mMat_ordered_sample)[,TF_driver],t(mMat_ordered_sample), method='pearson')))
+    mMat_ordered_sample = mMat_ordered_sample[c(head(cor_to_tf,top_TFs),tail(cor_to_tf,top_TFs))  ,]
+    mMat_ordered_sample = as.data.frame(lapply(as.data.frame(t(mMat_ordered_sample)), function(x) {
+      zoo::rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
+    }))
+    traj_sample[[sam]] = Heatmap (
+      t(as.data.frame(lapply(mMat_ordered_sample, rescale, to = c(-10,10)))), 
+      col = rev(palette_deviation), 
+      cluster_columns=F,
+      name = sam,
+      cluster_rows=F,
+      column_names_gp = gpar(fontsize = 0),
+      row_names_gp = gpar(fontsize = 7, fontface='italic'))
+    }
+
+pdf (file.path('Plots',paste0('sarc_trajectory_',TF_driver,'_sample.pdf')), height=12, width=3)
+traj_sample
+dev.off()
+
+
+
+# Plot UMAP per sample showing sarcomatoid score and correlated TFs e.g. SOX9 HIC2.. ####
 sams = unique(archp$Sample2)
 sams = sams[!sams %in% c('normal_pleura','P3','P13')]
 cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
@@ -956,208 +1263,6 @@ theme_void ()
 pdf (file.path('Plots','sarcomatoid_score_scaled_per_sample_feature_plots.pdf'), width = 10, height = 5)
 umap_p1
 dev.off()
-
-# Try with PCA ####
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = as.matrix(mMat[selected_TF,])
-tf_mat = lapply (sams, function(x) t(scale(mMat[,archp$Sample2 == x ])))
-names (tf_mat) = sams
-#tf_mat = do.call (rbind,tf_mat)
-cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
-cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample2 == x, ])))
-names(cnmf_mat) = sams
-
-TF_driver='SOX9'
-pca_result <- lapply (tf_mat, function(x) prcomp(t(x), center = TRUE, scale. = TRUE))
-names(pca_result) = sams
-pca_data <- lapply (sams, function (sam) {
-  tmp = as.data.frame(pca_result[[sam]]$x)
-  umap_result <- umap(tmp, n_neighbors = 15, min_dist = 0.1, n_components = 2)
-  umap_result = as.data.frame(umap_result)
-  colnames(umap_result) <- c("UMAP1", "UMAP2")
-  #umap_result$TF = tf_mat[[sam]][,TF_driver] 
-  #umap_result$sarc = cnmf_mat[[sam]]['sarcomatoid.cNMF20',]
-  ggplot(umap_result, aes(x = UMAP1, y = UMAP2))+#, color = sarc)) +
-  geom_point() +
-  theme_minimal() +
-  labs(title = paste("PCA - ",sam)) + 
-  scale_colour_gradientn (colours = rev(palette_deviation))
-})
-
-pdf (file.path('Plots','TF_PCA.pdf'), width = 10, height = 5)
-wrap_plots (pca_data)
-dev.off()
-
-
-# Correlate module scores with TFs ####
-if (!exists('gsSE')) gsSE = fetch_mat(archp, 'GeneScore')
-if (!exists('mSE')) gsSE = fetch_mat(archp, 'Motif')
-gsMat = assays (gsSE)[[1]]
-rownames (gsMat) = rowData (gsSE)$name
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = as.data.frame (t(as.matrix(scale(mMat[selected_TF,]))))
-
-cnmf_tf_l = list()
-for (sam in unique(archp_meta$Sample3))
-  {
-  cnmf_tf_l[[sam]] = cor (cnmfs[archp_meta$Sample3 == sam,], mMat[archp_meta$Sample3 == sam,], method = 'spearman')
-  }
-
-cnmf_tf_array = simplify2array(cnmf_tf_l)
-#any(lapply(corTF_array, function(x) any(is.na(x))))
-# Take element-wise median
-mean_matrix = apply(cnmf_tf_array, c(1, 2), mean)
-
-cnmf_tf_df = Heatmap (mean_matrix,
-  row_names_gp = gpar(fontsize = 8),
-  #rect_gp = gpar(type = "none"),
-  column_names_gp = gpar(fontsize = 8, fontface='italic'))
-
-pdf (paste0 ('Plots/selected_TF_cnmf_corr_heatmaps.pdf'), width = 6,height=5)
-cnmf_tf_df
-dev.off()
-
-# Show sarcomatoid module ####
-#metaGroupName = "Clusters"
-#force=FALSE
-#if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source ('../../PM_scATAC/DAG.R')
-
-celltype_markers = 'sarcomatoid.cNMF20'
-
-pdf()
-p <- plotEmbedding(
-    ArchRProj = archp, 
-    colorBy = "cellColData", 
-    name = celltype_markers, 
-    embedding = "UMAP",
-    pal = palette_expression,
-    imputeWeights = getImputeWeights(archp)
-)
-dev.off()
-
-pdf (file.path('Plots','sarcomatoid_score_feature_plots.pdf'), width = 20, height = 20)
-print (wrap_plots (p, ncol = 4))
-dev.off()
-
-# Plot the same but scaled 
-scaled_cnmfs = archp@cellColData[grep ('sarcomatoid',colnames(archp@cellColData))]
-scaled_cnmfs = as.data.frame (t(scale(t(scaled_cnmfs))))
-umap_df = data.frame (archp@embeddings$UMAP[[1]], scaled_cnmfs)
-umap_p1 = ggplot(data = umap_df) + 
-geom_point (aes (x = IterativeLSI.UMAP_Dimension_1, y= IterativeLSI.UMAP_Dimension_2, color = sarcomatoid.cNMF20), size = .1) + 
-scale_colour_gradientn (colours = rev(brewer.pal (n = 11, name = "RdBu")),limits=c(-max (abs(umap_df$sarcomatoid.cNMF20)), max (abs(umap_df$sarcomatoid.cNMF20)))) +
-ggtitle ('sarcomatoid_score') + 
-#facet_wrap (as.formula(paste("~", metaGroupNames[3]))) + 
-theme_classic() +
-theme_void()
-
-pdf (file.path('Plots','sarcomatoid_score_scaled_feature_plots.pdf'), width = 6, height = 6)
-umap_p1
-dev.off()
-  
-
-
-
-# Order cells per samples along SOX9 deviation and plot the rest of TF deviations together ####
-library (scales)
-tf_name_selected = selected_TF
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = mMat[tf_name_selected,]
-archp_meta = as.data.frame (archp@cellColData)
-archp_meta$Sample3 = archp_meta$Sample2
-archp_meta$Sample3[archp_meta$Clusters == 'C14'] = 'P11_HOX'
-
-all (colnames(mMat) == rownames(archp_meta))
-
-TF_driver = 'SOX9'
-traj_sample = list()
-for (sam in unique(archp_meta$Sample3))
-    {
-    library(zoo)
-    bin_width <- 100   # Number of observations per bin
-    overlap <- 1    
-    mMat_ordered_sample = as.data.frame(scale(mMat[,archp_meta$Sample3 == sam]))
-    mMat_ordered_sample = mMat_ordered_sample[, order(unlist(mMat_ordered_sample[TF_driver,]))]
-    cor_to_tf = order(-as.vector(cor (t(mMat_ordered_sample)[,TF_driver],t(mMat_ordered_sample), method='pearson')))
-    mMat_ordered_sample = mMat_ordered_sample[cor_to_tf,]
-    mMat_ordered_sample = as.data.frame(lapply(as.data.frame(t(mMat_ordered_sample)), function(x) {
-      zoo::rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
-    }))
-    traj_sample[[sam]] = Heatmap (
-      t(as.data.frame(lapply(mMat_ordered_sample, rescale, to = c(-10,10)))), 
-      col = rev(palette_deviation), 
-      cluster_columns=F,
-      name = sam,
-      cluster_rows=F,
-      column_names_gp = gpar(fontsize = 0),
-      row_names_gp = gpar(fontsize = 7, fontface='italic'))
-    }
-
-pdf (file.path('Plots',paste0('sarc_trajectory_',TF_driver,'_sample.pdf')), height=4, width=3)
-traj_sample
-dev.off()
-
-
-
-
-### check correlation of sarcomatoid score to fetal celltypes ####
-
-# Compute correlation of sarcomatoid cNMF with TFs ####
-sams = unique(archp$Sample2)
-sams = sams[!sams %in% c('normal_pleura','P3','P13')]
-cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
-cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample2 == x, ])))
-names (cnmf_mat) = sams
-
-archp_meta = as.data.frame (archp@cellColData)
-archp_meta$Sample3 = archp_meta$Sample2
-archp_meta$Sample3[archp_meta$Clusters == 'C14'] = 'P11_HOX'
-
-# # Get fetal matrix ####
-if (!exists('fSE')) fSE = fetch_mat (archp, 'scATAC_datasets')
-all (colnames(fSE) == rownames(archp))
-fetal_Mat = assays (fSE)[[1]]
-rownames (fetal_Mat) = rownames(rowData (fSE))
-
-fetal_Mat = lapply (sams, function(x) scale(fetal_Mat[,archp$Sample2 == x]))
-names (fetal_Mat) = sams
-
-sarc_tf = lapply (sams, function(sam) cor (t(fetal_Mat[[sam]]), t(cnmf_mat[[sam]]['sarcomatoid.cNMF20',,drop=F])))
-sarc_tf_df = do.call (cbind,sarc_tf)
-
-# ha1 = HeatmapAnnotation (' ' = anno_boxplot(-sarc_tf_df,axis = T, 
-#   width = unit(1.2, "cm"), outline=F, border=F,box_width = .8,
-#     gp = gpar(fill = 'white')), 
-#   which = 'row')
-
-cnmf_fetal_l = list()
-for (sam in sams)
-  {
-  cnmf_fetal_l[[sam]] = cor (t(cnmf_mat[[sam]]), t(fetal_Mat[[sam]]), method = 'spearman')
-  }
-
-fetal_array <- simplify2array(cnmf_fetal_l)
-#any(lapply(corTF_array, function(x) any(is.na(x))))
-# Take element-wise median
-median_matrix <- apply(fetal_array, c(1, 2), mean)
-
-cor_fetal_df = Heatmap (median_matrix[rownames(median_matrix) != 'sarcomatoid.cNMF9',],
-  row_names_gp = gpar(fontsize = 8),
-  #rect_gp = gpar(type = "none"),
-  column_names_gp = gpar(fontsize = 7, fontface='italic'),
-  #col = palette_deviation_cor_fun
-  )
-
-pdf (paste0 ('Plots/selected_fetal_cnmf_corr_heatmaps.pdf'), width = 36,height=5)
-cor_fetal_df
-dev.off()
-
-
-
-
 
 
 
