@@ -20,11 +20,12 @@ repodir=${3}
 nfeat=${4}
 k_list=${5}
 cores=${6}
+cnmf_name=${7}
 
 # Run cNMF
 cd ${projdir}/${cnmf_out}
 
-cnmf prepare --output-dir ./ --name cnmf -c ../counts_nmf_${nfeat}.txt -k $k_list --n-iter 100 --seed 14 --numgenes $nfeat --total-workers $cores #--genes $genes_file #
+cnmf prepare --output-dir ./ --name cnmf -c ../counts_nmf_${nfeat}_${cnmf_name}.txt -k $k_list --n-iter 100 --seed 14 --numgenes $nfeat --total-workers $cores #--genes $genes_file #
 
 chmod +x $repodir/utils/cnmf_factorization_parallel.sh
 job_id=$(bsub -P acc_Tsankov_Normal_Lung -J "cnmf_factorization[1-$cores]" -R rusage[mem=4000] -W 5:00 $repodir/utils/cnmf_factorization_parallel.sh $projdir $cnmf_out $cores | awk '{print $2}' | sed 's/<//g' | sed 's/>//g')

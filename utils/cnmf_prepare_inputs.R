@@ -12,15 +12,15 @@ cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(
 dir.create (file.path(cnmf_out,'Plots'), recursive=T)
 
 # Export count matrices ####
-if (!file.exists (file.path('cNMF',paste0('counts_nmf_',nfeat,'.txt'))) | force) 
+if (!file.exists (file.path('cNMF',paste0('counts_nmf_',nfeat,'_',cnmf_name,'.txt'))) | force) 
 	{
 	count_mat = t(srt@assays$RNA@counts[vf,])
-	write.table (count_mat, (file.path('cNMF',paste0('counts_nmf_',nfeat,'.txt'))), sep='\t', col.names = NA)
+	write.table (count_mat, (file.path('cNMF',paste0('counts_nmf_',nfeat,'_',cnmf_name,'.txt'))), sep='\t', col.names = NA)
 	}
-if (!file.exists (file.path('cNMF',paste0('norm_nmf_',nfeat,'.txt'))) | force) 
+if (!file.exists (file.path('cNMF',paste0('norm_nmf_',nfeat,'_',cnmf_name,'.txt'))) | force) 
 	{
 	norm_mat = t(srt@assays$RNA@data[vf,])	
-	write.table (norm_mat, (file.path('cNMF',paste0('norm_nmf_',nfeat,'.txt'))), sep='\t', col.names = NA)	
+	write.table (norm_mat, (file.path('cNMF',paste0('norm_nmf_',nfeat,'_',cnmf_name,'.txt'))), sep='\t', col.names = NA)	
 	}
 	
 ### RUN consensus NMF ####
@@ -42,7 +42,7 @@ if (!all(file.exists(file.path(cnmf_out,'cnmf',paste0('cnmf.spectra.k_',k_select
 	
 	# Run cNMF prepare script
 	system (paste0('chmod +x ',file.path(repodir,'utils','cnmf_master.sh')), wait=FALSE) 
-	system (paste0('bash ',file.path(repodir,'utils','cnmf_master.sh '), projdir,' ',cnmf_out,' ',repodir,' ',nfeat,' ',k_list_formatted,' ', cores), wait=TRUE)
+	system (paste0('bash ',file.path(repodir,'utils','cnmf_master.sh '), projdir,' ',cnmf_out,' ',repodir,' ',nfeat,' ',k_list_formatted,' ', cores,' ', cnmf_name), wait=TRUE)
 	} else {
 	message ('cnmf spectra files aready generated!')	
 	}	

@@ -98,7 +98,8 @@ for (ct in celltypes)
 
 
 ### Import and format spectra files ####
-k_selection = 19
+k_selection = 20
+cnmf_name = 'Malignant'
 source (file.path ('..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
 sapply (cnmf_spectra_unique, function(x) 'KLRC1' %in% x)
 cnmf_spectra_unique[[6]]
