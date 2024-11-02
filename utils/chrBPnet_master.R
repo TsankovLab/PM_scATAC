@@ -20,7 +20,7 @@ if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('
 		#system (paste0('chmod +x ',file.path(repodir, 'utils','chrBPnet_training.sh')))
 		#paste("bsub bash -c \"/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombnet_NKT_NK_KLRC1_f3.sh, projdir)
 		#system (paste("bsub bash -c \", file.path(repodir,utils','chrBPnet_training.sh '), chromBPdir,' ',grefdir,' ',repodir,' ',celltype,' ',fold_number,'"'), wait=FALSE)
-		command <- paste("bsub -J", paste0(celltype,'_chrBP_model'), "-P acc_Tsankov_Normal_Lung -q gpu -n 8 -W 48:00 -gpu num=1 -R v100 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('chormBPtraining_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('chormBPtraining_',celltype,'.err')),file.path(repodir,'utils','chrBPnet_training.sh'))
+		command <- paste("bsub -J", paste0(celltype,'_cBP'), "-P acc_Tsankov_Normal_Lung -q gpu -n 8 -W 48:00 -gpu num=1 -R v100 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('chormBPtraining_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('chormBPtraining_',celltype,'.err')),file.path(repodir,'utils','chrBPnet_training.sh'))
 		args <- paste(chromBPdir, grefdir, celltype, fold_number)
 		system (paste(command, args))
 		}
@@ -43,7 +43,7 @@ if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('
 		#system (paste0('chmod +x ',file.path(repodir, 'utils','chrBPnet_training.sh')))
 		#paste("bsub bash -c \"/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombnet_NKT_NK_KLRC1_f3.sh, projdir)
 		#system (paste("bsub bash -c \", file.path(repodir,utils','chrBPnet_training.sh '), chromBPdir,' ',grefdir,' ',repodir,' ',celltype,' ',fold_number,'"'), wait=FALSE)
-		command <- paste("bsub -J", paste0(celltype,'_chrBP_contribution'), "-P acc_Tsankov_Normal_Lung -q gpu -n 8 -W 48:00 -gpu num=1 -R v100 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('chromBPcontribution_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('chromBPcontribution_',celltype,'.err')),file.path(repodir,'utils','chrBPnet_contribution.sh'))
+		command <- paste("bsub -J", paste0(celltype,'_cBPcntr'), "-P acc_Tsankov_Normal_Lung -q gpu -n 8 -W 48:00 -gpu num=1 -R v100 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('chromBPcontribution_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('chromBPcontribution_',celltype,'.err')),file.path(repodir,'utils','chrBPnet_contribution.sh'))
 		args <- paste(chromBPdir, grefdir, celltype, fold_number)
 		system (paste(command, args))
 		}
@@ -65,7 +65,7 @@ if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('
 		#system (paste0('chmod +x ',file.path(repodir, 'utils','chrBPnet_training.sh')))
 		#paste("bsub bash -c \"/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombnet_NKT_NK_KLRC1_f3.sh, projdir)
 		#system (paste("bsub bash -c \", file.path(repodir,utils','chrBPnet_training.sh '), chromBPdir,' ',grefdir,' ',repodir,' ',celltype,' ',fold_number,'"'), wait=FALSE)
-		command <- paste("bsub -J", paste0(celltype,'_TF_modisco'), "-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 24:00 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('TFmodisco_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('TFmodisco_',celltype,'.err')),file.path(repodir,'utils','TFmodisco.sh'))
+		command <- paste("bsub -J", paste0(celltype,'_TFmd'), "-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 24:00 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('TFmodisco_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('TFmodisco_',celltype,'.err')),file.path(repodir,'utils','TFmodisco.sh'))
 		args <- paste(chromBPdir,celltype, fold_number)
 		system (paste(command, args))
 		}

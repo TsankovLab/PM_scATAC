@@ -1387,3 +1387,18 @@ repodir='/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git
 grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 celltype='CD8'
 fold_numbers = c(0,1,2,3,4)
+
+
+### Check expression of RUNX3 and CTCF predicted by chromBPnet
+pdf (file.path ('Plots','TF_exp_dotplots.pdf'))
+DotPlot (srt[,srt$celltype2 != 'Proliferating'], features= c('FOS','CREB1','RUNX1','RUNX2','RUNX3','CTCF','ELK4'), group.by = 'celltype2')
+dev.off()
+
+deg_res = FindMarkers (srt, ident.1 = 'NK_KLRC1', ident.2 = 'NK_FGFBP2', group.by='celltype2')
+deg_res[rownames(deg_res) %in% c('RUNX1','RUNX2','RUNX3'),]
+head (deg_res,10)
+
+
+
+
+

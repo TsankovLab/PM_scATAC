@@ -1,5 +1,6 @@
 
 # Format spectra NMF results ####
+cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
 cnmf_spectra_file = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
 
 # Assign genes uniquely to cNMF modules based on spectra values

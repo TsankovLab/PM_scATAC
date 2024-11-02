@@ -6,7 +6,6 @@ sce = SingleCellExperiment (list(counts=srt@assays$RNA@counts, logcounts = srt@a
 	# remove batchy genes
 	batchy_genes = c('RPL','RPS','MT-')
 	sce = sce[!apply(sapply(batchy_genes, function(x) grepl (x, rownames(sce))),1,any),]
-	nfeat = 5000
 	vf = getTopHVGs (sce, n=nfeat)
 
 cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
