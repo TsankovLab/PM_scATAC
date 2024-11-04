@@ -40,7 +40,7 @@ source ('../../git_repo/utils/scATAC_functions.R')
 source ('../../git_repo/utils/palettes.R')
 
 set.seed(1234)
-addArchRThreads (threads = 8) 
+addArchRThreads (threads = 1) 
 addArchRGenome("Hg38")
 
 sample_names = c(

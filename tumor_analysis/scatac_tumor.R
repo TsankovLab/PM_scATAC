@@ -394,144 +394,146 @@ dev.off()
 #   nmf_TF_df = readRDS ('nmf_TF_p2g_enrichments.rds')
 #   }
 
-# Make data.frame of deviation difference and expression difference between normal and tumors ####
-metaGroupName = 'Sample2'
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-archp_meta = as.data.frame (archp@cellColData)
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat_agg = as.data.frame (t(mMat))
-mMat_agg$metaGroup = as.character (archp_meta[,metaGroupName])
-mMat_agg = aggregate (.~ metaGroup, mMat_agg, mean)
-rownames (mMat_agg) = mMat_agg[,1]
-mMat_agg = mMat_agg[,-1]
-mMat_agg = t(mMat_agg)
-mMat_agg = mMat_agg[rownames(mMat_agg) %in% rownames(srt),]
-
-metaGroupName = 'sampleID'
-DefaultAssay (srt) = 'RNA'
-sample_names_rna = c('P1','P14','P13','P3','P12','P5','P11','P4','P8','P14','HU37','HU62')
-ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat_agg), group.by = metaGroupName)[[1]]) +1)
-ps = ps[, colnames(ps) %in% sample_names_rna]
-
-TF_diff_rna = data.frame (
-  tumor_dev = apply (mMat_agg[,unique(archp$Sample2)[!unique(archp$Sample2) == 'normal_pleura']], 1, mean),
-  normal_dev = mMat_agg[,unique(archp$Sample2)[unique(archp$Sample2) == 'normal_pleura']],
-  normal_rna = apply (ps[,c('HU37','HU62')], 1, mean),
-  tumor_rna = apply (ps[, !colnames(ps) %in% c('HU37','HU62')], 1, mean))
-TF_diff_rna$dev_diff = TF_diff_rna$tumor_dev - TF_diff_rna$normal_dev
-TF_diff_rna$rna_diff = TF_diff_rna$tumor_rna - TF_diff_rna$normal_rna
-
-
-# Compute significance per sample vs normal in scRNA and dev ####
-library (presto)
-pval_threshold = 0.01
-occurrence_threshold = 4
-
-srt$sampleID2 = srt$sampleID
-srt$sampleID2[srt$sampleID2 %in% c('HU37','HU62')] = 'normal'
-rna_comparisons = list(
-  P1 = c('P1','normal'),
-  P11 = c('P11','normal'),
-  P12 = c('P12','normal'),
-  P13 = c('P13','normal'),
-  P14 = c('P14','normal'),
-  P3 = c('P3','normal'),
-  P4 = c('P4','normal'),
-  P5 = c('P5','normal'),
-  P8 = c('P8','normal'))
-
-rna_res = lapply (rna_comparisons, function(x) 
-  wilcoxauc (srt[rowData (mSE)$name,], group_by = 'sampleID2', groups_use = x))
-rna_res_df = lapply (names (rna_comparisons), function(x) rna_res[[x]][rna_res[[x]]$group == x,'padj',drop=FALSE])
-rna_res_df = do.call (cbind , rna_res_df)
-rownames (rna_res_df) = rownames (srt[rowData (mSE)$name,])
-colnames (rna_res_df) = names (rna_comparisons)
-
-# Also test genetic and chromatin regulators ####
-rna_res_2 = lapply (rna_comparisons, function(x) 
-  wilcoxauc (srt, group_by = 'sampleID2', groups_use = x))
-chromatin_regulators = c('SETD5, ASH1L, CREBBP, PRDM2, KDM2B, KMT2D, EZH2, SETDB1')
-chromatin_regulators = unlist(strsplit (chromatin_regulators, ', '))
-genetic_drivers = c('BAP1, NF2, CDKN2B, CDKN2A, TP53, LATS2, SETD2, FAT4, PTCH1')
-chromatin_regulators2 = c('LATS1, DDX3X, ULK2, RYR2, CFAP45, SETDB1, DDX51, SF3B1, TRAF7, PTEN, RBFOX1, CSMD1, MTAP, TTC28, PCDH15, USH2A, CNTNAP2, DNAH1, KCNH7, PTK2, ROBO2, DLG2, PBRM1, PTPRD, ANTXR2, CTNNA3, LINGO2, LRP1B, PLCB1, UNC79, WWOX')
-chromatin_regulators2 = unlist (strsplit (chromatin_regulators2, ', '))
-genetic_drivers = unlist(strsplit (genetic_drivers, ', '))
-check_genes = unique (c(chromatin_regulators, genetic_drivers, chromatin_regulators2))
-
-rna_res_sum_p2 = apply (do.call (cbind, lapply (rna_res_2, function(x) x[match(check_genes, x$feature),c('padj'), drop=F])), 1, median)
-rna_res_sum_lfc2 = apply (do.call (cbind, lapply (rna_res_2, function(x) x[match(check_genes, x$feature),c('logFC'), drop=F])),1, median)
-rna_res_sum_ae2 = apply (do.call (cbind, lapply (rna_res_2, function(x) x[match(check_genes, x$feature),c('avgExpr'), drop=F])),1, median)
-rna_res_sum2 = data.frame (row.names = check_genes, RNA_pvalue_median = rna_res_sum_p2, RNA_lfc_median = rna_res_sum_lfc2, RNA_avExpr_median = rna_res_sum_ae2)
-write.csv (rna_res_sum2, 'normal_tumor_DEG_chromatin_reg_genetic_drivers.csv')
-
-#occurence_filter = apply (rna_res_df, 1, function(x) sum (x < pval_threshold))
-# rna_res_df_filtered = rna_res_df[occurence_filter > occurrence_threshold, ]
-# tf_tumor_pos = rownames(TF_diff_rna)[TF_diff_rna$dev_diff > 0 & TF_diff_rna$rna_diff > 0]
-# rna_res_df_filtered = rna_res_df_filtered[rownames(rna_res_df_filtered) %in% tf_tumor_pos,]
-# rna_selected_TF = rownames(rna_res_df_filtered)
-
-# Repeat using chromVAR deviations ####
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-
-all (colnames(mMat) == rownames(archp@cellColData))
-
-dev_comparisons = list(
-  P1 = c('P1','normal_pleura'),
-  P11 = c('P11','normal_pleura'),
-  P12 = c('P12','normal_pleura'),
-  P13 = c('P13','normal_pleura'),
-  P14 = c('P14','normal_pleura'),
-  P3 = c('P3','normal_pleura'),
-  P4 = c('P4','normal_pleura'),
-  P5 = c('P5','normal_pleura'),
-  P8 = c('P8','normal_pleura'))
-
-dev_res = lapply (dev_comparisons, function(x) 
-  wilcoxauc (mMat, y = archp$Sample2, groups_use = x))
-dev_res_df = lapply (names (dev_comparisons), function(x) dev_res[[x]][dev_res[[x]]$group == x,'padj',drop=FALSE])
-dev_res_df = do.call (cbind , dev_res_df)
-rownames (dev_res_df) = rowData (mSE)$name
-colnames (dev_res_df) = names(dev_comparisons)
-#occurence_filter = apply (dev_res_df, 1, function(x) sum (x < pval_threshold))
-# dev_res_df_filtered = dev_res_df[occurence_filter > occurrence_threshold, ]
-# dev_res_df_filtered = dev_res_df_filtered[rownames(dev_res_df_filtered) %in% tf_tumor_pos,]
-# dev_selected_TF = rownames(dev_res_df_filtered)
-# selected_TF = intersect (rna_selected_TF, dev_selected_TF)
-
-rna_res_df_logic = rna_res_df < pval_threshold
-dev_res_df_logic = dev_res_df < pval_threshold
-rna_res_df_logic = rna_res_df_logic[unique (intersect (rownames(dev_res_df_logic), rownames(rna_res_df_logic))),]
-dev_res_df_logic = dev_res_df_logic[unique (intersect (rownames(dev_res_df_logic), rownames(rna_res_df_logic))),]
-comb_res_df = rna_res_df_logic + dev_res_df_logic
-comb_res_df[comb_res_df == 1] = 0
-comb_res_df[comb_res_df == 2] = 1
-selected_TF = rownames(comb_res_df) [rowSums (comb_res_df) > occurrence_threshold] 
-tf_tumor_pos = rownames(TF_diff_rna)[TF_diff_rna$dev_diff > 0 & TF_diff_rna$rna_diff > 0]
-selected_TF = selected_TF[selected_TF %in% tf_tumor_pos]
-
-
-# Order by mean logFC ####
-res_df2 = lapply (names (rna_comparisons), function(x) rna_res[[x]][rna_res[[x]]$group == x,'logFC',drop=FALSE])
-res_df2 = do.call (cbind , res_df2)
-rownames (res_df2) = rownames(mMat_agg)
-tf_order = rownames(res_df2)[order (-apply (res_df2, 1, mean))]
-selected_TF_ordered = tf_order[tf_order %in% selected_TF]
-
-# Export selected TFs ####
-write.csv (selected_TF_ordered, 'Active_TFs.csv')
-
-# Plot distribution of diff deviation and diff expression between tumor and normal ####
-diff_line = 0
-TF_diff_rna$label = ''
-TF_diff_rna$label[match (selected_TF_ordered,rownames(TF_diff_rna))] = selected_TF_ordered
-TF_diff_rna$color = TF_diff_rna$label != ''
-TF_diff_rna$label_top = ''
-TF_diff_rna$label_top[match (head (selected_TF_ordered,20),rownames(TF_diff_rna))] = head (selected_TF_ordered,20)
-TF_diff_rna$alpha = 0.7
-TF_diff_rna$alpha[match (selected_TF_ordered,rownames(TF_diff_rna))] = 1
-tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, y = rna_diff,label = label_top)) + 
+  # Make data.frame of deviation difference and expression difference between normal and tumors ####
+if(!file.exists('selected_TF.rds'))
+  {
+  metaGroupName = 'Sample2'
+  if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+  archp_meta = as.data.frame (archp@cellColData)
+  mMat = assays (mSE)[[1]]
+  rownames (mMat) = rowData (mSE)$name
+  mMat_agg = as.data.frame (t(mMat))
+  mMat_agg$metaGroup = as.character (archp_meta[,metaGroupName])
+  mMat_agg = aggregate (.~ metaGroup, mMat_agg, mean)
+  rownames (mMat_agg) = mMat_agg[,1]
+  mMat_agg = mMat_agg[,-1]
+  mMat_agg = t(mMat_agg)
+  mMat_agg = mMat_agg[rownames(mMat_agg) %in% rownames(srt),]
+  
+  metaGroupName = 'sampleID'
+  DefaultAssay (srt) = 'RNA'
+  sample_names_rna = c('P1','P14','P13','P3','P12','P5','P11','P4','P8','P14','HU37','HU62')
+  ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat_agg), group.by = metaGroupName)[[1]]) +1)
+  ps = ps[, colnames(ps) %in% sample_names_rna]
+  
+  TF_diff_rna = data.frame (
+    tumor_dev = apply (mMat_agg[,unique(archp$Sample2)[!unique(archp$Sample2) == 'normal_pleura']], 1, mean),
+    normal_dev = mMat_agg[,unique(archp$Sample2)[unique(archp$Sample2) == 'normal_pleura']],
+    normal_rna = apply (ps[,c('HU37','HU62')], 1, mean),
+    tumor_rna = apply (ps[, !colnames(ps) %in% c('HU37','HU62')], 1, mean))
+  TF_diff_rna$dev_diff = TF_diff_rna$tumor_dev - TF_diff_rna$normal_dev
+  TF_diff_rna$rna_diff = TF_diff_rna$tumor_rna - TF_diff_rna$normal_rna
+  
+  
+  # Compute significance per sample vs normal in scRNA and dev ####
+  library (presto)
+  pval_threshold = 0.01
+  occurrence_threshold = 4
+  
+  srt$sampleID2 = srt$sampleID
+  srt$sampleID2[srt$sampleID2 %in% c('HU37','HU62')] = 'normal'
+  rna_comparisons = list(
+    P1 = c('P1','normal'),
+    P11 = c('P11','normal'),
+    P12 = c('P12','normal'),
+    P13 = c('P13','normal'),
+    P14 = c('P14','normal'),
+    P3 = c('P3','normal'),
+    P4 = c('P4','normal'),
+    P5 = c('P5','normal'),
+    P8 = c('P8','normal'))
+  
+  rna_res = lapply (rna_comparisons, function(x) 
+    wilcoxauc (srt[rowData (mSE)$name,], group_by = 'sampleID2', groups_use = x))
+  rna_res_df = lapply (names (rna_comparisons), function(x) rna_res[[x]][rna_res[[x]]$group == x,'padj',drop=FALSE])
+  rna_res_df = do.call (cbind , rna_res_df)
+  rownames (rna_res_df) = rownames (srt[rowData (mSE)$name,])
+  colnames (rna_res_df) = names (rna_comparisons)
+  
+  # Also test genetic and chromatin regulators ####
+  rna_res_2 = lapply (rna_comparisons, function(x) 
+    wilcoxauc (srt, group_by = 'sampleID2', groups_use = x))
+  chromatin_regulators = c('SETD5, ASH1L, CREBBP, PRDM2, KDM2B, KMT2D, EZH2, SETDB1')
+  chromatin_regulators = unlist(strsplit (chromatin_regulators, ', '))
+  genetic_drivers = c('BAP1, NF2, CDKN2B, CDKN2A, TP53, LATS2, SETD2, FAT4, PTCH1')
+  chromatin_regulators2 = c('LATS1, DDX3X, ULK2, RYR2, CFAP45, SETDB1, DDX51, SF3B1, TRAF7, PTEN, RBFOX1, CSMD1, MTAP, TTC28, PCDH15, USH2A, CNTNAP2, DNAH1, KCNH7, PTK2, ROBO2, DLG2, PBRM1, PTPRD, ANTXR2, CTNNA3, LINGO2, LRP1B, PLCB1, UNC79, WWOX')
+  chromatin_regulators2 = unlist (strsplit (chromatin_regulators2, ', '))
+  genetic_drivers = unlist(strsplit (genetic_drivers, ', '))
+  check_genes = unique (c(chromatin_regulators, genetic_drivers, chromatin_regulators2))
+  
+  rna_res_sum_p2 = apply (do.call (cbind, lapply (rna_res_2, function(x) x[match(check_genes, x$feature),c('padj'), drop=F])), 1, median)
+  rna_res_sum_lfc2 = apply (do.call (cbind, lapply (rna_res_2, function(x) x[match(check_genes, x$feature),c('logFC'), drop=F])),1, median)
+  rna_res_sum_ae2 = apply (do.call (cbind, lapply (rna_res_2, function(x) x[match(check_genes, x$feature),c('avgExpr'), drop=F])),1, median)
+  rna_res_sum2 = data.frame (row.names = check_genes, RNA_pvalue_median = rna_res_sum_p2, RNA_lfc_median = rna_res_sum_lfc2, RNA_avExpr_median = rna_res_sum_ae2)
+  write.csv (rna_res_sum2, 'normal_tumor_DEG_chromatin_reg_genetic_drivers.csv')
+  
+  #occurence_filter = apply (rna_res_df, 1, function(x) sum (x < pval_threshold))
+  # rna_res_df_filtered = rna_res_df[occurence_filter > occurrence_threshold, ]
+  # tf_tumor_pos = rownames(TF_diff_rna)[TF_diff_rna$dev_diff > 0 & TF_diff_rna$rna_diff > 0]
+  # rna_res_df_filtered = rna_res_df_filtered[rownames(rna_res_df_filtered) %in% tf_tumor_pos,]
+  # rna_selected_TF = rownames(rna_res_df_filtered)
+  
+  # Repeat using chromVAR deviations ####
+  mMat = assays (mSE)[[1]]
+  rownames (mMat) = rowData (mSE)$name
+  
+  all (colnames(mMat) == rownames(archp@cellColData))
+  
+  dev_comparisons = list(
+    P1 = c('P1','normal_pleura'),
+    P11 = c('P11','normal_pleura'),
+    P12 = c('P12','normal_pleura'),
+    P13 = c('P13','normal_pleura'),
+    P14 = c('P14','normal_pleura'),
+    P3 = c('P3','normal_pleura'),
+    P4 = c('P4','normal_pleura'),
+    P5 = c('P5','normal_pleura'),
+    P8 = c('P8','normal_pleura'))
+  
+  dev_res = lapply (dev_comparisons, function(x) 
+    wilcoxauc (mMat, y = archp$Sample2, groups_use = x))
+  dev_res_df = lapply (names (dev_comparisons), function(x) dev_res[[x]][dev_res[[x]]$group == x,'padj',drop=FALSE])
+  dev_res_df = do.call (cbind , dev_res_df)
+  rownames (dev_res_df) = rowData (mSE)$name
+  colnames (dev_res_df) = names(dev_comparisons)
+  #occurence_filter = apply (dev_res_df, 1, function(x) sum (x < pval_threshold))
+  # dev_res_df_filtered = dev_res_df[occurence_filter > occurrence_threshold, ]
+  # dev_res_df_filtered = dev_res_df_filtered[rownames(dev_res_df_filtered) %in% tf_tumor_pos,]
+  # dev_selected_TF = rownames(dev_res_df_filtered)
+  # selected_TF = intersect (rna_selected_TF, dev_selected_TF)
+  
+  rna_res_df_logic = rna_res_df < pval_threshold
+  dev_res_df_logic = dev_res_df < pval_threshold
+  rna_res_df_logic = rna_res_df_logic[unique (intersect (rownames(dev_res_df_logic), rownames(rna_res_df_logic))),]
+  dev_res_df_logic = dev_res_df_logic[unique (intersect (rownames(dev_res_df_logic), rownames(rna_res_df_logic))),]
+  comb_res_df = rna_res_df_logic + dev_res_df_logic
+  comb_res_df[comb_res_df == 1] = 0
+  comb_res_df[comb_res_df == 2] = 1
+  selected_TF = rownames(comb_res_df) [rowSums (comb_res_df) > occurrence_threshold] 
+  tf_tumor_pos = rownames(TF_diff_rna)[TF_diff_rna$dev_diff > 0 & TF_diff_rna$rna_diff > 0]
+  selected_TF = selected_TF[selected_TF %in% tf_tumor_pos]
+  
+  
+  # Order by mean logFC ####
+  res_df2 = lapply (names (rna_comparisons), function(x) rna_res[[x]][rna_res[[x]]$group == x,'logFC',drop=FALSE])
+  res_df2 = do.call (cbind , res_df2)
+  rownames (res_df2) = rownames(mMat_agg)
+  tf_order = rownames(res_df2)[order (-apply (res_df2, 1, mean))]
+  selected_TF_ordered = tf_order[tf_order %in% selected_TF]
+  
+  # Export selected TFs ####
+  write.csv (selected_TF_ordered, 'Active_TFs.csv')
+  
+  # Plot distribution of diff deviation and diff expression between tumor and normal ####
+  diff_line = 0
+  TF_diff_rna$label = ''
+  TF_diff_rna$label[match (selected_TF_ordered,rownames(TF_diff_rna))] = selected_TF_ordered
+  TF_diff_rna$color = TF_diff_rna$label != ''
+  TF_diff_rna$label_top = ''
+  TF_diff_rna$label_top[match (head (selected_TF_ordered,20),rownames(TF_diff_rna))] = head (selected_TF_ordered,20)
+  TF_diff_rna$alpha = 0.7
+  TF_diff_rna$alpha[match (selected_TF_ordered,rownames(TF_diff_rna))] = 1
+  tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, y = rna_diff,label = label_top)) + 
   geom_point(aes(color=color, alpha = alpha), size = 2, shape = 21, stroke=0.3) + # Color points based on x value
   scale_color_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
   scale_fill_gradient(low = "white", high = "black") +
@@ -553,10 +555,13 @@ tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, y = rna_diff,label = label_to
     xlim (c(-0.2, .2)) + 
     ylim (c(-0.6, .6))
 
-pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot2.pdf'),5,height = 4)
-tf_diff_p
-dev.off()
-
+  pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot2.pdf'),5,height = 4)
+  print (tf_diff_p)
+  dev.off()
+  saveRDS(selected_TF, 'selected_TF.rds')
+  } else {
+  selected_TF = readRDS ('selected_TF.rds')
+  }
 
 ### Look at overlap of TF with CNV from TCGA ####
 ## Generate circos plot for showing hubs on recurrent CNVs ####
@@ -725,7 +730,7 @@ TF_bulk_sarc_cor_hm = Heatmap (tf_sarc_cor_tf,
         width = unit(.6, "cm"))
 
 # Add cNMF vs TF correlation from scRNA ####
-cnmf_tf_cor = readRDS ('../scrna/cNMF_TF_correlation_subsampled.rds')
+
 
 cnmf_tf_cor_hm = Heatmap (t(cnmf_tf_cor)[selected_TF_ordered,],
         #right_annotation=tf_mark,
@@ -818,22 +823,18 @@ write.csv (tf_table, 'candidate_TFs_table.csv')
 
 
 
-
-
-
-
 # Add cNMF identified in scRNA to archr object ####
 nfeat=5000
 k=25
-cnmf_list = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
-cnmf_list = cnmf_list[!names(cnmf_list) %in% c( 'cNMF16','cNMF24')]
-cnmf_list = lapply (cnmf_list, function(x) head(x, 50)[head(x, 50) %in% rownames (gsMat)])
+cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
+cnmf_spectra_unique = cnmf_spectra_unique[!names(cnmf_spectra_unique) %in% c( 'cNMF16','cNMF24')]
+cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x, 50)[head(x, 50) %in% rownames (gsMat)])
 
   archp = addModuleScore (
     ArchRProj = archp,
     useMatrix = 'GeneScoreMatrix',
     name = "sarcomatoid",
-    features = cnmf_list,
+    features = cnmf_spectra_unique,
     nBin = 25,
     nBgd = 100,
     seed = 1,
@@ -848,12 +849,14 @@ cnmfs = as.data.frame (t(scale (t(cnmfs))))
 
 
 # Make coexpression network for each sample using top TFs deviations ####
-sams = unique(archp$Sample3)
-sams = sams[!sams %in% c('normal_pleura','P3','P13')]
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 archp_meta = as.data.frame (archp@cellColData)
-archp_meta = archp_meta[!archp_meta$Sample2 %in% sams,]
 archp_meta$Sample3 = archp_meta$Sample2
 archp_meta$Sample3[archp_meta$Clusters == 'C14'] = 'P11_HOX'
+sams = unique(archp_meta$Sample3)
+sams = sams[!sams %in% c('normal_pleura','P3','P13')]
+
+archp_meta = archp_meta[archp_meta$Sample3 %in% sams,]
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 mMat = as.matrix(mMat[selected_TF,])
@@ -872,9 +875,9 @@ median_matrix <- apply(corTF_array, c(1, 2), mean)
 
 # Compute correlation of sarcomatoid cNMF with TFs ####
 cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
-cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
+cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp_meta$Sample3 == x, ])))
 names (cnmf_mat) = sams
-tf_mat = lapply (sams, function(x) scale(mMat[,archp$Sample3 == x]))
+tf_mat = lapply (sams, function(x) scale(mMat[,archp_meta$Sample3 == x]))
 names (tf_mat) = sams
 
 sarc_tf = lapply (sams, function(sam) cor (t(tf_mat[[sam]]), t(cnmf_mat[[sam]]['sarcomatoid.cNMF20',,drop=F])))
@@ -885,23 +888,74 @@ ha1 = HeatmapAnnotation (' ' = anno_boxplot(-sarc_tf_df,axis = T,
     gp = gpar(fill = 'white')), 
   which = 'row')
 
-cor_TF_df = Heatmap (median_matrix,
+pdf()
+cor_TF_df = draw (Heatmap (median_matrix,
   left= ha1,
   row_names_gp = gpar(fontsize = 8),
-  rect_gp = gpar(type = "none"),
   column_names_gp = gpar(fontsize = 7, fontface='italic'),
   col = palette_deviation_cor_fun,
+  rect_gp = gpar(type = "none"),
   cell_fun = function(j, i, x, y, w, h, fill) {
         if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
-        }})
-
-pdf (paste0 ('Plots/selected_TF_dev_corr_heatmaps.pdf'), width = 6,height=5)
-cor_TF_df
+        }}))
 dev.off()
 
+# Add pathways of TF correlated genes from scRNA
+TFrow_order = row_order (cor_TF_df)
+TF_cor_sum = readRDS (file.path('..','scrna','enrichment_pathways_TFs.rds'))
+rownames (TF_cor_sum) = gsub ('HALLMARK_','',rownames(TF_cor_sum))
+TF_cor_sum = TF_cor_sum[apply (TF_cor_sum, 1, function(x) any(x > 3)),]
+pdf()
+hm = draw (Heatmap (
+    t(TF_cor_sum[,TFrow_order]),
+    column_names_rot =45, 
+    row_names_gp = gpar(fontsize = 7),
+    column_names_gp = gpar(fontsize = 6),
+    col =palette_enrichment, 
+    cluster_rows=F,
+#     cell_fun = function(j, i, x, y, width, height, fill) {
+#         grid.text(sprintf("%.0f", t(TF_cor_sum)[i, j]), x, y, gp = gpar(fontsize = 10, col='white'))
+# },
+    border=T))
+dev.off()
 
-# Also plot boxplots ordered by correlation to sarcomatoid score ####
+pdf (paste0 ('Plots/selected_TF_dev_corr_heatmaps.pdf'), width = 6,height=5)
+cor_TF_df 
+dev.off()
+
+pdf (paste0 ('Plots/selected_TF_dev_corr_pathways_heatmaps.pdf'), width = 3,height=6)
+hm
+dev.off()
+
+# # Plot also scRNA 
+# tf_order = row_order (cor_TF_df)
+
+# diag(cor_TF) = 0
+# cor_TF2 = cor_TF
+# cor_TF2[cor_TF2 > 0.5] = 0.5
+# cor_TF2[cor_TF2 < -0.5] = -0.5
+# pdf (file.path('Plots','cor_selected_TF_metacells_heatmap.pdf'),width=5, height=4)
+# Heatmap (cor_TF[tf_order,tf_order], 
+#   column_names_gp = gpar(fontsize = 5),
+#   row_names_gp = gpar(fontsize = 5),
+#   cluster_rows=T,
+#   cluster_columns=T,
+#     rect_gp = gpar(type = "none"),
+#   # clustering_distance_rows = 'pearson',
+#   # clustering_distance_columns='pearson',
+#   col = palette_expression_cor_fun(cor_TF2),
+#   cell_fun = function(j, i, x, y, w, h, fill) {
+#         if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+#             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#                     }})
+
+# dev.off()
+
+
+
+
+# Plot boxplots ordered by correlation to sarcomatoid score using TF activity and scRNA ####
 sarc_tf_med = apply (sarc_tf_df,1, median)
 sarc_tf_med = order(-sarc_tf_med)
 sarc_tf_df2 = as.data.frame (sarc_tf_df)
@@ -909,11 +963,102 @@ colnames(sarc_tf_df2) = names (tf_mat)
 sarc_tf_df2$TF = rownames(sarc_tf_df2)
 sarc_tf_df2 = gather (sarc_tf_df2, scS, score, 1:(ncol(sarc_tf_df2) - 1))
 sarc_tf_df2$TF = factor (sarc_tf_df2$TF, levels = unique(sarc_tf_df2$TF)[sarc_tf_med])
-bp = ggplot (sarc_tf_df2, aes (x = TF, y = score)) + bxp + gtheme
+sarc_tf_df2$type = 'scATAC'
 
-pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots.pdf'), width = 8,height=3)
+# Compute TF correlation to sarcomatoid in scRNA ####
+metacells = readRDS (file.path('..','scrna','metacells.rds'))
+
+sams = c('P1','P11','P12','P13','P4','P5','P8')
+
+metacells = ModScoreCor (
+        seurat_obj = metacells, 
+        geneset_list = cnmf_spectra_unique, 
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # threshold for fetal_pval2
+        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+
+metacells_assay = metacells@assays$RNA@layers$data
+rownames (metacells_assay) = rownames (srt)
+metacells_assay = metacells_assay[selected_TF,]
+
+tc_cor = lapply (sams, function(sam)
+  {
+  tmp = cor(as.matrix(t(metacells_assay[,metacells$sampleID == sam])), as.matrix(metacells$cNMF20)[metacells$sampleID == sam,,drop=F], method='spearman')
+  tmp = as.data.frame (tmp)
+  tmp$scS = sam
+  tmp$TF = rownames(tmp)
+  colnames (tmp) = c('score','scS','TF')
+  tmp = tmp[,c('TF','scS','score')]
+  })
+scrna_tf_cor_df = do.call (rbind, tc_cor)
+scrna_tf_cor_df$type = 'scRNA'
+combined_df = rbind (sarc_tf_df2, scrna_tf_cor_df)
+#lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
+
+
+top_sarc_TF = head(levels (combined_df$TF),10)
+combined_df = combined_df[combined_df$TF %in% , top_sarc_TF]
+bp = ggplot (combined_df, aes (x = TF, y = score, fill = type), alpha=.5) + 
+geom_boxplot (
+    linewidth = .2,
+    width=1,
+    outlier.alpha = 0.2,
+    outlier.shape = NA,
+     size=0.6, alpha=0.7
+     ) + 
+geom_point (position = 'jitter', alpha= 0.2, color = 'grey22', size=1) +
+gtheme +
+scale_fill_manual (values = c(scATAC = '#B2183BFF', scRNA = '#7663A3FF')) + 
+geom_hline(yintercept = 0, color='red',  linetype='dashed')
+
+pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots.pdf'), width = 5,height=3)
 bp
 dev.off()
+
+
+# Compute co-occurrence of sarcomatoid TFs ####
+motifMat = getPositions (archp)
+matches = getMatches (archp)
+matchesMat = assay (matches)
+colnames (matchesMat) = gsub ('_.*','',colnames (matchesMat))
+colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
+
+matchesMat = matchesMat[,top_sarc_TF]
+matchesMat = matchesMat[rowSums (matchesMat) > 0,]
+
+cooc = matrix (ncol = ncol(matchesMat), nrow= ncol(matchesMat))
+
+for (i in 1:ncol(matchesMat))
+  {
+  for (z in 1:ncol(matchesMat)) 
+    {
+    ov = sum (rowSums (matchesMat[,c(i,z)]) == 2) / min (colSums(matchesMat[,c(i,z)]))
+    cooc[i,z] = ov
+    }
+  }
+
+colnames (cooc) = top_sarc_TF
+rownames (cooc) = top_sarc_TF
+diag (cooc) = 1
+
+cooc_hm = Heatmap (
+    cooc,
+    column_names_rot =45, 
+    row_names_gp = gpar(fontsize = 7),
+    column_names_gp = gpar(fontsize = 6),
+    col =palette_cooccurrence, 
+    cluster_rows=F,
+    cluster_columns = F,
+rect_gp = gpar (col = "white", lwd = 1))
+
+pdf (paste0 ('Plots/selected_TF_cooccurence_heatmaps.pdf'), width = 6,height=5)
+cooc_hm 
+dev.off()
+
+
+
+  
+
 
 # Try with PCA ####
 library (uwot)
@@ -1264,7 +1409,7 @@ pdf (file.path('Plots','sarcomatoid_score_scaled_per_sample_feature_plots.pdf'),
 umap_p1
 dev.off()
 
-
+  
 
 
 

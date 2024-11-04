@@ -100,7 +100,9 @@ palette_pseudotime = colorRamp2(c(-4,0,4), c('white','white','black'))
 palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('white','white','black'))
 
 palette_expression_correlation = paletteer::paletteer_c("ggthemes::Green-Blue-White Diverging",100)
-palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#24693DFF','#F6F9FCFF','#4F7FAAFF'))
+palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#grey','#FCFDFEFF','#2A6F3FFF'))
+palette_cooccurrence = colorRamp2(c(0,1), c('white','cornsilk4'))
+palette_expression_cor_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c('grey25','#FCFDFEFF','#2A6F3FFF')))}
 #palette_expression_cor = c('#24693DFF','#F6F9FCFF','#4F7FAAFF')
 
 palette_deviation_correlation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
