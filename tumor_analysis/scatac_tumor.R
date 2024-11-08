@@ -956,6 +956,27 @@ dev.off()
 
 
 # Plot boxplots ordered by correlation to sarcomatoid score using TF activity and scRNA ####
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = as.matrix(mMat[selected_TF,])
+
+archp_meta = as.data.frame (archp@cellColData)
+archp_meta$Sample3 = archp_meta$Sample2
+archp_meta$Sample3[archp_meta$Clusters == 'C14'] = 'P11_HOX'
+sams = unique(archp_meta$Sample3)
+sams = sams[!sams %in% c('normal_pleura','P3','P13')]
+
+# Compute correlation of sarcomatoid cNMF with TFs ####
+cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
+cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp_meta$Sample3 == x, ])))
+names (cnmf_mat) = sams
+tf_mat = lapply (sams, function(x) scale(mMat[,archp_meta$Sample3 == x]))
+names (tf_mat) = sams
+
+sarc_tf = lapply (sams, function(sam) cor (t(tf_mat[[sam]]), t(cnmf_mat[[sam]]['sarcomatoid.cNMF20',,drop=F])))
+sarc_tf_df = do.call (cbind,sarc_tf)
+
 sarc_tf_med = apply (sarc_tf_df,1, median)
 sarc_tf_med = order(-sarc_tf_med)
 sarc_tf_df2 = as.data.frame (sarc_tf_df)
@@ -967,6 +988,9 @@ sarc_tf_df2$type = 'scATAC'
 
 # Compute TF correlation to sarcomatoid in scRNA ####
 metacells = readRDS (file.path('..','scrna','metacells.rds'))
+nfeat=5000
+k=25
+cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
 
 sams = c('P1','P11','P12','P13','P4','P5','P8')
 
@@ -995,23 +1019,22 @@ scrna_tf_cor_df$type = 'scRNA'
 combined_df = rbind (sarc_tf_df2, scrna_tf_cor_df)
 #lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
 
-
-top_sarc_TF = head(levels (combined_df$TF),10)
-combined_df = combined_df[combined_df$TF %in% , top_sarc_TF]
+top_sarc_TF = head(levels (combined_df$TF),20)
+combined_df = combined_df[combined_df$TF %in% top_sarc_TF, ]
 bp = ggplot (combined_df, aes (x = TF, y = score, fill = type), alpha=.5) + 
 geom_boxplot (
-    linewidth = .2,
+    linewidth = .1,
     width=1,
     outlier.alpha = 0.2,
     outlier.shape = NA,
-     size=0.6, alpha=0.7
+     size=0.5, alpha=0.7
      ) + 
 geom_point (position = 'jitter', alpha= 0.2, color = 'grey22', size=1) +
 gtheme +
 scale_fill_manual (values = c(scATAC = '#B2183BFF', scRNA = '#7663A3FF')) + 
 geom_hline(yintercept = 0, color='red',  linetype='dashed')
 
-pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots.pdf'), width = 5,height=3)
+pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots.pdf'), width = 7,height=3)
 bp
 dev.off()
 
@@ -1054,6 +1077,20 @@ rect_gp = gpar (col = "white", lwd = 1))
 pdf (paste0 ('Plots/selected_TF_cooccurence_heatmaps.pdf'), width = 6,height=5)
 cooc_hm 
 dev.off()
+
+# Check overlap of co-occurring motifs #### WORK IN PROGRESS
+sox9 = motifMat[[grep ('SOX9',names(motifMat))]]
+sox9p = getPeakSet (archp)[unique(queryHits (findOverlaps (getPeakSet(archp), sox9)))]
+sox6 = motifMat[[grep ('SOX6',names(motifMat))]]
+sox6p = getPeakSet (archp)[unique(queryHits (findOverlaps (getPeakSet(archp), sox6)))]
+peak_ovs = sox9p[queryHits(findOverlaps(sox9p, sox6p))]
+#'SERPINE1' %in% unique(peak_ovs$nearestGene)
+distance (motifMat[[grep('SOX9', names(motifMat))]][queryHits (findOverlaps (motifMat[[grep('SOX9', names(motifMat))]], peak_ovs[i]))],
+motifMat[[grep('SOX6', names(motifMat))]][queryHits (findOverlaps (motifMat[[grep('SOX6', names(motifMat))]], peak_ovs))])
+
+
+
+
 
 
 
