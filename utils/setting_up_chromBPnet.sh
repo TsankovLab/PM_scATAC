@@ -23,7 +23,7 @@ ml cudnn/8.2.0
 ml proxies
 
 
-# Create background regions file - Go in the output chromBPnet folder
+### Create background regions file - Go in the output chromBPnet folder ####
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
 
 # Remove regions overlapping black listed regions

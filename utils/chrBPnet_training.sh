@@ -4,7 +4,7 @@
 #BSUB -q gpu
 #BSUB -n 8
 #BSUB -W 48:00
-#BSUB -gpu num=1
+#BSUB -gpu num=2
 #BSUB -R v100
 #BSUB -R rusage[mem=32000]
 #BSUB -R span[hosts=1]
@@ -48,3 +48,17 @@ chrombpnet pipeline \
     -b bias_model/models/model_bias.h5 \
     -o ${celltype}_model/fold_$fold_number/
 
+## Troubleshoot numpy (version installed should be 1.23.4)
+# python
+# import deepdish as dd
+# import numpy as np
+# d = {"test": np.array([0,0])}
+# dd.io.save("test.h5", d, compression='blosc')
+
+
+# !!!!!!ATTENTION!!!!!HOW TO USE THE NEW GPUS ADDED!!!!!ATTENTION!!!!!!!!!!!!!!!!!!!!!!!!!
+# To submit jobs to NVLinked H100 GPU nodes, flag "-R h100nvl" is required.
+# PLEASE ADD  #BSUB -R h100nvl to your LSF script or -R h100nvl to your LSF command line
+
+# To submit jobs to L40S GPU nodes, flag "-R l40s" is required. 
+# PLEASE ADD #BSUB -R l40s to your LSF script or -R l40s to your LSF command line. 

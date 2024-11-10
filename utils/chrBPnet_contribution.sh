@@ -4,7 +4,7 @@
 #BSUB -q gpu
 #BSUB -n 8
 #BSUB -W 48:00
-#BSUB -gpu num=1
+#BSUB -gpu num=2
 #BSUB -R v100
 #BSUB -R rusage[mem=8000]
 #BSUB -R span[hosts=1]
