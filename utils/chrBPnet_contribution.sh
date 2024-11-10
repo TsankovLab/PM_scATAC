@@ -37,7 +37,7 @@ source activate chrombpnet
 # Get contribution score bigwigs
 cd $chromBPdir
 
-MODEL_H5=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/${celltype}_model/fold_$fold_number/models/chrombpnet_nobias.h5
+MODEL_H5=${celltype}_model/fold_$fold_number/models/chrombpnet_nobias.h5
 REGIONS=peakset_$celltype.bed
 GENOME=$grefdir/genome_references/hg38.genome.fa
 CHROM_SIZES=$grefdir/hg38.chrom.sizes
