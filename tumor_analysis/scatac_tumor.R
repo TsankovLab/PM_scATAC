@@ -31,6 +31,10 @@ if (!file.exists ('Save-ArchR-Project.rds'))
  archp = loadArchRProject (projdir)   
   }
 
+archp$Sample3 = archp$Sample2
+archp$Sample3[archp$Clusters == 'C14'] = 'P11_HOX'
+
+
 # Load RNA ####
 srt = readRDS (file.path('..','scrna','srt.rds'))
 sarc_order = read.csv (file.path('..','scrna','cnmf20_sarcomatoid_sample_order.csv'), row.names=1)
@@ -827,7 +831,7 @@ write.csv (tf_table, 'candidate_TFs_table.csv')
 nfeat=5000
 k=25
 cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
-cnmf_spectra_unique = cnmf_spectra_unique[!names(cnmf_spectra_unique) %in% c( 'cNMF16','cNMF24')]
+#cnmf_spectra_unique = cnmf_spectra_unique[!names(cnmf_spectra_unique) %in% c( 'cNMF16','cNMF24')]
 cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x, 50)[head(x, 50) %in% rownames (gsMat)])
 
   archp = addModuleScore (
@@ -851,8 +855,6 @@ cnmfs = as.data.frame (t(scale (t(cnmfs))))
 # Make coexpression network for each sample using top TFs deviations ####
 if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 archp_meta = as.data.frame (archp@cellColData)
-archp_meta$Sample3 = archp_meta$Sample2
-archp_meta$Sample3[archp_meta$Clusters == 'C14'] = 'P11_HOX'
 sams = unique(archp_meta$Sample3)
 sams = sams[!sams %in% c('normal_pleura','P3','P13')]
 
@@ -1199,15 +1201,17 @@ dev.off()
 ### check correlation of sarcomatoid score to external celltypes ####
 
 # Compute correlation of sarcomatoid cNMF external celltypes ####
-archp$Sample3 = archp$Sample2
-archp$Sample3[archp$Clusters == 'C14'] = 'P11_HOX'
-
 sams = unique(archp$Sample3)
 sams = sams[!sams %in% c('normal_pleura','P3','P13')]
 cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
 cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
 names (cnmf_mat) = sams
 
+# # Get ENCODE matrix ####
+if (!exists('enSE')) enSE = fetch_mat (archp, 'ENCODE_H3K4me3')
+all (colnames(enSE) == rownames(archp))
+encode_Mat = assays (enSE)[[1]]
+rownames (encode_Mat) = rownames(rowData (enSE))
 
 # # Get external matrix ####
 if (!exists('fSE')) fSE = fetch_mat (archp, 'scATAC_datasets')
@@ -1215,29 +1219,53 @@ all (colnames(fSE) == rownames(archp))
 fetal_Mat = assays (fSE)[[1]]
 rownames (fetal_Mat) = rownames(rowData (fSE))
 
-fetal_Mat = lapply (sams, function(x) scale(fetal_Mat[,archp$Sample3 == x]))
-names (fetal_Mat) = sams
+ext_mat = rbind (encode_Mat, fetal_Mat)
+remove_immune = c(
+  rownames (ext_mat)[grep ('CD4',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('lymph',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('CD8',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('T-',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('\\.T\\.cell',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('killer',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('\\.B\\.cell',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('NK',rownames(ext_mat), ignore.case =F)],
+  rownames (ext_mat)[grep ('Treg',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('Naive.B',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('Naive.T',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('Mast',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('Memory.B',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('Mac',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('Memory.B',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('Plasma',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('Monocyte',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('Myelo',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('DC',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('CD5',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('myeloid',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('B cell',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('neutrophil',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('T cell',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('ILC',rownames(ext_mat), ignore.case =T)],
+  rownames (ext_mat)[grep ('mononuclear',rownames(ext_mat), ignore.case =F)],
+  rownames (ext_mat)[grep ('Eryth',rownames(ext_mat), ignore.case =F)])
 
-sarc_tf = lapply (sams, function(sam) cor (t(fetal_Mat[[sam]]), t(cnmf_mat[[sam]]['sarcomatoid.cNMF8',,drop=F])))
-sarc_tf = lapply (sarc_tf, function(x) head(x[order(-x[,1]),],10))
+ext_mat = ext_mat[!rownames(ext_mat)%in% remove_immune,]
 
-sarc_tf_df = do.call (cbind,sarc_tf)
 
-# ha1 = HeatmapAnnotation (' ' = anno_boxplot(-sarc_tf_df,axis = T, 
-#   width = unit(1.2, "cm"), outline=F, border=F,box_width = .8,
-#     gp = gpar(fill = 'white')), 
-#   which = 'row')
+
+ext_mat = lapply (sams, function(x) scale(ext_mat[,archp$Sample3 == x]))
+names (ext_mat) = sams
 
 cnmf_fetal_l = list()
 for (sam in sams)
   {
-  cnmf_fetal_l[[sam]] = cor (t(cnmf_mat[[sam]]), t(fetal_Mat[[sam]]), method = 'spearman')
+  cnmf_fetal_l[[sam]] = cor (t(cnmf_mat[[sam]]), t(ext_mat[[sam]]), method = 'spearman')
   }
 
 fetal_array <- simplify2array(cnmf_fetal_l)
 #any(lapply(corTF_array, function(x) any(is.na(x))))
 # Take element-wise median
-median_matrix <- apply(fetal_array, c(1, 2), mean)
+median_matrix <- apply(fetal_array, c(1, 2), median)
 
 cor_fetal_df = Heatmap (median_matrix[rownames(median_matrix) != 'sarcomatoid.cNMF9',],
   row_names_gp = gpar(fontsize = 8),
@@ -1250,65 +1278,24 @@ pdf (paste0 ('Plots/selected_fetal_cnmf_corr_heatmaps.pdf'), width = 36,height=5
 cor_fetal_df
 dev.off()
 
-
-# # Get ENCODE matrix ####
-if (!exists('enSE')) enSE = fetch_mat (archp, 'ENCODE_H3K4me3')
-all (colnames(enSE) == rownames(archp))
-encode_Mat = assays (enSE)[[1]]
-rownames (encode_Mat) = rownames(rowData (enSE))
-
-cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
-cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
-names (cnmf_mat) = sams
-
-sams = unique(archp$Sample3)
-sams = sams[!sams %in% c('normal_pleura','P3','P13')]
-encode_Mat = lapply (sams, function(x) scale(encode_Mat[,archp$Sample3 == x]))
-names (encode_Mat) = sams
-
-sarc_tf = lapply (sams, function(sam) cor (t(encode_Mat[[sam]]), t(cnmf_mat[[sam]]['sarcomatoid.cNMF20',,drop=F])))
-sarc_tf = lapply (sarc_tf, function(x) head(x[order(-x[,1]),],10))
+# Also plot boxplots ordered by correlation to sarcomatoid score ####
+cnmf_module = 'sarcomatoid.cNMF20'
+top_ext_ct = median_matrix[cnmf_module,]
+top_ext_ct = top_ext_ct[order (-top_ext_ct)]
+top_ext_ct = names(c(head (top_ext_ct, 20)))#,tail (top_ext_ct, 20)))
+sarc_tf = lapply (sams, function(sam) cor (t(ext_mat[[sam]][top_ext_ct,]), t(cnmf_mat[[sam]]['sarcomatoid.cNMF20',,drop=F]), method = 'spearman'))
 sarc_tf_df = do.call (cbind,sarc_tf)
 
-# ha1 = HeatmapAnnotation (' ' = anno_boxplot(-sarc_tf_df,axis = T, 
-#   width = unit(1.2, "cm"), outline=F, border=F,box_width = .8,
-#     gp = gpar(fill = 'white')), 
-#   which = 'row')
-
-cnmf_encode_l = list()
-for (sam in sams)
-  {
-  cnmf_encode_l[[sam]] = cor (t(cnmf_mat[[sam]]), t(encode_Mat[[sam]]), method = 'spearman')
-  }
-
-cnmf_encode_array <- simplify2array(cnmf_encode_l)
-#any(lapply(corTF_array, function(x) any(is.na(x))))
-# Take element-wise median
-median_matrix <- apply(cnmf_encode_array, c(1, 2), mean)
-
-cor_cnmf_encode_df = Heatmap (median_matrix,
-  row_names_gp = gpar(fontsize = 8),
-  #rect_gp = gpar(type = "none"),
-  column_names_gp = gpar(fontsize = 7, fontface='italic'),
-  #col = palette_deviation_cor_fun
-  )
-
-pdf (paste0 ('Plots/ENCODE_cnmf_corr_heatmaps.pdf'), width = 10,height=7)
-cor_cnmf_encode_df
-dev.off()
-
-
-# Also plot boxplots ordered by correlation to sarcomatoid score ####
-sarc_tf_med = apply (sarc_tf_df,1, mean)
-sarc_tf_order = head (order(-sarc_tf_med),20)
-sarc_tf_med = sarc_tf_med[sarc_tf_order]
-sarc_tf_df2 = sarc_tf_df[sarc_tf_order,]
-sarc_tf_df2 = as.data.frame (sarc_tf_df2)
-colnames(sarc_tf_df2) = names (encode_Mat) 
+sarc_tf_df = as.data.frame (sarc_tf_df)
 #sarc_tf_df2$TF = rownames(sarc_tf_df2)
-sarc_tf_df2$ENCODE_celltype = factor (names(sarc_tf_med), levels = names (sarc_tf_med))
-sarc_tf_df2 = gather (sarc_tf_df2, scS, score, 1:(ncol(sarc_tf_df2)-1))
-bp = ggplot (sarc_tf_df2, aes (x = ENCODE_celltype, y = score)) + geom_boxplot () + gtheme
+colnames(sarc_tf_df) = sams
+sarc_tf_df$ENCODE_celltype = factor (top_ext_ct, levels = rev(top_ext_ct))
+sarc_tf_df = gather (sarc_tf_df, scS, score, 1:(ncol(sarc_tf_df)-1))
+bp = ggplot (sarc_tf_df, aes (x = score, y = ENCODE_celltype)) + 
+  geom_boxplot (alpha=.2, outlier.shape = NA, fill = 'red') + 
+  geom_jitter(width = 0.2, alpha = 0.4, color = "grey22", size=.5) + 
+  gtheme_no_rot + 
+  geom_vline(xintercept = 0, color = "red", linetype = "dashed", size = 1)
 
 pdf (paste0 ('Plots/sarcomatoid_score_ENCODE_boxplots.pdf'), width = 6,height=5)
 bp
