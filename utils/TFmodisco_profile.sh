@@ -36,5 +36,6 @@ cd ${chromBPdir}/${celltype}_model/fold_${fold_number}/modisco_profile/
 
 modisco motifs -i ../${celltype}_contribution_scores.profile_scores.h5 -n 1000000 -o modisco_results.h5
 
-modisco report -i modisco_results.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
+#modisco report -i modisco_results.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
 
+modisco report -i modisco_results.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/cisBP_db/Homo_sapiens.meme

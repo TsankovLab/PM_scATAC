@@ -17,12 +17,12 @@ set.seed(1234)
 
 # Set project dir
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/'
-dir.create (paste0(projdir,'/Plots/'), recursive =T)
+dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
-source ('../../git_repo/utils/useful_functions.R')
-source ('../../git_repo/utils/palettes.R')
-source ('../../git_repo/utils/ggplot_aestetics.R')
-source ('../../git_repo/utils/palettes.R')
+source (file.path'..','..','git_repo','utils','useful_functions.R'))
+source (file.path'..','..','git_repo','utils','palettes.R'))
+source (file.path'..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path'..','..','git_repo','utils','palettes.R'))
 
 sample_names = c(
     'P1', # p786
@@ -91,6 +91,9 @@ if (!file.exists ('srt.rds'))
 	srt[['integrated']] = NULL	
 	saveRDS (srt, 'srt.rds')
 	
+	srt$sampleID3 = srt$sampleID
+	srt$sampleID3[srt$seurat_clusters == '14'] = 'P11_HOX-'
+
 	pdf ('Plots/umap_samples.pdf', width=12)
 	wrap_plots (DimPlot (srt, group.by = 'sampleID'), DimPlot (srt, group.by = 'seurat_clusters', label=T))
 	dev.off()
@@ -309,8 +312,10 @@ if (!file.exists (paste0('cNMF_normalized/',cnmf_out, '/EnrichR_cNMF_module_gene
 
 # Make correlation network using TFs from scatac analysis
 library (hdWGCNA)
-
-if (!file.exists ('metacells.rds'))
+force = TRUE
+# table (srt$sampleID)
+# srt$sampleID
+if (!file.exists ('metacells.rds') | force)
 	{
 	srt <- SetupForWGCNA(
 	  srt,
@@ -321,11 +326,11 @@ if (!file.exists ('metacells.rds'))
 	# construct metacells  in each group
 	srt <- MetacellsByGroups(
 	  seurat_obj = srt,
-	  group.by = c("sampleID"), # specify the columns in seurat_obj@meta.data to group by
+	  group.by = c("sampleID3"), # specify the columns in seurat_obj@meta.data to group by
 	  reduction = 'umap', # select the dimensionality reduction to perform KNN on
 	  k = 50, # nearest-neighbors parameter
 	  max_shared = 25, # maximum number of shared cells between two metacells
-	  ident.group = 'sampleID' # set the Idents of the metacell seurat object
+	  ident.group = 'sampleID3' # set the Idents of the metacell seurat object
 	)
 	
 	# normalize metacell expression matrix:
@@ -335,6 +340,9 @@ if (!file.exists ('metacells.rds'))
 	} else {
 	metacells = readRDS ('metacells.rds')	
 	}
+
+# install.packages('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/enrichR_3.2.tar.gz',repos = NULL, type = "source")
+
 
 # metacells = metacells[activeTFs[[2]], ]
 # cor_TF_l = list()
@@ -489,15 +497,15 @@ metacells = ModScoreCor (
 
 ccomp_df = metacells@meta.data[,c(names(cnmf_spectra_unique))]
 
-tc_cor = lapply (unique(metacells$sampleID), function(x)
+tc_cor = lapply (unique(metacells$sampleID3), function(x)
 	{
-	metacells_assay_sample = metacells_assay[selected_TF,metacells$sampleID == x]
-	ccomp_df_sample = ccomp_df[metacells$sampleID == x,]
+	metacells_assay_sample = metacells_assay[selected_TF,metacells$sampleID3 == x]
+	ccomp_df_sample = ccomp_df[metacells$sampleID3 == x,]
 	res = sapply (selected_TF, function (y) cor (metacells_assay_sample[y,], ccomp_df_sample, method = 'spearman'))
 	rownames (res) = colnames (ccomp_df_sample)
 	res
 	})
-names (tc_cor) = unique(metacells$sampleID)
+names (tc_cor) = unique(metacells$sampleID3)
 #lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
 
 
@@ -722,4 +730,26 @@ Heatmap (cor_TF,
 	clustering_distance_columns='pearson',
 	col = palette_expression_cor_fun(cor_TF))
 dev.off()
+
+# Check only SOX9 correlation with sarcomatoid score ####
+tc_cor_sox9 = lapply (tc_cor, function(x) x['cNMF20',c('SOX9','SOX6')])
+
+pdf (file.path ('Plots','SOX_dotplot.pdf'))
+DimPlot (srt, group.by = 'seurat_clusters')
+DotPlot (srt, features = c('SOX9','SOX6','SOX5'), group.by = 'sampleID3')
+reductionName = 'umap'
+fp (srt, c('SOX9','HOXB13'))
+dev.off()
+
+
+pdf (file.path ('Plots','SOX_dotplot.pdf'))
+DotPlot (srt, features = c('SOX9','SOX6','SOX5'), group.by = 'sampleID3')
+reductionName = 'umap'
+DimPlot (srt, group.by = 'sampleID3')
+DimPlot (srt, group.by = 'seurat_clusters')
+fp (srt, c('SOX9','HOXB13'))
+dev.off()
+
+
+
 

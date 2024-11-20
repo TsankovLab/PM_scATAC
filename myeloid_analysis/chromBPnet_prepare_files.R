@@ -3,21 +3,15 @@ dir.create ('chromBPnet')
 
 # Export fragments subset by meta group ####
 fragments_l = list()
-metaGroupName = 'epit_sarc2'
-metagroups=c('P5__sarcomatoid','P5__epithelioid')
+metaGroupName = 'TREM2_state'
 
 if (!exists ('fragments')) fragments = unlist(getFragmentsFromProject (archp))
-
-### Get bias model trained from TNK compartment ####
-
-#if (!file.exists (file.path('chromBPnet',paste0('fragments_tumor_cells.tsv')))) write.table (fragments, file.path('chromBPnet',paste0('fragments_tumor_cells.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+if (!file.exists (file.path('chromBPnet',paste0('fragments_myeloid_cells.tsv')))) write.table (fragments, file.path('chromBPnet',paste0('fragments_myeloid_cells.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
 
 force = TRUE
-#metagroup = 'epit_sarc'
-for (metagroup in metagroups)
+for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
   {
-   #if (!metagroup %in% c('C15','C16')) next
-  if (!file.exists(file.path('chromBPnet',paste0('fragments_',metagroup,'.tsv'))) | force)
+  if (!file.exists(paste0('fragments_',metagroup,'.tsv')) | force)
     {  
     #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
     fragments_metagroup = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]]
@@ -27,14 +21,14 @@ for (metagroup in metagroups)
 
 
 ### Run peak calling ####
-metaGroupName = "epit_sarc2"
+metaGroupName = "TREM2_state"
 force=TRUE
-archp = archp[as.character(archp@cellColData[,metaGroupName]) %in% metagroups]
+#archp = archp[as.character(archp@cellColData[,metaGroupName]) %in% metagroups]
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source (file.path('..','..','git_repo','utils','callPeaks.R'))
 
 
 # Export peak sets by meta group ####
-peaksets = lapply (metagroups,
+peaksets = lapply (unique(as.character(archp@cellColData[,metaGroupName])),
   function(x)
   {
    tmp = readRDS (file.path('PeakCalls',paste0(x, '-reproduciblePeaks.gr.rds')))
@@ -55,4 +49,3 @@ ps = ps[,1:10]
 ps[[10]] = 1500
 ps[,4:9] = '.'
 write.table (ps, row.names =FALSE, col.names=FALSE, quote=FALSE, sep='\t',file.path('chromBPnet',paste0('peakset_all.bed')))
-

@@ -77,7 +77,7 @@
 
   mMat = assays (mSE)[[1]]
   rownames (mMat) = rowData (mSE)$name
-  mMat_mg = mMat[DAM_df$gene, ]
+  mMat_mg = mMat[active_DAM, ]
   mMat_mg = as.data.frame (t(mMat_mg))
   mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
   mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)

@@ -14,11 +14,12 @@ library (fgsea)
 library (circlize)
 library (tidyverse)
 library (harmony)
+library (ArchR)
 
 set.seed(1234)
 
 # Set project dir
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna'
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
 
@@ -42,6 +43,13 @@ sample_names = c(
     'P14')
 
 sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14')
+#srt = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/srt.rds')
+#srt = srt[,srt$celltype_simplified %in% c('cDCs','MonoMac')]
+table (srt$celltype2)
+saveRDS (srt, file.path ('srt.rds'))
+srt = readRDS ('srt.rds')
+
+archp = loadArchRProject (file.path('..','scatac_ArchR'))
 
 # Load scRNA ####
 if (!file.exists ('srt.rds'))
@@ -86,8 +94,8 @@ if (!file.exists ('srt.rds'))
 
 	reductionName = 'umap'
 	fps = fp (srt, gene = c('CD3D','KLRC1','FGFBP2','CD8A','CD4','FOXP3','CXCL13','CTLA4','PDCD1','CXCR5','MKI67'))
-	dp = wrap_plots (DimPlot (srt, group.by = 'sampleID'), DimPlot (srt, group.by = 'seurat_clusters', label=T),
-		DimPlot (srt, group.by = 'celltype'))
+	dp = wrap_plots (DimPlot (srt, group.by = 'sampleID',reduction='umap'), DimPlot (srt, group.by = 'seurat_clusters', label=T,reduction='umap'),
+		DimPlot (srt, group.by = 'celltype',reduction='umap'))
 	pdf (file.path('Plots','markers_celltypes_umap.pdf'), width=12)
 	wrap_plots (fps)
 	dev.off()
@@ -194,3 +202,184 @@ saveRDS (srt, 'srt.rds')
 } else {
 srt = readRDS ('srt.rds')	
 }
+
+
+### Find cNMF shared between myeloid in each sample ####
+#### Run cNMF ####
+nfeat = 5000
+force=F
+k_list = c(5:10)
+k_selections = c(5:10)
+cores= 100
+
+sams = unique (archp$Sample)
+sams = sams[sams %in% unique(srt$sampleID)]
+
+srt2 = srt
+for (sam in sams)
+	{
+	srt = srt2[,srt2$sampleID == sam]	
+	cnmf_name = paste0('myeloid_',sam)
+	cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
+	dir.create (file.path(cnmf_out,'Plots'), recursive=T)
+	repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+	
+	### RUN consensus NMF ####
+	source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R')) 		
+	}
+
+
+### Import and format spectra files ####
+k_selection = 10
+sams = sams[sams != 'P10'] # double check why P10 was not included
+cnmf_spectra_unique_l = list()
+for (sam in sams)
+	{
+	cnmf_name = paste0('myeloid_',sam)	
+	source (file.path ('..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
+	cnmf_spectra_unique_l[[sam]] = cnmf_spectra_unique
+	}
+
+cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, function(y) head(y,50)))
+
+# cnmf_overlap = do.call (cbind, lapply (names(cnmf_spectra_unique_l), function(x)
+# 				rowSums (sapply (names(cnmf_spectra_unique_l), function(y)
+# 					unlist(lapply (cnmf_spectra_unique_l[[x]], function(z)
+# 						sum(unlist(lapply (cnmf_spectra_unique_l[[y]], function(d) sum (z %in% d) > 10)))))))))
+# cnmf_overlap = cnmf_overlap - 1
+
+# Select shared programs and plot their gene overlap ####
+# overlap_cutoff = 1
+# result <- which(cnmf_overlap > overlap_cutoff, arr.ind=TRUE)
+# row_names <- rownames(cnmf_overlap)[result[, 1]]
+# col_names <- colnames(cnmf_overlap)[result[, 2]]
+# # Combine row and column names into a data frame
+# output <- data.frame(Row = row_names, Column = col_names)
+# print(output)
+
+# ov_mat = do.call (cbind, (lapply (seq(nrow(output)), function(x) cnmf_spectra_unique_l[[output$Column[[x]]]][[output$Row[x]]])))
+# colnames (ov_mat) = paste0(output$Column, '_',output$Row)
+# ov_mat = as.list(as.data.frame(ov_mat))
+cnmf_spectra_unique_l = unlist(cnmf_spectra_unique_l, recursive=F)
+ov_mat = ovmat (cnmf_spectra_unique_l, ov_threshold = 0.2, df=T) 
+km = kmeans (ov_mat, centers=9)
+ho = Heatmap (ov_mat,
+column_split =km$cluster , 
+row_split = km$cluster, 
+	col = viridis::inferno(100))
+pdf (file.path ('Plots','shared_cNMF_overlap.pdf'),width = 7,7)
+ho
+dev.off()
+
+shared_cnmf = split (rownames(ov_mat), km$cluster)
+overlap_cutoff = 2 
+shared_cnmf_genes = lapply (shared_cnmf, function(x) names(table (unlist(cnmf_spectra_unique_l[x]))[table (unlist(cnmf_spectra_unique_l[x])) > overlap_cutoff]))
+saveRDS (shared_cnmf_genes, paste0 ('shared_cnmf_myeloid.rds'))
+
+# Make PCA plot using module scores as features ####
+shared_cnmf_genes = readRDS ('shared_cnmf_myeloid.rds')
+srt = ModScoreCor (
+    seurat_obj = srt, 
+    geneset_list = shared_cnmf_genes, 
+    cor_threshold = NULL, 
+    pos_threshold = NULL, # threshold for fetal_pval2
+    listName = 'shared_cnmf', outdir = NULL)
+
+
+# # Try with PCA ####
+# cnmfs = data.frame (srt@meta.data[,names (shared_cnmf_genes)])
+# library (uwot)
+
+
+# pca_result <- prcomp(cnmfs, center = TRUE, scale = TRUE)
+# umap_result = as.data.frame(pca_result$x)
+# umap_result <- umap (umap_result, n_neighbors = 15, min_dist = 0.1, n_components = 2)
+# umap_result = as.data.frame (umap_result)
+# colnames(umap_result) <- c("UMAP1", "UMAP2")
+# umap_result$gene = srt@assays$RNA@data['C3',]
+# umap_result$sample = srt$sampleID
+
+# up = ggplot(umap_result, aes(x = UMAP1, y = UMAP2, color = gene, label = rownames(umap_result))) +#, colors=class))+#, color = sarc)) +
+# geom_point(alpha=0.5, size=.1) + gtheme# +
+# # geom_point(data = umap_result[umap_result$class != 'ND',], aes(color=class),alpha=0.5) +
+# # geom_smooth(data = umap_result[umap_result$class != 'ND',],
+# #   method = "lm", se = TRUE, aes (color = class2)) + 
+# # geom_point(data = umap_result[umap_result$tf != '',],size=4) +
+#  geom_text_repel()#+ 
+# # labs(title = paste("UMAP - ",sam)) + 
+# # scale_color_manual (values = c(ND = 'grey', emtTF = 'red', inflTF = 'blue', lineageTF= 'green',nonlineageTF = 'purple'))
+# # )
+# pdf (file.path('Plots','Mac_modules_umap.pdf'), width = 6, height = 5)
+# wrap_plots (up)
+# dev.off()
+
+
+library (hdWGCNA)
+force = TRUE
+# table (srt$sampleID)
+# srt$sampleID
+if (!file.exists ('metacells.rds') | force)
+	{
+	srt <- SetupForWGCNA(
+	  srt,
+	  gene_select = "fraction", # the gene selection approach
+	  fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
+	  wgcna_name = "metacells" # the name of the hdWGCNA experiment
+	)
+	# construct metacells  in each group
+	srt <- MetacellsByGroups(
+	  seurat_obj = srt,
+	  group.by = c("sampleID"), # specify the columns in seurat_obj@meta.data to group by
+	  reduction = 'umap', # select the dimensionality reduction to perform KNN on
+	  k = 50, # nearest-neighbors parameter
+	  max_shared = 25, # maximum number of shared cells between two metacells
+	  ident.group = 'sampleID' # set the Idents of the metacell seurat object
+	)
+	
+	# normalize metacell expression matrix:
+	srt <- NormalizeMetacells (srt)
+	metacells = GetMetacellObject (srt)
+	saveRDS (metacells, 'metacells.rds')
+	} else {
+	metacells = readRDS ('metacells.rds')	
+	}
+
+# install.packages
+
+
+# Correlate genes with cNMFs on metacells ####
+vf = VariableFeatures (FindVariableFeatures (metacells, nfeat=20000))
+metacells_assay = metacells@assays$RNA@layers$data
+rownames (metacells_assay) = rownames (srt)
+metacells_assay = metacells_assay[unique(c(vf)),]
+
+metacells = ModScoreCor (
+        seurat_obj = metacells, 
+        geneset_list = shared_cnmf_genes, 
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # threshold for fetal_pval2
+        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+
+ccomp_df = metacells@meta.data[,c(names(shared_cnmf_genes))]
+
+tc_cor = lapply (unique(metacells$sampleID), function(x)
+	{
+	metacells_assay_sample = t(metacells_assay[vf,metacells$sampleID == x])
+	ccomp_df_sample = ccomp_df[metacells$sampleID == x,]
+	res = cor (metacells_assay_sample, ccomp_df_sample, method = 'spearman')
+	#rownames (res) = colnames (ccomp_df_sample)
+	res
+	})
+names (tc_cor) = unique(metacells$sampleID)
+trem2_mod = tc_cor[[1]][,6]
+trem2_mod = trem2_mod[order(-trem2_mod)]
+genes = c('TREM2','SPP1','BACH2',
+	'JUN','FOS','C1QA',
+	'C1QB','STAT2','C3',
+	'PRDM1','IRF1','CEBPZ','NFYC','SP2','IRF3',
+	'PBX3','SP2','SMARCC1','JUNB','JDP2','NFEL2L2')
+trem2_mod[genes]
+#lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
+
+
+

@@ -55,7 +55,8 @@ install.packages ('GSA')
 devtools::install_github("GreenleafLab/chromVARmotifs")
 BiocManager::install("compEpiTools")
 install.packages("harmony")  
-install.packages("zoo")  
+install.packages("zoo")
+devtools::install_github('smorabit/hdWGCNA', ref='dev')  
 
 
 ### Run cNMF scripts on LSF batch submission ###   

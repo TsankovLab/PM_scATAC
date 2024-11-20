@@ -1,7 +1,7 @@
 conda activate chrombpnet
 
 ### Create background regions file - Go in the output chromBPnet folder ####
-cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet
+cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
 
 # Remove regions overlapping black listed regions
 bedtools slop -i /sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet/blacklist.bed.gz -g /sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet/hg38.chrom.sizes -b 1057 > temp.bed

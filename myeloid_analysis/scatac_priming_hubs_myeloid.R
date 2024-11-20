@@ -98,7 +98,7 @@ cor_cutoff = 0.3
 max_dist = 12500
 min_peaks = 5
 dgs = 0
-hubs_dir = paste0 ('../hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks)
+hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks)
 hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))  
 
 # Generate matrix of fragment counts of hubs x metagroup per dataset ####

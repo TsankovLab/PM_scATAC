@@ -51,7 +51,8 @@ sample_names = c(
 'P11', # p11
 'P12', # p12
 'P13', # p13
-'P14'#,# p14
+'P14',#,# p14
+'P23'
 # Normal
 # 'RPL_280_neg_1',
 # 'RPL_280_neg_2',
@@ -59,7 +60,6 @@ sample_names = c(
 # 'RPL_Epi_2'#,
 #'cf_distal'
 )
-
 
 
 metadata_paths = c(
@@ -73,7 +73,8 @@ metadata_paths = c(
 '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_11/230714/ZHAO8mesotheliomaATAC/cellranger_output/ALTS04_Zhao8ATAC_0_v1/singlecell.csv',
 '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_12/230718/ZHAO9mesotheliomaATAC/cellranger_output/ALTS04_Zhao9ATAC_0_v1/singlecell.csv',
 '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_13/231018/ZHAO12mesotheliomaATAC/cellranger_output/ALTS04_Zhao12ATAC_0_v1/singlecell.csv',
-'/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_14/240109/ZHAO13mesotheliomaATAC/cellranger_output/ALTS04_Zhao13ATAC_0_v1/singlecell.csv'#,
+'/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_14/240109/ZHAO13mesotheliomaATAC/cellranger_output/ALTS04_Zhao13ATAC_0_v1/singlecell.csv',
+'/sc/arion/projects/Tsankov_Normal_Lung/data/meso_polyICLC/23Mesothelioma/cellranger_output/ALTS04_P22_0_v1/singlecell.csv'#,
 # Normal
 # '/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_1/RPL_280_neg_1/outs/fragments.tsv.gz',
 # '/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_2/RPL_280_neg_2/outs/fragments.tsv.gz',
@@ -92,7 +93,8 @@ fragment_paths = c(
 '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_11/230714/ZHAO8mesotheliomaATAC/cellranger_output/ALTS04_Zhao8ATAC_0_v1/fragments.tsv.gz',
 '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_12/230718/ZHAO9mesotheliomaATAC/cellranger_output/ALTS04_Zhao9ATAC_0_v1/fragments.tsv.gz',
 '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_13/231018/ZHAO12mesotheliomaATAC/cellranger_output/ALTS04_Zhao12ATAC_0_v1/fragments.tsv.gz',
-'/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_14/240109/ZHAO13mesotheliomaATAC/cellranger_output/ALTS04_Zhao13ATAC_0_v1/fragments.tsv.gz'#,
+'/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_14/240109/ZHAO13mesotheliomaATAC/cellranger_output/ALTS04_Zhao13ATAC_0_v1/fragments.tsv.gz',
+'/sc/arion/projects/Tsankov_Normal_Lung/data/meso_polyICLC/23Mesothelioma/cellranger_output/ALTS04_P22_0_v1/fragments.tsv.gz'#,#,
 # '/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_1/RPL_280_neg_1/outs/fragments.tsv.gz',
 # '/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_2/RPL_280_neg_2/outs/fragments.tsv.gz',
 # '/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_Epi_1/RPL_Epi_1/outs/fragments.tsv.gz',
@@ -111,7 +113,8 @@ pmat_paths = c(
 '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_11/230714/ZHAO8mesotheliomaATAC/cellranger_output/ALTS04_Zhao8ATAC_0_v1/raw_peak_bc_matrix.h5',
 '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_12/230718/ZHAO9mesotheliomaATAC/cellranger_output/ALTS04_Zhao9ATAC_0_v1/raw_peak_bc_matrix.h5',
 '/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_13/231018/ZHAO12mesotheliomaATAC/cellranger_output/ALTS04_Zhao12ATAC_0_v1/raw_peak_bc_matrix.h5',
-'/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_14/240109/ZHAO13mesotheliomaATAC/cellranger_output/ALTS04_Zhao13ATAC_0_v1/raw_peak_bc_matrix.h5'#,
+'/ahg/regevdata/projects/lungCancerBueno/10x/MPM_polyICLC/patient_14/240109/ZHAO13mesotheliomaATAC/cellranger_output/ALTS04_Zhao13ATAC_0_v1/raw_peak_bc_matrix.h5',
+'/sc/arion/projects/Tsankov_Normal_Lung/data/meso_polyICLC/23Mesothelioma/cellranger_output/ALTS04_P22_0_v1/raw_peak_bc_matrix.h5'
 # Normal
 # '/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_1/RPL_280_neg_1/outs/fragments.tsv.gz',
 # '/ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_2/RPL_280_neg_2/outs/fragments.tsv.gz',
@@ -293,8 +296,10 @@ for (sam in sample_names)
     fragments = data.table::fread (cmd = paste0("zcat < ", fragment_paths[sam])) %>% 
     data.frame()
     colnames(fragments)[1:4] = c('seqnames','start','end','RG')
-    fragments = fragments[fragments$RG %in% colnames (sgn_l[[sam]])]
+    fragments = fragments[fragments$RG %in% colnames (sgn_l[[sam]]),]
     write.table (fragments, paste0('fragments_',sam,'.tsv'), sep='\t', row.names=FALSE)
+    fragments = GenomicRanges::makeGRangesFromDataFrame (fragments, keep.extra.columns = TRUE)
+    fragments_l[[sam]] = fragments
     } else {
     fragments = read.table (paste0('fragments_',sam,'.tsv'), sep='\t', header=T)  
     fragments = GenomicRanges::makeGRangesFromDataFrame (fragments, keep.extra.columns = TRUE)
@@ -305,7 +310,7 @@ for (sam in sample_names)
 #fragments_l = lapply (sample_names, function(x) fragments_l[[x]][fragments_l[[x]]$RG %in% colnames(sgn_l[[x]])])
 
 # Get Granges of blacklist regions 
-blacklist = toGRanges (paste0('/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/blacklisted_regions/ENCODE_blacklist/',"hg38-blacklist.v2.bed")) # taken from https://github.com/Boyle-Lab/Blacklist/tree/master/lists
+blacklist = toGRanges (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/blacklisted_regions/ENCODE_blacklist/',"hg38-blacklist.v2.bed")) # taken from https://github.com/Boyle-Lab/Blacklist/tree/master/lists
 projdir_cnv = 'CNV_analysis'
 dir.create (projdir_cnv)
 
@@ -650,7 +655,7 @@ dev.off()
 write.csv (do.call (rbind, lapply (sgn_l, function(x) as.data.frame(x$celltype))), 'cell_annotation.csv')
 
 
-### Make heatmap of malgiant prediction and chr deletion scores ####
+### Make heatmap of malignant prediction and chr deletion scores ####
 library (scales)
 meta_df = lapply(sgn_l, function(x) x@meta.data)
 meta_df[['P10']]$prediction.score.Malignant = 0

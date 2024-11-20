@@ -30,6 +30,8 @@ packages = c(
 lapply(packages, require, character.only = TRUE)
 
 set.seed(1234)
+
+source ('../git_repo/utils/ggplot_aestetics.R')
 # Set directory
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/'
 system (paste('mkdir -p',paste0(projdir,'Plots/')))
@@ -190,6 +192,7 @@ meso_bulk_meta_l = lapply (names(meso_bulk_meta_l), function(x) {
   meso_bulk_meta_l[[x]]$sarc_score = tmp
   meso_bulk_meta_l[[x]]
   })
+names (meso_bulk_meta_l) = c('bueno','tcga','mesomics')
 
 ### Query bulk data ####
 module_l = c(LAG3 = 'LAG3', HAVCR2 = 'HAVCR2', PDCD1 = 'PDCD1', TIGIT = 'TIGIT', CTLA4 = 'CTLA4')
@@ -210,7 +213,8 @@ module_l = list(chr18_q23 = as.data.frame(org.Hs.egSYMBOL)[match (genes_in_regio
 module_l = c(MBP = 'MBP')
 module_l = c(TXNL4A = 'TXNL4A')
 module_l = list(HOXB13 = 'HOXB13', HOXC13 = 'HOXC13',sarc='AXL')
-
+module_l = sarc_score
+module_l = list(SOX9 = 'SOX9',SOX6 = 'SOX6')
 # Run genes on bulk datasets
 stat_testL2 = list()
 for (mod_name in names(module_l))
@@ -286,7 +290,8 @@ your.gene2 = genes_in_region[[48]]
 your.gene2 = 'LYZ'
 your.gene2 = 'BAP1'
 your.gene2 = c('PMP2')
-your.gene2 = c('VGF')
+your.gene1 = 'SOX9'
+your.gene2 = 'SOX9'
 #study = c('bueno_immune_corrected','tcga_immune_corrected','mesomics_immune_corrected')
 corr_res = list()
 studies = c('bueno','tcga','mesomics')
@@ -346,6 +351,54 @@ for (study in studies)
 pdf (paste0 ( 'Plots/',your.gene1,'_',your.gene2,'_correlation_scatterplots2.pdf'),8,3)
 wrap_plots (corr_res, ncol=3)
 #corr_res
+dev.off()
+
+
+# Show expression of SOX6 / SOX9 in relation to the scS score
+studies = c ('bueno','tcga','mesomics')
+by_histology=F
+filter_low_exp = 0
+your.gene1 = 'RUNX2'
+your.gene2 = 'SOX6'
+sp_l = list()
+for (study in studies)
+  {
+  meso_bulk = meso_bulk_l[[study]]
+  meso_bulk_meta = meso_bulk_meta_l[[study]]
+  if (length(your.gene1) > 1) gene_exp1 = colMeans(meso_bulk[rownames(meso_bulk) %in% your.gene1,,drop=F]) else
+  gene_exp1 = as.vector (unlist (meso_bulk[your.gene1,,drop=F]))
+  if (length(your.gene2) > 1) gene_exp2 = colMeans(meso_bulk[rownames(meso_bulk) %in% your.gene2,,drop=F]) else  
+  gene_exp2 = as.vector (unlist (meso_bulk[your.gene2,,drop=F]))
+
+  exp_df = data.frame (your.gene1 = gene_exp1, your.gene2 = gene_exp2, scs_score = meso_bulk_meta$sarc_score)
+  exp_df$subtype = meso_bulk_meta$subtype
+  rownames (exp_df) = colnames (meso_bulk)
+  exp_df = exp_df[exp_df$your.gene1 > 1 & exp_df$your.gene1 > 1, ]
+  #exp_df = exp_df[!is.na(exp_df$subtype),]
+  
+  sp = ggscatter (
+            exp_df,
+            x = 'your.gene1',
+            y = 'your.gene2',
+            #palette = bulk_palette,
+            shape=16,
+            color = 'scs_score',
+            fill = 'scs_score',
+            add = "reg.line", conf.int = FALSE, 
+            cor.coef = TRUE, cor.method = "spearman",
+            xlab = paste(your.gene1, collapse=' '), ylab = paste(your.gene2, collapse=' '),
+            title = paste0(study,'(n=',nrow(exp_df),')'), fullrange = TRUE) + 
+            ggtitle (study) +
+            scale_fill_gradient2 (viridis::inferno(100)) +
+            scale_color_gradient2 (viridis::inferno(100)) +
+#            facet_wrap (~subtype, drop=TRUE, scales = 'free_x', ncol=length (unique(exp_df$subtype))) +
+            #scale_color_manual (values=bulk_palette) +
+            NoLegend()
+    sp_l[[study]] = sp
+    }
+
+pdf (file.path ('Plots',paste(your.gene1,'_',your.gene2)), width=18, height=4)
+wrap_plots (sp_l, ncol=3)
 dev.off()
 
 # Correlate TFs vs sarcomatoid score (cNMF20) and extract values ####
@@ -611,7 +664,26 @@ cor (meso_bulk_tcga['HOXB13',],bp_tcga, method='spearman')
 
 
 
+### Import Blum meta-analysis to compare with top TF correlated with scS-score ####
+top_genes = c('HIC2','PKNOX1','SOX9','RUNX2','TWIST1','MESP1','ID4','CUX1','TCF4', 'ZEB1','SOX5','SOX6','TCF3','SNAI2','HOXA7','TFAP2A','PITX2','HIC1','HMGA2','SOX11')
+blum_df = read.csv ('../tumor_compartment/Blum_et_al_SE_score.csv')
+blum_dfE = data.frame (gene = blum_df$Gene.Name, score = blum_df$correlation.E.score, SE_score = 'epithelioid')
+blum_dfS = data.frame (gene = blum_df$Gene.Name.1, score = blum_df$correlation.S.score, SE_score = 'sarcomatoid')
+blum_df = rbind (blum_dfE, blum_dfS)
+blum_df = na.omit (blum_df)
+rownames (blum_df) = blum_df$gene
+blum_df = blum_df[top_genes, ]
+blum_df$gene = rownames (blum_df)
+blum_df$gene = factor (blum_df$gene, levels = blum_df$gene)
+# Create the dot plot
+dp = ggplot(blum_df, aes(x = gene, y = 1)) +
+  geom_point(aes (size = score, color = SE_score)) + # Adds the points
+  labs(title = "Correlation to Blum et al") + # Labels
+  scale_color_manual (values = c(epithelioid = 'darkgreen',sarcomatoid = 'firebrick2')) + gtheme
 
+pdf (file.path ('Plots','Blum_top_sarc_TF.pdf'))
+dp
+dev.off()
 
 
 

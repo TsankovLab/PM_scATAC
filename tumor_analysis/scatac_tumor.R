@@ -170,7 +170,7 @@ if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 all (colnames(mSE) == rownames(archp))
 
 # # Get deviation matrix ####
-mMat = assays (mSE)[[1]]
+mMat = assays (mSE)[[1]] 
 rownames (mMat) = rowData (mSE)$name
 
 # Filter by RNA expression ####
@@ -243,7 +243,7 @@ library(viridis)
 tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
 names (tf_modules) = paste0('mod_',unique(km$cluster))
 tf_modules = as.data.frame (do.call (cbind, tf_modules))
-tf_modules$Sample = archp$Sample2
+tf_modules$Sample = archp$Sample3
 # sapply (rownames(tf_modules), function(x) unlist(strsplit (x, '\\#'))[1]) == archp$Sample2
 tf_modules = gather (tf_modules, module, expression,1:5)
 tf_modules$module = factor (tf_modules$module, levels = paste0('mod_',names (row_order (cor_mMat_hm))))
@@ -261,7 +261,7 @@ tf_modules$module = factor (tf_modules$module, levels = paste0('mod_',names (row
 
 
 dp = ggplot (tf_modules) +
-  geom_density(aes(x=expression,fill=Sample),
+  geom_density(aes(x=expression,fill=Sample),color='white',
                       alpha = 0.4) +
   # geom_vline(aes(xintercept = mean, group = tf_modules, linetype = Sample),
   #            data = combined_sla_means) +
@@ -269,7 +269,7 @@ dp = ggplot (tf_modules) +
   scale_fill_manual (values = palette_sample) +
   gtheme_no_rot
 
-pdf (file.path ('Plots','TF_modules_ridge_plots2.pdf'), width = 7,height=8)
+pdf (file.path ('Plots','TF_modules_ridge_plots2.pdf'), width = 5,height=8)
 dp
 dev.off()
 
@@ -967,7 +967,7 @@ archp_meta = as.data.frame (archp@cellColData)
 archp_meta$Sample3 = archp_meta$Sample2
 archp_meta$Sample3[archp_meta$Clusters == 'C14'] = 'P11_HOX'
 sams = unique(archp_meta$Sample3)
-sams = sams[!sams %in% c('normal_pleura','P3','P13')]
+sams = sams[!sams %in% c('normal_pleura','P3','P13','P11_HOX')]
 
 # Compute correlation of sarcomatoid cNMF with TFs ####
 cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
@@ -990,11 +990,14 @@ sarc_tf_df2$type = 'scATAC'
 
 # Compute TF correlation to sarcomatoid in scRNA ####
 metacells = readRDS (file.path('..','scrna','metacells.rds'))
+metacells$sampleID = metacells$sampleID3
+metacells$sampleID[metacells$sampleID == 'P11'] = 'P11_HOX'
+metacells$sampleID[metacells$sampleID == 'P11_HOX-'] = 'P11'
 nfeat=5000
 k=25
 cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
 
-sams = c('P1','P11','P12','P13','P4','P5','P8')
+sams = c('P1','P4','P5','P8','P11','P12')
 
 metacells = ModScoreCor (
         seurat_obj = metacells, 
@@ -1023,7 +1026,7 @@ combined_df = rbind (sarc_tf_df2, scrna_tf_cor_df)
 
 top_sarc_TF = head(levels (combined_df$TF),20)
 combined_df = combined_df[combined_df$TF %in% top_sarc_TF, ]
-bp = ggplot (combined_df, aes (x = TF, y = score, fill = type), alpha=.5) + 
+bp = ggplot (combined_df, aes (x = TF, y = score, fill = type, color = type), alpha=.5) + 
 geom_boxplot (
     linewidth = .1,
     width=1,
@@ -1039,6 +1042,7 @@ geom_hline(yintercept = 0, color='red',  linetype='dashed')
 pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots.pdf'), width = 7,height=3)
 bp
 dev.off()
+
 
 
 # Compute co-occurrence of sarcomatoid TFs ####
@@ -1584,44 +1588,137 @@ dev.off()
 
 
 
+# Check correlation of SOX9 expression and deviation with sarcomatoid module to pick sample for chrombpnet analysis ####
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = as.matrix(mMat[selected_TF,])
 
-### Label tumor subtypes for chrombpnet ####
-archp$Sample3 = archp$Sample2
-archp$Sample3[archp$Clusters == 'C14'] = 'P11_HOX'
+archp_meta = as.data.frame (archp@cellColData)
+archp_meta$Sample3 = archp_meta$Sample2
+archp_meta$Sample3[archp_meta$Clusters == 'C14'] = 'P11_HOX'
+sams = unique(archp_meta$Sample3)
+sams = sams[!sams %in% c('normal_pleura','P3','P13','P11_HOX')]
 
-cnmfs = archp@cellColData[,grep ('sarcomatoid',colnames(archp@cellColData))]
-cnmfs_scaled = lapply (unique(archp$Sample2), function(x) as.data.frame (t(scale (t(cnmfs)))))
-cnmfs_scaled = do.call (rbind,cnmfs_scaled)
+# Compute correlation of sarcomatoid cNMF with TFs ####
+cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
+cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp_meta$Sample3 == x, ])))
+names (cnmf_mat) = sams
+tf_mat = lapply (sams, function(x) scale(mMat[,archp_meta$Sample3 == x]))
+names (tf_mat) = sams
 
-cnmfs_scaled = cnmfs_scaled[rownames(archp@cellColData),]
-all (rownames (cnmfs_scaled) == rownames(archp@cellColData))
-archp$epit_sarc2 = ifelse (cnmfs$sarcomatoid.cNMF20 > mean (cnmfs$sarcomatoid.cNMF20), 'sarc','epit')
-archp$epit_sarc2 = paste0(archp$Sample3, '__',archp$epit_sarc2)
-table (archp$epit_sarc2, archp$Clusters)
+tf = 'SOX9'
+mod = 'sarcomatoid.cNMF20'
+sarc_tf = lapply (sams, function(sam)  data.frame (barcode = colnames(tf_mat[[sam]]), TF = as.vector(tf_mat[[sam]][tf,]), module = as.vector(cnmf_mat[[sam]][mod,,drop=F]), sample=sam))
+sarc_tf_df = do.call (rbind,sarc_tf)
 
-archp$epit_sarc = 'NS'
-archp$epit_sarc[archp$Clusters == 'C15'] = 'sarc'
-archp$epit_sarc[archp$Clusters == 'C16'] = 'epit'
+# Compute TF correlation to sarcomatoid in scRNA ####
+metacells = readRDS (file.path('..','scrna','metacells.rds'))
+metacells$sampleID = metacells$sampleID3
+metacells$sampleID[metacells$sampleID == 'P11'] = 'P11_HOX'
+metacells$sampleID[metacells$sampleID == 'P11_HOX-'] = 'P11'
+nfeat=5000
+k=25
+cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
 
-pdf (file.path ('Plots','sarc_epit_umap.pdf'),width=10)
-p1 <- plotEmbedding(
-    ArchRProj = archp, 
-    colorBy = "cellColData", 
-    name = 'epit_sarc', 
-    embedding = "UMAP",
-    #pal = palette_expression,
-    #imputeWeights = getImputeWeights(archp)
-)
-p2 <- plotEmbedding(
-    ArchRProj = archp, 
-    colorBy = "cellColData", 
-    name = 'epit_sarc2', 
-    embedding = "UMAP",
-    #pal = palette_expression,
-    #imputeWeights = getImputeWeights(archp)
-)
-wrap_plots (p1,p2)
+
+if (!all (names(cnmf_spectra_unique) %in% colnames(metacells@meta.data)))
+{
+metacells = ModScoreCor (
+        seurat_obj = metacells, 
+        geneset_list = cnmf_spectra_unique, 
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # threshold for fetal_pval2
+        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))  
+}
+metacells_assay = metacells@assays$RNA@layers$data
+rownames (metacells_assay) = rownames (srt)
+metacells_assay = metacells_assay[tf,,drop=F]
+
+sams = c('P1','P4','P5','P8','P11','P12')
+tc_cor = lapply (sams, function(sam)
+  {
+  tmp = data.frame(TF = metacells_assay[tf,metacells$sampleID == sam], module = metacells$cNMF20[metacells$sampleID == sam])
+  tmp$sample = sam
+  tmp
+  })
+scrna_tf_cor_df = do.call (rbind, tc_cor)
+
+# plot correlation TF vs module score in atac and RNA space
+sp = ggplot (sarc_tf_df, aes (x= TF, y = module, color = sample)) + 
+geom_point(alpha = .4) + facet_wrap (~sample, ncol = length(unique(sarc_tf_df$sample)), scales = 'free') +
+scale_color_manual (values = palette_sample) + gtheme_no_rot +                                      
+  stat_smooth(method = "lm", 
+              formula = y ~ x, 
+              geom = "smooth") +
+  stat_cor(method = "spearman", color ='black')
+sp2 = ggplot (scrna_tf_cor_df, aes (x= TF, y = module, color = sample)) + geom_point(alpha = .4) + 
+facet_wrap (~sample, ncol = length(unique(sarc_tf_df$sample)), scales = 'free') + 
+scale_color_manual (values = palette_sample) + gtheme_no_rot +                                      
+  stat_smooth(method = "lm", 
+              formula = y ~ x, 
+              geom = "smooth") +
+  stat_cor(method = "spearman", color ='black')
+pdf (file.path ('Plots',paste0('correlation',tf,'_module',mod,'.pdf')), width=20, height = 3)
+sp
+sp2
 dev.off()
+
+# P5 has the strongest correlation of SOX9 and sarc score in atac and rna ####
+cnmfs = archp@cellColData[,grep ('sarcomatoid',colnames(archp@cellColData))]
+cnmfs = as.data.frame(cnmfs)
+cnmfs_scaled = as.data.frame (t(scale (t(cnmfs))))
+top_cells = 1000
+cnmf_labelled = lapply (split(cnmfs_scaled, archp$Sample3), function(x)
+  {
+  df1 = data.frame (barcode = head (rownames(x)[order(x$sarcomatoid.cNMF20)], top_cells),
+    subtype = 'epithelioid')
+  df2 = data.frame (barcode = tail (rownames(x)[order(x$sarcomatoid.cNMF20)], top_cells),
+    subtype = 'sarcomatoid')
+  rbind (df1, df2)
+  })
+cnmf_labelled_df = do.call (rbind,cnmf_labelled)
+
+archp$epit_sarc2 = 0
+archp$epit_sarc2 = cnmf_labelled_df$subtype[match (rownames(archp@cellColData), cnmf_labelled_df$barcode)]
+archp$epit_sarc2 = paste0(archp$Sample3, '__',archp$epit_sarc2)
+table (archp$epit_sarc2)#, archp$Clusters)
+
+# Check groups have been assigned correctly
+sp = ggplot (sarc_tf_df, aes (x= TF, y = module, color = archp$epit_sarc2[match(sarc_tf_df$barcode, rownames(archp@cellColData))])) + 
+geom_point(alpha = .4) + facet_wrap (~sample, ncol = length(unique(sarc_tf_df$sample)), scales = 'free') +
+#scale_color_manual (values = palette_sample) + gtheme_no_rot +                                      
+  stat_smooth(method = "lm", 
+              formula = y ~ x, 
+              geom = "smooth") +
+  stat_cor(method = "spearman", color ='black')
+pdf (file.path ('Plots','sarc_epit_umap.pdf'),width=30)
+sp
+dev.off()
+
+
+#### Check regions with SOX9 and SOX6
+TFmatch = getMatches (archp)
+x= 'P5__sarcomatoid'
+tmp = readRDS (file.path('PeakCalls',paste0(x, '-reproduciblePeaks.gr.rds')))
+TFmatch_sub = subsetByOverlaps (TFmatch, tmp)
+TFmatch_assay = assay (TFmatch_sub)
+motif_peaks = rowRanges (TFmatch_sub)[which(TFmatch_assay[,which(grepl('SOX9', colnames(TFmatch_sub)))])]
+#write.csv (as.character(motif_peaks), 'SOX9_peaks_P5_sarcomatoid.csv')
+#head(table (motif_peaks$nearestGene)[order(-table (motif_peaks$nearestGene))],50)
+motif_peaks=as.data.frame(motif_peaks, row.names=NULL)
+write.table (motif_peaks[,c(1:4)], file.path('SOX9_peaks_P5_sarcomatoid.bed'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+#'RUNX2' %in% unique(motif_peaks$nearestGene)
+#table (TFMatch_assay)
+head (motif_peaks,100)
+
+
+
+
+
+
+
+
 
 
 ### Check correlation with seq-depth for module scores ####
