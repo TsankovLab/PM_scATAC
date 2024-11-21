@@ -25,23 +25,9 @@ palette_celltype_simplified = c(
 palette_gene_expression = as.character(paletteer::paletteer_c("grDevices::Blue-Red 3", 100))
 palette_gene_expression2 = as.character(paletteer::paletteer_c("grDevices::Blue-Red 3", 100))[c(1,50,100)]
 palette_gene_expression_fun = function(x) {return(colorRamp2(c(min(x), 0, max(x)), c(palette_gene_expression2)))}
-palette_sample = c(
-'#7c10a3
-#9443b3
-#ac6ac2
-#c28fd2
-#d7b4e1
-#ebd9f0
-#ffffff
-#d6dbe2
-#adb9c5
-#8697aa
-#5f778f
-#375974
-#003c5b')
-palette_sample = c(unlist(strsplit (palette_sample, '\n')))
-palette_sample = c(as.character(paletteer::paletteer_d("impressionist.colors::la_chanson_du_chien")), 'red','red','red')
-palette_sample = setNames (palette_sample , c('P1','P13','P3','P12','P5','P11','P4','P8','P10','P14','HU62','HU37','normal_pleura'))
+
+palette_sample = c(as.character(paletteer::paletteer_d("impressionist.colors::la_chanson_du_chien")), 'darkblue', 'red','red','red')
+palette_sample = setNames (palette_sample , c('P1','P13','P3','P12','P5','P11','P4','P8','P10','P14','P23', 'HU62','HU37','normal_pleura'))
 #palette_sample = setNames (as.character(paletteer::paletteer_c("pals::ocean.dense",13)))
 #palette_sample = c(palette_sample, P10 = 'grey')
 palette_sample2 = c(palette_sample[3], palette_sample[6], palette_sample[10])

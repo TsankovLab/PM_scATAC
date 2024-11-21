@@ -40,7 +40,7 @@ source (file.path('..','..','git_repo','utils','palettes.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 set.seed (1234)
-addArchRThreads (threads = 1) 
+addArchRThreads (threads = 8) 
 addArchRGenome ("Hg38")
 
 sample_names = c(
@@ -54,7 +54,8 @@ sample_names = c(
     'P11', # p11
     'P12', # p12
     'P13', # p13
-    'P14'#,# p14
+    'P14',#,# p14
+    'P23'
     # # Normal
     # 'RPL_280_neg_1',
     # 'RPL_280_neg_2',

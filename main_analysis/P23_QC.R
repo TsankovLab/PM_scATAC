@@ -242,3 +242,33 @@ saveRDS (sgn, 'sgn.rds')
 saveRDS (sgn,'signac_normal.rds')
 
 
+### Read in ArchR to generate arrow ####
+fragment_paths = '/sc/arion/projects/Tsankov_Normal_Lung/data/meso_polyICLC/23Mesothelioma/cellranger_output/ALTS04_P22_0_v1/fragments.tsv.gz'
+sample_names = 'P23'
+set.seed (1234)
+addArchRThreads (threads = 8) 
+addArchRGenome ("Hg38")
+
+      #setwd (projdir)  
+      ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
+      sampleNames = sample_names,
+      minTSS = 4, #Dont set this too high because you can always increase later
+      minFrags = 1000,
+      maxFrags = Inf,
+      addTileMat = TRUE,
+      addGeneScoreMat = TRUE,
+      force = TRUE,
+      subThreading = T
+      )
+
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/P23'
+  archp = ArchRProject (
+    ArrowFiles = ArrowFiles, 
+    outputDirectory = projdir,
+    copyArrows = FALSE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
+  )
+saveArchRProject (archp)
+
+
+
+

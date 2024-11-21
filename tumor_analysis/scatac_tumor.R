@@ -1668,7 +1668,7 @@ dev.off()
 cnmfs = archp@cellColData[,grep ('sarcomatoid',colnames(archp@cellColData))]
 cnmfs = as.data.frame(cnmfs)
 cnmfs_scaled = as.data.frame (t(scale (t(cnmfs))))
-top_cells = 1000
+top_cells = 500
 cnmf_labelled = lapply (split(cnmfs_scaled, archp$Sample3), function(x)
   {
   df1 = data.frame (barcode = head (rownames(x)[order(x$sarcomatoid.cNMF20)], top_cells),
@@ -1679,13 +1679,13 @@ cnmf_labelled = lapply (split(cnmfs_scaled, archp$Sample3), function(x)
   })
 cnmf_labelled_df = do.call (rbind,cnmf_labelled)
 
-archp$epit_sarc2 = 0
-archp$epit_sarc2 = cnmf_labelled_df$subtype[match (rownames(archp@cellColData), cnmf_labelled_df$barcode)]
-archp$epit_sarc2 = paste0(archp$Sample3, '__',archp$epit_sarc2)
-table (archp$epit_sarc2)#, archp$Clusters)
+archp$epit_sarc3 = 0
+archp$epit_sarc3 = cnmf_labelled_df$subtype[match (rownames(archp@cellColData), cnmf_labelled_df$barcode)]
+archp$epit_sarc3 = paste0(archp$Sample3, '__',archp$epit_sarc3)
+table (archp$epit_sarc3)#, archp$Clusters)
 
 # Check groups have been assigned correctly
-sp = ggplot (sarc_tf_df, aes (x= TF, y = module, color = archp$epit_sarc2[match(sarc_tf_df$barcode, rownames(archp@cellColData))])) + 
+sp = ggplot (sarc_tf_df, aes (x= TF, y = module, color = archp$epit_sarc3[match(sarc_tf_df$barcode, rownames(archp@cellColData))])) + 
 geom_point(alpha = .4) + facet_wrap (~sample, ncol = length(unique(sarc_tf_df$sample)), scales = 'free') +
 #scale_color_manual (values = palette_sample) + gtheme_no_rot +                                      
   stat_smooth(method = "lm", 
@@ -1697,13 +1697,15 @@ sp
 dev.off()
 
 
-#### Check regions with SOX9 and SOX6
+#### Check regions with SOX9 and SOX6 ####
+tf_name = 'SOX6'
 TFmatch = getMatches (archp)
-x= 'P5__sarcomatoid'
+TFpositions = getPositions (archp)
+x= 'P5__epithelioid'
 tmp = readRDS (file.path('PeakCalls',paste0(x, '-reproduciblePeaks.gr.rds')))
 TFmatch_sub = subsetByOverlaps (TFmatch, tmp)
 TFmatch_assay = assay (TFmatch_sub)
-motif_peaks = rowRanges (TFmatch_sub)[which(TFmatch_assay[,which(grepl('SOX9', colnames(TFmatch_sub)))])]
+motif_peaks = rowRanges (TFmatch_sub)[which(TFmatch_assay[,which(grepl(tf_name, colnames(TFmatch_sub)))])]
 #write.csv (as.character(motif_peaks), 'SOX9_peaks_P5_sarcomatoid.csv')
 #head(table (motif_peaks$nearestGene)[order(-table (motif_peaks$nearestGene))],50)
 motif_peaks=as.data.frame(motif_peaks, row.names=NULL)
@@ -1711,11 +1713,46 @@ write.table (motif_peaks[,c(1:4)], file.path('SOX9_peaks_P5_sarcomatoid.bed'), s
 #'RUNX2' %in% unique(motif_peaks$nearestGene)
 #table (TFMatch_assay)
 head (motif_peaks,100)
+motif_peaks = rowRanges (TFmatch_sub)[which(TFmatch_assay[,which(grepl(tf_name, colnames(TFmatch_sub)))])]
+TFpositions_sub = TFpositions[[grep (tf_name, names(TFpositions))]]
+TFpositions_sub = TFpositions_sub[unique(queryHits(findOverlaps (TFpositions_sub, motif_peaks)))]
+head (as.character(TFpositions_sub[order(-TFpositions_sub$score)]))
 
+### Check most co-occurring TFs with SOX9 / SOX6 ####
+# # Get deviation matrix ####
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]] 
+rownames (mMat) = rowData (mSE)$name
 
+# Filter by RNA expression ####
+metaGroupName = 'sampleID'
+active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
 
-
-
+tf_name = 'SOX9'
+peaksets = c('P5__sarcomatoid','P5__epithelioid')
+cooc_TF_l = list()
+for (peakset in peaksets)
+{
+tmp = readRDS (file.path('PeakCalls',paste0(peakset, '-reproduciblePeaks.gr.rds')))
+tmp= tmp[tmp$score > 200,]
+TFmatch_sub = subsetByOverlaps (TFmatch, tmp)
+colnames(TFmatch_sub) = gsub ('_.*','',colnames(TFmatch_sub))
+colnames(TFmatch_sub) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames(TFmatch_sub))
+TFmatch_assay = assay (TFmatch_sub[,active_TFs])
+motif_peaks = rowRanges (TFmatch_sub)[which(TFmatch_assay[,tf_name])]
+TFmatch_sub = subsetByOverlaps (TFmatch_sub, motif_peaks)
+cooc_TFs = colSums (TFmatch_assay)
+cooc_TFs = proportions(cooc_TFs)
+cooc_TFs = data.frame (cooc = cooc_TFs, TF = names(cooc_TFs))
+cooc_TFs$TF = factor (cooc_TFs$TF, levels = cooc_TFs$TF[order (-cooc_TFs$cooc)])
+cooc_TFs$peakset = peakset
+cooc_TF_l[[peakset]] = cooc_TFs
+}
+cooc_TF_df = do.call (rbind, cooc_TF_l)
+bp = ggplot (cooc_TF_df, aes (x =TF, y = cooc, fill = peakset)) + geom_bar (stat = 'identity', position = 'dodge') + gtheme
+pdf (file.path ('Plots','cooc_TF.pdf'), width=70)
+bp
+dev.off()
 
 
 

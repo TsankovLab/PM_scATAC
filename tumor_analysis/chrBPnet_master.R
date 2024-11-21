@@ -4,7 +4,7 @@
 # repodir='/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 # grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 # celltype='very_high'
-# celltype='P5__sarcomatoid'
+# celltype='P5__epithelioid'
 # fold_numbers = c(0,1,2,3,4)
 
 message ('Submit job for chromBPnet training model')	
@@ -58,7 +58,7 @@ system (paste0('chmod +x ',file.path(repodir,'utils','TFmodisco.sh')), wait=FALS
 
 if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'modisco','modisco_results.h5'))))
 	{
-	fold_numbers_remained = fold_numbers[!file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'TF_modisco','_modisco_results.h5'))]	
+	fold_numbers_remained = fold_numbers[!file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'TF_modisco','_modisco_results.h5'))]
 	# fold_numbers_remained = c(0:4)
 	for (fold_number in fold_numbers_remained)
 		{
