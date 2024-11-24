@@ -17,12 +17,6 @@ sample_names = c(
     'P13', # p13
     'P14',#,# p14
     'P23'
-    # # Normal
-    # 'RPL_280_neg_1',
-    # 'RPL_280_neg_2',
-    # 'RPL_Epi_1',
-    # 'RPL_Epi_2'#,
-    # #'cf_distal'
     )
 
 # Load last istance

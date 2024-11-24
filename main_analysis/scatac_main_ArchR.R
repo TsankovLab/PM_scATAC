@@ -40,7 +40,7 @@ source (file.path('..','..','git_repo','utils','palettes.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 set.seed (1234)
-addArchRThreads (threads = 8) 
+addArchRThreads (threads = 1) 
 addArchRGenome ("Hg38")
 
 sample_names = c(
@@ -171,6 +171,8 @@ meso_markers = c(meso_markers, 'IGLL5')
 meso_markers = meso_markers[meso_markers != 'IGHM']
 #meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
 archp = addImputeWeights (archp)
+
+pdf()
 p <- plotEmbedding(
     ArchRProj = archp,
     colorBy = "GeneScoreMatrix", 
@@ -179,7 +181,7 @@ p <- plotEmbedding(
     pal = palette_expression,
     imputeWeights = getImputeWeights(archp)
 )
-
+dev.off()
 #p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
 
 pdf (file.path('Plots','marker_genes_feature_plots_3.pdf'), width = 25, height = 25)
@@ -192,31 +194,12 @@ dev.off()
 archp$celltype_revised_sample = archp$celltype_revised
 archp$celltype_revised_sample[archp$celltype_revised_sample == 'Malignant'] = paste0('Malignant_',archp$Sample[archp$celltype_revised_sample == 'Malignant'])
 
-run_peakCall = FALSE
-if (run_peakCall)
-  {
-  ### Call peaks on celltypes ###
-  metaGroupName = 'celltype_revised_sample'
-  archp = addGroupCoverages (
-    ArchRProj = archp, 
-    groupBy = metaGroupName,  
-    force = FALSE,
-    minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
-    maxCells = 500,
-    minReplicates = 2,
-    sampleRatio = 0.8,
-    useLabels = TRUE)
+### Run peak calling ####
+metaGroupName = "Clusters"
+force=TRUE
+if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source ('../../git_repo/utils/callPeaks.R')
   
-  archp = addReproduciblePeakSet (
-      archp,
-      groupBy= metaGroupName,
-      peakMethod = 'Macs2',
-      reproducibility = "1",
-      maxPeaks = 500000, 
-      minCells=20,
-      force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower
-  archp = addPeakMatrix (archp)
-  
+
   archp = saveArchRProject (archp, load=TRUE)
   
   metaGroupNames = c('TSSEnrichment','nFrags','ReadsInTSS','FRIP')  

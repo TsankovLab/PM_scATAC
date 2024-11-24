@@ -31,10 +31,6 @@ archp = archp[archp$Sample2 %in% c('P1','P10','P11','P12','P13','P14','P3','P4',
 
 # Load RNA ####
 srt = readRDS (file.path('..','scrna','srt.rds'))
-sarc_order = read.csv (file.path('..','scrna','cnmf20_sarcomatoid_sample_order.csv'), row.names=1)
-sarc_order = sarc_order[! sarc_order$sampleID %in% c('HU37','HU62'),]
-sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
-#archp$Sample2 = factor (archp$Sample2, levels = sarc_order$sampleID)
 
 ## Reduce dimension and harmonize ####
   varfeat = 25000

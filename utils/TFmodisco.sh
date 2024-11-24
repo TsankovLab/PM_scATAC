@@ -34,7 +34,7 @@ echo $fold_number
 mkdir ${chromBPdir}/${celltype}_model/fold_${fold_number}/modisco/
 cd ${chromBPdir}/${celltype}_model/fold_${fold_number}/modisco/
 
-modisco motifs -i ../${celltype}_contribution_scores.counts_scores.h5 -n 10000000 -o modisco_results.h5 -w 2000
+modisco motifs -i ../${celltype}_contribution_scores.counts_scores.h5 -n 1000000 -o modisco_results.h5 #-w 2000
 
 modisco report -i modisco_results.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
 

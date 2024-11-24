@@ -11,6 +11,7 @@ sample_names = c(
   'P12', # p12
   'P13', # p13
   'P14',# p14
+  'P23',
   # Normal
   'RPL_280_neg_1',
   'RPL_280_neg_2',
@@ -21,7 +22,7 @@ sample_names = c(
 
   # Fix the fragment file of multiome sample by removing the header 
   #system ('zcat atac_fragments.tsv.gz | grep -v ^\# | bgzip > atac_fragments_fixed.tzv.gz')
-  
+
 fragment_paths =c(
   '/ahg/regevdata/projects/lungCancerBueno/10x/191121/scATAC_Pt_mesothelioma_CD45_neg_cellranger_atac_v1.2/138_ATACseq_CD45_neg_Lung_ATAC/outs/fragments.tsv.gz',
   '/ahg/regevdata/projects/lungCancerBueno/10x/200128/scATAC_Pt811_mesothelioma_CD45pos_neg_cellranger_atac_v1.2/161_ATACseq_Pt811_mesothelioma_CD45pos_CD45neg_ATAC/outs/fragments.tsv.gz',
@@ -41,11 +42,13 @@ fragment_paths =c(
   )
    
   
-ArrowFiles_dir = '/ahg/regevdata/projects/ICA_Lung/Bruno/ArrowFiles/'
+ArrowFiles_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/ArrowFiles'
+ArrowFiles_dir = file.path(ArrowFiles_dir,sample_names)
 if (!all (paste0(sample_names,'.arrow') %in% list.files(ArrowFiles_dir)))
   {
   #setwd (projdir)  
-  ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
+  ArrowFiles = createArrowFiles (
+  inputFiles = fragment_paths,
   sampleNames = sample_names,
   minTSS = 4, #Dont set this too high because you can always increase later
   minFrags = 1000,
@@ -59,16 +62,17 @@ if (!all (paste0(sample_names,'.arrow') %in% list.files(ArrowFiles_dir)))
   ArrowFiles = paste0(ArrowFiles_dir, paste0(sample_names,'.arrow'))
   }
 
+ArrowFiles_dir = paste0(ArrowFiles_dir,'.arrow')
 archp = ArchRProject (
-  ArrowFiles = ArrowFiles, 
+  ArrowFiles = ArrowFiles_dir, 
   outputDirectory = projdir,
   copyArrows = FALSE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
 )
-  
+
 archp$Sample2 = archp$Sample
 archp$Sample2[grep ('RPL',archp$Sample2)] = 'normal_pleura'
-  
 
+  
 ### Subset ArchR object only for cells retained in Signac analysis ####
 #tumor_l = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/signac_list.rds')
 tumor_annotation = read.csv ('../../main/scatac_ArchR/barcode_annotation.csv', row.names=1)

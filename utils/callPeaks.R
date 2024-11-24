@@ -9,6 +9,7 @@ archp = addGroupCoverages (
   sampleRatio = 0.8,
   useLabels = TRUE)
 
+pdf()
 archp = addReproduciblePeakSet (
     archp,
     groupBy= metaGroupName,
@@ -17,6 +18,7 @@ archp = addReproduciblePeakSet (
     maxPeaks = 500000, 
     minCells=20,
     force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower
+dev.off()
 archp = addPeakMatrix (archp)
   
 archp = saveArchRProject (archp, load=TRUE)
