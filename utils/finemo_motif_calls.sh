@@ -38,7 +38,7 @@ cd ${chromBPdir}/${celltype}_model/
 
 
 source activate finemo
-finemo extract-regions-chrombpnet-h5 -c fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 #fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 fold_2/${celltype}_contribution_scores.counts_scores.h5 fold_3/${celltype}_contribution_scores.counts_scores.h5 fold_4/${celltype}_contribution_scores.counts_scores.h5 -o motif_calls -w 2000
+finemo extract-regions-chrombpnet-h5 -c fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 -o motif_calls -w 2000 #fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 fold_2/${celltype}_contribution_scores.counts_scores.h5 fold_3/${celltype}_contribution_scores.counts_scores.h5 fold_4/${celltype}_contribution_scores.counts_scores.h5 
 
 finemo call-hits -r motif_calls.npz -m fold_$fold_number/modisco/modisco_results.h5 -o finemo_out -p ../peakset_${celltype}.bed -J
 
