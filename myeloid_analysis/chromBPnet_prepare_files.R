@@ -3,7 +3,7 @@ dir.create ('chromBPnet')
 
 # Export fragments subset by meta group ####
 fragments_l = list()
-metaGroupName = 'TREM2_state'
+metaGroupName = 'TREM2_state2'
 
 if (!exists ('fragments')) fragments = unlist(getFragmentsFromProject (archp))
 if (!file.exists (file.path('chromBPnet',paste0('fragments_myeloid_cells.tsv')))) write.table (fragments, file.path('chromBPnet',paste0('fragments_myeloid_cells.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
@@ -21,7 +21,7 @@ for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
 
 
 ### Run peak calling ####
-metaGroupName = "TREM2_state"
+metaGroupName = "TREM2_state2"
 force=TRUE
 #archp = archp[as.character(archp@cellColData[,metaGroupName]) %in% metagroups]
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source (file.path('..','..','git_repo','utils','callPeaks.R'))

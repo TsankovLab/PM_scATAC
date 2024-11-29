@@ -46,7 +46,8 @@ sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14')
 #srt = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/srt.rds')
 #srt = srt[,srt$celltype_simplified %in% c('cDCs','MonoMac')]
 table (srt$celltype2)
-saveRDS (srt, file.path ('srt.rds'))
+
+#saveRDS (srt, file.path ('srt.rds'))
 srt = readRDS ('srt.rds')
 
 archp = loadArchRProject (file.path('..','scatac_ArchR'))
@@ -180,23 +181,6 @@ vp
 dev.off()
 
 
-# Annotate cells ####
-srt$celltype2 = 0
-srt$celltype2[srt$RNA_snn_res.0.8 == 11] = 'Tregs'
-srt$celltype2[srt$RNA_snn_res.0.8 == 12] = 'Proliferating'
-srt$celltype2[srt$RNA_snn_res.0.8 == 8] = 'NK_KLRC1'
-srt$celltype2[srt$RNA_snn_res.0.8 %in% c(2,9,7,6)] = 'CD8'
-srt$celltype2[srt$RNA_snn_res.1 %in% c(6)] = 'CD8_exhausted'
-srt$celltype2[srt$RNA_snn_res.0.8 %in% c(0,3,5,1,10)] = 'CD4'
-srt$celltype2[srt$RNA_snn_res.0.8 %in% c(4)] = 'NK_FGFBP2'
-
-dp = DimPlot(srt, group.by = 'celltype2')
-pdf (file.path('Plots',paste0('celltype_new_dimplot.pdf')))
-dp
-DimPlot (srt, group.by = 'RNA_snn_res.1', label=T)
-dev.off()
-
-
 saveRDS (srt, 'srt.rds')
 
 } else {
@@ -240,7 +224,7 @@ for (sam in sams)
 	cnmf_spectra_unique_l[[sam]] = cnmf_spectra_unique
 	}
 
-cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, function(y) head(y,50)))
+cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, function(y) head(y,100)))
 
 # cnmf_overlap = do.call (cbind, lapply (names(cnmf_spectra_unique_l), function(x)
 # 				rowSums (sapply (names(cnmf_spectra_unique_l), function(y)
@@ -260,24 +244,33 @@ cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, fu
 # ov_mat = do.call (cbind, (lapply (seq(nrow(output)), function(x) cnmf_spectra_unique_l[[output$Column[[x]]]][[output$Row[x]]])))
 # colnames (ov_mat) = paste0(output$Column, '_',output$Row)
 # ov_mat = as.list(as.data.frame(ov_mat))
+force=FALSE
+if (!file.exists('shared_cnmf_myeloid.rds') | force)
+{
 cnmf_spectra_unique_l = unlist(cnmf_spectra_unique_l, recursive=F)
 ov_mat = ovmat (cnmf_spectra_unique_l, ov_threshold = 0.2, df=T) 
-km = kmeans (ov_mat, centers=9)
+km = kmeans (ov_mat, centers=10)
 ho = Heatmap (ov_mat,
 column_split =km$cluster , 
 row_split = km$cluster, 
 	col = viridis::inferno(100))
-pdf (file.path ('Plots','shared_cNMF_overlap.pdf'),width = 7,7)
+pdf (file.path ('Plots','shared_cNMF_overlap.pdf'),width = 12,12)
 ho
 dev.off()
 
 shared_cnmf = split (rownames(ov_mat), km$cluster)
-overlap_cutoff = 2 
+overlap_cutoff = 2
 shared_cnmf_genes = lapply (shared_cnmf, function(x) names(table (unlist(cnmf_spectra_unique_l[x]))[table (unlist(cnmf_spectra_unique_l[x])) > overlap_cutoff]))
+shared_cnmf_genes = shared_cnmf_genes[sapply(shared_cnmf_genes, function(x) length(x) >0)]
+names (shared_cnmf_genes) = paste0('cnmf.',names(shared_cnmf_genes))
 saveRDS (shared_cnmf_genes, paste0 ('shared_cnmf_myeloid.rds'))
 
-# Make PCA plot using module scores as features ####
+} else {
+
 shared_cnmf_genes = readRDS ('shared_cnmf_myeloid.rds')
+}
+
+# Make PCA plot using module scores as features ####
 srt = ModScoreCor (
     seurat_obj = srt, 
     geneset_list = shared_cnmf_genes, 
@@ -318,6 +311,7 @@ library (hdWGCNA)
 force = TRUE
 # table (srt$sampleID)
 # srt$sampleID
+#srt_tam = srt[,srt$celltype2 == 'TAMs']
 if (!file.exists ('metacells.rds') | force)
 	{
 	srt <- SetupForWGCNA(
@@ -331,8 +325,8 @@ if (!file.exists ('metacells.rds') | force)
 	  seurat_obj = srt,
 	  group.by = c("sampleID"), # specify the columns in seurat_obj@meta.data to group by
 	  reduction = 'umap', # select the dimensionality reduction to perform KNN on
-	  k = 50, # nearest-neighbors parameter
-	  max_shared = 25, # maximum number of shared cells between two metacells
+	  k = 100, # nearest-neighbors parameter
+	  max_shared = 50, # maximum number of shared cells between two metacells
 	  ident.group = 'sampleID' # set the Idents of the metacell seurat object
 	)
 	
@@ -345,8 +339,6 @@ if (!file.exists ('metacells.rds') | force)
 	}
 
 # install.packages
-
-
 # Correlate genes with cNMFs on metacells ####
 vf = VariableFeatures (FindVariableFeatures (metacells, nfeat=20000))
 metacells_assay = metacells@assays$RNA@layers$data
@@ -369,7 +361,7 @@ tc_cor = lapply (unique(metacells$sampleID), function(x)
 	res = cor (metacells_assay_sample, ccomp_df_sample, method = 'spearman')
 	#rownames (res) = colnames (ccomp_df_sample)
 	res
-	})
+	})	
 names (tc_cor) = unique(metacells$sampleID)
 trem2_mod = tc_cor[[1]][,6]
 trem2_mod = trem2_mod[order(-trem2_mod)]
@@ -381,5 +373,49 @@ genes = c('TREM2','SPP1','BACH2',
 trem2_mod[genes]
 #lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
 
+# Check expression of ELK1 and other TFs from chromvar / chrombpnet predictions  ####
+TF = 'ELK3'
+#srt = srt[,srt$celltype2 == 'TAMs']
+
+pdf (file.path ('Plots',paste0(TF,'expression_dotplot.pdf')))
+DotPlot (srt, features = TF, group.by = 'celltype2')
+dev.off()
+
+module = 'cnmf.4'
+scrna_cnmf = srt@meta.data[, names(shared_cnmf_genes)]
+scrna_cnmf_sample = lapply (unique (srt$sampleID), function(x) scrna_cnmf[srt$sampleID == x,module,drop=F])
+scrna_cnmf_sample = lapply (scrna_cnmf_sample, function(x) head(rownames(x)[order(-x[,1])],20))
+srt$SPP1_high = ifelse (colnames(srt) %in% unlist (scrna_cnmf_sample), 'SPP1_high','SPP1_low')
+
+TF = c('ELK1','ELK3','KLF12','NFKB1','CTCF','CEBPA','NFYB','IRF1','NFIC','IRF8','ZNF76','ZEB1','MAF','SNAI1','ZN143')
+# pdf (file.path ('Plots',paste0(TF,'expression_dotplot.pdf')),width=12, height=8)
+# DotPlot (srt_tam, features = TF, group.by = 'SPP1_high')
+# VlnPlot (srt_tam, features = TF, group.by = 'SPP1_high',pt.size=0)
+# dev.off()	
+
+mod_sample_df = data.frame (
+	module = srt$SPP1_high, 
+	score = srt@meta.data[,module],
+	sample = srt$sampleID)
+mod_sample_df = cbind(mod_sample_df)
+mod_sample_df = aggregate (
+	t(srt@assays$RNA@data[rownames(srt) %in% TF,]),
+	by = list(sampleID= mod_sample_df$sample,
+		module = mod_sample_df$module), mean)
+
+mod_sample_df = gather (mod_sample_df, TF, expression, 3:ncol(mod_sample_df))
+bp = ggplot (mod_sample_df, aes (x = TF, y = expression, fill = module)) + 
+geom_boxplot() + gtheme
+
+pdf (file.path ('Plots','module_sample_boxplot.pdf'))
+bp
+dev.off()
 
 
+reductionName = 'umap'
+fps = fp (srt, gene = c('TREM2','C1QA','C3','MAF','NFATC2','VCAN','APOE','SPP1','A2M'))
+pdf (file.path('Plots','markers_celltypes_umap.pdf'), width=12)
+wrap_plots (DimPlot (srt, group.by = 'sampleID', reduction=reductionName),DimPlot (srt, group.by = 'celltype2', reduction=reductionName))
+wrap_plots (fps)
+dev.off()
+	

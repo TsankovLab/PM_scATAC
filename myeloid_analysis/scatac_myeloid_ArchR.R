@@ -136,8 +136,9 @@ dev.off()
 
 
 # Check for doublets ####
-meso_markers = c('C1QA','APOE','IL1B','CD3D')
+meso_markers = c('C1QA','SPP1','APOE','IL1B','CD3D','TREM2','C1QB','C3')
 archp = addImputeWeights (archp)
+pdf()
 p <- plotEmbedding(
     ArchRProj = archp,
     colorBy = "GeneScoreMatrix", 
@@ -147,7 +148,7 @@ p <- plotEmbedding(
     pal = palette_expression,
     imputeWeights = getImputeWeights(archp)
 )
-
+dev.off()
 pdf (file.path('Plots','myeloid_markers_fplots.pdf'), width = 18, height = 15)
 wrap_plots (p, ncol=3)
 dev.off()
@@ -392,32 +393,87 @@ draw (DAM_hm + TF_exp_selected_hm + TF_exp_selected_hm2)
 dev.off()
 
 
-# Import shared cNMF from scRNA and make module scores ####
+
+# Check correlation of cnmf modules in scrna and scatac-seq ####
 shared_cnmf = readRDS (file.path('..','scrna','shared_cnmf_myeloid.rds'))
-archp = addModuleScore (
-    ArchRProj = archp,
-    useMatrix = 'GeneScoreMatrix',
-    name = "shared_cnmf",
-    features = shared_cnmf,
-    nBin = 25,
-    nBgd = 100,
-    seed = 1,
-    threads = getArchRThreads(),
-    logFile = createLogFile("addModuleScore")
-  )
-pdf()
+shared_cnmf = lapply (shared_cnmf, function(x) x[x %in% getFeatures (archp)])
+#srt_tam = srt[,srt$celltype2 == 'TAMs']
+sample_names = unique(archp$Sample)[unique(archp$Sample) %in% unique(srt_tam$sampleID)]
+
+force = TRUE
+if (!all (names (shared_cnmf) %in% colnames (archp@cellColData)) | force)
+  {
+  archp@cellColData = archp@cellColData[,!grepl ('cnmf',colnames(archp@cellColData))]
+  archp = addModuleScore (
+      ArchRProj = archp,
+      useMatrix = 'GeneScoreMatrix',
+      name = '',
+      features = shared_cnmf,
+      nBin = 25,
+      nBgd = 100,
+      seed = 1,
+      threads = getArchRThreads(),
+      logFile = createLogFile("addModuleScore")
+    )
+  colnames (archp@cellColData) = gsub ('^\\.','',colnames(archp@cellColData))    
+  }
+
 archp = addImputeWeights (archp)
+pdf()
 p <- plotEmbedding (
     ArchRProj = archp, 
     colorBy = "cellColData", 
-    name = colnames(archp@cellColData)[grep('shared_cnmf',colnames(archp@cellColData))], 
+    name = names (shared_cnmf), 
     embedding = "UMAP_H",
     pal = palette_expression,
     imputeWeights = getImputeWeights(archp)
 )
-
-pdf (file.path ('Plots','shared_cnmf.pdf'),10,10)
+dev.off()
+pdf (file.path ('Plots','shared_cnmf_fplots.pdf'),10,10)
 wrap_plots (p, ncol=3)
+dev.off()
+  
+srt = ModScoreCor (
+        seurat_obj = srt, 
+        geneset_list = shared_cnmf, 
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # threshold for fetal_pval2
+        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+cnmf_scrna = srt@meta.data[,c(names(shared_cnmf))]
+#cnmf_scrna = t(scale (t(cnmf_scrna)))
+#colnames (cnmf_scrna) = sapply (colnames(cnmf_scrna), function(x) unlist(strsplit(x, '\\.'))[2])
+cnmf_scrna = lapply (sample_names, function(x) cnmf_scrna[srt$sampleID == x, ])
+names (cnmf_scrna) = sample_names
+cnmf_scrna_celltype = lapply (sample_names, function(x) srt$celltype2[srt$sampleID == x])
+names (cnmf_scrna_celltype) = sample_names
+#cnmf_scatac = archp@cellColData[,names(shared_cnmf)]
+cnmf_scatac = as.data.frame (t(scale(t(archp@cellColData[,names(shared_cnmf)]))))
+#cnmf_scatac = as.data.frame (t(scale(t(archp@cellColData[,names(shared_cnmf)]))))
+cnmf_scatac = lapply (sample_names, function(x) cnmf_scatac[archp$Sample == x,])
+names (cnmf_scatac) = sample_names
+
+# Take median of module module correlation across samples ####
+sample_names_rna = sample_names[sample_names %in% unique(srt$sampleID)]
+scrna_tf_cor = lapply (sample_names_rna, function(x) cor  (cnmf_scrna[[x]], method = 'spearman'))
+
+sample_array <- simplify2array (scrna_tf_cor)
+#any(lapply(corTF_array, function(x) any(is.na(x))))
+# Take element-wise median
+scrna_tf_cor <- apply (sample_array, c(1, 2), median)
+
+pdf(file.path ('Plots','scrna_module_correlation_median_heatmap.pdf'),width=5,height=4)
+Heatmap (scrna_tf_cor, col = palette_expression_cor_fun(scrna_tf_cor), border=T)
+dev.off()
+
+scatac_tf_cor = lapply (sample_names_rna, function(x) cor  (cnmf_scatac[[x]], method = 'spearman'))
+
+sample_array <- simplify2array (scatac_tf_cor)
+#any(lapply(corTF_array, function(x) any(is.na(x))))
+# Take element-wise median
+scatac_tf_cor <- apply (sample_array, c(1, 2), median)
+
+pdf(file.path ('Plots','scatac_module_correlation_median_heatmap.pdf'),width=5,height=4)
+Heatmap (scatac_tf_cor, col = palette_deviation_cor_fun, border=T)
 dev.off()
 
 
@@ -425,55 +481,167 @@ dev.off()
 metaGroupName = "celltype2"
 force=FALSE
 source (file.path('..','..','git_repo','utils','DAM.R'))
+
+metaGroupName = "sampleID"
+#Get active genes from RNA
+ps = log2(as.data.frame (AverageExpression (srt_tam,
+features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
+group.by = metaGroupName)[[1]]) +1)
+min_exp = 0
+ps = ps[apply(ps, 1, function(x) all (x > min_exp)),]
+active_TFs = rownames(ps)[rowSums(ps) > 0]
+
+sample_names = unique(archp$Sample)
 if (!exists('mSE')) gsSE = fetch_mat(archp, 'Motif')
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 mMat = as.data.frame (t(as.matrix(scale(mMat[active_TFs,]))))
-cnmfs = as.data.frame (archp@cellColData[,grep ('shared_cnmf', colnames(archp@cellColData))])
-cnmfs = t(scale (t(cnmfs)))
-tf_cnmf_df = cor (cnmfs, mMat)
-top_TFs = colnames(tf_cnmf_df)[order(-tf_cnmf_df['shared_cnmf.8',])]
-top_TFs = c(head (top_TFs,10), tail (top_TFs,10))
-ha = HeatmapAnnotation(' ' = anno_mark(at = match(top_TFs, colnames(tf_cnmf_df)), 
+cnmf_scatac = as.data.frame (archp@cellColData[,names (shared_cnmf)])
+cnmf_scatac = t(scale (t(cnmf_scatac)))
+
+#colnames (cnmfs) = sapply (colnames(cnmfs), function(x) unlist(strsplit(x, '\\.'))[2])
+cnmf_scatac_cor = lapply (sample_names, function(x) cor (cnmf_scatac[archp$Sample ==x ,], mMat[archp$Sample == x,], method = 'spearman'))
+
+# remove low number samples ####
+remove_samples = c('P3','P8', 'P4')
+cnmf_scatac_cor = cnmf_scatac_cor[!sample_names %in% remove_samples]
+
+
+sample_array <- simplify2array(cnmf_scatac_cor)
+#any(lapply(corTF_array, function(x) any(is.na(x))))
+# Take element-wise median
+cnmf_scatac_cor <- apply(sample_array, c(1, 2), median)
+
+top_TFs = colnames(cnmf_scatac_cor)[order(-cnmf_scatac_cor['cnmf.8',])]
+top_TFs = c(head (top_TFs,50), tail (top_TFs,50))
+
+# Run TF nmf module correlation in scrna metacells #### 
+metacells = readRDS (file.path ('..','scrna','metacells.rds'))
+shared_cnmf = readRDS (file.path('..','scrna','shared_cnmf_myeloid.rds'))
+metacells = ModScoreCor (
+        seurat_obj = metacells, 
+        geneset_list = shared_cnmf, 
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # threshold for fetal_pval2
+        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+
+cnmf_metacells = metacells@meta.data[,c(names(shared_cnmf))]
+metacells_assay = metacells@assays$RNA@layers$data
+rownames (metacells_assay) = rownames (srt_tam)
+metacells_assay = t(metacells_assay[active_TFs,])
+sample_names_rna = sample_names[sample_names %in% unique(metacells$sampleID)]
+sample_names_rna = sample_names_rna[! sample_names_rna %in% remove_samples]
+cnmf_scrna_cor = lapply (sample_names_rna, function(x) cor  (metacells_assay[metacells$sampleID == x,], cnmf_metacells[metacells$sampleID == x,], method = 'spearman'))
+
+sample_array <- simplify2array(cnmf_scrna_cor)
+#any(lapply(corTF_array, function(x) any(is.na(x))))
+# Take element-wise median
+cnmf_scrna_cor <- apply(sample_array, c(1, 2), median)
+
+ha = rowAnnotation(' ' = anno_mark(at = match(top_TFs, colnames(cnmf_scatac_cor)), 
     labels = top_TFs, labels_gp = gpar(fontsize = 6, fontface='italic')))
-cnmf_tf_df = Heatmap (tf_cnmf_df,
+hm1 = Heatmap (t(cnmf_scatac_cor),
   column_dend_side = 'bottom',
-  top_annotation = ha,
-  row_names_gp = gpar (fontsize = 8),
+  #top_annotation = ha,
+  row_names_gp = gpar (fontsize = 0),
   col = rev(palette_deviation),
-  column_km = 2,
+#  row_km = 2,
   #rect_gp = gpar(type = "none"),
   border=T,
-  column_names_gp = gpar(fontsize = 0, fontface='italic'))
+  column_names_gp = gpar (fontsize = 6, fontface='italic'))
+hm2 = Heatmap (cnmf_scrna_cor,
+  column_dend_side = 'bottom',
+  #right_annotation = ha,
+  row_names_gp = gpar (fontsize = 5),
+  col = rev(palette_expression_correlation),
+  #column_km = 2,
+  #rect_gp = gpar(type = "none"),
+  border=T,
+  column_names_gp = gpar(fontsize = 8, fontface='italic'))
 
-pdf (paste0 ('Plots/active_TF_cnmf_cor_heatmap.pdf'), width = 6,height=3)
-cnmf_tf_df
+pdf (paste0 ('Plots/active_TF_cnmf_cor_heatmap.pdf'), width = 4,height=20)
+hm1 + hm2
+hm2
 dev.off()
 
 
-# Check distribution of cnmf modules across samples ####
-cnmfs = as.data.frame (archp@cellColData[,grep ('shared_cnmf', colnames(archp@cellColData))])
-cnmfs$sample = archp$Sample
-# cnmfs_agg = aggregate (cnmfs, by = list(sampleID= archp$Sample), mean)
-# rownames (cnmfs_agg) = cnmfs_agg$sampleID
-# cnmfs_agg = cnmfs_agg[,-1]
+trem2_mod = cnmf_scrna_cor[,'cnmf.3']
+trem2_mod = trem2_mod[order (-trem2_mod)]
+trem2_mod [grep ('NFKB',names(trem2_mod))]
+head (trem2_mod, 30)
 
-# FRIP = as.data.frame (archp$FRIP)
-# frip_agg = aggregate (FRIP, by = list(sampleID= archp$Sample), mean)   
+# Show TF correlation to TREM2 module in scatac and rna 
+module = 'cnmf.9'
+TF = 'NR1H3'
+scrna_module = cnmf_scrna_cor[,module]
+scatac_module = cnmf_scatac_cor[module,]
+cor (cnmf_scrna_cor, t(cnmf_scatac_cor))
 
+mod_tf = data.frame (expression = scrna_module, activity = scatac_module)
+scrna_tf = data.frame (module = cnmf_metacells[,module], TF = metacells_assay[,TF], sample = metacells$sampleID)
+dev_tf = data.frame (module = cnmf_scatac[,module], TF = mMat[,TF], sample = archp$Sample)
 
-# cnmfs_agg_norm = cnmfs_agg / frip_agg[,2]
-# # Check if they correlate to seq-deph
-# p.adjust(sapply (seq(ncol(cnmfs_agg)), function(x) cor.test (cnmfs_agg[[x]], frip_agg[[2]])$p.value))
-
-# cnmfs_agg$sample = rownames(cnmfs_agg)
-cnmfs_df = gather (cnmfs, cnmf, score, 1:(ncol (cnmfs)-1))
-
-cp = ggplot (cnmfs_df, aes (x= cnmf, y = score, fill = sample)) + geom_boxplot () + gtheme + 
-scale_fill_manual (values = palette_sample)
-pdf (file.path ('Plots','cnmf_score_sample_boxplots.pdf'), width=12)
-cp
+library (smplot2)
+pdf (file.path ('Plots',paste0('expression_vs_activity_TFs_module',module,'.pdf')),4,4)
+ggplot (scrna_tf, aes (x = module, y = TF, color=sample)) + geom_point() + gtheme +# + facet_wrap (~sample) +
+  sm_statCorr(
+    color = "#0f993d", corr_method = "spearman",
+    linetype = "dashed"
+  )
+ggplot (mod_tf, aes (x = expression, y = activity)) + geom_point() + gtheme +
+  sm_statCorr(
+    color = "#0f993d", corr_method = "spearman",
+    linetype = "dashed"
+  )
+ggplot (dev_tf, aes (x = module, y = TF, color = sample)) + geom_point() + gtheme + facet_wrap (~sample) +
+  sm_statCorr(
+    color = "#0f993d", corr_method = "spearman",
+    linetype = "dashed"
+  )
 dev.off()
+
+
+# Highlight TF with high correlation in scatac and scrna space ####
+
+head (mod_tf)
+mod_tf = data.frame (expression = scrna_module, activity = scatac_module)
+top_TFs = 30
+mod_tf$mean = rowMeans (mod_tf)
+mod_tf$high_TF = ''
+mod_tf$high_TF[head(order(-mod_tf$mean),top_TFs)] = rownames(mod_tf)[head(order(-mod_tf$mean),top_TFs)]
+mod_tf$high_TF[mod_tf$expression < 0 | mod_tf$activity < 0 ] = ''
+mod_tf$hits = ifelse (mod_tf$high_TF != '','hit','nohit')
+mod_tf$hits2 = ifelse (mod_tf$high_TF != '',1,0.5)
+sp = ggplot (mod_tf, aes (x = expression, y = activity, label = high_TF, color = hits, alpha = hits2), color='grey22') + geom_point() + gtheme_no_rot + 
+  geom_hline(yintercept = 0, linetype = "dashed", color = "darkred", size = 1) + # Dashed horizontal line
+  geom_vline(xintercept = 0, linetype = "dashed", color = "darkred", size = 1) + 
+  scale_color_manual (values = c(hit = 'darkblue',nohit = 'grey22')) +
+  geom_text_repel (size=3) 
+
+pdf (file.path ('Plots',paste0('expression_activity_',module,'_scatter.pdf')),4,width=5)
+sp
+dev.off()
+
+
+
+
+# Make barplot of module TFs ####
+module = 'cnmf.4'
+top_activity = cnmf_scatac_cor[module,][order(-cnmf_scatac_cor[module,])]
+top_exp = scrna_tf_cor[,module][names(top_activity)]
+module_df = data.frame (
+  TF = factor(names(top_activity), levels =names(top_activity)),
+ expression = top_exp,
+ activity = top_activity)
+
+bp = ggplot (module_df, aes (x = TF, y = expression)) + 
+geom_bar (stat='identity',fill = 'darkgreen') +
+gtheme
+
+pdf (file.path ('Plots',paste0('activity_ranked_module_',module,'_barplot.pdf')),width=50)
+bp
+dev.off()
+
 
 
 
@@ -537,12 +705,12 @@ all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 
 
 
-### Compute correlation of myeloid modules with hubs
+### Compute correlation of myeloid modules with hubs ####
 archp_meta = as.data.frame (archp@cellColData)
-cnmfs = as.data.frame (archp@cellColData[,grep ('shared_cnmf', colnames(archp@cellColData))])
+cnmfs = as.data.frame (archp@cellColData[,names (shared_cnmf)])
 #cnmfs = scale (t(cnmfs))
 
-module_driver = 'shared_cnmf.6'
+module_driver = 'cnmf.8'
 top_hubs = 30
 traj_sample = list()
 sams = unique(archp$Sample2)
@@ -568,10 +736,11 @@ sams = unique(archp$Sample2)
     cor_order = order (-cor_cnmf_hub[module_driver,])
     hub_ordered_sample = hub_ordered_sample[, cor_order]
     hub_ordered_sample = as.data.frame (t(hub_ordered_sample))
-    hub_ordered_sample = rbind (head(hub_ordered_sample,top_hubs), tail (hub_ordered_sample, top_hubs))
+    hub_ordered_sample = head(hub_ordered_sample,top_hubs)#, tail (hub_ordered_sample, top_hubs))
     row_names = hubs_obj$hubsCollapsed$gene[match(rownames(hub_ordered_sample), hubs_obj$hubs_id)]
     traj_sample = Heatmap (
-      t(scale(t(hub_ordered_sample))), 
+      t(scale(t(log2(hub_ordered_sample+1)))),
+      row_labels = hubs_obj$hubsCollapsed$gene[match(rownames(hub_ordered_sample), hubs_obj$hubs_id)], 
       col = rev(palette_hubs_accessibility), 
       cluster_columns=F,
     #  name = sam,
@@ -581,13 +750,13 @@ sams = unique(archp$Sample2)
       border=T)
     #}
 
-pdf (file.path('Plots',paste0('hubs_cor_to_cnmf_',module_driver,'_all.pdf')), height=6, width=3)
+pdf (file.path('Plots',paste0('hubs_cor_to_cnmf_',module_driver,'_all.pdf')), height=4, width=5)
 traj_sample
 dev.off()
-
-pdf (file.path('Plots',paste0('hubs_cor_to_cnmf_',module_driver,'_sample.pdf')), height=8, width=3)
-traj_sample
-dev.off()
+  
+# pdf (file.path('Plots',paste0('hubs_cor_to_cnmf_',module_driver,'_sample.pdf')), height=8, width=3)
+# traj_sample
+# dev.off()
 
 
 ### Check TF enrichment in HUBS correlated with TREM2 vs anticorrelated ####
@@ -605,11 +774,10 @@ hubs_TF_res =  hyperMotif (
 
 ### Group macrophages by TREM2 module score ####
 #module_driver = 'shared_cnmf.6'
-cnmfs = as.data.frame (archp@cellColData[,grep ('shared_cnmf', colnames(archp@cellColData))])
+cnmfs = as.data.frame (t(scale(t(archp@cellColData[,names(shared_cnmf)]))))
 #cnmfs = as.data.frame (do.call (rbind, lapply (unique(archp$Sample), function(x) t(scale(t(cnmfs[archp$Sample == x,]))))))
-cnmfs = as.data.frame (t(scale(t(archp@cellColData[,grep ('shared_cnmf', colnames(archp@cellColData))]))))
-
-TREM2_state = cnmfs$shared_cnmf.6
+module= 'cnmf.8'
+TREM2_state = cnmfs[,module]
 names (TREM2_state) = rownames(archp@cellColData)
 TREM2_state = TREM2_state[order(-TREM2_state)]
 
@@ -625,11 +793,11 @@ df <- data.frame(
   label = rep(names(labeled_splits), times = sapply(labeled_splits, length))
 )
 
-archp$TREM2_state = df$label[match(rownames(archp@cellColData), sapply(rownames(df), function(x) unlist(strsplit(x,'\\.'))[2]))] 
+archp$TREM2_state2 = df$label[match(rownames(archp@cellColData), sapply(rownames(df), function(x) unlist(strsplit(x,'\\.'))[2]))] 
 #table (archp$TREM2_state2, archp$TREM2_state)
 
 # Export bigiwg files ####
-metaGroupName = 'TREM2_state'
+metaGroupName = 'TREM2_state2'
 exp_bigwig = TRUE
 if (exp_bigwig)
   {

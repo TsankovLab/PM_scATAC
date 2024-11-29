@@ -67,13 +67,13 @@ if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('
 		#system (paste0('chmod +x ',file.path(repodir, 'utils','chrBPnet_training.sh')))
 		#paste("bsub bash -c \"/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombnet_NKT_NK_KLRC1_f3.sh, projdir)
 		#system (paste("bsub bash -c \", file.path(repodir,utils','chrBPnet_training.sh '), chromBPdir,' ',grefdir,' ',repodir,' ',celltype,' ',fold_number,'"'), wait=FALSE)
-		command <- paste("bsub -J", paste0(celltype,'_TFmd'), "-P acc_Tsankov_Normal_Lung -q premium -n 4 -W 72:00 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('TFmodisco_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('TFmodisco_',celltype,'.err')),file.path(repodir,'utils','TFmodisco.sh'))
+		command <- paste("bsub -J", paste0(celltype,'_TFmd'), "-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=64000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('TFmodisco_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('TFmodisco_',celltype,'.err')),file.path(repodir,'utils','TFmodisco.sh'))
 		args <- paste(chromBPdir,celltype, fold_number)
 		system (paste(command, args))
 		}
 	}
 
-system (paste0('chmod +x ',file.path(repodir,'utils','TFmodisco_profile.sh')), wait=FALSE) 
+system (paste0('chmod +x ',file.path(repodir,'utils','finemo_motif_calls.sh')), wait=FALSE) 
 
 if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'modisco_profile','modisco_results.h5'))))
 	{
@@ -81,12 +81,12 @@ if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('
 	# fold_numbers_remained = c(0:4)
 	for (fold_number in fold_numbers_remained)
 		{
-		message (paste0('submit job for TFmodisco fold ',fold_number))
+		message (paste0('submit job for finemo fold ',fold_number))
 		#fold_number = 4
 		#system (paste0('chmod +x ',file.path(repodir, 'utils','chrBPnet_training.sh')))
 		#paste("bsub bash -c \"/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombnet_NKT_NK_KLRC1_f3.sh, projdir)
 		#system (paste("bsub bash -c \", file.path(repodir,utils','chrBPnet_training.sh '), chromBPdir,' ',grefdir,' ',repodir,' ',celltype,' ',fold_number,'"'), wait=FALSE)
-		command <- paste("bsub -J", paste0(celltype,'_TFmd'), "-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 24:00 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('TFmodisco_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('TFmodisco_',celltype,'.err')),file.path(repodir,'utils','TFmodisco_profile.sh'))
+		command <- paste("bsub -J", paste0(celltype,'_finemo'), "-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 24:00 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('finemo_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('finemo_',celltype,'.err')),file.path(repodir,'utils','finemo_motif_calls.sh'))
 		args <- paste(chromBPdir,celltype, fold_number)
 		system (paste(command, args))
 		}

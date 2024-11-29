@@ -43,7 +43,7 @@ fragment_paths =c(
    
   
 ArrowFiles_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/ArrowFiles'
-ArrowFiles_dir = file.path(ArrowFiles_dir,sample_names)
+ArrowFiles_dir = file.path(ArrowFiles_dir,paste0(sample_names,'.arrow'))
 if (!all (paste0(sample_names,'.arrow') %in% list.files(ArrowFiles_dir)))
   {
   #setwd (projdir)  
@@ -62,7 +62,7 @@ if (!all (paste0(sample_names,'.arrow') %in% list.files(ArrowFiles_dir)))
   ArrowFiles = paste0(ArrowFiles_dir, paste0(sample_names,'.arrow'))
   }
 
-ArrowFiles_dir = paste0(ArrowFiles_dir,'.arrow')
+
 archp = ArchRProject (
   ArrowFiles = ArrowFiles_dir, 
   outputDirectory = projdir,
