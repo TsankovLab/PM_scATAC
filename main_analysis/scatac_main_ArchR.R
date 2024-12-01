@@ -40,7 +40,7 @@ source (file.path('..','..','git_repo','utils','palettes.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 set.seed (1234)
-addArchRThreads (threads = 1) 
+addArchRThreads (threads = 8) 
 addArchRGenome ("Hg38")
 
 sample_names = c(
@@ -67,13 +67,13 @@ sample_names = c(
 # Load RNA
 srt = readRDS ('../scrna/srt.rds')
 srt$celltype_simplified2[srt$celltype_simplified2 == 'pDC'] = 'pDCs'
-sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
+#sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
 
 archp = loadArchRProject (projdir)
 
-sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14','P10')
-archp$Sample2 = archp$Sample
-archp$Sample2 = factor (archp$Sample2, levels = sarc_order)
+#sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14','P10')
+#archp$Sample2 = archp$Sample
+#archp$Sample2 = factor (archp$Sample2, levels = sarc_order)
 
 ### Gene score based analysis ####
 run_GS_analysis = FALSE
@@ -200,7 +200,7 @@ force=TRUE
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source ('../../git_repo/utils/callPeaks.R')
   
 
-  archp = saveArchRProject (archp, load=TRUE)
+archp = saveArchRProject (archp, load=TRUE)
   
   metaGroupNames = c('TSSEnrichment','nFrags','ReadsInTSS','FRIP')  
     umap_p12 = lapply (metaGroupNames, function(x) plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
@@ -216,7 +216,7 @@ run_chromVAR = TRUE
 
 if (run_chromVAR)
   {  
-  archp = addBgdPeaks (archp, force= FALSE)
+  archp = addBgdPeaks (archp, force= TRUE)
   archp = addMotifAnnotations (ArchRProj = archp,
       motifSet = "cisbp",
       #motifSet = 'JASPAR2020',
@@ -234,45 +234,6 @@ if (run_chromVAR)
 
 
 
-# Find activating and repressing TFs ####
-run_activeTF = FALSE
-
-devMethod = 'ArchR'
- if (devMethod == 'ArchR')
-    {
-    TF_db='Motif'
-    if (!exists('mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
-    mSE = mSE[, archp$cellNames]
-    rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
-    rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
-    }
-  
-if (!file.exists ('TF_activators_genescore.rds'))
-  {
-  seGroupMotif <- getGroupSE(ArchRProj = archp, useMatrix = "MotifMatrix", groupBy = "Clusters")
-  seZ <- seGroupMotif[rowData(seGroupMotif)$seqnames=="z",]
-  rowData(seZ)$maxDelta <- lapply(seq_len(ncol(seZ)), function(x){
-    rowMaxs(assay(seZ) - assay(seZ)[,x])
-  }) %>% Reduce("cbind", .) %>% rowMaxs
-  corGSM_MM <- correlateMatrices (
-      ArchRProj = archp,
-      useMatrix1 = "GeneScoreMatrix",
-      useMatrix2 = "MotifMatrix",
-      reducedDims = "IterativeLSI"
-  )
-  corGSM_MM = corGSM_MM[!grepl ('-AS',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-DT',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-OT',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-RAB5IF',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-IT2',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = corGSM_MM[!grepl ('-C8orf76',corGSM_MM$GeneScoreMatrix_name),]
-  corGSM_MM = na.omit (corGSM_MM)
-  saveRDS (corGSM_MM, 'TF_activators_genescore.rds')
-  } else {
-  corGSM_MM = readRDS ('TF_activators_genescore.rds') 
-  }
-
-
 ### ChromVAR based analysis ####
 run_chromVAR_analysis = FALSE
 
@@ -280,7 +241,7 @@ if (run_chromVAR_analysis)
   {
   # Find DAM ####
   metaGroupName = "celltype_revised"
-  force = FALSE
+  force = TRUE
   if (!file.exists (paste0('DAM_',metaGroupName,'.rds')) | force)
     {
     DAM_list = getMarkerFeatures (
@@ -652,6 +613,33 @@ VlnPlot (srt[,!srt$celltype_simplified3 %in% c('NK','T_cells')], feature = 'NR4A
 dev.off()
 
 
+
+
+
+### Subset ArchR project ####
+
+# Subset T cells ####
+metaGroupName = 'celltype_revised'
+subsetArchRProject(
+  ArchRProj = archp,
+  cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% c('T_cells','NK')],
+  outputDirectory = file.path('..','..','NKT_cells','scatac_ArchR'),
+  dropCells = TRUE,
+  logFile = NULL,
+  threads = getArchRThreads(),
+  force = TRUE
+)
+
+metaGroupName = 'celltype_revised'
+subsetArchRProject(
+  ArchRProj = archp,
+  cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% c('Myeloid')],
+  outputDirectory = file.path('..','..','myeloid_cells','scatac_ArchR'),
+  dropCells = TRUE,
+  logFile = NULL,
+  threads = getArchRThreads(),
+  force = TRUE
+)
 
 
 

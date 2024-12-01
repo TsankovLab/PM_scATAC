@@ -2,22 +2,22 @@ conda activate meso_scatac
 R
 
 ####### ANALYSIS of NKT compartment #######
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/CD8/scatac_ArchR'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CD8/scatac_ArchR'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
-source (file.path('..','..','PM_scATAC','utils','load_packages.R'))
-source (file.path('..','..','PM_scATAC','utils','useful_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','ggplot_aestetics.R'))
-source (file.path('..','..','PM_scATAC','utils','scATAC_functions.R'))
-source (file.path('..','..','PM_scATAC','utils','palettes.R'))
+source (file.path('..','..','git_repo','utils','load_packages.R'))
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads(threads = 8) 
+addArchRThreads(threads = 1) 
 addArchRGenome("hg38")
 
-archp = loadArchRProject (projdir)
+archp = loadArchRProject (projdir, force=T)
 
 
 ## Reduce dimension and harmonize ####
@@ -32,9 +32,6 @@ archp = loadArchRProject (projdir)
 
   archp = addClusters (input = archp, resolution = 3,
     reducedDims = "IterativeLSI", maxClusters = 100,
-    force = TRUE)
-  archp = addUMAP (ArchRProj = archp, 
-    reducedDims = "IterativeLSI",
     force = TRUE)
 
   archp = addHarmony (
@@ -53,29 +50,23 @@ archp = addClusters (input = archp,
     name='Clusters_H',
     force = TRUE)
 
-
-umap_p1 = plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
- name = "celltype", embedding = "UMAP")
-umap_p2 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "Sample2",
-   embedding = "UMAP")
+pdf()
 umap_p3 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "Sample2",
+  colorBy = "cellColData", name = "Sample",
    embedding = "UMAP_H")
 umap_p4 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "celltype",
+  colorBy = "cellColData", name = "celltype2",
    embedding = "UMAP_H")
 umap_p5 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Clusters_H",
    embedding = "UMAP_H")
-  
-  pdf (file.path('Plots','celltype_harmony_sample_umap.pdf'),5,5)
-  print (umap_p1)
-  print (umap_p2)
-  print (umap_p3)
-  print (umap_p4)
-  print (umap_p5)
-  dev.off()
+dev.off()
+
+pdf (file.path('Plots','celltype_harmony_sample_umap.pdf'),5,5)
+print (umap_p3)
+print (umap_p4)
+print (umap_p5)
+dev.off()
 
 # ## Further remove outlier clusters ####
 archp = archp[!archp$Clusters_H %in% c('C1','C9')]
@@ -307,6 +298,8 @@ dev.off()
 # TNK markers ####
 meso_markers = c('CD8A','CTLA4','PDCD1','HAVCR2','TIGIT','TOX','GZMB','IL7R')
 archp = addImputeWeights (archp)
+
+pdf()
 p <- plotEmbedding(
     ArchRProj = archp,
     colorBy = "GeneScoreMatrix", 
@@ -315,6 +308,7 @@ p <- plotEmbedding(
     pal = palette_expression,
     imputeWeights = getImputeWeights(archp)
 )
+dev.off()
 
 #archp$celltype[archp$Clusters == 'C30'] = 'Fibroblasts_WT1'
 #p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))

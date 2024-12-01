@@ -1,3 +1,26 @@
+library (ArchR)
+
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
+dir.create (file.path (projdir,'Plots'), recursive =T)
+setwd (projdir)
+
+set.seed(1234)
+
+####### ANALYSIS of TUMOR compartment #######
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
+dir.create (file.path (projdir,'Plots'), recursive =T)
+setwd (projdir)
+
+# Load utils functions palettes and packages ####
+source (file.path('..','..','git_repo','utils','load_packages.R'))
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
+
+# Set # of threads and genome reference ####
+addArchRThreads (threads = 1) 
+addArchRGenome ("hg38")
 
 sample_names = c(
   # Tumor  
@@ -75,7 +98,7 @@ archp$Sample2[grep ('RPL',archp$Sample2)] = 'normal_pleura'
   
 ### Subset ArchR object only for cells retained in Signac analysis ####
 #tumor_l = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/signac_list.rds')
-tumor_annotation = read.csv ('../../main/scatac_ArchR/barcode_annotation.csv', row.names=1)
+tumor_annotation = read.csv ('../../git_repo/files/barcode_annotation.csv', row.names=1)
 normal = readRDS ('../../per_sample_QC_signac/signac_normal.rds')
 normal_annotation = data.frame (barcode= colnames(normal), celltype = normal$predicted.id)
 normal_annotation$barcode = gsub (paste0(sample_names[11],'_'),paste0(sample_names[11],'#'),normal_annotation$barcode)
@@ -107,6 +130,7 @@ archp = addTSNE (ArchRProj = archp,
   reducedDims = "IterativeLSI",
   force = TRUE)
 
+pdf()
 umap_p1 = plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
  name = "Sample2", embedding = "UMAP", pal = palette_sample)
 umap_p2 = plotEmbedding (ArchRProj = archp, 
@@ -118,7 +142,7 @@ umap_p3 = plotEmbedding (ArchRProj = archp,
 umap_p4 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "TSSEnrichment",
    embedding = "UMAP")
-
+dev.off()
 
 pdf (file.path('Plots','celltype_umap.pdf'))
 print (umap_p1)

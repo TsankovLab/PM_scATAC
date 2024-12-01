@@ -28,6 +28,7 @@ palette_gene_expression_fun = function(x) {return(colorRamp2(c(min(x), 0, max(x)
 
 palette_sample = c(as.character(paletteer::paletteer_d("impressionist.colors::la_chanson_du_chien")), 'darkblue', 'red','red','red')
 palette_sample = setNames (palette_sample , c('P1','P13','P3','P12','P5','P11','P4','P8','P10','P14','P23', 'HU62','HU37','normal_pleura'))
+palette_sample = c(palette_sample,P11_HOX = 'violet')
 #palette_sample = setNames (as.character(paletteer::paletteer_c("pals::ocean.dense",13)))
 #palette_sample = c(palette_sample, P10 = 'grey')
 palette_sample2 = c(palette_sample[3], palette_sample[6], palette_sample[10])
@@ -92,7 +93,7 @@ palette_expression_cor_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,m
 #palette_expression_cor = c('#24693DFF','#F6F9FCFF','#4F7FAAFF')
 
 palette_deviation_correlation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
-palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#727C83FF','#FDFDFDFF','#AE123AFF'))
+palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#49525EFF','#FFFCFCFF','#AE123AFF'))
 palette_deviation2 = paletteer::paletteer_c("pals::ocean.curl",100)
 
 #palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#2B5C8AFF','white','#9E3D22FF'))

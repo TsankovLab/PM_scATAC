@@ -224,7 +224,7 @@ for (sam in sams)
 	cnmf_spectra_unique_l[[sam]] = cnmf_spectra_unique
 	}
 
-cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, function(y) head(y,100)))
+cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, function(y) head(y,50)))
 
 # cnmf_overlap = do.call (cbind, lapply (names(cnmf_spectra_unique_l), function(x)
 # 				rowSums (sapply (names(cnmf_spectra_unique_l), function(y)
@@ -411,11 +411,16 @@ pdf (file.path ('Plots','module_sample_boxplot.pdf'))
 bp
 dev.off()
 
+active_TFs = read.csv ('../scatac_ArchR/active_TFs.csv')
 
 reductionName = 'umap'
-fps = fp (srt, gene = c('TREM2','C1QA','C3','MAF','NFATC2','VCAN','APOE','SPP1','A2M'))
-pdf (file.path('Plots','markers_celltypes_umap.pdf'), width=12)
+fps = fp (srt, gene = c('TREM2','JUN','C1QA','C3','MAF','NFATC2','VCAN','APOE','SPP1','A2M'))
+fps = fp (srt, gene = active_TFs[[2]])
+pdf (file.path('Plots','markers_celltypes_umap.pdf'), width=52, height=50)
 wrap_plots (DimPlot (srt, group.by = 'sampleID', reduction=reductionName),DimPlot (srt, group.by = 'celltype2', reduction=reductionName))
 wrap_plots (fps)
 dev.off()
-	
+
+pdf (file.path('Plots','modules_umap.pdf'), width=10, height=10)
+wrap_plots (fp (srt, gene = names(shared_cnmf_genes)))
+dev.off()

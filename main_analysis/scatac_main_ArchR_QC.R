@@ -131,7 +131,14 @@ if (!file.exists ('Save-ArchR-Project.rds'))
   archp = addUMAP (ArchRProj = archp, 
     reducedDims = "IterativeLSI",
     force = TRUE)
-  
+
+pdf ()  
+umap_p0 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Clusters",
+   embedding = "UMAP",
+   #pal = palette_celltype_simplified,
+   labelMeans = FALSE)
+
 umap_p1 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "celltype_revised",
    embedding = "UMAP",
@@ -143,8 +150,9 @@ umap_p2 = plotEmbedding (ArchRProj = archp,
    embedding = "UMAP",
    pal = palette_sample,
    labelMeans = FALSE)
-
+dev.off()
 pdf (file.path ('Plots','celltype_revised_umap.pdf'))
+umap_p0
 umap_p1
 umap_p2
 dev.off()

@@ -22,7 +22,7 @@ source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads (threads = 1) 
+addArchRThreads (threads = 16) 
 addArchRGenome ("hg38")
 
 if (!file.exists ('Save-ArchR-Project.rds')) 
@@ -32,7 +32,7 @@ if (!file.exists ('Save-ArchR-Project.rds'))
   }
 
 archp$Sample3 = archp$Sample2
-archp$Sample3[archp$Clusters == 'C14'] = 'P11_HOX'
+archp$Sample3[archp$Clusters == 'C15'] = 'P11_HOX'
 
 
 # Load RNA ####
@@ -47,8 +47,9 @@ metaGroupName = "Clusters"
 force=FALSE
 if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source ('../../PM_scATAC/DAG.R')
 
-celltype_markers = c('WT1','CALB2','RUNX2','TCF3','SOX9','MESP1','HMGA1','TWIST1','SNAI2')
 archp = addImputeWeights (archp)
+celltype_markers = c('WT1','CALB2','RUNX2','TCF3','SOX9','SOX6','MESP1','HMGA1','TWIST1','SNAI2')
+pdf()
 p <- plotEmbedding(
     ArchRProj = archp, 
     colorBy = "GeneScoreMatrix", 
@@ -57,7 +58,7 @@ p <- plotEmbedding(
     pal = palette_expression,
     imputeWeights = getImputeWeights(archp)
 )
-
+dev.off()
 pdf (file.path('Plots','marker_genes_feature_plots.pdf'), width = 20, height = 20)
 print (wrap_plots (p, ncol = 4))
 dev.off()
@@ -148,18 +149,18 @@ if (run_bin_analysis)
 
 ### Run peak calling ####
 metaGroupName = "Clusters"
-force=FALSE
-if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source ('../../PM_scATAC/callPeaks.R')
+force=TRUE
+if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source (file.path('..','..','git_repo','utils','callPeaks.R'))
   
 
 
 
 ### chromVAR analysis ####
-force=FALSE
+force=TRUE
 if (!all(file.exists(file.path('Annotations',
   c('Motif-Matches-In-Peaks.rds',
     'Motif-Positions-In-Peaks.rds',
-    'Motif-In-Peaks-Summary.rds')))))
+    'Motif-In-Peaks-Summary.rds'))))| force)
 source (file.path('..','..','git_repo','utils','chromVAR.R'))
 
 
@@ -178,7 +179,33 @@ metaGroupName = 'sampleID'
 active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
 mMat = mMat[active_TFs, ]
 
+# Generate heatmap of clusters x samples across active TFs ####
+mMat_agg = aggregate (as.matrix(t(scale(mMat))), by = list(archp$Sample3), FUN='mean')
+rownames (mMat_agg) = mMat_agg[,1]
+mMat_agg = mMat_agg[,-1]
 
+ha = HeatmapAnnotation (sample = rownames(mMat_agg), col = list(sample = palette_sample))
+mMat_hm = Heatmap (t(mMat_agg),# row_km=15,
+  #left_annotation = ha,
+  #rect_gp = gpar(type = "none"),
+  clustering_distance_rows='euclidean' ,
+  clustering_distance_columns = 'euclidean', 
+  col=palette_deviation_cor_fun, 
+  #row_split = km$cluster,
+  #column_split = km$cluster,
+  #row_km=2, 
+  #column_km=2,
+  top_annotation = ha,
+  border=T,
+#   ,
+  row_names_gp = gpar(fontsize = 3), 
+  column_names_gp = gpar(fontsize = 0)
+)
+pdf (file.path ('Plots','TF_samples_heatmap.pdf'), width = 8,height=45)
+mMat_hm
+dev.off()
+
+### Run TF correlation to identify TF modules across cancers #### 
 mMat_cor = cor (as.matrix(t(scale(mMat))), method = 'spearman')
 
 km = kmeans (mMat_cor, centers=5)
@@ -399,7 +426,8 @@ dev.off()
 #   }
 
   # Make data.frame of deviation difference and expression difference between normal and tumors ####
-if(!file.exists('selected_TF.rds'))
+force = T
+if(!file.exists('selected_TF.rds') | force)
   {
   metaGroupName = 'Sample2'
   if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')

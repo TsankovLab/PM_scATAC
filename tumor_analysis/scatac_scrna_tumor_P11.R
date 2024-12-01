@@ -1,9 +1,11 @@
+conda activate meso_scatac
+R
 
 ####### ANALYSIS of P11 TUMOR #######
 set.seed(1234)
 
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_epi/scATAC_PM/tumor_compartment/scatac_scrna_P11'
-projdir_scatac = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_epi/scATAC_PM/tumor_compartment/scatac_ArchR'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_scrna_P11'
+projdir_scatac = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
 
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
@@ -16,7 +18,7 @@ source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 source (file.path('..','..','git_repo','utils','palettes.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads(threads = 8) 
+addArchRThreads(threads = 1) 
 addArchRGenome("hg38")
 
 # Load scATAC ####
@@ -39,9 +41,12 @@ reductionGraphKnn = 'RNA_knn'
 reductionGraphSnn = 'RNA_snn' 
 
 srt = RunUMAP (object = srt, reduction = reductionSave, dims = 1:30)
-
+srt = FindNeighbors (srt)
+srt = FindClusters (srt, res=.6)
 pdf (file.path ('Plots','celltypes_umap.pdf'))
 DimPlot (srt, group.by = 'celltype_simplified', reduction = 'umap')
+DimPlot (srt, group.by = 'seurat_clusters', reduction = 'umap', label=T)
+fp (srt, gene = 'HOXB13',reduction= reductionName)
 dev.off()
 
 
@@ -455,20 +460,23 @@ mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 mMat_P11 = mMat[,archp$Sample2 == 'P11']
 P11_clusters = archp$Clusters[archp$Sample2 == 'P11']
-P11_clusters = ifelse (P11_clusters == 'C14','P11_small','P11_large')
+P11_clusters = ifelse (P11_clusters == 'C15','P11_small','P11_large')
 p11_dev_rna = wilcoxauc (mMat_P11 , y = P11_clusters)
 p11_dev_rna = p11_dev_rna[p11_dev_rna$group == 'P11_large',]
-head (p11_dev_rna[order(p11_dev_rna$logFC),],20)
+head (p11_dev_rna[order(p11_dev_rna$logFC),],50)
 p11_dev_rna[p11_dev_rna$feature == 'NFATC1',]
 # Make volcano plot showing also scRNA RNA expression
 pdf (paste0('Plots/scrna_clusters_umap.pdf'), 15,15)
 wrap_plots (DimPlot (srt, group.by = 'seurat_clusters'), DimPlot (srt, group.by = 'sampleID'))
 dev.off()
 
-ps = log2(as.data.frame (AverageExpression (srt, features = p11_dev_rna$feature, group.by = 'seurat_clusters')[[1]]) +1)
+srt$HOX = ''
+srt$HOX[srt$seurat_clusters %in% c(1,13)] = 'HOX+'
+srt$HOX[srt$seurat_clusters %in% c(12,3)] = 'HOX-'
+ps = log2(as.data.frame (AverageExpression (srt, features = p11_dev_rna$feature, group.by = 'HOX')[[1]]) +1)
 #ps = ps[, colnames(ps) %in% sample_names_rna]
-ps_P11_diff = ps[, 'g14', drop=F] - ps[, 'g9', drop=F]
-
+ps_P11_diff = ps[, 'HOX+', drop=F] - ps[, 'HOX-', drop=F]
+ps_P11_diff['HOXB13',]
 p11_dev_rna$rna_diff = NA
 p11_dev_rna$rna_diff = ps_P11_diff[p11_dev_rna$feature,1]
 p11_dev_rna$rna_diff[is.na(p11_dev_rna$rna_diff)] = 0
@@ -477,34 +485,35 @@ logfcThreshold = .1
 pvalAdjTrheshold = 0.05
 p11_dev_rna$sig = ifelse (abs(p11_dev_rna$logFC) > logfcThreshold & p11_dev_rna$padj < pvalAdjTrheshold, 1,0)
 p11_dev_rna$sig = p11_dev_rna$sig * sign (p11_dev_rna$logFC)
-p11_dev_rna$sig[p11_dev_rna$sig == -1] = 'HOX+'
-p11_dev_rna$sig[p11_dev_rna$sig == 1] = 'HOX-'
+p11_dev_rna$sig[p11_dev_rna$sig == 1] = 'HOX+'
+p11_dev_rna$sig[p11_dev_rna$sig == -1] = 'HOX-'
 
 p11_dev_rna$rna_sign = ifelse (abs(p11_dev_rna$logFC) > logfcThreshold & p11_dev_rna$padj < pvalAdjTrheshold, 1,0)
 p11_dev_rna$rna_sign = p11_dev_rna$rna_sign * sign (p11_dev_rna$rna_diff)
-p11_dev_rna$rna_sign[p11_dev_rna$rna_sign == -1] = 'HOX+'
-p11_dev_rna$rna_sign[p11_dev_rna$rna_sign == 1] = 'HOX-'
+p11_dev_rna$rna_sign[p11_dev_rna$rna_sign == 1] = 'HOX+'
+p11_dev_rna$rna_sign[p11_dev_rna$rna_sign == -1] = 'HOX-'
 
 res_filtered = p11_dev_rna[abs(p11_dev_rna$logFC) > logfcThreshold & p11_dev_rna$padj < pvalAdjTrheshold,]
 res_filtered = head (res_filtered$feature[order (-abs(res_filtered$logFC))],20)
 p11_dev_rna$labels = ''
 p11_dev_rna$labels[match (res_filtered, p11_dev_rna$feature)] = res_filtered
+
 vp = ggplot (p11_dev_rna, aes(x=logFC, y= -log10(padj))) +
     geom_point(shape=21, aes (fill = sig, color = rna_sign, size = abs(rna_diff)), alpha=.5) +
-    geom_vline(xintercept = logfcThreshold, linetype="dotted", 
-                color = "grey20", size=1) +
-    geom_vline(xintercept = -logfcThreshold, linetype="dotted", 
-                color = "grey20", size=1) +
-    geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dotted", 
-                color = "grey20", size=1) + 
+    geom_vline(xintercept = logfcThreshold, linetype="dashed", 
+                color = "grey20", size=.4) +
+    geom_vline(xintercept = -logfcThreshold, linetype="dashed", 
+                color = "grey20", size=.4) +
+    geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dashed", 
+                color = "grey20", size=.4) + 
     geom_text_repel (size=2, data = p11_dev_rna, aes(label = labels),segment.size=.2) + 
     ggtitle ('Hubs differential accessibility') +
     #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
     scale_color_manual (values = c("0"='grey77',"HOX-"='green',"HOX+"='red')) + 
-    scale_fill_manual (values = c("0"='grey77',"HOX-"='green',"HOX+"='red')) + 
-    theme_light()
+    scale_fill_manual (values = c("0"='grey77',"HOX-"='green',"HOX+"='red')) + gtheme_no_rot
 
-pdf (file.path ('Plots', 'P11_TF_volcano.pdf'),height=3,width=5)
+
+pdf (file.path ('Plots', 'P11_TF_volcano.pdf'),height=5,width=6)
 vp
 dev.off()
 
