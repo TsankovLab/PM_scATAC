@@ -217,6 +217,7 @@ HUB84 HUB499 HUB1324 HUB575 HUB178 HUB733 HUB429 HUB369 HUB242 HUB602
 ### Call peaks on celltypes ####
 metaGroupName = 'fetal_gss2'
 force=FALSE
+peak_reproducibility=2
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) 
 source (file.path('..','..','git_repo','utils','callPeaks.R'))
   

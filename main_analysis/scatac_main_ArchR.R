@@ -197,6 +197,7 @@ archp$celltype_revised_sample[archp$celltype_revised_sample == 'Malignant'] = pa
 ### Run peak calling ####
 metaGroupName = "Clusters"
 force=TRUE
+peak_reproducibility=2
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source ('../../git_repo/utils/callPeaks.R')
   
 

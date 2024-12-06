@@ -582,3 +582,10 @@ degClusters3 = degClusters3[order(degClusters3$p_val_adj), ]
 head (degClusters3, 30)
 
 
+### Check if KLRC1 positive CD8 cells in P10 are present in scRNA ####
+reductionName = 'umap'
+pdf (file.path ('Plots','markers_fplots.pdf'))
+DimPlot (srt, group.by = 'sampleID')
+fp (srt, gene = c('KLRC1','HAVCR2','PDCD1'))
+DotPlot (srt, feature = 'KLRC1', group.by = 'celltype2')
+dev.off()

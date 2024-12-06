@@ -29,6 +29,7 @@ for (metagroup in metagroups)
 ### Run peak calling ####
 metaGroupName = "epit_sarc2"
 force=TRUE
+peak_reproducibility=2
 archp = archp[as.character(archp@cellColData[,metaGroupName]) %in% metagroups]
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source (file.path('..','..','git_repo','utils','callPeaks.R'))
 

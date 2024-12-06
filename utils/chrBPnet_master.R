@@ -1,10 +1,10 @@
 # Variables
-# chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet'
+# chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet'
 # repodir='/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 # grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
-# celltype='NK_FGFBP2'
+# celltype='cnmf_cluster_6'
+# celltype = 'TREM2'
 # fold_numbers = c(0,1,2,3,4)
-
 message ('Submit job for chromBPnet training model')	
 
 # Make script executable

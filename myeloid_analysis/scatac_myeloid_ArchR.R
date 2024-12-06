@@ -54,15 +54,25 @@ archp = addUMAP (ArchRProj = archp,
 
 archp = addClusters (input = archp,
     reducedDims = "Harmony_project",
-    name='Clusters_H',
+    name='Clusters_H', res=1,
     force = TRUE)
+
+### Annotate cell types ####
+archp$celltype2 = 0
+archp$celltype2[archp$Clusters_H == 'C6'] = 'Monocytes'
+archp$celltype2[archp$Clusters_H %in% c('C7','C9')] = 'Inflammatory'
+archp$celltype2[archp$Clusters_H %in% c('C8')] = 'DCs'
+archp$celltype2[archp$Clusters_H %in% c('C10','C11','C3')] = 'TREM2_SPP1'
+archp$celltype2[archp$Clusters_H %in% c('C4','C5','C2','C1')] = 'Interstitial'
+
 
 pdf()
 umap_p3 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Sample",
+  pal= palette_sample,
    embedding = "UMAP_H")
 umap_p4 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "celltype_revised2",
+  colorBy = "cellColData", name = "celltype2",
    embedding = "UMAP_H")
 umap_p5 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Clusters_H",
@@ -94,6 +104,7 @@ wrap_plots (p, ncol=3)
 dev.off()
 
 
+
 # Get markers for gene score ####
 immune_markers = read.csv ('/ahg/regevdata/projects/ICA_Lung/Bruno/gene_sets/scRNA_immune_markers_humanLUAD_Samarth_Assaf.csv')
 immune_markers = immune_markers [immune_markers$group %in% c('Neutrophil','TRMac','IM','DC2','DC1','pDC','mregDC','CD14 mono',
@@ -122,6 +133,7 @@ dev.off()
 pdf(file.path('Plots','peakcalls.pdf'))
 metaGroupName = 'Clusters_H'
 force=TRUE
+peak_reproducibility=2
 if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds'))) | force) 
 source (file.path('..','..','git_repo','utils','callPeaks.R'))
 dev.off()
@@ -151,7 +163,7 @@ mMat_mg = mMat_mg[,-1]
 mMat_mg = mMat_mg[names (DAM_list),]
 
 # Generate RNA pseudobulk of matching cell types ####
-metaGroupName = 'Clusters_H'
+metaGroupName = 'celltype2'
 #selected_TF = c(rownames(DAM_hm@matrix), 'NR4A3','NR4A2','NR4A1')
 ps = log2(as.data.frame (AverageExpression (srt, features = active_DAM, group.by = metaGroupName)[[1]]) +1)
 colnames (ps) = gsub ('-','_',colnames(ps))
@@ -159,7 +171,7 @@ ps = ps[, colnames(DAM_hm@matrix)]
 ps_tf = ps[active_DAM,]
 
   
- DAM_hm = Heatmap (t(scale(mMat_mg)), 
+ DAM_hm = Heatmap (t(mMat_mg), 
           row_labels = colnames (mMat_mg),
           column_title = paste('top',top_genes),
           clustering_distance_columns = 'euclidean',
@@ -214,7 +226,7 @@ TF_exp_selected_hm2 = Heatmap (ps_tf,
         border=T,
         width = unit(2, "cm"))
 
-pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 8,height=4)
+pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 10,height=39)
 draw (DAM_hm + TF_exp_selected_hm + TF_exp_selected_hm2)
 dev.off()
 
@@ -225,10 +237,12 @@ shared_cnmf = readRDS (file.path('..','scrna','shared_cnmf_myeloid.rds'))
 shared_cnmf = lapply (shared_cnmf, function(x) x[x %in% getFeatures (archp)])
 #srt_tam = srt[,srt$celltype2 == 'TAMs']
 remove_samples = c('P3','P8', 'P4')
-sample_names = unique(archp$Sample)[unique(archp$Sample) %in% unique(srt_tam$sampleID)]
+sample_names = unique(archp$Sample)#[unique(archp$Sample) %in% unique(srt$sampleID)]
+sample_names_rna = unique(archp$Sample)[unique(archp$Sample) %in% unique(srt$sampleID)]
 sample_names = sample_names[! sample_names %in% remove_samples]
+sample_names_rna = sample_names_rna[! sample_names_rna %in% remove_samples]
 
-force = TRUE
+force = FALSE
 if (!all (names (shared_cnmf) %in% colnames (archp@cellColData)) | force)
   {
   archp@cellColData = archp@cellColData[,!grepl ('cnmf',colnames(archp@cellColData))]
@@ -245,6 +259,127 @@ if (!all (names (shared_cnmf) %in% colnames (archp@cellColData)) | force)
     )
   colnames (archp@cellColData) = gsub ('^\\.','',colnames(archp@cellColData))    
   }
+
+
+# Generate heatmap of cnmf modules across cells and use kmeans to cluster ####
+cnmf_scatac = as.data.frame (t(scale(t(archp@cellColData[,names(shared_cnmf)]))))
+
+set.seed (123)
+cnmf_remove = c('cnmf.7') # remove redundant cell cycle module 
+km = kmeans (scale(cnmf_scatac[,!colnames(cnmf_scatac) %in% cnmf_remove]), centers=9)  
+
+ha = HeatmapAnnotation (sample = archp$Sample, col=list(sample = palette_sample))
+hm = Heatmap (t(scale(cnmf_scatac[,!colnames(cnmf_scatac) %in% cnmf_remove])), 
+  col = palette_genescore_fun(scale(cnmf_scatac)), 
+  top_annotation = ha,
+  show_column_dend = F,
+  column_split = km$cluster,
+#  column_km=9,
+  row_names_gp = gpar (fontsize = 8),
+  column_names_gp = gpar (fontsize = 0),
+  border=T)
+
+pdf (file.path ('Plots','cnmf_scatac_barcodes_heatmap_scaled.pdf'), height=3)
+hm
+dev.off()
+
+# Re-Annotate based on cnmf clustering ####
+all (names(km$cluster) == rownames(archp@cellColData))
+archp$cnmf_cluster2 = paste0('cnmf_cluster_',km$cluster)
+archp$cnmf_celltypes = archp$cnmf_cluster2
+archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_1'] = 'cDCs'
+archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_2'] = 'IM'
+archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_3'] = 'Mono'
+archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_4'] = 'C1Q'
+archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_5'] = 'SPP1'
+archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_6'] = 'TREM2'
+archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_7'] = 'IL1B'
+archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_8'] = 'IFN'
+archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_9'] = 'CC'
+
+
+# Find DAM in cnmf_clusters ####
+metaGroupName = "celltype2"
+archp$celltype2 = archp$cnmf_cluster
+force=TRUE
+source (file.path('..','..','git_repo','utils','DAM.R'))
+
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat_mg = mMat[active_DAM, ]
+mMat_mg = as.data.frame (t(mMat_mg))
+mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
+mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
+rownames (mMat_mg) = mMat_mg[,1]
+mMat_mg = mMat_mg[,-1]
+#mMat_mg = mMat_mg[names (DAM_list),]
+metaGroupName = 'celltype2'
+#selected_TF = c(rownames(DAM_hm@matrix), 'NR4A3','NR4A2','NR4A1')
+ps = log2(as.data.frame (AverageExpression (srt, features = active_DAM, group.by = metaGroupName)[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+#ps = ps[, colnames(DAM_hm@matrix)]
+ps_tf = ps[active_DAM,]
+
+DAM_hm = Heatmap (t(scale(mMat_mg)), 
+          row_labels = colnames (mMat_mg),
+          column_title = paste('top',top_genes),
+          clustering_distance_columns = 'euclidean',
+          clustering_distance_rows = 'euclidean',
+          cluster_rows = F,
+          #col = pals_heatmap[[5]],
+          cluster_columns=F,#col = pals_heatmap[[1]],
+          row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+          column_names_gp = gpar(fontsize = 8),
+          column_names_rot = 45,
+          name = 'chromVAR',
+          #rect_gp = gpar(col = "white", lwd = .5),
+          border=TRUE,
+          col = rev(palette_deviation),
+          width = unit(2, "cm")
+          #right_annotation = motif_ha
+          )
+
+scaled_ps = t(scale(t(ps_tf)))
+scaled_ps[is.na(scaled_ps)] = 0
+TF_exp_selected_hm = Heatmap (scaled_ps,
+        #right_annotation=tf_mark,
+        #column_split = column_split_rna,
+        cluster_rows = F, #km = 4, 
+        name = 'expression (scaled)',
+        column_gap = unit(.5, "mm"),
+        row_gap = unit(.2, "mm"),
+        clustering_distance_rows = 'euclidean',
+        clustering_distance_columns = 'euclidean',
+        cluster_columns=F, 
+        col = palette_expression,
+        row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+        column_names_gp = gpar(fontsize = 8),
+          column_names_rot = 45,
+        border=T,
+        width = unit(2, "cm"))
+
+TF_exp_selected_hm2 = Heatmap (ps_tf,
+        #right_annotation=tf_mark,
+        #column_split = column_split_rna,
+        cluster_rows = F, #km = 4, 
+        name = 'expression',
+        column_gap = unit(.5, "mm"),
+        row_gap = unit(.2, "mm"),
+        clustering_distance_rows = 'euclidean',
+        clustering_distance_columns = 'euclidean',
+        cluster_columns=F, 
+        col = palette_expression,
+        row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+        column_names_gp = gpar(fontsize = 8),
+          column_names_rot = 45,
+        border=T,
+        width = unit(2, "cm"))
+
+pdf (file.path ('Plots','cnmf_clusters_DAM_heatmap.pdf'), width = 10,height=6)
+draw (DAM_hm + TF_exp_selected_hm + TF_exp_selected_hm2)
+dev.off()
+
+
 
 archp = addImputeWeights (archp)
 pdf()
@@ -270,18 +405,17 @@ srt = ModScoreCor (
 cnmf_scrna = srt@meta.data[,c(names(shared_cnmf))]
 #cnmf_scrna = t(scale (t(cnmf_scrna)))
 #colnames (cnmf_scrna) = sapply (colnames(cnmf_scrna), function(x) unlist(strsplit(x, '\\.'))[2])
-cnmf_scrna = lapply (sample_names, function(x) cnmf_scrna[srt$sampleID == x, ])
-names (cnmf_scrna) = sample_names
-cnmf_scrna_celltype = lapply (sample_names, function(x) srt$celltype2[srt$sampleID == x])
-names (cnmf_scrna_celltype) = sample_names
+cnmf_scrna = lapply (sample_names_rna, function(x) cnmf_scrna[srt$sampleID == x, ])
+names (cnmf_scrna) = sample_names_rna
+cnmf_scrna_celltype = lapply (sample_names_rna, function(x) srt$celltype2[srt$sampleID == x])
+names (cnmf_scrna_celltype) = sample_names_rna
 #cnmf_scatac = archp@cellColData[,names(shared_cnmf)]
 cnmf_scatac = as.data.frame (t(scale(t(archp@cellColData[,names(shared_cnmf)]))))
-#cnmf_scatac = as.data.frame (t(scale(t(archp@cellColData[,names(shared_cnmf)]))))
 cnmf_scatac = lapply (sample_names, function(x) cnmf_scatac[archp$Sample == x,])
 names (cnmf_scatac) = sample_names
 
 # Take median of module module correlation across samples ####
-sample_names_rna = sample_names[sample_names %in% unique(srt$sampleID)]
+#sample_names_rna = sample_names[sample_names %in% unique(srt$sampleID)]
 scrna_tf_cor = lapply (sample_names_rna, function(x) cor  (cnmf_scrna[[x]], method = 'spearman'))
 
 sample_array <- simplify2array (scrna_tf_cor)
@@ -289,33 +423,34 @@ sample_array <- simplify2array (scrna_tf_cor)
 # Take element-wise median
 scrna_tf_cor <- apply (sample_array, c(1, 2), median)
 
-pdf(file.path ('Plots','scrna_module_correlation_median_heatmap.pdf'),width=5,height=4)
+pdf(file.path ('Plots','scrna_module_correlation_median_heatmap2.pdf'),width=5,height=4)
 Heatmap (scrna_tf_cor, col = palette_expression_cor_fun(scrna_tf_cor), border=T)
 dev.off()
 
-scatac_tf_cor = lapply (sample_names_rna, function(x) cor  (cnmf_scatac[[x]], method = 'spearman'))
+scatac_tf_cor = lapply (sample_names, function(x) cor  (cnmf_scatac[[x]], method = 'spearman'))
 
 sample_array <- simplify2array (scatac_tf_cor)
 #any(lapply(corTF_array, function(x) any(is.na(x))))
 # Take element-wise median
 scatac_tf_cor <- apply (sample_array, c(1, 2), median)
 
-pdf(file.path ('Plots','scatac_module_correlation_median_heatmap.pdf'),width=5,height=4)
+pdf(file.path ('Plots','scatac_module_correlation_median_heatmap2.pdf'),width=5,height=4)
 Heatmap (scatac_tf_cor, col = palette_deviation_cor_fun, border=T)
 dev.off()
 
 
 # Correlate module scores with TFs ####
-metaGroupName = "celltype2"
+metaGroupName = "Clusters_H"
+archp$celltype2 = archp$Clusters_H
 force=FALSE
 source (file.path('..','..','git_repo','utils','DAM.R'))
 
 metaGroupName = "sampleID"
 #Get active genes from RNA
-ps = log2(as.data.frame (AverageExpression (srt_tam,
+ps = log2(as.data.frame (AverageExpression (srt,
 features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
 group.by = metaGroupName)[[1]]) +1)
-min_exp = 0.1
+min_exp = 0.5
 ps = ps[apply(ps, 1, function(x) all (x > min_exp)),]
 active_TFs = rownames(ps)[rowSums(ps) > 0]
 write.csv (active_TFs, 'active_TFs.csv')
@@ -325,6 +460,7 @@ rownames (mMat) = rowData (mSE)$name
 mMat = as.data.frame (t(as.matrix(scale(mMat[active_TFs,]))))
 cnmf_scatac = as.data.frame (archp@cellColData[,names (shared_cnmf)])
 cnmf_scatac = t(scale (t(cnmf_scatac)))
+
 
 #colnames (cnmfs) = sapply (colnames(cnmfs), function(x) unlist(strsplit(x, '\\.'))[2])
 cnmf_scatac_cor = lapply (sample_names, function(x) cor (cnmf_scatac[archp$Sample ==x ,], mMat[archp$Sample == x,], method = 'spearman'))
@@ -354,7 +490,7 @@ rownames (metacells_assay) = rownames (metacells)
 metacells_assay = t(metacells_assay[active_TFs,])
 #sample_names_rna = sample_names[sample_names %in% unique(metacells$sampleID)]
 #sample_names_rna = sample_names_rna[! sample_names_rna %in% remove_samples]
-cnmf_scrna_cor = lapply (sample_names, function(x) cor  (t(scale(t(metacells_assay[metacells$sampleID == x,]))), t(scale(t(cnmf_metacells[metacells$sampleID == x,]))), method = 'spearman'))
+cnmf_scrna_cor = lapply (sample_names_rna, function(x) cor  (t(scale(t(metacells_assay[metacells$sampleID == x,]))), t(scale(t(cnmf_metacells[metacells$sampleID == x,]))), method = 'spearman'))
 
 sample_array <- simplify2array(cnmf_scrna_cor)
 #any(lapply(corTF_array, function(x) any(is.na(x))))
@@ -382,9 +518,14 @@ hm2 = Heatmap (cnmf_scrna_cor,
   border=T,
   column_names_gp = gpar(fontsize = 8, fontface='italic'))
 
-pdf (paste0 ('Plots/active_TF_cnmf_cor_heatmap.pdf'), width = 4,height=13)
+pdf (paste0 ('Plots/active_TF_cnmf_cor_heatmap.pdf'), width = 4,height=6)
 hm1 + hm2
 hm2
+dev.off()
+
+hm3 = Heatmap (cor (cnmf_scrna_cor, t(cnmf_scatac_cor)), cluster_rows=F, cluster_columns=F, border=T)
+pdf (paste0 ('Plots/scrna_scatac_cor_cor_heatmap.pdf'), width = 5,height=4)
+hm3
 dev.off()
 
 
@@ -663,7 +804,7 @@ umap_p1
 dev.off()
 
 # Export bigiwg files ####
-metaGroupName = 'TREM2_state3'
+metaGroupName = 'cnmf_celltypes'
 exp_bigwig = TRUE
 if (exp_bigwig)
   {

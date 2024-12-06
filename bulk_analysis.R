@@ -31,12 +31,12 @@ lapply(packages, require, character.only = TRUE)
 
 set.seed(1234)
 
-source ('../git_repo/utils/ggplot_aestetics.R')
 # Set directory
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/'
 system (paste('mkdir -p',paste0(projdir,'Plots/')))
 setwd(projdir)
 
+source ('../git_repo/utils/ggplot_aestetics.R')
 bulk_palette = setNames (hue_pal()(4)[c(4,3,2,1)],c('Sarcomatoid','Biphasic-S','Biphasic-E','Epithelioid'))
 bulk_palette = setNames (as.character(paletteer::paletteer_d("rockthemes::heep")), c('Epithelioid', 'Biphasic-E', 'Biphasic-S', 'Sarcomatoid'))
 bueno_palette = setNames (paletteer::paletteer_d("rcartocolor::ArmyRose")[c(1,2,5,7)], c('Sarcomatoid','Biphasic-S','Biphasic-E','Epithelioid'))
@@ -154,6 +154,7 @@ meso_bulk_meta_l = list (
   tcga = tcga_meta,
   mesomics = msm_meta2)
 
+# Harmonize metadata ####
 meso_bulk_meta_l[['tcga']]$TUMOR_TYPE[meso_bulk_meta_l[['tcga']]$TUMOR_TYPE == 'Biphasic Mesothelioma'] = 'Biphasic'
 meso_bulk_meta_l[['tcga']]$TUMOR_TYPE[meso_bulk_meta_l[['tcga']]$TUMOR_TYPE == 'Epithelioid Mesothelioma'] = 'Epithelioid'
 meso_bulk_meta_l[['tcga']]$TUMOR_TYPE[meso_bulk_meta_l[['tcga']]$TUMOR_TYPE == 'Sarcomatoid Mesothelioma'] = 'Sarcomatoid'
@@ -185,7 +186,7 @@ meso_bulk_meta_l[['bueno']]$status = ifelse (meso_bulk_meta_l[['bueno']]$status 
 nfeat = 5000
 k_selection = 25
 cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds')))
-sarc_score = head (cnmf_spectra_unique[[20]],20)
+sarc_score = head (cnmf_spectra_unique[['cNMF20']],20)
 
 meso_bulk_meta_l = lapply (names(meso_bulk_meta_l), function(x) {
   tmp = colMeans(na.omit(meso_bulk_l[[x]][rownames(meso_bulk_l[[x]]) %in% sarc_score,]))
@@ -215,7 +216,8 @@ module_l = c(TXNL4A = 'TXNL4A')
 module_l = list(HOXB13 = 'HOXB13', HOXC13 = 'HOXC13',sarc='AXL')
 module_l = sarc_score
 module_l = list(SOX9 = 'SOX9',SOX6 = 'SOX6')
-# Run genes on bulk datasets
+
+# Run genes on bulk datasets ####
 stat_testL2 = list()
 for (mod_name in names(module_l))
   {
@@ -358,7 +360,7 @@ dev.off()
 studies = c ('bueno','tcga','mesomics')
 by_histology=F
 filter_low_exp = 0
-your.gene1 = 'RUNX2'
+your.gene1 = 'SOX9'
 your.gene2 = 'SOX6'
 sp_l = list()
 for (study in studies)

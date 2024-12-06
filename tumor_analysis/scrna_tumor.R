@@ -19,10 +19,10 @@ set.seed(1234)
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/'
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
-source (file.path'..','..','git_repo','utils','useful_functions.R'))
-source (file.path'..','..','git_repo','utils','palettes.R'))
-source (file.path'..','..','git_repo','utils','ggplot_aestetics.R'))
-source (file.path'..','..','git_repo','utils','palettes.R'))
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
 
 sample_names = c(
     'P1', # p786
@@ -92,10 +92,12 @@ if (!file.exists ('srt.rds'))
 	saveRDS (srt, 'srt.rds')
 	
 	srt$sampleID3 = srt$sampleID
-	srt$sampleID3[srt$seurat_clusters == '14'] = 'P11_HOX-'
+	srt$sampleID3[srt$seurat_clusters == '9'] = 'P11_HOX'
 
-	pdf ('Plots/umap_samples.pdf', width=12)
-	wrap_plots (DimPlot (srt, group.by = 'sampleID'), DimPlot (srt, group.by = 'seurat_clusters', label=T))
+	pdf (file.path('Plots','umap_samples.pdf'), width=12)
+	wrap_plots (DimPlot (srt, group.by = 'sampleID3'), DimPlot (srt, group.by = 'seurat_clusters', label=T))
+	reductionName='umap'
+	fp (srt, 'HOXB13')
 	dev.off()
 	} else {
 	srt = readRDS ('srt.rds')	
@@ -329,7 +331,7 @@ if (!file.exists ('metacells.rds') | force)
 	  group.by = c("sampleID3"), # specify the columns in seurat_obj@meta.data to group by
 	  reduction = 'umap', # select the dimensionality reduction to perform KNN on
 	  k = 50, # nearest-neighbors parameter
-	  max_shared = 25, # maximum number of shared cells between two metacells
+	  max_shared = 30, # maximum number of shared cells between two metacells
 	  ident.group = 'sampleID3' # set the Idents of the metacell seurat object
 	)
 	
@@ -378,7 +380,7 @@ gmt_annotations = c(
 #'c5.bp.v7.1.symbol.gmt'
 )
 
-sams = unique(metacells$sampleID)[!unique(metacells$sampleID) %in% c('HU37','HU62')]
+sams = unique(metacells$sampleID3)[!unique(metacells$sampleID3) %in% c('HU37','HU62','P11_HOX')] # remove normal samples and outliers 
 gmt_annotation = gmt_annotations[1]
 force = T
 top_genes= 100
@@ -387,7 +389,7 @@ if (!file.exists(paste0('EnrichR_activeTF_cor_top_genes_ann_',gmt_annotation,'_t
 	TF_cor_sample = list()
 	for (sam in sams)
 	  {
-	  metacells_assay_sample = as.matrix(metacells_assay[,metacells$sampleID == sam])
+	  metacells_assay_sample = as.matrix(metacells_assay[,metacells$sampleID3 == sam])
 	  TF_cor_sample[[sam]] = lapply (selected_TF, function(x) 
 	  	{
 	  	tc_cor = t(cor (metacells_assay_sample[x,], t(metacells_assay_sample)))
@@ -435,7 +437,7 @@ colnames (TF_cor_sum) = selected_TF
 TF_cor_sum[is.na(TF_cor_sum)] = 0
 #TF_cor_sum[TF_cor_sum < 3] = 0
 TF_cor_sum = TF_cor_sum[rowSums (TF_cor_sum) > 0, ]
-TF_cor_sum = TF_cor_sum[,colSums (TF_cor_sum) > 0 ]
+#TF_cor_sum = TF_cor_sum[,colSums (TF_cor_sum) > 0 ]
 
 # Export enrichment table ####
 saveRDS (TF_cor_sum, 'enrichment_pathways_TFs.rds')

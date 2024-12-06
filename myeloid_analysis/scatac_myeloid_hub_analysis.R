@@ -1,13 +1,13 @@
 # Load functions for hub detection ####
-source (file.path('..','git_repo','utils','knnGen.R'))
-source (file.path('..','git_repo','utils','addCoax.R'))
-source (file.path('..','git_repo','utils','Hubs_finder.R'))
-source (file.path('..','git_repo','utils','hubs_track.R'))
+source (file.path('..','..','git_repo','utils','knnGen.R'))
+source (file.path('..','..','git_repo','utils','addCoax.R'))
+source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 
 
 # Export bigiwg files ####
-metaGroupName = 'celltype'
+metaGroupName = 'celltype2'
 exp_bigwig = T
 if (exp_bigwig)
   {
@@ -46,10 +46,10 @@ dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 
 
 # Generate cluster-aware knn groups ####
-k= 30
+k= 100
 metaGroupName = 'Clusters_H'
 
-force = T
+force = F
 if (!file.exists(file.path (hubs_dir, paste0 ('KNNs_',metaGroupName,'k_',k,'.rds'))) | force)
   {
   KNNs = knnGen (
@@ -96,7 +96,7 @@ if (run_coax)
   }
 
 ### Run hub finder ####
-force=TRUE
+force=FALSE
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (
@@ -122,7 +122,7 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
 
 
 # Generate matrix of fragment counts of hubs x metagroup ####
-metaGroupName = 'Clusters_H'
+metaGroupName = 'cnmf_celltypes'
 if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
@@ -151,9 +151,11 @@ hm = Heatmap (
   scale (t(hubsSample_mat)), 
 #  top_annotation = ha, 
   column_names_gp = gpar(fontsize = 0),
-  show_column_dend = F,
+  #column_km = 2,
   #row_dend_width = unit(5,'mm'),
   row_dend_side = 'left',
+  clustering_distance_columns = 'pearson',
+  clustering_distance_rows = 'pearson',
   col = rev(palette_hubs_accessibility),
   border=T,
   name = 'Hubs')
@@ -166,7 +168,8 @@ dev.off()
 
 
 # Generate matrix of fragment counts of hubs x barcodes ####
-if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))))
+force=FALSE
+if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds')))| force)
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
     ArchRProj = archp))    
@@ -193,7 +196,7 @@ hubsCell_mat = as.data.frame (hubsCell_mat)
 
 # Compute differential hub accessibility DHA ####
 library (presto)
-metaGroupName = 'celltype3'
+metaGroupName = 'cnmf_celltypes'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 res = wilcoxauc (log2(hubsCell_mat+1), as.character (archp@cellColData[,metaGroupName]))
 
@@ -203,7 +206,7 @@ res_l = lapply (split (res, res$group), function(x){
   tmp
 })
 
-head (res_l[['Tregs']],100)
+head (res_l[['TREM2']],20)
 
 ## Hubs to show in IGV ####
 HUB84 HUB499 HUB1324 HUB575 HUB178 HUB733 HUB429 HUB369 HUB242 HUB602
@@ -211,7 +214,7 @@ HUB84 HUB499 HUB1324 HUB575 HUB178 HUB733 HUB429 HUB369 HUB242 HUB602
 
 
 ### Call peaks on celltypes ####
-metaGroupName = 'celltype3'
+metaGroupName = 'cnmf_cluster'
 archp = addGroupCoverages (
   ArchRProj = archp, 
   groupBy = metaGroupName,  
@@ -226,7 +229,7 @@ archp = addReproduciblePeakSet (
     archp,
     groupBy= metaGroupName,
     peakMethod = 'Macs2',
-    reproducibility = "1",
+    reproducibility = "2",
     maxPeaks = 500000, 
     minCells=20,
     force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower

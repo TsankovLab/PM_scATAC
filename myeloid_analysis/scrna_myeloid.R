@@ -278,6 +278,14 @@ srt = ModScoreCor (
     pos_threshold = NULL, # threshold for fetal_pval2
     listName = 'shared_cnmf', outdir = NULL)
 
+# Plot cnmfs 
+reductionName = 'umap'
+pdf (file.path ('Plots','cnmf_featplots.pdf'),10,10)
+wrap_plots (fp (srt, names (shared_cnmf_genes)))
+wrap_plots (fp (srt, c('TREM2','SPP1','C3','VCAN','NFKB1')))
+dev.off()
+
+
 
 # # Try with PCA ####
 # cnmfs = data.frame (srt@meta.data[,names (shared_cnmf_genes)])

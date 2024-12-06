@@ -208,6 +208,7 @@ if (exp_bigwig)
 ### Run peak calling ####
 metaGroupName = "Clusters_H"
 force=FALSE
+peak_reproducibility=2
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source ('../../PM_scATAC/callPeaks.R')
   
 
@@ -296,9 +297,9 @@ dev.off()
 
 
 # TNK markers ####
-meso_markers = c('CD8A','CTLA4','PDCD1','HAVCR2','TIGIT','TOX','GZMB','IL7R')
+meso_markers = c('CD8A','CTLA4','PDCD1','HAVCR2','TIGIT','TOX','GZMB','IL7R','KLRC1','GNLY')
 archp = addImputeWeights (archp)
-
+qc_param = c('nFrags','TSSEnrichment','ReadsInTSS')
 pdf()
 p <- plotEmbedding(
     ArchRProj = archp,
@@ -308,13 +309,25 @@ p <- plotEmbedding(
     pal = palette_expression,
     imputeWeights = getImputeWeights(archp)
 )
+p2 <- plotEmbedding(
+    ArchRProj = archp,
+    colorBy = "cellColData", 
+    name = qc_param, 
+    embedding = "UMAP_H",
+#    pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+umap_p3 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Sample",
+   embedding = "UMAP_H")
 dev.off()
 
 #archp$celltype[archp$Clusters == 'C30'] = 'Fibroblasts_WT1'
 #p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
 
-pdf (file.path('Plots','CD8_markers_fplots_only_normal.pdf'), width = 15, height = 8)
-wrap_plots(p, ncol=4)
+pdf (file.path('Plots','CD8_markers_fplots_only_normal.pdf'), width = 18, height = 12)
+wrap_plots (p, ncol=4)
+wrap_plots (c(p2,list(umap_p3)), ncol=4)
 dev.off()
 
 

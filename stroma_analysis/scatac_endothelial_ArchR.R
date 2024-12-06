@@ -148,7 +148,7 @@ if (exp_bigwig)
 ### Call peaks on celltypes ####
 metaGroupName = 'Clusters_H'
 force=TRUE
-
+peak_reproducibility=2
 pdf() # This is necessary cause cairo throws error and stops the script
 if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) 
 source (file.path('..','..','git_repo','utils','callPeaks.R'))

@@ -10,8 +10,8 @@ addArchRThreads(threads = 8)
 addArchRGenome("hg38")
 
 # Export bigiwg files ####
-metaGroupName = 'Sample2'
 metaGroupName = 'SampleP11'
+metaGroupName = 'Sample3'
 exp_bigwig = FALSE
 if (exp_bigwig)
   {

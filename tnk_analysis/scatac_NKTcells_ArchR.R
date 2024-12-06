@@ -74,7 +74,7 @@ dev.off()
 
 # TNK markers ####
 tnk_markers = c('CD3D','CD8A','PDCD1','HAVCR2','CD4', 'FOXP3','GNLY',
-  'FGFBP2','KLRC1')
+  'FGFBP2','KLRC1','XCL1')
 archp = addImputeWeights (archp)
 pdf()
 p <- plotEmbedding(
@@ -102,6 +102,36 @@ archp$celltype2[archp$Clusters_H %in% c('C16')] = 'Tregs'
 archp$celltype2[archp$Clusters_H %in% c('C14','C20','C11','C17','C12','C13')] = 'CD4'
 archp$celltype2[archp$Clusters_H %in% c('C1','C5','C6','C18','C15','C19','C10')] = 'CD8'
 archp$celltype2[archp$Clusters_H %in% c('C3','C2','C4')] = 'CD8_exhausted'
+
+# Check QC in P10 to assess if CD8 exhausted KLRC1+ are doublets
+qc_param = c('TSSEnrichment','nFrags','ReadsInTSS')
+archp$celltype2_smaple = paste0(archp$celltype2, '_',archp$Sample)
+pdf()
+p3 <- lapply (unique(archp$Sample), function (x) plotGroups(
+    ArchRProj = archp[archp$Sample == x], 
+    groupBy = "celltype2_smaple", 
+    colorBy = "cellColData", 
+    name = qc_param,
+    plotAs = "violin",
+    pal = palette_sample,
+    alpha = 0.4,
+    addBoxPlot = TRUE
+   ))
+dev.off()
+pdf (file.path ('Plots','qc_celltype_samples.pdf'), height=4, width=10)
+lapply (p3, function (x) wrap_plots (x, ncol=3))
+dev.off()
+
+cp = cellComp (as.data.frame (archp@cellColData[,c('Sample','celltype_revised2')]),
+   metaGroups = c('Sample','celltype_revised2'),
+   subset = 'CD8_exhausted',
+   prop=FALSE,
+   plot_as = 'bar',
+   pal = palette_tnk_cells
+   ) + gtheme
+pdf (file.path ('Plots','cell_composition_P23_exluded.pdf'))
+cp
+dev.off()
 
 
 # # Subset CD8 cells ####
@@ -162,6 +192,7 @@ dev.off()
 ### Call peaks on celltypes ####
 metaGroupName = 'celltype2'
 force=TRUE
+peak_reproducibility=2
 if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds'))) | force) 
 source (file.path('..','..','git_repo','utils','callPeaks.R'))
 
@@ -959,7 +990,7 @@ peak_windows = slidingWindows (x = ext_hg38_sub, width = 50, step = 25)
 
 
 metaGroupName = 'celltype2'
-force = TRUE
+force = FALSE
 ext_l = list()
 
 pb =progress::progress_bar$new(total = length (unique (as.character(archp@cellColData[,metaGroupName]))))
@@ -997,7 +1028,7 @@ ylim (c(0, max(ext_den))) +
 gtheme_no_rot)
 #facet_wrap (~celltype, ncol=length(unique(ext_den$celltype)))
 
-pdf (file.path ('Plots',paste0('density_coverage_',metaGroupName,'.pdf')), height=4,width=12)
+pdf (file.path ('Plots',paste0('density_coverage_',metaGroupName,'2.pdf')), height=4,width=12)
 wrap_plots (den, ncol= length(unique(names (ext_l))))
 dev.off()
 
@@ -1011,7 +1042,7 @@ rownames(ext_df) = as.character(ext_hg38_sub)
 #ext_df = as.data.frame(apply(ext_df, 2, function(x) sort(x, decreasing = TRUE)))
 #palette_fragments = paletteer::paletteer_c("ggthemes::Classic Area-Brown",n=40)
 ha = HeatmapAnnotation (bar1 = anno_barplot(colSums(ext_df),gp = gpar(fill = "azure4",border =NA,lty='blank'),border =FALSE, baseline=200,lty='blank'))
-pdf (file.path ('Plots','ext_peakset_riegel.pdf'), height=4,width=6)
+pdf (file.path ('Plots','ext_peakset_riegel2.pdf'), height=4,width=6)
 Heatmap (ext_df,
   top_annotation = ha,
 #  column_split = , 
@@ -1020,6 +1051,8 @@ Heatmap (ext_df,
   column_title_gp = gpar(
 fontsize = 8),
   column_names_gp = gpar(
+fontsize = 0),
+  row_names_gp = gpar(
 fontsize = 0),
   col = palette_fragments, 
   cluster_columns=F,
@@ -1047,7 +1080,8 @@ gene_regions_extended = GRangesList (lapply (seq_along(gene_regions), function(x
 gene_regions_peaks = lapply (seq_along(gene_regions), function(x) queryHits (findOverlaps(getPeakSet(archp), gene_regions_extended[x])))
 gene_regions_peaks = lapply (gene_regions_peaks, function(x) getPeakSet(archp)[x])
 
-if (!file.exists ('pMats.rds'))
+force = FALSE
+if (!file.exists ('pMats.rds') | force)
   {
   pMats = lapply (gene_regions_peaks, function(x) getGroupSE(
     ArchRProj = archp,
@@ -1107,11 +1141,12 @@ vp = lapply (names(peak_gene_cor), function(x)
     ggplot (peak_gene_cor[[x]], aes(x=distance, y= cor)) +
     geom_bar (stat = 'identity') +
     geom_point (aes (size = max), shape=21, color='black',alpha=.5, fill = 'burlywood') +
+    xlim(c(-extend_region,extend_region)) + 
     ggtitle (x) + 
     geom_text_repel (size=2.4, color='red', aes(label = name), segment.size=.2) + gtheme_no_rot
     })
 
-pdf (file.path ('Plots','enhancers_distance_ext_TF.pdf'),width=7,height=3)
+pdf (file.path ('Plots','enhancers_distance_ext_TF2.pdf'),width=7,height=3)
 vp
 dev.off()
 

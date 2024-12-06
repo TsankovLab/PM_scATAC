@@ -742,7 +742,7 @@ plotBrowserTrack2 <- function(
 
     #Add Labels if There are Genes with this orientation!
     if(length(which(genesO$strand!="-")) > 0){
-      p <- p + ggrepel::geom_label_repel(data=genesO[which(genesO$strand!="-"),], 
+      p <- p + ggrepel::geom_text_repel(data=genesO[which(genesO$strand!="-"),], 
         aes(x = start, y = cluster, label = symbol, color = strand),fill = 'white', 
           segment.color = "grey", nudge_x = -0.01*(end(region) - start(region)), nudge_y = -0.25, 
           size = labelSize, direction = "x")
@@ -750,7 +750,7 @@ plotBrowserTrack2 <- function(
 
     #Add Labels if There are Genes with this orientation!
     if(length(which(genesO$strand=="-")) > 0){
-      p <- p + ggrepel::geom_label_repel(data=genesO[which(genesO$strand=="-"),], 
+      p <- p + ggrepel::geom_text_repel(data=genesO[which(genesO$strand=="-"),], 
         aes(x = end, y = cluster, label = symbol, color = strand),,fill = 'white', 
           segment.color = "grey", nudge_x = +0.01*(end(region) - start(region)), nudge_y = 0.25, 
           size = labelSize, direction = "x")
@@ -958,11 +958,11 @@ plotBrowserTrack2 <- function(
 
       loopO$facet <- title
       if(is.null(pal)){
-        pal <- colorRampPalette(c("#E6E7E8","#3A97FF","#8816A7","black"))(100)
+        pal <- colorRampPalette(c("white","black"))(100)
       }
 
       p <- ggplot(data = data.frame(loopO), aes(x = x, y = y, group = id, color = value)) + 
-        geom_line() +
+        geom_line(size=0.1) +
         facet_grid(name ~ .) +
         ylab("") + 
         coord_cartesian(ylim = c(-100,0)) +
@@ -1089,7 +1089,7 @@ hubsTracks <- function(
 
       hubsO$facet <- title
       if(is.null(pal)){
-        pal <- colorRampPalette(c("grey88","black"))(100)
+        pal <- colorRampPalette(c("white","black"))(100)
       }
 
       p <- ggplot(data = data.frame(hubsO), aes(x = x, y = y, group = id, color = value)) + 

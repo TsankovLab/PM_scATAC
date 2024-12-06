@@ -14,7 +14,7 @@ archp = addReproduciblePeakSet (
     archp,
     groupBy= metaGroupName,
     peakMethod = 'Macs2',
-    reproducibility = "2",
+    reproducibility = peak_reproducibility,
     maxPeaks = 500000, 
     minCells=20,
     force =TRUE) # I think this should be set corresponding to the smallest cluster in the group or lower
