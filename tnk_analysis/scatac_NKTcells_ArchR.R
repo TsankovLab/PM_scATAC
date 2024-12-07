@@ -44,7 +44,7 @@ if (trim_clusters)
     groupBy ='Sample', force=TRUE
 )
 
-archp = addUMAP (ArchRProj = archp, 
+archp = addUMAP (ArchRProj = archp,
     reducedDims = "Harmony_project", name='UMAP_H',
     force = TRUE)
 
@@ -72,9 +72,14 @@ dev.off()
   print (umap_p5)
   dev.off()
 
+# Run genescore DAG ####
+metaGroupName = "Clusters_H"
+force = TRUE
+if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
+
 # TNK markers ####
 tnk_markers = c('CD3D','CD8A','PDCD1','HAVCR2','CD4', 'FOXP3','GNLY',
-  'FGFBP2','KLRC1','XCL1')
+  'FGFBP2','KLRC1','XCL1','ICOS')
 archp = addImputeWeights (archp)
 pdf()
 p <- plotEmbedding(
@@ -102,6 +107,90 @@ archp$celltype2[archp$Clusters_H %in% c('C16')] = 'Tregs'
 archp$celltype2[archp$Clusters_H %in% c('C14','C20','C11','C17','C12','C13')] = 'CD4'
 archp$celltype2[archp$Clusters_H %in% c('C1','C5','C6','C18','C15','C19','C10')] = 'CD8'
 archp$celltype2[archp$Clusters_H %in% c('C3','C2','C4')] = 'CD8_exhausted'
+
+
+
+
+
+# TNK markers ####
+meso_markers = c('CD8A','CTLA4','PDCD1','HAVCR2','TIGIT','TOX','GZMB','IL7R','KLRC1','GNLY','ICOS')
+#archp = addImputeWeights (archp)
+qc_param = c('nFrags','TSSEnrichment','ReadsInTSS')
+
+sams = unique(archp$Sample)
+sams = c('P10','P13','P14','P23')
+for (sam in sams)
+{
+archp_sam = archp[archp$Sample == sam]  
+varfeat = 25000
+  LSI_method = 2
+  archp_sam = addIterativeLSI (ArchRProj = archp_sam,
+    useMatrix = "TileMatrix", name = "IterativeLSI",
+    force = TRUE, LSIMethod = LSI_method,
+    varFeatures = varfeat)
+
+archp_sam = addUMAP (ArchRProj = archp_sam, 
+    reducedDims = "IterativeLSI", name='UMAP',
+    force = TRUE)
+
+archp_sam = addClusters (input = archp_sam,
+    reducedDims = "IterativeLSI",
+    name='Clusters_H',
+    force = TRUE)
+
+pdf()
+umap_p3 = plotEmbedding (ArchRProj = archp_sam, 
+  colorBy = "cellColData", name = "Sample",
+   embedding = "UMAP")
+umap_p4 = plotEmbedding (ArchRProj = archp_sam, 
+  colorBy = "cellColData", name = "celltype2",
+   embedding = "UMAP")
+umap_p5 = plotEmbedding (ArchRProj = archp_sam, 
+  colorBy = "cellColData", name = "Clusters_H",
+   embedding = "UMAP")
+dev.off()
+
+pdf (file.path('Plots',paste0(sam,'_celltype_harmony_sample_umap.pdf')),5,5)
+print (umap_p3)
+print (umap_p4)
+print (umap_p5)
+dev.off()  
+
+archp_sam = addImputeWeights (archp_sam)
+
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp_sam,
+    colorBy = "GeneScoreMatrix", 
+    name = meso_markers,
+    embedding = "UMAP",
+    pal = palette_expression,
+    imputeWeights = getImputeWeights (archp_sam)
+)
+dev.off()
+
+pdf (file.path('Plots',paste0('TNK_',sam,'.pdf')), width = 18, height = 12)
+print(wrap_plots (p, ncol=4))
+dev.off()
+}
+
+pdf()
+p3 <- plotGroups(
+    ArchRProj = archp, 
+    groupBy = "Clusters_H", 
+    colorBy = "GeneScoreMatrix", 
+    name = c('ICOS','PDCD1','HAVCR2','KLRC1','LAG3','TIGIT'),
+    plotAs = "violin",
+    #pal = palette_sample,
+    alpha = 0.4,
+    addBoxPlot = TRUE
+   )
+dev.off()
+
+pdf (file.path ('Plots','ext_genescore_clusters.pdf'), height=8, width=10)
+wrap_plots (p3, ncol=3)
+dev.off()
+
 
 # Check QC in P10 to assess if CD8 exhausted KLRC1+ are doublets
 qc_param = c('TSSEnrichment','nFrags','ReadsInTSS')
@@ -311,24 +400,31 @@ min_exp = 0.1
 ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
 active_TFs = rownames(ps)[rowSums(ps) > 0]
 #positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0]
-metaGroupName = 'celltype2'
+#metaGroupName = 'celltype2'
 mMat = mMat[active_TFs,]
-mMat = as.data.frame (t(mMat))
-mMat$metaGroup = as.character (archp@cellColData[,metaGroupName])
-mMat = aggregate (.~ metaGroup, mMat, mean)
-rownames (mMat) = mMat[,1]
-mMat = mMat[,-1]
+#mMat = as.data.frame (t(mMat))
+#mMat$metaGroup = as.character (archp@cellColData[,metaGroupName])
+#mMat = aggregate (.~ metaGroup, mMat, mean)
+#rownames (mMat) = mMat[,1]
+#mMat = mMat[,-1]
+km = kmeans (t(scale(mMat)), centers=3)
 
-TF_hm = draw (Heatmap (scale(mMat), 
+ha = HeatmapAnnotation (df = data.frame (
+  celltype = as.character(archp@cellColData[,metaGroupName]),
+  sample = archp$Sample), col=list (celltype = palette_tnk_cells, sample=palette_sample))
+
+TF_hm = Heatmap (scale(mMat), 
+          top_annotation= ha,
           #row_labels = colnames (mMat_mg),
           #column_title = paste('top',top_genes),
           clustering_distance_columns = 'pearson',
           clustering_distance_rows = 'pearson',
+          column_split = km$cluster,
           cluster_rows = T,
-          column_km = 20,
+#          column_km = 3,
           #col = pals_heatmap[[5]],
           cluster_columns=T,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+          row_names_gp = gpar(fontsize = 0, fontface = 'italic'),
           column_names_gp = gpar(fontsize = 0),
           column_names_rot = 45,
           name = 'chromVAR',
@@ -337,26 +433,146 @@ TF_hm = draw (Heatmap (scale(mMat),
           col = palette_deviation_centered#,
           #width = unit(2, "cm")
           #right_annotation = motif_ha
-          ))
+          )
 
-pdf (file.path ('Plots',paste0('TF_',metaGroupName,'heatmap.pdf')), width=8, height=1.6)
+pdf (file.path ('Plots',paste0('TF_',metaGroupName,'heatmap.pdf')), width=12, height=5)
 TF_hm
 dev.off()
 
-colnames(TF_hm@ht_list$chromVAR@matrix)[unlist(column_order(TF_hm)[c('2','3','4','5')])]
-which (colnames(mMat) == 'NR4A2')
-sapply (column_order(TF_hm), function(x) 497 %in% x)
-
-# Distance matrix ####
-d <- as.dist(1 - cor(t(mMat), method='pearson'))
-
-# Hierarchical clustering ####
-hc <- hclust(d)
-
-# Dendrogram ####
-pdf (file.path ('Plots',paste0('TF_',metaGroupName,'_no_km_dendrogram.pdf')), width=3, height=3.6)
-plot(hc)
+archp$cell_kmeans = paste0('km',km$cluster)
+pdf()
+umap_p5 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "cell_kmeans",
+   embedding = "UMAP_H")
 dev.off()
+
+pdf (file.path('Plots','celltype_kmeans_umap.pdf'),5,5)
+print (umap_p5)
+dev.off()
+
+
+
+
+
+### Run TF correlation to identify TF modules across cancers #### 
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = as.matrix(mMat)#[selected_TF,])
+
+# Filter by RNA expression ####
+metaGroupName = 'celltype2'
+active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
+mMat = mMat[active_TFs, ]
+
+mMat_cor = cor (as.matrix(t(scale(mMat))), method = 'spearman')
+
+set.seed(1234)
+centers=3
+km = kmeans (mMat_cor, centers=centers)
+
+pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
+cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
+  #left_annotation = ha,
+  #rect_gp = gpar(type = "none"),
+  clustering_distance_rows='euclidean' ,
+  clustering_distance_columns = 'euclidean', 
+  col=palette_deviation_cor_fun, 
+  row_split = km$cluster,
+  column_split = km$cluster,
+  #row_km=2, 
+  #column_km=2,
+#  right_annotation = ha,
+  border=T,
+#   ,
+  row_names_gp = gpar(fontsize = 0), 
+  column_names_gp = gpar(fontsize = 0)
+# cell_fun = function(j, i, x, y, w, h, fill) {# THIS DOESNT WORK NEED TO USE LAYER_FUN
+#         if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+#             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#         }}
+  ))
+  # ,
+  # cell_fun = function(j, i, x, y, w, h, fill) {
+  #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+  #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#        }}))
+dev.off()
+
+pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
+cor_mMat_hm
+dev.off()
+
+tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+names (tf_modules) = paste0('mod_',unique(km$cluster))
+tf_modules = do.call (cbind, tf_modules)
+archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
+archp@cellColData = cbind (archp@cellColData, tf_modules) 
+
+pdf()
+TF_p = plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "cellColData",
+    name = paste0('mod_',unique(km$cluster)), 
+    pal = rev(palette_deviation),
+    #useSeqnames='z',
+    embedding = "UMAP_H")
+dev.off()
+pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 20,height=6)
+wrap_plots (TF_p, ncol=5)
+dev.off()
+
+
+# ridge plots of TF modules ####
+library (ggridges)
+library (ggplot2)
+library (viridis)
+#library(hrbrthemes)
+tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+names (tf_modules) = paste0('mod_',unique(km$cluster))
+tf_modules = as.data.frame (do.call (cbind, tf_modules))
+all (rownames(tf_modules) == rownames(archp@cellColData))
+tf_modules$celltype2 = archp$celltype2
+tf_modules = gather (tf_modules, module, expression,1:centers)
+tf_modules$module = factor (tf_modules$module, levels = paste0('mod_',names (row_order (cor_mMat_hm))))
+
+# Plot
+# rp = lapply (paste0('mod_',unique(km$cluster)), function(x) 
+#   ggplot(tf_modules,  aes_string(x='Sample', y=x, fill='..x..')) +
+
+#   geom_vridgeline(stat="ydensity", trim=FALSE, alpha = 0.85, scale = 2, width=.10) +
+#   palette_deviation_ggplot_fill +
+#     theme_classic())
+# pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 20,height=3)
+# wrap_plots (rp, ncol=5)
+# dev.off()
+
+dp = ggplot (tf_modules) +
+  geom_density(aes(x=expression,fill=celltype2),color='white',
+                      alpha = 0.6) +
+  # geom_vline(aes(xintercept = mean, group = tf_modules, linetype = Sample),
+  #            data = combined_sla_means) +
+  facet_wrap (~module, nrow = 5, scales = 'free',strip.position = "left") +
+  scale_fill_manual (values = palette_tnk_cells) +
+  gtheme_no_rot
+
+pdf (file.path ('Plots','TF_modules_ridge_plots2.pdf'), width = 7,height=5)
+dp
+dev.off()
+# colnames(TF_hm@ht_list$chromVAR@matrix)[unlist(column_order(TF_hm)[c('2','3','4','5')])]
+# which (colnames(mMat) == 'NR4A2')
+# sapply (column_order(TF_hm), function(x) 497 %in% x)
+
+# # Distance matrix ####
+# d <- as.dist(1 - cor(t(mMat), method='pearson'))
+
+# # Hierarchical clustering ####
+# hc <- hclust(d)
+
+# # Dendrogram ####
+# pdf (file.path ('Plots',paste0('TF_',metaGroupName,'_no_km_dendrogram.pdf')), width=3, height=3.6)
+# plot(hc)
+# dev.off()
   
 # # Generate RNA pseudobulk of matching cell types ####
 # metaGroupName = 'celltype2'

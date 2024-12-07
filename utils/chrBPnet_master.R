@@ -4,6 +4,7 @@
 # grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 # celltype='cnmf_cluster_6'
 # celltype = 'TREM2'
+# celltype = 'IM'
 # fold_numbers = c(0,1,2,3,4)
 message ('Submit job for chromBPnet training model')	
 

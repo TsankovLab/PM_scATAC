@@ -689,3 +689,49 @@ dev.off()
 
 
 
+### Check HOX genes and make heatmap 
+srt = readRDS (file.path ('..','main','scrna','srt.rds'))
+srt = srt[,srt$sampleID == 'P11']
+hoxb13_sig = read.csv ('../tumor_compartment/scatac_scrna_P11/HOXB13_cnmf.csv')
+hox_sig = head(hoxb13_sig[,2],Inf)
+
+pdf (file.path('Plots','HOX_signature_dotplot.pdf'), width=30)
+DotPlot (srt, feature = hox_sig) + gtheme
+dev.off()
+
+hox_sig_specific = c('HOXB13','CA8','SULT1E1','SYT1','GAS2','WDR72','CHST9','RPRM','LY6G6D','COL9A1','MPPED2','TEKT3','CLIC5','NKX2−5','S100A7','ASPG','BEX1','GABRA2','PKP2','TDRD10','GRM1','PLPPR3',
+  'PI3','ACTR3B','LY6H','TNNT2')
+
+exp_mat = log2(meso_bulk_l[[2]]+1)[rownames(meso_bulk_l[[2]]) %in% hox_sig_specific,]
+ha = HeatmapAnnotation(df = meso_bulk_meta_l[[2]][,c(
+  'subtype',
+  'CANCER_TYPE_DETAILED',
+  'AJCC_PATHOLOGIC_TUMOR_STAGE',
+  'AGE',
+  'ANEUPLOIDY_SCORE'
+  )])
+hm = Heatmap (t(scale(t(exp_mat))), top_annotation = ha)
+
+pdf (file.path('Plots','HOX_signature_tcga_heatmap.pdf'), width=15)
+hm
+dev.off()
+
+exp_mat = log2(meso_bulk_l[[1]]+1)[rownames(meso_bulk_l[[1]]) %in% hox_sig_specific,]
+ha = HeatmapAnnotation (df = meso_bulk_meta_l[[1]][,c('subtype','PD.L1.expression..RPKM.','Asbestos.exposure','NF2..FISH.','FISH.chrom3','Type.of.pre.op.Treatment','Fibers.gm.lung','Sex')])
+hm = Heatmap (t(scale(t(exp_mat))), top_annotation = ha)
+
+pdf (file.path('Plots','HOX_signature_bueno_heatmap.pdf'), width=15)
+hm
+dev.off()
+
+exp_mat = log2(meso_bulk_l[[3]]+1)[rownames(meso_bulk_l[[3]]) %in% hox_sig_specific,]
+ha = HeatmapAnnotation (df = meso_bulk_meta_l[[3]][,c('subtype','Subtype2','Cytological.Variant1','Stroma1','Chimio','Radioth','Immunoth','History.Location')])
+hm = Heatmap (t(scale(t(exp_mat))), top_annotation = ha)
+
+pdf (file.path('Plots','HOX_signature_mesomics_heatmap.pdf'), width=15)
+hm
+dev.off()
+
+
+
+

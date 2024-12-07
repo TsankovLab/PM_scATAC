@@ -297,7 +297,7 @@ dev.off()
 
 
 # TNK markers ####
-meso_markers = c('CD8A','CTLA4','PDCD1','HAVCR2','TIGIT','TOX','GZMB','IL7R','KLRC1','GNLY')
+meso_markers = c('CD8A','CTLA4','PDCD1','HAVCR2','TIGIT','TOX','GZMB','IL7R','KLRC1','GNLY','ICOS')
 archp = addImputeWeights (archp)
 qc_param = c('nFrags','TSSEnrichment','ReadsInTSS')
 pdf()
@@ -318,7 +318,7 @@ p2 <- plotEmbedding(
     imputeWeights = getImputeWeights(archp)
 )
 umap_p3 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "Sample",
+  colorBy = "cellColData", name = "Sample", pal = palette_sample
    embedding = "UMAP_H")
 dev.off()
 
@@ -332,3 +332,20 @@ dev.off()
 
 
 
+
+pdf()
+p3 <- plotGroups(
+    ArchRProj = archp, 
+    groupBy = "Clusters_H", 
+    colorBy = "GeneScoreMatrix", 
+    name = c('ICOS','PDCD1','HAVCR2','KLRC1','LAG3','TIGIT'),
+    plotAs = "violin",
+    #pal = palette_sample,
+    alpha = 0.4,
+    addBoxPlot = TRUE
+   )
+dev.off()
+
+pdf (file.path ('Plots','ext_genescore_clusters.pdf'), height=8, width=10)
+wrap_plots (p3, ncol=3)
+dev.off()

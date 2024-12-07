@@ -183,7 +183,7 @@ sample_sarc_order = factor (archp$Sample3, levels = average_by_group$Sample3)
 ### Run peak calling ####
 metaGroupName = "Clusters"
 force=TRUE
-peak_reproducibility=1
+peak_reproducibility='1'
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source (file.path('..','..','git_repo','utils','callPeaks.R'))
   
 

@@ -39,7 +39,8 @@
        })
   
 
-
+  if (metaGroupName %in% colnames(srt@meta.data))
+  {
   #Get active genes from RNA
   ps = log2(as.data.frame (AverageExpression (srt, 
   features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
@@ -49,7 +50,10 @@
   active_TFs = rownames(ps)[rowSums(ps) > 0]
 
   #active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > 0.1]
-  DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])
+  DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])    
+  } else {
+  DAM_list2 = DAM_list  
+  }
   names (DAM_list2) = names (DAM_list)
   FDR_threshold = 1e-3
   meandiff_threshold = 0
