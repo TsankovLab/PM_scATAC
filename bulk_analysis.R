@@ -700,7 +700,7 @@ DotPlot (srt, feature = hox_sig) + gtheme
 dev.off()
 
 hox_sig_specific = c('HOXB13','CA8','SULT1E1','SYT1','GAS2','WDR72','CHST9','RPRM','LY6G6D','COL9A1','MPPED2','TEKT3','CLIC5','NKX2−5','S100A7','ASPG','BEX1','GABRA2','PKP2','TDRD10','GRM1','PLPPR3',
-  'PI3','ACTR3B','LY6H','TNNT2')
+  'PI3','ACTR3B','LY6H','TNNT2','CXCL14')
 
 exp_mat = log2(meso_bulk_l[[2]]+1)[rownames(meso_bulk_l[[2]]) %in% hox_sig_specific,]
 ha = HeatmapAnnotation(df = meso_bulk_meta_l[[2]][,c(

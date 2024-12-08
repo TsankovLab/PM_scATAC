@@ -103,13 +103,13 @@
           name = 'chromVAR',
           #rect_gp = gpar(col = "white", lwd = .5),
           border=TRUE,
-          col = rev(palette_deviation)
+          col = palette_deviation_fun(scale(mMat_mg))
 
           #right_annotation = motif_ha
           )
 
   #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
-pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmaps.pdf')), width = 3, height = 5)
+pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmaps.pdf')), width = 6, height = 8)
 print(DAM_hm)
 dev.off()
 

@@ -95,6 +95,7 @@ palette_expression_cor_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,m
 palette_deviation_correlation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
 palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#49525EFF','#FFFCFCFF','#AE123AFF'))
 palette_deviation2 = paletteer::paletteer_c("pals::ocean.curl",100)
+palette_deviation_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c(palette_deviation[length(palette_deviation)],'white',palette_deviation[1])))}
 
 palette_genescore = as.character(paletteer::paletteer_d("khroma::vik"))
 palette_genescore_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c(palette_genescore[1],'white',palette_genescore[length(palette_genescore)])))}

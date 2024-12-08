@@ -45,7 +45,7 @@ dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 
 
 # Generate cluster-aware knn groups ####
-k= 30
+k= 50
 metaGroupName = 'Clusters_H'
 
 force = FALSE
@@ -85,7 +85,7 @@ dev.off()
 
 
 # Run Co-accessibility ####
-run_coax = FALSE
+run_coax = T
 if (run_coax)
   {
   archp = addCoAx (
@@ -95,7 +95,7 @@ if (run_coax)
   }
 
 ### Run hub finder ####
-force=F
+force=T
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (

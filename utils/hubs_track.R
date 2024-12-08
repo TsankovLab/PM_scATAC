@@ -958,11 +958,11 @@ plotBrowserTrack2 <- function(
 
       loopO$facet <- title
       if(is.null(pal)){
-        pal <- colorRampPalette(c("white","black"))(100)
+        pal <- colorRampPalette(c("white",'purple',"black"))(100)
       }
 
       p <- ggplot(data = data.frame(loopO), aes(x = x, y = y, group = id, color = value)) + 
-        geom_line(size=0.1) +
+        geom_line(size=.5) +
         facet_grid(name ~ .) +
         ylab("") + 
         coord_cartesian(ylim = c(-100,0)) +
@@ -1089,11 +1089,11 @@ hubsTracks <- function(
 
       hubsO$facet <- title
       if(is.null(pal)){
-        pal <- colorRampPalette(c("white","black"))(100)
+        pal <- colorRampPalette(c("white",'purple',"black"))(100)
       }
 
       p <- ggplot(data = data.frame(hubsO), aes(x = x, y = y, group = id, color = value)) + 
-        geom_line(size=0.2) +
+        geom_line(size=.5) +
         facet_grid(name ~ .) +
         ylab("") + 
         coord_cartesian(ylim = c(-100,0)) +

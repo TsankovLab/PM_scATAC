@@ -48,7 +48,7 @@ hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_
 dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 
 # Generate cluster-aware knn groups ####
-k= 30
+k= 50
 metaGroupName = 'Sample2'
 
 force = FALSE

@@ -298,29 +298,65 @@ dev.off()
 
 # TNK markers ####
 meso_markers = c('CD8A','CTLA4','PDCD1','HAVCR2','TIGIT','TOX','GZMB','IL7R','KLRC1','GNLY','ICOS')
-archp = addImputeWeights (archp)
+#archp = addImputeWeights (archp)
 qc_param = c('nFrags','TSSEnrichment','ReadsInTSS')
+
+sams = unique(archp$Sample)
+sams = c('P10','P13','P14','P23')
+for (sam in sams)
+{
+archp_sam = archp[archp$Sample == sam]  
+varfeat = 25000
+  LSI_method = 2
+  archp_sam = addIterativeLSI (ArchRProj = archp_sam,
+    useMatrix = "TileMatrix", name = "IterativeLSI",
+    force = TRUE, LSIMethod = LSI_method,
+    varFeatures = varfeat)
+
+archp_sam = addUMAP (ArchRProj = archp_sam, 
+    reducedDims = "IterativeLSI", name='UMAP',
+    force = TRUE)
+
+archp_sam = addClusters (input = archp_sam,
+    reducedDims = "IterativeLSI",
+    name='Clusters_H',
+    force = TRUE)
+
+pdf()
+umap_p3 = plotEmbedding (ArchRProj = archp_sam, 
+  colorBy = "cellColData", name = "Sample",
+   embedding = "UMAP")
+umap_p4 = plotEmbedding (ArchRProj = archp_sam, 
+  colorBy = "cellColData", name = "celltype2",
+   embedding = "UMAP")
+umap_p5 = plotEmbedding (ArchRProj = archp_sam, 
+  colorBy = "cellColData", name = "Clusters_H",
+   embedding = "UMAP")
+dev.off()
+
+pdf (file.path('Plots',paste0(sam,'_celltype_harmony_sample_umap.pdf')),5,5)
+print (umap_p3)
+print (umap_p4)
+print (umap_p5)
+dev.off()  
+
+archp_sam = addImputeWeights (archp_sam)
+
 pdf()
 p <- plotEmbedding(
-    ArchRProj = archp,
+    ArchRProj = archp_sam,
     colorBy = "GeneScoreMatrix", 
-    name = meso_markers, 
-    embedding = "UMAP_H",
+    name = meso_markers,
+    embedding = "UMAP",
     pal = palette_expression,
-    imputeWeights = getImputeWeights(archp)
+    imputeWeights = getImputeWeights (archp_sam)
 )
-p2 <- plotEmbedding(
-    ArchRProj = archp,
-    colorBy = "cellColData", 
-    name = qc_param, 
-    embedding = "UMAP_H",
-#    pal = palette_expression,
-    imputeWeights = getImputeWeights(archp)
-)
-umap_p3 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "Sample", pal = palette_sample
-   embedding = "UMAP_H")
 dev.off()
+
+pdf (file.path('Plots',paste0('CD8_',sam,'.pdf')), width = 18, height = 12)
+print(wrap_plots (p, ncol=4))
+dev.off()
+}
 
 #archp$celltype[archp$Clusters == 'C30'] = 'Fibroblasts_WT1'
 #p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
@@ -338,8 +374,9 @@ p3 <- plotGroups(
     ArchRProj = archp, 
     groupBy = "Clusters_H", 
     colorBy = "GeneScoreMatrix", 
-    name = c('ICOS','PDCD1','HAVCR2','KLRC1','LAG3','TIGIT'),
+    name = c('ICOS','PDCD1','HAVCR2','KLRC1','LAG3','TIGIT','GZMA','CD8A'),
     plotAs = "violin",
+    imputeWeights=NULL,
     #pal = palette_sample,
     alpha = 0.4,
     addBoxPlot = TRUE

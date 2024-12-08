@@ -584,3 +584,67 @@ top_pathways = 10
 top_genes = 5
 force = F
 source (file.path('..','..','git_repo','utils','DEG_standard.R'))
+
+
+
+
+
+
+
+
+### Correlate HOX genes with CNV in P11 HOX+ cluster ####
+p11cnv = readRDS (file.path('..','..','per_sample_QC_signac','CNV_analysis','CNV_LFC_GC_P11_ws_1e+07_ss_5e+06.rds'))
+p11cnv_mat = assays(p11cnv)$counts
+p11cnv_mat = scale (p11cnv_mat)
+
+if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
+# # Get deviation matrix ####
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+
+# Get active TFs ####
+selected_TF = read.csv ('Active_TFs.csv', row.names=1)
+p11mMat = mMat[, archp$Clusters == 'C14']
+#p11mMat = mMat[, archp$Sample2 == 'P11']
+colnames(p11mMat) = sapply (colnames(p11mMat), function(x) unlist(strsplit(x, '#'))[2])
+p11cnv_mat = p11cnv_mat[,colnames (p11mMat)]
+
+#p11mMat = p11mMat[grepl ('^', rownames(p11mMat)), ]
+
+# correlate
+p11mMat = t(p11mMat)
+p11cnv_mat = t(p11cnv_mat)
+
+cnv_hox_cor = cor (as.matrix(p11mMat), as.matrix(p11cnv_mat), method='spearman')
+
+hm = Heatmap  (cnv_hox_cor, cluster_columns = F, 
+  column_names_gp = gpar(fontsize = 4),
+  row_names_gp = gpar(fontsize = 4))
+pdf (file.path ('Plots','cnv_HOX_P11_cor_heatmap.pdf'), width=20, height=30)
+hm
+dev.off()
+
+min_cor = cnv_hox_cor['HOXB13',]
+min_cor = min_cor[order(min_cor)]
+
+pdf (file.path ('Plots','cnv_TF_cor.pdf'))
+plot (p11mMat[,'HOXB13'], p11cnv_mat[,names(min_cor)[1]])
+dev.off()
+cor (p11mMat[,'HOXB13'], p11cnv_mat[,names(min_cor)[1]], method = 'spearman')
+
+cnv_tf_cor = p11cnv_mat[,names(min_cor)[1]]
+names(cnv_tf_cor) = paste0('P11#',names(cnv_tf_cor))
+archp$p11_hox_cnv = cnv_tf_cor[match(rownames(archp@cellColData), names(cnv_tf_cor))]
+archp$p11_hox_cnv[is.na(archp$p11_hox_cnv)] = 0
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "cellColData", 
+    name = 'p11_hox_cnv', 
+    embedding = "UMAP",
+    pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+
+pdf (file.path('Plots','cnv_TF_cor_umap.pdf'))
+p
+dev.off()
