@@ -115,6 +115,8 @@ archp$celltype2[archp$Clusters_H %in% c('C14','C20','C11','C17','C12','C13')] = 
 archp$celltype2[archp$Clusters_H %in% c('C1','C5','C6','C18','C15','C19','C10')] = 'CD8'
 archp$celltype2[archp$Clusters_H %in% c('C3','C2','C4')] = 'CD8_exhausted'
 
+write.csv (data.frame (barcode = rownames(archp@cellColData), celltype = archp$celltype2), 'barcode_annotation.csv')
+
 
 
 
@@ -1297,14 +1299,14 @@ TF = 'NR4A2'
 pdf()
 meso_markers <- plotBrowserTrack2 (
     ArchRProj = archp, 
-    sizes = c(6, 1, 1, 1,1),
+    sizes = c(6, 1, 1, 1,1,1),
     groupBy = metaGroupName, 
     geneSymbol = TF,
     normMethod = "ReadsInTSS",
     scCellsMax=3000,
     plotSummary = c("bulkTrack", "featureTrack", 
-        "loopTrack", 
-      "geneTrack", "hubTrack"),
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
     upstream = 50000,
@@ -1370,24 +1372,25 @@ head (deg_res,10)
 
 
 metaGroupName = 'celltype3'
-TF = 'ICOS'
+TF = c('CTLA4','PDCD1','ICOS','HAVCR2')
 pdf()
 meso_markers <- plotBrowserTrack2 (
     ArchRProj = archp, 
-    sizes = c(6, 1, 1, 1,1),
+    sizes = c(6, 1, 1, 1,1,1),
     groupBy = metaGroupName, 
     geneSymbol = TF,
     normMethod = "ReadsInTSS",
     scCellsMax=3000,
-    plotSummary = c("bulkTrack", "featureTrack", 
-        "loopTrack", 
-      "geneTrack", "hubTrack"),
+    loop_size = .2,
+        plotSummary = c("bulkTrack", "featureTrack", 
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-    upstream = 200000,
+    upstream = 100000,
     pal = palette_tnk_cells_ext2,
     #ylim=c(0,0.1),
-    downstream = 200000,
+    downstream = 100000,
     #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
     #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
 #    loops = getCoAccessibility (archp, corCutOff = 0.25),
@@ -1403,6 +1406,25 @@ plotPDF (meso_markers, ArchRProj = archp,
   addDOC = F)
 
   
+TF='ICOS'
+metaGroupName = 'celltype2'
+top_dah = data.frame (
+gene = srt@assays$RNA@data[TF,],
+group = srt@meta.data[,metaGroupName])
+top_dah$group = factor (top_dah$group, levels = 
+  rev (c('CD4','CD8','NK_FGFBP2','Tregs','CD8_exhausted',
+  'NK_KLRC1','TFH')))
+top_dah = na.omit(top_dah)
+bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
+vlp + 
+bxpv + 
+scale_fill_manual (values = palette_tnk_cells) +
+#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+gtheme_no_rot
+
+pdf (file.path ('Plots', paste0('scrna_',TF,'_boxplots.pdf')), height=4, width=4)
+bp
+dev.off()
 
 
 

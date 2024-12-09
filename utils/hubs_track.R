@@ -54,11 +54,13 @@ plotBrowserTrack2 <- function(
   region = NULL, 
   groupBy = "Clusters",
   useGroups = NULL, 
-  plotSummary = c("bulkTrack", "featureTrack", "loopTrack", "geneTrack", "hubTrack"),
-  sizes = c(10, 1.5, 3, 4,3),
+  plotSummary = c("bulkTrack", "featureTrack", "loopTrack", "geneTrack", "hubTrack",'hubregiontrack'),
+  sizes = c(10, 1.5, 3, 4,3, 3),
   features = getPeakSet(ArchRProj),
   loops = getCoAccessibility(ArchRProj),
+  loop_size = 0.5,
   hubs = hubs_obj$hubsLinks,
+  hubs_regions = hubs_obj$hubsCollapsed,
   geneSymbol = NULL,
   useMatrix = NULL,
   log2Norm = TRUE,
@@ -222,6 +224,22 @@ plotBrowserTrack2 <- function(
     }
 
     ##########################################################
+    # hubregion Tracks
+    ##########################################################
+    if("hubregiontrack" %in% tolower(plotSummary)){
+      if(!is.null(hubs_regions)){
+        .logDiffTime(sprintf("Adding hubregion Tracks (%s of %s)",x,length(region)), t1=tstart, verbose=verbose, logFile=logFile)
+        plotList$hubregiontrack <- .hubregionTracks(
+            features = hubs_regions, 
+            region = region[x], 
+            facetbaseSize = facetbaseSize,
+            hideX = TRUE, 
+            title = "hub region",
+            logFile = logFile) + theme(plot.margin = unit(c(0, 0, 0, 0), "cm"))
+      }
+    }
+
+    ##########################################################
     # Loops Tracks
     ##########################################################
     if("looptrack" %in% tolower(plotSummary)){
@@ -229,6 +247,7 @@ plotBrowserTrack2 <- function(
         .logDiffTime(sprintf("Adding Loop Tracks (%s of %s)",x,length(region)), t1=tstart, verbose=verbose, logFile=logFile)
         plotList$looptrack <- .loopTracks(
             loops = loops, 
+            loop_size = loop_size,
             region = region[x], 
             facetbaseSize = facetbaseSize,
             hideX = TRUE, 
@@ -885,6 +904,110 @@ plotBrowserTrack2 <- function(
 
 }
 
+
+#######################################################
+# Feature Tracks
+#######################################################
+.hubregionTracks <- function(
+  features = NULL, 
+  region = NULL, 
+  title = "hubregiontrack", 
+  pal = NULL,
+  baseSize = 9, 
+  facetbaseSize = NULL,
+  featureWidth = 2, 
+  borderWidth = 0.3, 
+  hideX = FALSE, 
+  hideY = FALSE,
+  logFile = NULL
+  ){
+
+  .requirePackage("ggplot2", source = "cran")
+
+  #only take first region
+  region <- .validGRanges(region)
+  region <- .subsetSeqnamesGR(region[1], as.character(seqnames(region[1])))
+
+  if(!is.null(features)){
+
+    if(!.isGRList(features)){
+      features <- .validGRanges(features)
+      featureList <- SimpleList(FeatureTrack = features)
+      hideY <- TRUE
+    }else{
+      featureList <- features
+      hideY <- FALSE
+    }
+    featureList <- featureList[rev(seq_along(featureList))]
+
+    featureO <- lapply(seq_along(featureList), function(x){
+      featurex <- featureList[[x]]
+      namex <- names(featureList)[x]
+      mcols(featurex) <- NULL
+      sub <- subsetByOverlaps(featurex, region, ignore.strand = TRUE)
+      if(length(sub) > 0){
+        data.frame(sub, name = namex)
+      }else{
+        empty <- GRanges(as.character(seqnames(region[1])), ranges = IRanges(0,0))
+        data.frame(empty, name = namex)
+      }
+
+    })
+
+    featureO <- Reduce("rbind", featureO)
+    
+    .logThis(featureO, "featureO", logFile = logFile)
+
+    featureO$facet <- title
+
+    if(is.null(pal)){
+      pal <- paletteDiscrete(set = "stallion", values = rev(unique(paste0(featureO$name))))
+    }
+    
+    featureO$name <- factor(paste0(featureO$name), levels=names(featureList))
+
+    p <- ggplot(data = featureO, aes(color = name)) +
+      facet_grid(facet~.) +
+      geom_segment(data = featureO, aes(x = start, xend = end, y = name, yend = name, color = name), size=featureWidth) +
+      ylab("") + xlab("") + 
+      scale_x_continuous(limits = c(start(region), end(region)), expand = c(0,0)) +
+      scale_color_manual(values = pal) +
+      theme_void() + 
+      theme(legend.text = element_text(size = baseSize)) + 
+      theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = 0) +
+      guides(color = FALSE, fill = FALSE) + theme(strip.text.y = element_text(size = facetbaseSize, angle = 0), strip.background = element_blank())
+
+  }else{
+
+    #create empty plot
+    df <- data.frame(facet = "hubregionTrack", start = 0, end = 0, strand = "*", symbol = "none")
+    p <- ggplot(data = df, aes(start, end)) + 
+      geom_point() +
+      facet_grid(facet~.) +
+      #theme_ArchR(baseSize = baseSize, baseLineSize = borderWidth, baseRectSize = borderWidth) +
+      theme_void() +
+      scale_x_continuous(limits = c(start(region), end(region)), expand = c(0,0)) +
+      theme(axis.title.x=element_blank(), axis.text.x=element_blank(),axis.ticks.x=element_blank()) +
+      theme(axis.title.y=element_blank(), axis.text.y=element_blank(),axis.ticks.y=element_blank())
+
+  }
+
+  if(hideX){
+    p <- p + theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank())
+  }
+
+  if(hideY){
+    p <- p + theme(axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank())
+  }
+
+  if(!is.ggplot(p)){
+    .logError("hubregionTrack is not a ggplot!", fn = "hubregionTrack", info = "", errorList = NULL, logFile = logFile)
+  }
+
+  return(p)
+
+}
+
 #######################################################
 # Loop Tracks
 #######################################################
@@ -894,6 +1017,7 @@ plotBrowserTrack2 <- function(
   title = "LoopTrack", 
   pal = NULL,
   baseSize = 9, 
+  loop_size = NULL,
   facetbaseSize = 9,
   featureWidth = 2, 
   borderWidth = 0.4, 
@@ -962,7 +1086,7 @@ plotBrowserTrack2 <- function(
       }
 
       p <- ggplot(data = data.frame(loopO), aes(x = x, y = y, group = id, color = value)) + 
-        geom_line(size=.5) +
+        geom_line(size=loop_size) +
         facet_grid(name ~ .) +
         ylab("") + 
         coord_cartesian(ylim = c(-100,0)) +
@@ -1380,7 +1504,7 @@ hubsTracks <- function(
     plotList[idx] <- NULL
     
     for(i in seq_along(plotList)){
-      p <- p + plotList[[i]] + plot_spacer() + plot_spacer()
+      p <- p + plotList[[i]] 
     }
     
     p <- p + plot_layout(
@@ -1399,7 +1523,7 @@ hubsTracks <- function(
     plotList[idx] <- NULL
     
     for(i in seq_along(plotList)){
-      p <- p + plotList[[i]] + plot_spacer() + plot_spacer()
+      p <- p + plotList[[i]] 
     }
     
     p <- p + plot_layout(

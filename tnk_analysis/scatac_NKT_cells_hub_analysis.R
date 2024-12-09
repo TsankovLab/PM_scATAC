@@ -95,7 +95,7 @@ if (run_coax)
   }
 
 ### Run hub finder ####
-force=T
+force=F
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (
@@ -119,7 +119,7 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))  
   }
 
-  ## Bind peak2genes results with hubs links ####
+## Bind peak2genes results with hubs links ####
 hubs_obj$peakLinks
 p2gl = getPeak2GeneLinks (archp, corCutOff = 0.2)[[1]]
 elementMetadata(p2gl) = elementMetadata(p2gl)[,-ncol(elementMetadata(p2gl))]
@@ -152,51 +152,61 @@ if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.r
   }
 hubsSample_mat = as.data.frame (hubsSample_mat)
 
-ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
+#ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
+int_genes = c('NR4A2','ICOS','CTLA4','PDCD1','HAVCR2')
+int_genes_pos = unlist(sapply (int_genes, function(x) grep (x, hubs_obj$hubsCollapsed$gene)))
+int_genes_label = paste0(hubs_obj$hubs_id, '_', hubs_obj$hubsCollapsed$gene)[unlist(sapply (int_genes, function(x) grep (x, hubs_obj$hubsCollapsed$gene)))]
+
+ha2 = rowAnnotation(foo = anno_mark(at = int_genes_pos, 
+    labels = int_genes_label, labels_gp = gpar(fontsize = 7, fontface='italic')))
 hm = Heatmap (
-  scale (t(hubsSample_mat)), 
-#  top_annotation = ha, 
-  column_names_gp = gpar(fontsize = 3),
-  show_column_dend = T,
+  t(scale (t(hubsSample_mat))), 
+  right_annotation = ha2, 
+  #column_names_gp = gpar(fontsize = 3),
+  show_column_dend = F,
+  show_row_dend = F,
+  column_names_gp = gpar(fontsize = 8),
+  row_names_gp = gpar(fontsize = 0),
+  column_names_rot = 45,
   #column_km = 5,
   #row_dend_width = unit(5,'mm'),
   row_dend_side = 'left',
   col = rev(palette_hubs_accessibility),
   border=T,
   name = 'Hubs')
-pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=2.2, width = 100)
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=4, width = 3.5)
 hm
 dev.off()
 
-# Compare with similarity using all peaks called ####
-if (!exists('pSE')) pSE = ArchR::getMatrixFromProject (archp, 'PeakMatrix')
-pSE = pSE[,rownames(archp@cellColData)]
-metaGroupName = 'celltype2'
-pmat = assays(pSE)[[1]]
-pmat_l = list()
-for (i in unique(archp@cellColData[,metaGroupName])) 
-  {
-  pmat_l[[i]] = data.frame (i = rowMeans (pmat[,as.character(archp@cellColData[,metaGroupName]) == i]))
-  colnames(pmat_l[[i]]) = i
-  }
-pmat_agr = do.call (cbind, pmat_l)
-rownames(pmat_agr) = as.character(rowRanges(pSE))
-pmat_agr_cor = cor (pmat_agr)
+# # Compare with similarity using all peaks called ####
+# if (!exists('pSE')) pSE = ArchR::getMatrixFromProject (archp, 'PeakMatrix')
+# pSE = pSE[,rownames(archp@cellColData)]
+# metaGroupName = 'celltype2'
+# pmat = assays(pSE)[[1]]
+# pmat_l = list()
+# for (i in unique(archp@cellColData[,metaGroupName])) 
+#   {
+#   pmat_l[[i]] = data.frame (i = rowMeans (pmat[,as.character(archp@cellColData[,metaGroupName]) == i]))
+#   colnames(pmat_l[[i]]) = i
+#   }
+# pmat_agr = do.call (cbind, pmat_l)
+# rownames(pmat_agr) = as.character(rowRanges(pSE))
+# pmat_agr_cor = cor (pmat_agr)
 
-hm = Heatmap (
-  scale (t(pmat_agr)), 
-#  top_annotation = ha, 
-  column_names_gp = gpar(fontsize = 0),
-  show_column_dend = T,
-  #column_km = 2,
-  #row_dend_width = unit(5,'mm'),
-  row_dend_side = 'left',
-  col = rev(palette_hubs_accessibility),
-  border=T,
-  name = 'peaks')
-pdf (file.path (hubs_dir,'Plots',paste0('peaks_',metaGroupName,'_heatmap.pdf')), height=2.2, width = 100)
-hm
-dev.off()
+# hm = Heatmap (
+#   scale (t(pmat_agr)), 
+# #  top_annotation = ha, 
+#   column_names_gp = gpar(fontsize = 0),
+#   show_column_dend = T,
+#   #column_km = 2,
+#   #row_dend_width = unit(5,'mm'),
+#   row_dend_side = 'left',
+#   col = rev(palette_hubs_accessibility),
+#   border=T,
+#   name = 'peaks')
+# pdf (file.path (hubs_dir,'Plots',paste0('peaks_',metaGroupName,'_heatmap.pdf')), height=2.2, width = 100)
+# hm
+# dev.off()
 
 
 

@@ -42,6 +42,7 @@ sarc_order = sarc_order[! sarc_order$sampleID %in% c('HU37','HU62'),]
 sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
 #archp$Sample2 = factor (archp$Sample2, levels = sarc_order$sampleID)
 
+archp_NN = archp[archp$Sample3 != 'normal_pleura']
 pdf ()
 umap_p1 = plotEmbedding (ArchRProj = archp_NN, labelMeans = F, 
   colorBy = "cellColData", name = "Sample2", 

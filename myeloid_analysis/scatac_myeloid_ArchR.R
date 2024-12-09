@@ -297,6 +297,7 @@ archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_7'] = 'IL1B'
 archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_8'] = 'IFN'
 archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_9'] = 'CC'
 
+write.csv (data.frame (barcode = rownames(archp@cellColData), celltype = archp$cnmf_celltypes), 'barcode_annotation.csv')
 
 # Find DAM in cnmf_clusters ####
 metaGroupName = "celltype2"

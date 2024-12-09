@@ -4,6 +4,7 @@
 # repodir='/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 # grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 # celltype='very_high'
+# celltype='TREM2'
 # celltype='P5__epithelioid'
 # fold_numbers = c(0,1,2,3,4)
 
@@ -86,17 +87,8 @@ if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('
 		#system (paste0('chmod +x ',file.path(repodir, 'utils','chrBPnet_training.sh')))
 		#paste("bsub bash -c \"/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombnet_NKT_NK_KLRC1_f3.sh, projdir)
 		#system (paste("bsub bash -c \", file.path(repodir,utils','chrBPnet_training.sh '), chromBPdir,' ',grefdir,' ',repodir,' ',celltype,' ',fold_number,'"'), wait=FALSE)
-		command <- paste("bsub -J", paste0(celltype,'_finemo'), "-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 24:00 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('finemo_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('finemo_',celltype,'.err')),file.path(repodir,'utils','finemo_motif_calls.sh'))
+		command <- paste("bsub -J", paste0(celltype,'_finemo'), "-P acc_Tsankov_Normal_Lung  -q gpu -n 1 -W 12:00 -gpu num=1 -R v100 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('finemo_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('finemo_',celltype,'.err')),file.path(repodir,'utils','finemo_motif_calls.sh'))
 		args <- paste(chromBPdir,celltype, fold_number)
 		system (paste(command, args))
 		}
 	}
-
-
-
-
-
-
-
-
-

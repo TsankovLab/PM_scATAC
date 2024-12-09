@@ -1,89 +1,89 @@
 
-# Generate heatmap of clusters x samples across active TFs ####
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-all (colnames(mSE) == rownames(archp))
-mMat = assays (mSE)[[1]] 
-rownames (mMat) = rowData (mSE)$name
+# # Generate heatmap of clusters x samples across active TFs ####
+# if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+# all (colnames(mSE) == rownames(archp))
+# mMat = assays (mSE)[[1]] 
+# rownames (mMat) = rowData (mSE)$name
 
-# Filter by RNA expression ####
-metaGroupName = 'sampleID'
-active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
-mMat = mMat[active_TFs, ]
+# # Filter by RNA expression ####
+# metaGroupName = 'sampleID'
+# active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
+# mMat = mMat[active_TFs, ]
 
-mMat_agg = aggregate (as.matrix(t(scale(mMat))), by = list(archp$Clusters), FUN='mean')
-rownames (mMat_agg) = mMat_agg[,1]
-mMat_agg = mMat_agg[,-1]
+# mMat_agg = aggregate (as.matrix(t(scale(mMat))), by = list(archp$Clusters), FUN='mean')
+# rownames (mMat_agg) = mMat_agg[,1]
+# mMat_agg = mMat_agg[,-1]
 
-remove_clusters = 'C9' # remove normal sample
-ha = HeatmapAnnotation (sample = rownames(mMat_agg), col = list(sample = palette_sample))
-mMat_hm = Heatmap (t(mMat_agg[!rownames(mMat_agg) %in% remove_clusters,]),# row_km=15,
-  #left_annotation = ha,
-  #rect_gp = gpar(type = "none"),
-  clustering_distance_rows='euclidean' ,
-  clustering_distance_columns = 'euclidean', 
-  col=palette_deviation_cor_fun, 
-  #row_split = km$cluster,
-  #column_split = km$cluster,
-  #row_km=2, 
-  #column_km=2,
-#  top_annotation = ha,
-  border=T,
-#   ,
-  row_names_gp = gpar(fontsize = 0), 
-  column_names_gp = gpar(fontsize = 8)
-)
-pdf (file.path ('Plots','TF_samples_heatmap.pdf'), width = 4,height=8)
-mMat_hm
-dev.off()
-
-
-
-# Try with PCA ####
-library (uwot)
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = as.matrix(mMat)#[selected_TF,])
-tf_mat = lapply (sams, function(x) t(scale(mMat[,archp$Sample3 == x ])))
-names (tf_mat) = sams
-#tf_mat = do.call (rbind,tf_mat)
-cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
-cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
-names(cnmf_mat) = sams
-
-# Filter by RNA expression ####
-metaGroupName = 'sampleID'
-active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
-mMat = mMat[active_TFs, ]
-
-archp$Clusters_sample = paste0(archp$Clusters, '_',archp$Sample2)
-remove_clusters = names(table (archp$Clusters_sample)[table (archp$Clusters_sample) < 10])
-
-mMat_agg = aggregate (as.matrix(t(scale(mMat))), by = list(archp$Clusters_sample), FUN='mean')
-rownames (mMat_agg) = mMat_agg[,1]
-mMat_agg = mMat_agg[,-1]
-mMat_agg = mMat_agg[!rownames(mMat_agg) %in% remove_clusters,]
+# remove_clusters = 'C9' # remove normal sample
+# ha = HeatmapAnnotation (sample = rownames(mMat_agg), col = list(sample = palette_sample))
+# mMat_hm = Heatmap (t(mMat_agg[!rownames(mMat_agg) %in% remove_clusters,]),# row_km=15,
+#   #left_annotation = ha,
+#   #rect_gp = gpar(type = "none"),
+#   clustering_distance_rows='euclidean' ,
+#   clustering_distance_columns = 'euclidean', 
+#   col=palette_deviation_cor_fun, 
+#   #row_split = km$cluster,
+#   #column_split = km$cluster,
+#   #row_km=2, 
+#   #column_km=2,
+# #  top_annotation = ha,
+#   border=T,
+# #   ,
+#   row_names_gp = gpar(fontsize = 0), 
+#   column_names_gp = gpar(fontsize = 8)
+# )
+# pdf (file.path ('Plots','TF_samples_heatmap.pdf'), width = 4,height=8)
+# mMat_hm
+# dev.off()
 
 
-pca_result <- prcomp(mMat_agg, center = TRUE, scale = TRUE)
 
-tmp = as.data.frame(pca_result$x)[,c('PC1','PC2')]
-umap_result = tmp
-umap_result$Sample = sapply (rownames(umap_result), function(x) unlist(strsplit(x,'_'))[2])
-umap_result = umap_result[umap_result$Sample != 'normal', ]
+# # Try with PCA ####
+# library (uwot)
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData (mSE)$name
+# mMat = as.matrix(mMat)#[selected_TF,])
+# tf_mat = lapply (sams, function(x) t(scale(mMat[,archp$Sample3 == x ])))
+# names (tf_mat) = sams
+# #tf_mat = do.call (rbind,tf_mat)
+# cnmf_mat = as.matrix(archp@cellColData[,grep ('sarcomatoid', colnames(archp@cellColData))])
+# cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
+# names(cnmf_mat) = sams
 
-pca_data = ggplot(umap_result, aes(x = PC1, y = PC2, fill = Sample)) +#, colors=class))+#, color = sarc)) +
-geom_point(alpha=0.8,size=4, shape=21, color='grey22') + gtheme_no_rot +
-#geom_point(data = umap_result[umap_result$class != 'ND',], aes(color=class),alpha=0.5) +
-#geom_smooth(data = umap_result[umap_result$class != 'ND',],
-#  method = "lm", se = TRUE, aes (color = class2)) + 
-#geom_point(data = umap_result[umap_result$tf != '',],size=4) +
-#geom_text_repel(data= umap_result[umap_result$tf != '',]) + 
-#labs(title = paste("UMAP - ",sam)) #+ 
-scale_fill_manual (values = palette_sample)
+# # Filter by RNA expression ####
+# metaGroupName = 'sampleID'
+# active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
+# mMat = mMat[active_TFs, ]
 
-pdf (file.path('Plots','clusters_TF_umap.pdf'), width = 3.5, height = 3)
-pca_data
-dev.off()
+# archp$Clusters_sample = paste0(archp$Clusters, '_',archp$Sample2)
+# remove_clusters = names(table (archp$Clusters_sample)[table (archp$Clusters_sample) < 10])
+
+# mMat_agg = aggregate (as.matrix(t(scale(mMat))), by = list(archp$Clusters_sample), FUN='mean')
+# rownames (mMat_agg) = mMat_agg[,1]
+# mMat_agg = mMat_agg[,-1]
+# mMat_agg = mMat_agg[!rownames(mMat_agg) %in% remove_clusters,]
+
+
+# pca_result <- prcomp(mMat_agg, center = TRUE, scale = TRUE)
+
+# tmp = as.data.frame(pca_result$x)[,c('PC1','PC2')]
+# umap_result = tmp
+# umap_result$Sample = sapply (rownames(umap_result), function(x) unlist(strsplit(x,'_'))[2])
+# umap_result = umap_result[umap_result$Sample != 'normal', ]
+
+# pca_data = ggplot(umap_result, aes(x = PC1, y = PC2, fill = Sample)) +#, colors=class))+#, color = sarc)) +
+# geom_point(alpha=0.8,size=4, shape=21, color='grey22') + gtheme_no_rot +
+# #geom_point(data = umap_result[umap_result$class != 'ND',], aes(color=class),alpha=0.5) +
+# #geom_smooth(data = umap_result[umap_result$class != 'ND',],
+# #  method = "lm", se = TRUE, aes (color = class2)) + 
+# #geom_point(data = umap_result[umap_result$tf != '',],size=4) +
+# #geom_text_repel(data= umap_result[umap_result$tf != '',]) + 
+# #labs(title = paste("UMAP - ",sam)) #+ 
+# scale_fill_manual (values = palette_sample)
+
+# pdf (file.path('Plots','clusters_TF_umap.pdf'), width = 3.5, height = 3)
+# pca_data
+# dev.off()
 
 
 
@@ -211,3 +211,29 @@ dp = ggplot (tf_modules) +
 pdf (file.path ('Plots','TF_modules_ridge_plots2.pdf'), width = 5,height=8)
 dp
 dev.off()
+
+
+
+
+
+# Read in peak files from scATAC studies ####
+projects = 'rawlins_fetal_lung'
+projects_peaks = lapply (seq_along(projects), function(x) {
+  bed_files = list.files (file.path('..','all_tissues_ArchR',projects[x],'PeakCalls'), pattern = '.rds')
+  grlist = lapply (seq_along(bed_files), 
+    function(y) readRDS (file.path('..','all_tissues_ArchR',projects[x],'PeakCalls',bed_files[y])))
+names (grlist) = paste0(projects[x], '_', sapply (bed_files, function(z) unlist(strsplit (z, '-'))[1]))
+grlist
+})
+projects_peaks = unlist (projects_peaks, recursive=F)
+
+#### chromVAR analysis ####
+archp = addBgdPeaks (archp, force= TRUE)
+archp = addPeakAnnotations (ArchRProj = archp, 
+     regions = projects_peaks, name = "rawlins_fetal_lung")
+
+archp = addDeviationsMatrix (
+  ArchRProj = archp, 
+  peakAnnotation = "scATAC_datasets",
+  force = TRUE
+)
