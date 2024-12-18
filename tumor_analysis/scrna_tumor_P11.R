@@ -479,7 +479,7 @@ res_p11s = res_p11s[!is.na(res_p11s)]
 write.csv (res_p11s, 'correlated_genes_p11s_HOXB13.csv')
 
 # Run Enrichment on correlated genes ####
-fetal_sigs = read.csv ('/ahg/regevdata/projects/ICA_Lung/Bruno/guccione_prj/final_fetal_sigs.csv')
+fetal_sigs = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/guccione_prj/final_fetal_sigs.csv')
 fetal_sigs = as.list (fetal_sigs)
 writeGMT (fetal_sigs, '/ahg/regevdata/projects/ICA_Lung/Bruno/DBs/GSEA_gs/human/fetal_sigs.gmt')
 

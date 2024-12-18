@@ -112,6 +112,7 @@ pvalAdjTrheshold = 0.05
 		dev.off()
 		})
 	}
+}
 	#if (feat == 'all')
 	#	{
 	#	dhm_grob = grid.grabExpr(draw(dhm[[1]]))
