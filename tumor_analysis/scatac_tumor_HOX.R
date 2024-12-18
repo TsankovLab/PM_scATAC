@@ -208,26 +208,6 @@ dev.off()
 
 
 
-### Run chrombpnet on HOX cluster to identify peaks where it binds and with which TFs ####
-pdf()
-p <- plotEmbedding(
-    ArchRProj = archp, 
-    colorBy = "cellColData", 
-    name = 'Clusters', 
-    embedding = "UMAP"#,
-#    pal = palette_expression,
-#    imputeWeights = getImputeWeights(archp)
-)
-dev.off()
-
-pdf (file.path('Plots','clusters_umap.pdf'))
-p
-dev.off()
-
-if (!all(file.exists (file.path ('chromBPnet',c('fragments_C15.tsv','peakset_C15.bed')))))
-source (file.path ('..','..','git_repo','tumor_analysis','chromBPnet_prepare_file_P11_HOX.R'))
-
-
 ### Check HOXB13 expression in bulk and correlate with survival ####
 # load bulkRNA cohorts ####
 meso_bulk_l = readRDS (file.path ('..','..','bulkRNA_meso','bulk_RNA_studies.rds'))
@@ -443,6 +423,201 @@ for (study in names (cfit_study))
   
 
 
+
+
+### Run chrombpnet on HOX cluster to identify peaks where it binds and with which TFs ####
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "cellColData", 
+    name = 'Clusters', 
+    embedding = "UMAP"#,
+#    pal = palette_expression,
+#    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+
+pdf (file.path('Plots','clusters_umap.pdf'))
+p
+dev.off()
+
+if (!all(file.exists (file.path ('chromBPnet',c('fragments_C15.tsv','peakset_C15.bed')))))
+source (file.path ('..','..','git_repo','tumor_analysis','chromBPnet_prepare_file_P11_HOX.R'))
+
+
+### Combine TF modisco and finemo outputs to build network of co-occurring TFs across peaks ####
+library (httr)
+library (XML)
+library (igraph)
+
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
+fold_number = 0
+celltype = 'C15' # in new clustering is C1
+
+
+count_to_adj = function(data = NULL)
+  {
+  count1s <- function(x, y) colSums(x == 1 & y == 1)
+  n <- 1:ncol(data)
+  mat <- outer(n, n, function(x, y) count1s(data[, x], data[, y]))
+  diag(mat) <- 0
+  dimnames(mat) <- list(colnames(data), colnames(data))
+  return (mat)
+  }
+    
+
+ov_motif_peaks_adj_l = list()
+#celltype= 'IL1B'
+modisco_motifs = as.data.frame(readHTMLTable(file.path(chromBPdir, paste0(celltype,'_model'),'fold_0','modisco','report','motifs.html')))
+modisco_motifs$motif_match0 = sapply (modisco_motifs$NULL.match0, function(x) unlist(strsplit (x, '_'))[1])
+modisco_motifs$motif_match1 = sapply (modisco_motifs$NULL.match1, function(x) unlist(strsplit (x, '_'))[1])
+modisco_motifs$motif_match2 = sapply (modisco_motifs$NULL.match2, function(x) unlist(strsplit (x, '_'))[1])
+
+finemo_hits = read.table(file.path(chromBPdir,paste0(celltype,'_model'),'finemo_out','hits.tsv'), sep='\t', header=T)
+finemo_hits$motif_name0 = modisco_motifs$motif_match0[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+finemo_hits$motif_name1 = modisco_motifs$motif_match1[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+finemo_hits$motif_name2 = modisco_motifs$motif_match2[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+write.table (finemo_hits[,c(1,2,3,14,15,16)], paste0(celltype,'_finemo_to_genome_browser.tsv'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+
+peakset = read.table (file.path(chromBPdir,paste0('peakset_',celltype,'.bed')))
+peakset = peakset[,1:3]
+colnames (peakset) = c ('chr','start','end')
+peakset = makeGRangesFromDataFrame (peakset)
+finemo_hits = makeGRangesFromDataFrame (finemo_hits, keep.extra.columns = T)
+
+match_rank = c('motif_name0')#,'motif_name1','motif_name2')
+ov_motif_peaks_mat_combined = list()
+for (motif_match in match_rank)
+  {
+  finemo_hits_l = split (finemo_hits, finemo_hits@elementMetadata[,motif_match])
+  
+  ov_motif_peaks = lapply (finemo_hits_l, function(x) findOverlaps (peakset, x, select='first'))
+  ov_motif_peaks_mat = do.call (cbind, ov_motif_peaks)
+  rownames (ov_motif_peaks_mat) = as.character(peakset)
+  ov_motif_peaks_mat[is.na(ov_motif_peaks_mat)] = 0
+  ov_motif_peaks_mat[ov_motif_peaks_mat > 0] = 1
+  ov_motif_peaks_mat_combined[[motif_match]] = ov_motif_peaks_mat
+  #ov_motif_peaks_df = as.data.frame (ov_motif_peaks_mat)
+  }
+ov_motif_peaks_mat_combined = do.call (cbind, ov_motif_peaks_mat_combined)  
+tf_columns = colnames(ov_motif_peaks_mat_combined)
+ov_motif_peaks_adj_l2 = as.data.frame (count_to_adj (data = ov_motif_peaks_mat_combined))
+# From https://stackoverflow.com/questions/66515117/convert-dummy-coded-matrix-to-adjacency-matrix
+ov_motif_peaks_adj_l[[celltype]] = ov_motif_peaks_adj_l2
+
+
+# Try with heatmaps 
+palette_cooccurence2 = paletteer::paletteer_c("grDevices::Oslo",100)
+all_TF = unique(unname(unlist(lapply (ov_motif_peaks_adj_l, function(x) unique(colnames(x))))))
+all_TF = all_TF[all_TF != 'NaN']
+ht_list = NULL 
+set.seed (1234)
+hm_mat = as.data.frame (ov_motif_peaks_adj_l[[celltype]][match(all_TF, colnames(ov_motif_peaks_adj_l[[celltype]])),])
+hm_mat = as.data.frame (t(hm_mat[all_TF,]))[all_TF,]
+rownames (hm_mat) = all_TF
+colnames (hm_mat) = all_TF
+hm_mat[is.na(hm_mat)] = 0
+#hm_mat = scale (hm_mat)
+hm_mat = log2(hm_mat+1)
+if (is.null(ht_list)) {
+d = as.dist(t(1-cor(hm_mat)))
+d[is.na(d)] = 1
+hc = hclust(d)
+column_order = colnames(hm_mat)[hc$order]
+d = as.dist(1-cor(hm_mat))
+d[is.na(d)] = 1
+hc = hclust(as.dist(d))
+row_order = colnames(hm_mat)[hc$order]
+ht_list = Heatmap (
+  hm_mat, 
+  column_names_gp= gpar(fontsize=0),
+  row_names_gp= gpar(fontsize=6), column_order=column_order, row_order=row_order,
+  col = palette_cooccurence2, border=T, column_title = celltype)
+} else {
+ht_list = ht_list + Heatmap (
+hm_mat[,column_order], cluster_columns=F,
+column_names_gp= gpar(fontsize=0),
+row_names_gp= gpar(fontsize=6),
+col = palette_cooccurence2, border=T, column_title = celltype)
+}
+
+pdf (file.path ('Plots','combined_chromBPnet_cooccurrence_heatmaps.pdf'),width=4,height=3)
+ht_list
+dev.off()
+
+  
+# Map peaks with HOXB13 seqlet and run GSEA enrichment using nearby genes ####
+TF = 'HXB13'
+tf_peaks = finemo_hits[finemo_hits$motif_name0 == TF,]
+peakHits = queryHits (findOverlaps(getPeakSet(archp),tf_peaks))
+peakHits_top = head (table (peakHits)[order(-table(peakHits))],200)
+tf_peaks = getPeakSet(archp)[as.numeric(names(peakHits_top))]
+nearby_genes = unique(tf_peaks$nearestGene)
+write.csv (nearby_genes, 'HOXB13_chrombpnet_top_hits.csv')
+# use RNA to select for most expressed genes
+metaGroupname = 'seurat_clusters'
+ps = log2(as.data.frame (AverageExpression (srt, features = nearby_genes, group.by = metaGroupname)[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+hox_cluster = 'g1'
+ps = ps[, hox_cluster,drop=F]
+ps = ps[order(-ps$g1),,drop=F]
+head(ps,150)
+
+#### Too many peaks have HOXB13!!
+
+
+# Check expression of TF binding HOXB13 locus as predicted by chrombpnet and chromVAR ####
+
+# Motif enrichment of peaks found around HOX13 genes ####
+tf_match = getMatches (archp)
+C1_peaks = readRDS (file.path ('PeakCalls','C1-reproduciblePeaks.gr.rds'))
+tf_match = tf_match[queryHits (findOverlaps(tf_match, C1_peaks))]
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+bg_peakSet = rowRanges (tf_match)
+region = GRanges (c(
+  'chr17:48726626-48729823'))
+
+region_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, region))]
+#tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+region_TF =  hyperMotif (
+  selected_peaks = region_peaks, 
+  motifmatch = tf_match)
+
+head (region_TF, 100)
+
+scrna_cor = read.csv (file.path ('..','scrna','correlated_genes_p11s_HOXB13.csv'))
+
+cor_df = data.frame (rna_cor = scrna_cor$x[match(rownames(region_TF), scrna_cor$X)],
+  TF_enrich_log10 = -log10(region_TF$padj), 
+  TF_enrich_padj = region_TF$padj,
+  row.names = rownames(region_TF)
+  )
+cor_df$label = ifelse (cor_df$TF_enrich_padj < 0.05, rownames(cor_df), '')
+gp = ggplot (cor_df, aes (x = TF_enrich_log10, y = rna_cor, label = label)) + 
+  geom_point(size = 2, shape = 21, stroke=0.3) + 
+  geom_text_repel() + 
+  gtheme_no_rot
+
+pdf (file.path ('Plots','scrna_cor_vs_TF_enrich_HOX_scatter.pdf'),width=13,3)
+gp
+dev.off()
+
+
+TFs = c('HOXB13','NFYB')
+pdf (file.path ('Plots','expression_of_TFs_binding_HOXB13_locus.pdf'),width=20)
+DotPlot (srt, TFs, group.by='seurat_clusters') + gtheme
+dev.off()
+
+# Check TF expression bindings HOBX13 locus without running hyper ####
+tf_match = getMatches (archp)
+region = GRanges (c(
+  'chr17:48726626-48729823'))
+region_peaks = tf_match[queryHits(findOverlaps(rowRanges(tf_match), region))]
+TF_hits = colnames(assay(region_peaks))[colSums (assay(region_peaks)) > 0]
+TF_hits = sapply (TF_hits, function(x) unlist(strsplit(x, '_'))[1])
+pdf (file.path ('Plots','expression_of_TFs_binding_HOXB13_locus.pdf'),width=20)
+DotPlot (srt, unname(TF_hits), group.by='seurat_clusters') + gtheme
+dev.off()
 
 
 

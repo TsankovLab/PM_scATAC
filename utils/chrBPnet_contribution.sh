@@ -32,8 +32,6 @@ fold_number=${4}
 echo $fold_number
 
 
-source activate chrombpnet
-
 # Get contribution score bigwigs
 cd $chromBPdir
 

@@ -105,7 +105,6 @@ pvalAdjTrheshold = 0.05
 	write.csv (mainPathways_print, file.path(paste0('fgsea_enrichments_',ann,'_table.csv')))
 	
 	# Plot dotplot of fGSEA annotations per cluster 
-
 	lapply (seq_along(fgseaResAll_dp), function(x) {
 	pdf (file.path('Plots',paste0('fGSEA_top_',top_pathways,'_annotation_',names (fgseaResAll_dp)[x],'_dotplots.pdf')),15,8)
 		print(fgseaResAll_dp[[x]])
