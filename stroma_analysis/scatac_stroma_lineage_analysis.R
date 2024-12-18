@@ -4,8 +4,8 @@
 # wget -r http://catlas.org/catlas_downloads/humantissues/Peaks/
 
 # Read ENCODE collection for peak annotation
-# H3K4me3_primary_filepath = '/ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/ENCODE/H3K4me3_ChIP-seq/primary_cells/'
-# encode_H3K4me3_primary = readRDS (paste0(H3K4me3_primary_filepath, 'H3K4me3_primary_cells_bed_list.rds'))
+H3K4me3_primary_filepath = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/ENCODE/H3K4me3_ChIP-seq/primary_cells/'
+encode_H3K4me3_primary = readRDS (paste0(H3K4me3_primary_filepath, 'H3K4me3_primary_cells_bed_list.rds'))
 
 # Read in peak files from scATAC studies ####
 projects = c('yang_kidney','Tsankov_lung','rawlins_fetal_lung','JShendure','greenleaf_colon','greenleaf_brain','bingren_pan')

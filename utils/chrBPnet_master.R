@@ -1,11 +1,15 @@
 # Variables
 # chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet'
+# chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
 # repodir='/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 # grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 # celltype='cnmf_cluster_6'
 # celltype = 'TREM2'
 # celltype = 'IM'
+# celltype = 'P23__sarcomatoid'
+# celltype = 'C15'
 # fold_numbers = c(0,1,2,3,4)
+# fold_numbers = 0
 message ('Submit job for chromBPnet training model')	
 
 # Make script executable
@@ -55,7 +59,7 @@ if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('
 
 system (paste0('chmod +x ',file.path(repodir,'utils','TFmodisco.sh')), wait=FALSE) 
 
-if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'TF_modisco','_modisco_results.h5'))))
+if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'modisco','modisco_results.h5'))))
 	{
 	fold_numbers_remained = fold_numbers[!file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('fold_',fold_numbers),'TF_modisco','_modisco_results.h5'))]	
 	# fold_numbers_remained = c(0:4)

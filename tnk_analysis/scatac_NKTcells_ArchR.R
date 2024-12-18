@@ -87,6 +87,9 @@ if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path
 # TNK markers ####
 tnk_markers = c('CD3D','CD8A','PDCD1','HAVCR2','CD4', 'FOXP3','GNLY',
   'FGFBP2','KLRC1','XCL1','ICOS')
+tnk_markers = c('CD4','CD8A','FOXP3',
+  'PDCD1','HAVCR2','GNLY',
+  'FGFBP2','KLRC1','XCL1')#,'ICOS')
 archp = addImputeWeights (archp)
 pdf()
 p <- plotEmbedding(
@@ -102,8 +105,8 @@ p = lapply (seq_along(p), function(x) p[[x]] + theme_void() + ggtitle (tnk_marke
 #archp$celltype[archp$Clusters == 'C30'] = 'Fibroblasts_WT1'
 #p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
 
-pdf (file.path('Plots','TNK_markers_fplots.pdf'), width = 10, height = 10)
-print (wrap_plots(p, ncol=4))
+pdf (file.path('Plots','TNK_markers_fplots.pdf'), width = 7, height = 13)
+print (wrap_plots(p, ncol=3))
 dev.off()
 
 ### Annotate meso cells ####
@@ -529,13 +532,34 @@ TF_p = plotEmbedding (
     ArchRProj = archp,
     colorBy = "cellColData",
     name = paste0('mod_',unique(km$cluster)), 
-    pal = rev(palette_deviation),
+    pal = rev(palette_deviation_correlation),
     #useSeqnames='z',
     embedding = "UMAP_H")
 dev.off()
 pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 20,height=6)
 wrap_plots (TF_p, ncol=5)
 dev.off()
+
+# Check NR4A2 deviations
+tf_markers = c('NR4A3')
+tf_markers = c('RUNX2')
+markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
+markerMotifs = grep ("z:", markerMotifs, value = TRUE)
+#archp = addImputeWeights (archp)
+pdf()
+TF_p = plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "MotifMatrix", 
+    name = sort(markerMotifs), 
+    embedding = "UMAP_H",
+   # pal = palette_deviation,
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+pdf (file.path ('Plots',paste0(tf_markers,'_umap.pdf')), width = 5,height=6)
+TF_p
+dev.off()
+
 
 
 # ridge plots of TF modules ####

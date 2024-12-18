@@ -44,6 +44,7 @@ if(!file.exists ("TCGA_CNV_hg38.rds"))
   } else {
   meso_CNV_gr_hg38 = readRDS ('TCGA_CNV_hg38.rds')  
   }
+sampleID = names(meso_CNV_gr_hg38) 
 
 # Compute bins ####
 ws = 1e6
@@ -90,6 +91,7 @@ if (!file.exists('TCGA_cnv_mat.rds') | force)
   } else {
   cnv_mat = readRDS ('TCGA_cnv_mat.rds')
   }
+colnames (cnv_mat) = sampleID
 
 if (!file.exists('TCGA_cnv_sample_avg.rds'))
   {

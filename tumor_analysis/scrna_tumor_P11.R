@@ -4,7 +4,7 @@ R
 ####### ANALYSIS of P11 TUMOR #######
 set.seed(1234)
 
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_scrna_P11'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna_P11'
 projdir_scatac = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
 
 dir.create (file.path (projdir,'Plots'), recursive =T)
@@ -26,6 +26,8 @@ addArchRGenome("hg38")
   
 
 # Load scRNA ####
+if (!file.exists ('srt.rds'))
+{
 srt = readRDS (file.path ('..','..','main','scrna','srt.rds'))
 srt = srt[,srt$sampleID == 'P11']
 srt = NormalizeData (object = srt, normalization.method = "LogNormalize", scale.factor = 10000)
@@ -48,6 +50,11 @@ DimPlot (srt, group.by = 'celltype_simplified', reduction = 'umap')
 DimPlot (srt, group.by = 'seurat_clusters', reduction = 'umap', label=T)
 fp (srt, gene = 'HOXB13',reduction= reductionName)
 dev.off()
+saveRDS (srt, 'srt.rds')
+} else {
+srt = readRDS ('srt.rds')    
+}
+
 
 
 #### Run cNMF ####
@@ -59,92 +66,156 @@ k_selection = 25
 cores= 100
 
 cnmf_name = 'scrna_p11'
-cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
-dir.create (file.path(cnmf_out,'Plots'), recursive=T)
+repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 
 ### RUN consensus NMF ####
-# conda create --yes --channel bioconda --channel conda-forge --channel defaults python=3.7 fastcluster matplotlib numpy palettable pandas scipy 'scikit-learn>=1.0' pyyaml 'scanpy>=1.8' -p /ahg/regevdata/projects/ICA_Lung/Bruno/conda/cnmf && conda clean --yes --all # Create environment, cnmf_env, containing required packages
-# conda activate cnmf
-# pip install cnmf
-vf = VariableFeatures (srt)
-if (!file.exists(paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt')))
-	{
-	# Extract and save count and data matrices from seurat object	
-	count_mat = t(srt@assays$RNA@counts[vf,])
-	norm_mat = t(srt@assays$RNA@data[vf,])
-	if (!file.exists (paste0('cNMF/counts_nmf_',nfeat,'.txt')) | force) write.table (count_mat, paste0('cNMF/counts_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
-	if (!file.exists (paste0('cNMF/norm_nmf_',nfeat,'.txt')) | force) write.table (norm_mat, paste0('cNMF/norm_nmf_',nfeat,'.txt'), sep='\t', col.names = NA)
-	
-	## Format k_list variable to be passed correctly to bash script
-	message ('submit cNMF job')
-	if(length(k_list) > 1) 
-		{
-		k_list_formatted = paste (k_list, collapse=' ')	
-		k_list_formatted = shQuote (k_list_formatted)
-		}
-	
-	
-	# Run cNMF prepare script
-	system (paste0('chmod +x ../../PM_scATAC/cnmf_prepare_job.sh'), wait=FALSE) 
-	system (paste0('bash ',file.path('..','..','PM_scATAC/cnmf_prepare_job.sh'),' ', paste0(projdir,'/'),' ', k_list_formatted,' ', nfeat, ' ', cnmf_out, ' ', cores), wait=TRUE)
-	
-	# Submitting cNMF factorization job
-	system (paste0('chmod +x ../../PM_scATAC/cnmf_factorization_parallel.sh'), wait=FALSE)
-	system (paste0 ('qsub -t 1-',cores,' ','../../PM_scATAC/cnmf_factorization_parallel.sh ', paste0(projdir,'/'),' ', cnmf_out, ' ', cores))
-	
-	# Run script to combine K iterations generated in previous script
-	system (paste0('chmod +x ../../PM_scATAC/cnmf_combine_job.sh'), wait=FALSE)
-	system (paste0('bash ','../../PM_scATAC/cnmf_combine_job.sh ', paste0(projdir,'/'), ' ',cnmf_out), wait=TRUE) # combine cnmf factors
-	
-	
-	# Run cNMF bash script
-	system (paste0('chmod +x ','../../PM_scATAC/cnmf_consensus_job.sh'), wait=FALSE)
-	system (paste0('qsub ','../../PM_scATAC/cnmf_consensus_job.sh ', paste0(projdir,'/'), ' ', cnmf_out,' ', k_selection), wait=FALSE)
-	} else {
-	cnmf_spectra = read.table (paste0(cnmf_out,'/cnmf/cnmf.spectra.k_',k_selection,'.dt_0_3.consensus.txt'))
-	}
+source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
 
-# Format NMF results ####
-# Assign genes uniquely to cNMF modules based on spectra values
-cnmf_spectra = t(cnmf_spectra)
-max_spectra = apply (cnmf_spectra, 1, which.max)
+### Import and format spectra files ####
+k_selection = 25
+cnmf_name = 'scrna_p11'
+source (file.path ('..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
 
-top_nmf_genes = Inf
-cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
-      {
-      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
-      tmp = tmp[order(-tmp[,1]),,drop=F]
-      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
-      head(rownames(tmp),top_nmf_genes)
-      })
-names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
-
-saveRDS (cnmf_spectra_unique, paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds'))
-write.csv (patchvecs (cnmf_spectra_unique), paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.csv'))
-
-top_nmf_genes = Inf
-cnmf_spectra_unique = lapply (1:ncol(cnmf_spectra), function(x) 
-      {
-      tmp = cnmf_spectra[names(max_spectra[max_spectra == x]),x,drop=F]
-      tmp = tmp[order(-tmp[,1]),,drop=F]
-      rownames (tmp) = gsub ('\\.','-', rownames (tmp))
-      head(rownames(tmp),top_nmf_genes)
-      })
-names(cnmf_spectra_unique) = paste0('cNMF',seq_along(cnmf_spectra_unique))
+top_nmf_genes = 50
+cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head (x, top_nmf_genes))
 
 # Add module score of cNMF modules ####
 if (!all (names(cnmf_spectra_unique) %in% colnames (srt@meta.data)))
-	{
-	srt = ModScoreCor (
-	        seurat_obj = srt, 
-	        geneset_list = cnmf_spectra_unique, 
-	        cor_threshold = NULL, 
-	        pos_threshold = NULL, # threshold for fetal_pval2
-	        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+    {
+    srt = ModScoreCor (
+            seurat_obj = srt, 
+            geneset_list = cnmf_spectra_unique, 
+            cor_threshold = NULL, 
+            pos_threshold = NULL, # threshold for fetal_pval2
+            listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
 
-	}
+    }
 
 srt$cNMF = 'cNMF'
+ccomp_df = srt@meta.data[,c(names(cnmf_spectra_unique),'sampleID','celltype_simplified'), drop=FALSE]
+      #ccomp_df = aggregate (ccomp_df, by=as.list(srt_wgcna@meta.data[,metaGroupNames,drop=F]), mean)    
+bp1 = lapply (names(cnmf_spectra_unique), function(x) {
+            ggplot (ccomp_df, aes_string (x= 'celltype_simplified', y= x)) +
+        #geom_violin (trim=TRUE, aes_string (fill = metaGroupNames[3])) +
+        #geom_violin (aes_string(fill = metaGroupNames[3])) +
+        geom_boxplot(width=0.5, color="black", alpha=0.2) +
+        #geom_bar (stats='identity') +
+        #geom_jitter (color="black", size=0.4, alpha=0.9) +
+        theme_classic() + 
+        #scale_fill_manual (values= module_pal) + 
+        ggtitle (paste(x,'mod score')) + 
+        theme (axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))  + NoLegend()
+      })
+
+  
+png (file.path('Plots',paste0('cNMF_module_scores_boxplots_',k_selection,'nfeat_',nfeat,'.png')),5000,5000,res=300)
+print (wrap_plots (bp1))
+dev.off()
+
+metaGroupNames = c('celltype_simplified')
+  umap_df = data.frame (srt[[reductionName]]@cell.embeddings, srt@meta.data[,c(names(cnmf_spectra_unique),metaGroupNames)])
+  umap_p1 = lapply (names(cnmf_spectra_unique), function(x) ggplot(data = umap_df) + 
+  geom_point (mapping = aes_string (x = colnames(umap_df)[1], y= colnames(umap_df)[2], color = x), size = .1) + 
+  scale_colour_gradientn (colours = rev(brewer.pal (n = 11, name = "RdBu")),limits=c(-max (abs(umap_df[,x])), max (abs(umap_df[,x])))) +
+  ggtitle (x) + 
+  #facet_wrap (as.formula(paste("~", metaGroupNames[3]))) + 
+  theme_classic() +
+  theme_void())
+  
+pdf (file.path('Plots',paste0('cNMF_module_scores_umap_',k_selection,'.pdf')),24,25)
+print (wrap_plots (umap_p1))
+dev.off()
+
+enricher_universe = vf
+#do.fgsea = TRUE
+gmt_annotations = c(
+'h.all.v7.4.symbol.gmt',#,
+'c5.bp.v7.1.symbol.gmt',
+'c3.tft.v7.1.symbol.gmt'
+)
+gmt_annotation = gmt_annotations[3]
+if (!file.exists (paste0('cNMF_normalized/',cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds')) | force)
+  {
+    gmt.file = file.path ('..','..','git_repo','files',gmt_annotation)
+    pathways = read.gmt (gmt.file)
+    EnrichRResCluster = list()
+    for (i in names(cnmf_spectra_unique))
+      {
+      message (paste ('EnrichR running module',i)) 
+      sig_genes = cnmf_spectra_unique[[i]]
+      if (!any (sig_genes %in% pathways$gene)) next
+      egmt = enricher (sig_genes, TERM2GENE=pathways, universe = enricher_universe)
+      egmt@result$ID = stringr::str_trunc (egmt@result$ID, 50)
+      EnrichRResCluster[[i]] = egmt@result
+      }
+    EnrichRResAll = EnrichRResCluster
+    saveRDS (EnrichRResAll, paste0(cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds'))
+    } else {
+  EnrichRResAll = readRDS (paste0(cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds'))
+  }
+  pvalAdjTrheshold = 0.05
+  top_pathways = 10
+  EnrichRes_dp = dotGSEA (enrichmentsTest_list = EnrichRResAll, type = 'enrich', padj_threshold = pvalAdjTrheshold, top_pathways= top_pathways)
+  pdf (paste0(cnmf_out, '/Plots/EnrichR_',i,'_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'_dotplots.pdf'), width = 8 + length(length (cnmf_spectra_unique))/10, height = 15)
+  print (EnrichRes_dp)
+  dev.off()
+
+
+## Rerun cNMF but only in HOXB13+ cluster ####
+
+#### Run cNMF ####
+nfeat = 5000
+force=F
+k_list = c(5:30)
+k_selections = c(5:30)
+k_selection = 10
+cores= 100
+
+cnmf_name = 'scrna_p11_HOX'
+repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+
+### RUN consensus NMF ####
+srt2 = srt
+srt = srt[,srt$seurat_clusters == 1]
+source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
+
+### Import and format spectra files ####
+k_selection = 10
+cnmf_name = 'scrna_p11_HOX'
+source (file.path ('..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
+
+top_nmf_genes = 200
+cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head (x, top_nmf_genes))
+write.csv (cnmf_spectra_unique, file.path (cnmf_out,'cnmf_list.csv'))
+
+# Add module score of cNMF modules ####
+force = T
+if (!all (names(cnmf_spectra_unique) %in% colnames (srt@meta.data)) | force)
+    {
+    srt = ModScoreCor (
+            seurat_obj = srt, 
+            geneset_list = cnmf_spectra_unique, 
+            cor_threshold = NULL, 
+            pos_threshold = NULL, # threshold for fetal_pval2
+            listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+
+    }
+
+srt$cNMF = 'cNMF'
+nfeat = 3000
+srt = FindVariableFeatures (srt, selection.method = "vst", nfeat = nfeat)
+srt = ScaleData (srt)   
+srt = RunPCA (srt, features = VariableFeatures (object = srt), npcs = ifelse(ncol(srt) <= 30,ncol(srt)-1,30), ndims.print = 1:5, nfeat.print = 5, verbose = FALSE)
+
+reductionName = 'umap'
+reductionSave = 'pca'
+reductionGraphKnn = 'RNA_knn'
+reductionGraphSnn = 'RNA_snn' 
+
+srt = RunUMAP (object = srt, reduction = reductionSave, dims = 1:30)
+srt = FindNeighbors (srt)
+srt = FindClusters (srt, res=.6)
+
 ccomp_df = srt@meta.data[,c(names(cnmf_spectra_unique),'sampleID','celltype_simplified'), drop=FALSE]
       #ccomp_df = aggregate (ccomp_df, by=as.list(srt_wgcna@meta.data[,metaGroupNames,drop=F]), mean)    
 bp1 = lapply (names(cnmf_spectra_unique), function(x) {
@@ -175,21 +246,21 @@ metaGroupNames = c('celltype_simplified')
   theme_classic() +
   theme_void())
   
-pdf (paste0(cnmf_out,'/Plots/cNMF_module_scores_umap_',k_selection,'.pdf'),24,25)
+pdf (file.path(cnmf_out,'Plots',paste0('cNMF_module_scores_umap_',k_selection,'_HOX.pdf')),width=10,7)
 print (wrap_plots (umap_p1))
 dev.off()
 
-enricher_universe = vf
+enricher_universe = rownames(srt)
 #do.fgsea = TRUE
 gmt_annotations = c(
-'h.all.v7.4.symbol.gmt',#,
+'h.all.v7.4.symbols.gmt',#,
 'c5.bp.v7.1.symbol.gmt',
 'c3.tft.v7.1.symbol.gmt'
 )
-gmt_annotation = gmt_annotations[3]
+gmt_annotation = gmt_annotations[2]
 if (!file.exists (paste0('cNMF_normalized/',cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds')) | force)
   {
-    gmt.file = paste0 ('../../PM_scATAC/files/',gmt_annotation)
+    gmt.file = file.path ('..','..','git_repo','files',gmt_annotation)
     pathways = read.gmt (gmt.file)
     EnrichRResCluster = list()
     for (i in names(cnmf_spectra_unique))
@@ -198,27 +269,25 @@ if (!file.exists (paste0('cNMF_normalized/',cnmf_out, '/EnrichR_cNMF_module_gene
       sig_genes = cnmf_spectra_unique[[i]]
       if (!any (sig_genes %in% pathways$gene)) next
       egmt = enricher (sig_genes, TERM2GENE=pathways, universe = enricher_universe)
-      egmt@result$ID = stringr::str_trunc (egmt@result$ID, 50)
+      egmt@result$ID = stringr::str_trunc (egmt@result$ID, 100)
       EnrichRResCluster[[i]] = egmt@result
       }
     EnrichRResAll = EnrichRResCluster
-    }
-  saveRDS (EnrichRResAll, paste0(cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds'))
-  } else {
+    saveRDS (EnrichRResAll, paste0(cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds'))
+    } else {
   EnrichRResAll = readRDS (paste0(cnmf_out, '/EnrichR_cNMF_module_genes_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'.rds'))
   }
   pvalAdjTrheshold = 0.05
   top_pathways = 10
   EnrichRes_dp = dotGSEA (enrichmentsTest_list = EnrichRResAll, type = 'enrich', padj_threshold = pvalAdjTrheshold, top_pathways= top_pathways)
-  pdf (paste0(cnmf_out, '/Plots/EnrichR_',i,'_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'_dotplots.pdf'), width = 8 + length(length (cnmf_spectra_unique))/10, height = 15)
+  pdf (paste0(cnmf_out, '/Plots/EnrichR_',i,'_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'_dotplots.pdf'), width = 12 + length(length (cnmf_spectra_unique))/10, height = 15)
   print (EnrichRes_dp)
   dev.off()
 
-# Plot only the malignant modules enrichments ####
-  
+# Restore original seurat object ####
+srt = srt2
 
 
-	
 ### Test correlation of chr18 mega hubs regions from P11 with other genes ####
 
 # Load metacells object ####
@@ -260,15 +329,13 @@ dev.off()
 
 
 ### Correlate megahubs region with all other genes in P11 metacells ####
-srt = readRDS (file.path ('..','scrna','srt.rds'))
-
 ccomp_df = metacells@meta.data[,'chr18_q23', drop=F]
 metacells_assay = metacells@assays$RNA@layers$data
-rownames (metacells_assay) = rownames(srt)
+rownames (metacells_assay) = rownames(metacells)
 
-res = sapply (unique(metacells$sampleID), function (y) cor (t(metacells_assay[,metacells$sampleID == y]), ccomp_df[metacells$sampleID == y,1, drop=F], method = 'pearson'))
+res = sapply (unique(metacells$sampleID3), function (y) cor (t(metacells_assay[,metacells$sampleID3 == y]), ccomp_df[metacells$sampleID3 == y,1, drop=F], method = 'pearson'))
 rownames (res) = rownames (metacells_assay)
-colnames (res) = unique (metacells$sampleID)
+colnames (res) = unique (metacells$sampleID3)
 
 res = as.data.frame (res)
 res = res[order (-res$P11),]
@@ -277,12 +344,12 @@ head (res)
 
 y = 'P11'
 pdf (file.path ('Plots','chr18_q23_CNDP2_scatter.pdf'))
-plot (x = metacells_assay['CNDP2',metacells$sampleID == y], y = ccomp_df[metacells$sampleID == y,1])
+plot (x = metacells_assay['CNDP2',metacells$sampleID3 == y], y = ccomp_df[metacells$sampleID3 == y,1])
 dev.off()
 
 ### Restrict above analysis only on metacells high for megahubs in P11 ####
-metacells_assay_P11s = metacells_assay[,metacells$sampleID == y & ccomp_df[,1] > 0.4]
-ccomp_df_P11s = ccomp_df[metacells$sampleID == y & ccomp_df[,1] > 0.4,]
+metacells_assay_P11s = metacells_assay[,metacells$sampleID3 == y & ccomp_df[,1] > 0.4]
+ccomp_df_P11s = ccomp_df[metacells$sampleID3 == y & ccomp_df[,1] > 0.4,]
 
 res_p11s = cor (t(metacells_assay_P11s), ccomp_df_P11s, method= 'pearson')
 res_p11s = res_p11s[order (-res_p11s[,1]),]
@@ -381,9 +448,9 @@ rownames (metacells_assay) = rownames(metacells)
 metacells@meta.data[,gene] = metacells_assay[gene, ]
 
 ### Restrict above analysis only on metacells high for HOXB13 in P11 ####
-y = 'P11'
+y = 'P11_HOX'
 summary (metacells@meta.data[,gene])
-metacells_assay_P11s = metacells_assay[,metacells$sampleID == y & metacells@meta.data[,gene] > 0.5]
+metacells_assay_P11s = metacells_assay[,metacells$sampleID3 == y & metacells@meta.data[,gene] > 0.5]
 
 
 pdf (file.path ('Plots','HOXB13_metacells_scatter.pdf'))
@@ -392,7 +459,7 @@ dev.off()
 
 # Double check the metacells selection chosed ####
 HOXB13_cells_selection = unlist(lapply (
-	metacells$cells_merged[metacells$sampleID == y & 
+	metacells$cells_merged[metacells$sampleID3 == y & 
 	metacells@meta.data[,gene] > 0.5], function(x) unlist(strsplit(x, ','))))
 srt$HOXB13_cells_selection = colnames(srt) %in% HOXB13_cells_selection
 
@@ -648,3 +715,187 @@ p <- plotEmbedding(
 pdf (file.path('Plots','cnv_TF_cor_umap.pdf'))
 p
 dev.off()
+
+
+
+
+
+
+
+
+
+### Combine TF modisco and finemo outputs to build network of co-occurring TFs across peaks ####
+library (httr)
+library (XML)
+library (igraph)
+
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
+fold_number = 0
+celltype = 'C15' # in new clustering is C1
+
+
+count_to_adj = function(data = NULL)
+  {
+  count1s <- function(x, y) colSums(x == 1 & y == 1)
+  n <- 1:ncol(data)
+  mat <- outer(n, n, function(x, y) count1s(data[, x], data[, y]))
+  diag(mat) <- 0
+  dimnames(mat) <- list(colnames(data), colnames(data))
+  return (mat)
+  }
+    
+
+ov_motif_peaks_adj_l = list()
+#celltype= 'IL1B'
+modisco_motifs = as.data.frame(readHTMLTable(file.path(chromBPdir, paste0(celltype,'_model'),'fold_0','modisco','report','motifs.html')))
+modisco_motifs$motif_match0 = sapply (modisco_motifs$NULL.match0, function(x) unlist(strsplit (x, '_'))[1])
+modisco_motifs$motif_match1 = sapply (modisco_motifs$NULL.match1, function(x) unlist(strsplit (x, '_'))[1])
+modisco_motifs$motif_match2 = sapply (modisco_motifs$NULL.match2, function(x) unlist(strsplit (x, '_'))[1])
+
+finemo_hits = read.table(file.path(chromBPdir,paste0(celltype,'_model'),'finemo_out','hits.tsv'), sep='\t', header=T)
+finemo_hits$motif_name0 = modisco_motifs$motif_match0[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+finemo_hits$motif_name1 = modisco_motifs$motif_match1[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+finemo_hits$motif_name2 = modisco_motifs$motif_match2[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+write.table (finemo_hits[,c(1,2,3,14,15,16)], paste0(celltype,'_finemo_to_genome_browser.tsv'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+
+peakset = read.table (file.path(chromBPdir,paste0('peakset_',celltype,'.bed')))
+peakset = peakset[,1:3]
+colnames (peakset) = c ('chr','start','end')
+peakset = makeGRangesFromDataFrame (peakset)
+finemo_hits = makeGRangesFromDataFrame (finemo_hits, keep.extra.columns = T)
+
+match_rank = c('motif_name0')#,'motif_name1','motif_name2')
+ov_motif_peaks_mat_combined = list()
+for (motif_match in match_rank)
+  {
+  finemo_hits_l = split (finemo_hits, finemo_hits@elementMetadata[,motif_match])
+  
+  ov_motif_peaks = lapply (finemo_hits_l, function(x) findOverlaps (peakset, x, select='first'))
+  ov_motif_peaks_mat = do.call (cbind, ov_motif_peaks)
+  rownames (ov_motif_peaks_mat) = as.character(peakset)
+  ov_motif_peaks_mat[is.na(ov_motif_peaks_mat)] = 0
+  ov_motif_peaks_mat[ov_motif_peaks_mat > 0] = 1
+  ov_motif_peaks_mat_combined[[motif_match]] = ov_motif_peaks_mat
+  #ov_motif_peaks_df = as.data.frame (ov_motif_peaks_mat)
+  }
+ov_motif_peaks_mat_combined = do.call (cbind, ov_motif_peaks_mat_combined)  
+tf_columns = colnames(ov_motif_peaks_mat_combined)
+ov_motif_peaks_adj_l2 = as.data.frame (count_to_adj (data = ov_motif_peaks_mat_combined))
+# From https://stackoverflow.com/questions/66515117/convert-dummy-coded-matrix-to-adjacency-matrix
+ov_motif_peaks_adj_l[[celltype]] = ov_motif_peaks_adj_l2
+
+
+# Try with heatmaps 
+palette_cooccurence2 = paletteer::paletteer_c("grDevices::Oslo",100)
+all_TF = unique(unname(unlist(lapply (ov_motif_peaks_adj_l, function(x) unique(colnames(x))))))
+all_TF = all_TF[all_TF != 'NaN']
+ht_list = NULL 
+set.seed (1234)
+hm_mat = as.data.frame (ov_motif_peaks_adj_l[[celltype]][match(all_TF, colnames(ov_motif_peaks_adj_l[[celltype]])),])
+hm_mat = as.data.frame (t(hm_mat[all_TF,]))[all_TF,]
+rownames (hm_mat) = all_TF
+colnames (hm_mat) = all_TF
+hm_mat[is.na(hm_mat)] = 0
+#hm_mat = scale (hm_mat)
+hm_mat = log2(hm_mat+1)
+if (is.null(ht_list)) {
+d = as.dist(t(1-cor(hm_mat)))
+d[is.na(d)] = 1
+hc = hclust(d)
+column_order = colnames(hm_mat)[hc$order]
+d = as.dist(1-cor(hm_mat))
+d[is.na(d)] = 1
+hc = hclust(as.dist(d))
+row_order = colnames(hm_mat)[hc$order]
+ht_list = Heatmap (
+  hm_mat, 
+  column_names_gp= gpar(fontsize=0),
+  row_names_gp= gpar(fontsize=6), column_order=column_order, row_order=row_order,
+  col = palette_cooccurence2, border=T, column_title = celltype)
+} else {
+ht_list = ht_list + Heatmap (
+hm_mat[,column_order], cluster_columns=F,
+column_names_gp= gpar(fontsize=0),
+row_names_gp= gpar(fontsize=6),
+col = palette_cooccurence2, border=T, column_title = celltype)
+}
+
+pdf (file.path ('Plots','combined_chromBPnet_cooccurrence_heatmaps.pdf'),width=4,height=3)
+ht_list
+dev.off()
+
+  
+# Map peaks with HOXB13 seqlet and run GSEA enrichment using nearby genes ####
+TF = 'HXB13'
+tf_peaks = finemo_hits[finemo_hits$motif_name0 == TF,]
+peakHits = queryHits (findOverlaps(getPeakSet(archp),tf_peaks))
+peakHits_top = head (table (peakHits)[order(-table(peakHits))],200)
+tf_peaks = getPeakSet(archp)[as.numeric(names(peakHits_top))]
+nearby_genes = unique(tf_peaks$nearestGene)
+write.csv (nearby_genes, 'HOXB13_chrombpnet_top_hits.csv')
+# use RNA to select for most expressed genes
+metaGroupname = 'seurat_clusters'
+ps = log2(as.data.frame (AverageExpression (srt, features = nearby_genes, group.by = metaGroupname)[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+hox_cluster = 'g1'
+ps = ps[, hox_cluster,drop=F]
+ps = ps[order(-ps$g1),,drop=F]
+head(ps,150)
+
+#### Too many peaks have HOXB13!!
+
+
+# Check expression of TF binding HOXB13 locus as predicted by chrombpnet and chromVAR ####
+
+# Motif enrichment of peaks found around HOX13 genes ####
+tf_match = getMatches (archp)
+C1_peaks = readRDS (file.path ('PeakCalls','C1-reproduciblePeaks.gr.rds'))
+tf_match = tf_match[queryHits (findOverlaps(tf_match, C1_peaks))]
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+bg_peakSet = rowRanges (tf_match)
+region = GRanges (c(
+  'chr17:48726626-48729823'))
+
+region_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, region))]
+#tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
+region_TF =  hyperMotif (
+  selected_peaks = region_peaks, 
+  motifmatch = tf_match)
+
+head (region_TF, 100)
+
+scrna_cor = read.csv (file.path ('..','scrna','correlated_genes_p11s_HOXB13.csv'))
+
+cor_df = data.frame (rna_cor = scrna_cor$x[match(rownames(region_TF), scrna_cor$X)],
+  TF_enrich_log10 = -log10(region_TF$padj), 
+  TF_enrich_padj = region_TF$padj,
+  row.names = rownames(region_TF)
+  )
+cor_df$label = ifelse (cor_df$TF_enrich_padj < 0.05, rownames(cor_df), '')
+gp = ggplot (cor_df, aes (x = TF_enrich_log10, y = rna_cor, label = label)) + 
+  geom_point(size = 2, shape = 21, stroke=0.3) + 
+  geom_text_repel() + 
+  gtheme_no_rot
+
+pdf (file.path ('Plots','scrna_cor_vs_TF_enrich_HOX_scatter.pdf'),width=13,3)
+gp
+dev.off()
+
+
+TFs = c('HOXB13','NFYB')
+pdf (file.path ('Plots','expression_of_TFs_binding_HOXB13_locus.pdf'),width=20)
+DotPlot (srt, TFs, group.by='seurat_clusters') + gtheme
+dev.off()
+
+# Check TF expression bindings HOBX13 locus without running hyper ####
+tf_match = getMatches (archp)
+region = GRanges (c(
+  'chr17:48726626-48729823'))
+region_peaks = tf_match[queryHits(findOverlaps(rowRanges(tf_match), region))]
+TF_hits = colnames(assay(region_peaks))[colSums (assay(region_peaks)) > 0]
+TF_hits = sapply (TF_hits, function(x) unlist(strsplit(x, '_'))[1])
+pdf (file.path ('Plots','expression_of_TFs_binding_HOXB13_locus.pdf'),width=20)
+DotPlot (srt, unname(TF_hits), group.by='seurat_clusters') + gtheme
+dev.off()
+
+

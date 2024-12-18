@@ -279,7 +279,7 @@ hm = Heatmap (t(scale(cnmf_scatac[,!colnames(cnmf_scatac) %in% cnmf_remove])),
   column_names_gp = gpar (fontsize = 0),
   border=T)
 
-pdf (file.path ('Plots','cnmf_scatac_barcodes_heatmap_scaled.pdf'), height=3)
+pdf (file.path ('Plots','cnmf_scatac_barcodes_heatmap_scaled2.pdf'), height=3)
 hm
 dev.off()
 
@@ -300,9 +300,10 @@ archp$cnmf_celltypes[archp$cnmf_cluster2 == 'cnmf_cluster_9'] = 'CC'
 write.csv (data.frame (barcode = rownames(archp@cellColData), celltype = archp$cnmf_celltypes), 'barcode_annotation.csv')
 
 # Find DAM in cnmf_clusters ####
+metaGroupName = "cnmf_celltypes"
 metaGroupName = "celltype2"
-archp$celltype2 = archp$cnmf_cluster
-force=TRUE
+#archp$celltype2 = archp$cnmf_cluster
+force=FALSE
 source (file.path('..','..','git_repo','utils','DAM.R'))
 
 mMat = assays (mSE)[[1]]
@@ -379,6 +380,13 @@ TF_exp_selected_hm2 = Heatmap (ps_tf,
 pdf (file.path ('Plots','cnmf_clusters_DAM_heatmap.pdf'), width = 10,height=6)
 draw (DAM_hm + TF_exp_selected_hm + TF_exp_selected_hm2)
 dev.off()
+
+# Find DAG in cnmf_clusters ####
+metaGroupName = "cnmf_celltypes"
+#metaGroupName = "celltype2"
+#archp$celltype2 = archp$cnmf_cluster
+force=FALSE
+source (file.path('..','..','git_repo','utils','DAG.R'))
 
 
 
@@ -853,6 +861,190 @@ pdf (file.path ('Plots','TF_featureplots.pdf'), width = 8,height=4)
 wrap_plots (TF_p, p)
 dev.off()
 
+
+### Combine TF modisco and finemo outputs to build network of co-occurring TFs across peaks ####
+library (httr)
+library (XML)
+library (igraph)
+
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet'
+fold_number = 0
+celltypes = c('IL1B','Mono','TREM2','SPP1','C1Q','IM')
+
+
+count_to_adj = function(data = NULL)
+  {
+  count1s <- function(x, y) colSums(x == 1 & y == 1)
+  n <- 1:ncol(data)
+  mat <- outer(n, n, function(x, y) count1s(data[, x], data[, y]))
+  diag(mat) <- 0
+  dimnames(mat) <- list(colnames(data), colnames(data))
+  return (mat)
+  }
+    
+
+ov_motif_peaks_adj_l = list()
+for (celltype in celltypes)
+  {
+  #celltype= 'IL1B'
+  modisco_motifs = as.data.frame(readHTMLTable(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet/',celltype,'_model/fold_0/modisco/report/motifs.html')))
+  modisco_motifs$motif_match0 = sapply (modisco_motifs$NULL.match0, function(x) unlist(strsplit (x, '_'))[1])
+  modisco_motifs$motif_match1 = sapply (modisco_motifs$NULL.match1, function(x) unlist(strsplit (x, '_'))[1])
+  modisco_motifs$motif_match2 = sapply (modisco_motifs$NULL.match2, function(x) unlist(strsplit (x, '_'))[1])
+
+  finemo_hits = read.table(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet/',celltype,'_model/finemo_out/hits.tsv'), sep='\t', header=T)
+  finemo_hits$motif_name0 = modisco_motifs$motif_match0[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+  finemo_hits$motif_name1 = modisco_motifs$motif_match1[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+  finemo_hits$motif_name2 = modisco_motifs$motif_match2[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+  peakset = read.table (file.path(chromBPdir,paste0('peakset_',celltype,'.bed')))
+  peakset = peakset[,1:3]
+  colnames (peakset) = c ('chr','start','end')
+  peakset = makeGRangesFromDataFrame (peakset)
+  finemo_hits = makeGRangesFromDataFrame (finemo_hits, keep.extra.columns = T)
+  
+  match_rank = c('motif_name0','motif_name1','motif_name2')
+  ov_motif_peaks_mat_combined = list()
+  for (motif_match in match_rank)
+    {
+    finemo_hits_l = split (finemo_hits, finemo_hits@elementMetadata[,motif_match])
+    
+    ov_motif_peaks = lapply (finemo_hits_l, function(x) findOverlaps (peakset, x, select='first'))
+    ov_motif_peaks_mat = do.call (cbind, ov_motif_peaks)
+    rownames (ov_motif_peaks_mat) = as.character(peakset)
+    ov_motif_peaks_mat[is.na(ov_motif_peaks_mat)] = 0
+    ov_motif_peaks_mat[ov_motif_peaks_mat > 0] = 1
+    ov_motif_peaks_mat_combined[[motif_match]] = ov_motif_peaks_mat
+    #ov_motif_peaks_df = as.data.frame (ov_motif_peaks_mat)
+    }
+  ov_motif_peaks_mat_combined = do.call (cbind, ov_motif_peaks_mat_combined)  
+  tf_columns = colnames(ov_motif_peaks_mat_combined)
+  ov_motif_peaks_adj_l2 = as.data.frame (count_to_adj (data = ov_motif_peaks_mat_combined))
+  # From https://stackoverflow.com/questions/66515117/convert-dummy-coded-matrix-to-adjacency-matrix
+  ov_motif_peaks_adj_l[[celltype]] = ov_motif_peaks_adj_l2
+  }
+# gr = graph_from_adjacency_matrix(
+#   ov_motif_peaks_adj,
+#   mode = c("undirected"),
+#   weighted = TRUE,
+#   diag = FALSE,
+#   add.colnames =NULL,
+#   add.rownames = NA
+# )
+
+
+
+
+
+# set.seed(1234)
+# grp_l = list() 
+
+# for (celltype in celltypes)
+# {
+# # set seed (so that the exact same network graph is created every time)
+
+
+# va = data.frame (node = names(rowSums (ov_motif_peaks_adj_l[[celltype]])), n = rowSums (ov_motif_peaks_adj_l[[celltype]]))
+
+
+# # create a new data frame 'ed' using the 'dat' data
+# ed <- ov_motif_peaks_adj_l[[celltype]] %>%
+#   # add a new column 'from' with row names
+#   dplyr::mutate(from = rownames(.)) %>%
+#   # reshape the data from wide to long format using 'gather'
+#   tidyr::gather(to, n, 1:(ncol(ov_motif_peaks_adj_l[[celltype]]))) %>%
+#   # remove zero frequencies 
+#   dplyr::filter(n != 0)
+# colnames(ed)[3] = 'weight'
+# ed$weight = log10(ed$weight + 1)
+# # el =as_edgelist (gr, names=T)
+# # el$weight = 
+# ig <- igraph::graph_from_data_frame(d=ed, vertices=va, directed = FALSE)
+
+# tg <- tidygraph::as_tbl_graph(ig) %>% 
+#   tidygraph::activate(nodes) %>% 
+#   dplyr::mutate(label=name)
+# # create a graph using the 'tg' data frame with the Fruchterman-Reingold layout
+# grp_l = tg %>%
+#   ggraph::ggraph(layout = "fr") +
+  
+#   # add arcs for edges with various aesthetics
+#   geom_edge_arc(colour = "gray50",
+#                 lineend = "round",
+#                 strength = .1,
+#                 aes(edge_width = exp(ed$weight),
+#                     alpha = ed$weight)) +
+  
+#   # add points for nodes with size based on log-transformed 'v.size' and color based on 'va$Family'
+#   geom_node_point(size = log10(va$n+1)*2, color = 'grey') +
+  
+#   # add text labels for nodes with various aesthetics
+#   geom_node_text(aes(label = name), 
+#                  repel = FALSE, 
+#                  point.padding = unit(0.2, "lines"), 
+#                  #size = sqrt(va$n), 
+#                  colour = "gray10") +
+  
+#   # adjust edge width and alpha scales
+#   scale_edge_width(range = c(0, 2.5)) +
+#   scale_edge_alpha(range = c(0, .3)) +
+  
+#   # set graph background color to white
+#   theme_graph(background = "white") +
+  
+#   # adjust legend position to the top
+#   theme(legend.position = "top", 
+#         # suppress legend title
+#         legend.title = element_blank()) +
+  
+#   # remove edge width and alpha guides from the legend
+#   guides(edge_width = FALSE,
+#          edge_alpha = FALSE)
+# #hm = Heatmap (ov_motif_peaks_adj)
+# pdf (file.path('Plots',paste0('graph_cooccurrence_',celltype,'_graph.pdf')), width=7, height=7)
+# print (grp_l)
+# dev.off()
+# }
+
+# Try with heatmaps 
+palette_cooccurence2 = paletteer::paletteer_c("grDevices::Oslo",100)
+all_TF = unique(unname(unlist(lapply (ov_motif_peaks_adj_l, function(x) unique(colnames(x))))))
+all_TF = all_TF[all_TF != 'NaN']
+ht_list = NULL 
+set.seed (1234)
+for (celltype in celltypes)
+{
+  hm_mat = as.data.frame (ov_motif_peaks_adj_l[[celltype]][match(all_TF, colnames(ov_motif_peaks_adj_l[[celltype]])),])
+  hm_mat = as.data.frame (t(hm_mat[all_TF,]))[all_TF,]
+  rownames (hm_mat) = all_TF
+  colnames (hm_mat) = all_TF
+  hm_mat[is.na(hm_mat)] = 0
+  #hm_mat = scale (hm_mat)
+  hm_mat = log2(hm_mat+1)
+  if (is.null(ht_list)) {
+  d = as.dist(t(1-cor(hm_mat)))
+  d[is.na(d)] = 1
+  hc = hclust(d)
+  column_order = colnames(hm_mat)[hc$order]
+  d = as.dist(1-cor(hm_mat))
+  d[is.na(d)] = 1
+  hc = hclust(as.dist(d))
+  row_order = colnames(hm_mat)[hc$order]
+  ht_list = Heatmap (
+    hm_mat, 
+    column_names_gp= gpar(fontsize=0),
+    row_names_gp= gpar(fontsize=3), column_order=column_order, row_order=row_order,
+    col = palette_cooccurence2, border=T, column_title = celltype)
+  } else {
+  ht_list = ht_list + Heatmap (
+  hm_mat[,column_order], cluster_columns=F,
+  column_names_gp= gpar(fontsize=0),
+  row_names_gp= gpar(fontsize=3),
+  col = palette_cooccurence2, border=T, column_title = celltype)
+  }
+}
+pdf (file.path ('Plots','combined_chromBPnet_cooccurrence_heatmaps.pdf'),width=10,height=4)
+ht_list
+dev.off()
 
 
 

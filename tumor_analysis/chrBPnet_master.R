@@ -3,9 +3,11 @@
 # chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet'
 # repodir='/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 # grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
-# celltype='very_high'
-# celltype='TREM2'
-# celltype='P5__epithelioid'
+# celltype='SPP1'
+# celltype='Mono'
+# celltype='C1Q'
+# celltype='P23__epithelioid'
+# celltype = 'C2'
 # fold_numbers = c(0,1,2,3,4)
 
 message ('Submit job for chromBPnet training model')	
@@ -68,7 +70,7 @@ if (!all (file.exists(file.path (chromBPdir, paste0(celltype,'_model'), paste0('
 		#system (paste0('chmod +x ',file.path(repodir, 'utils','chrBPnet_training.sh')))
 		#paste("bsub bash -c \"/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/tnk_analysis/chrombnet_NKT_NK_KLRC1_f3.sh, projdir)
 		#system (paste("bsub bash -c \", file.path(repodir,utils','chrBPnet_training.sh '), chromBPdir,' ',grefdir,' ',repodir,' ',celltype,' ',fold_number,'"'), wait=FALSE)
-		command <- paste("bsub -J", paste0(celltype,'_TFmd'), "-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=64000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('TFmodisco_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('TFmodisco_',celltype,'.err')),file.path(repodir,'utils','TFmodisco.sh'))
+		command <- paste ("bsub -J", paste0(celltype,'_TFmd'), "-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=64000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('TFmodisco_',celltype,'.out')), "-eo" ,file.path(chromBPdir,paste0('TFmodisco_',celltype,'.err')),file.path(repodir,'utils','TFmodisco.sh'))
 		args <- paste(chromBPdir,celltype, fold_number)
 		system (paste(command, args))
 		}

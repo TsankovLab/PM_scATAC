@@ -35,11 +35,8 @@ cd ${chromBPdir}/${celltype}_model/
 # Take mean of contribution bw 
 #wiggletools mean fold_0/${celltype}_contribution_scores.counts_scores.bw fold_1/${celltype}_contribution_scores.counts_scores.bw fold_2/${celltype}_contribution_scores.counts_scores.bw fold_3/${celltype}_contribution_scores.counts_scores.bw fold_4/${celltype}_contribution_scores.counts_scores.bw > ${celltype}_cntr_score_counts_mean.bw
 
-
 source activate finemo
 
 finemo extract-regions-chrombpnet-h5 -c fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 -o motif_calls -w 2000 #fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 fold_2/${celltype}_contribution_scores.counts_scores.h5 fold_3/${celltype}_contribution_scores.counts_scores.h5 fold_4/${celltype}_contribution_scores.counts_scores.h5 
-
 finemo call-hits -r motif_calls.npz -m fold_$fold_number/modisco/modisco_results.h5 -o finemo_out -p ../peakset_${celltype}.bed -J
-
 finemo report -r motif_calls.npz -H finemo_out/hits.tsv -p ../peakset_${celltype}.bed -m fold_$fold_number/modisco/modisco_results.h5 -o finemo_out/report -W 2000

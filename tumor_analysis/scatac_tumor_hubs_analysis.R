@@ -39,7 +39,7 @@ if (!file.exists ('peak_regions.bed'))
 
 ### Hubs analysis #####
 metaGroupName = "Sample2"
-cor_cutoff = 0.2
+cor_cutoff = 0.3
 #max_dist = 12500
 max_dist = 12500
 min_peaks = 5
@@ -48,18 +48,19 @@ hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_
 dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 
 # Generate cluster-aware knn groups ####
-k= 50
-metaGroupName = 'Sample2'
+k= 100
+metaGroupName = 'Sample3'
+archp_NN = archp[archp$Sample3 != 'normal_pleura']
 
-force = FALSE
+force = T
 if (!file.exists(paste0 ('KNNs_',metaGroupName,'k_',k,'.rds')) | force)
   {
   KNNs = knnGen (
-    ArchRProj = archp, 
+    ArchRProj = archp_NN, 
     k = k,
     reducedDims = 'IterativeLSI', 
     group = metaGroupName,
-    overlapCutoff = 0.6,
+    overlapCutoff = 0.7,
     #cellsToUse = metaGroup_df$barcode,
     #min.cells_in_group = min_cells,
     min_knn_cluster = 2
@@ -76,12 +77,14 @@ KNNs_df = lapply (seq_along(KNNs), function(x) data.frame (
   group2 = unlist(strsplit (names(KNNs)[x],'KNN'))[1]))
 
 KNNs_df = do.call (rbind, KNNs_df)
-archp$knn_groups = KNNs_df$group[match (archp$cellNames, KNNs_df$cell)]
+archp_NN$knn_groups = KNNs_df$group[match (archp_NN$cellNames, KNNs_df$cell)]
 
 # Plot KNNs on UMAP ####
-umap_knn = plotEmbedding (ArchRProj = archp, embedding = 'UMAP',
+pdf()
+umap_knn = plotEmbedding (ArchRProj = archp_NN, embedding = 'UMAP',
   colorBy = "cellColData", name = 'knn_groups',plotAs ='hex',
     baseSize=0, labelMeans=FALSE) + NoLegend() 
+dev.off()
 pdf (file.path(hubs_dir, 'Plots',paste0('knn_',k,'.pdf')), height=20, width=20)
 umap_knn
 dev.off()
@@ -91,18 +94,18 @@ dev.off()
 run_coax = TRUE
 if (run_coax)
   {
-  archp = addCoAx (
-    archp, 
+  archp_NN = addCoAx (
+    archp_NN, 
     KNNs,
     maxDist = max_dist)
   }
 
 ### Run hub finder ####
-force=F
+force=T
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (
-    ArchRProj = archp, 
+    ArchRProj = archp_NN, 
     group_by = NULL,
     cor_cutoff = cor_cutoff,
     #select_group = metaGroup_df$metaGroup,
@@ -124,26 +127,23 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
 
 
 # Generate matrix of fragment counts of hubs x metagroup ####
-metaGroupName = 'Sample2'
-archp$SampleP11 = archp$Sample2
-archp$SampleP11[archp$Clusters == 'C14'] = 'P11_HOX+'
-metaGroupName = 'SampleP11'
+metaGroupName = 'Sample3'
 if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
-    ArchRProj = archp))   
-  hubsSample_mat = matrix (ncol = length(unique(archp@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsSample_mat) = unique(archp@cellColData[,metaGroupName])
+    ArchRProj = archp_NN))   
+  hubsSample_mat = matrix (ncol = length(unique(archp_NN@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
+  colnames (hubsSample_mat) = unique(archp_NN@cellColData[,metaGroupName])
   rownames (hubsSample_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (unique(archp@cellColData[,metaGroupName])))
-  for (sam in unique(archp@cellColData[,metaGroupName]))
+  pb =progress::progress_bar$new(total = length (unique(archp_NN@cellColData[,metaGroupName])))
+  for (sam in unique(archp_NN@cellColData[,metaGroupName]))
     {
     pb$tick()  
-    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == sam]]  
+    fragments_in_sample = fragments[fragments$RG %in% rownames(archp_NN@cellColData)[as.character(archp_NN@cellColData[,metaGroupName]) == sam]]  
     fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
     hubsSample_mat[,sam] = fragments_in_sample_in_hubs
     }
-  frags_in_sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) sum (archp$nFrags[as.character(archp@cellColData[,metaGroupName]) == x]))
+  frags_in_sample = sapply (unique(archp_NN@cellColData[,metaGroupName]), function(x) sum (archp_NN$nFrags[as.character(archp_NN@cellColData[,metaGroupName]) == x]))
   hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
   saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
   } else {

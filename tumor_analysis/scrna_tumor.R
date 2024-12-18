@@ -89,10 +89,10 @@ if (!file.exists ('srt.rds'))
 
 	srt[['SCT']] = NULL
 	srt[['integrated']] = NULL	
-	saveRDS (srt, 'srt.rds')
 	
 	srt$sampleID3 = srt$sampleID
 	srt$sampleID3[srt$seurat_clusters == '9'] = 'P11_HOX'
+	saveRDS (srt, 'srt.rds')
 
 	pdf (file.path('Plots','umap_samples.pdf'), width=12)
 	wrap_plots (DimPlot (srt, group.by = 'sampleID3'), DimPlot (srt, group.by = 'seurat_clusters', label=T))

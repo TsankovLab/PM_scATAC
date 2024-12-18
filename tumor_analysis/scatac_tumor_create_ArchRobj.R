@@ -149,8 +149,5 @@ print (umap_p1)
 print (umap_p2)
 dev.off()
 
-# Remove outlier cells ####
-archp = archp[archp$Clusters != 'C1']
-
 # Save ArchR object ####
 archp = saveArchRProject (archp, dropCells = T)

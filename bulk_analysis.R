@@ -195,6 +195,12 @@ meso_bulk_meta_l = lapply (names(meso_bulk_meta_l), function(x) {
   })
 names (meso_bulk_meta_l) = c('bueno','tcga','mesomics')
 
+# Save data and metadata ####
+saveRDS (meso_bulk_l, 'bulk_RNA_studies.rds')
+saveRDS (meso_bulk_meta_l, 'bulk_RNA_studies_metadata.rds')
+
+
+
 ### Query bulk data ####
 module_l = c(LAG3 = 'LAG3', HAVCR2 = 'HAVCR2', PDCD1 = 'PDCD1', TIGIT = 'TIGIT', CTLA4 = 'CTLA4')
 module_l = c(neuroendocrine1 = 'PMP2', neuroendocrine2 = 'VGF')
@@ -666,30 +672,9 @@ cor (meso_bulk_tcga['HOXB13',],bp_tcga, method='spearman')
 
 
 
-### Import Blum meta-analysis to compare with top TF correlated with scS-score ####
-top_genes = c('HIC2','PKNOX1','SOX9','RUNX2','TWIST1','MESP1','ID4','CUX1','TCF4', 'ZEB1','SOX5','SOX6','TCF3','SNAI2','HOXA7','TFAP2A','PITX2','HIC1','HMGA2','SOX11')
-blum_df = read.csv ('../tumor_compartment/Blum_et_al_SE_score.csv')
-blum_dfE = data.frame (gene = blum_df$Gene.Name, score = blum_df$correlation.E.score, SE_score = 'epithelioid')
-blum_dfS = data.frame (gene = blum_df$Gene.Name.1, score = blum_df$correlation.S.score, SE_score = 'sarcomatoid')
-blum_df = rbind (blum_dfE, blum_dfS)
-blum_df = na.omit (blum_df)
-rownames (blum_df) = blum_df$gene
-blum_df = blum_df[top_genes, ]
-blum_df$gene = rownames (blum_df)
-blum_df$gene = factor (blum_df$gene, levels = blum_df$gene)
-# Create the dot plot
-dp = ggplot(blum_df, aes(x = gene, y = 1)) +
-  geom_point(aes (size = score, color = SE_score)) + # Adds the points
-  labs(title = "Correlation to Blum et al") + # Labels
-  scale_color_manual (values = c(epithelioid = 'darkgreen',sarcomatoid = 'firebrick2')) + gtheme
-
-pdf (file.path ('Plots','Blum_top_sarc_TF.pdf'))
-dp
-dev.off()
 
 
-
-### Check HOX genes and make heatmap 
+### Check HOX genes and make heatmap ####
 srt = readRDS (file.path ('..','main','scrna','srt.rds'))
 srt = srt[,srt$sampleID == 'P11']
 hoxb13_sig = read.csv ('../tumor_compartment/scatac_scrna_P11/HOXB13_cnmf.csv')

@@ -4,10 +4,9 @@ packages = c(
  'Seurat',
  'ggplot2',
  'patchwork',
- 'scATACutils',
  'SummarizedExperiment',
- 'epiAneufinder',
- 'JASPAR2020',
+ #'epiAneufinder',
+# 'JASPAR2020',
  'TFBSTools',
  'TxDb.Hsapiens.UCSC.hg38.knownGene',
  'EnsDb.Hsapiens.v86',
@@ -25,6 +24,11 @@ packages = c(
  'org.Hs.eg.db',
  'rstatix',
  'ggpubr',
- 'presto'
+ 'presto',
+ 'GSA',
+ 'clusterProfiler',
+ 'scales',
+ 'ggridges',
+ 'viridis'
 )
 lapply(packages, require, character.only = TRUE)
