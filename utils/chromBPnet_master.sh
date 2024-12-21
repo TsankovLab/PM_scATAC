@@ -71,7 +71,8 @@ bsub -J ${celltype}_combS \
      -o ${chromBPdir}/${celltype}_combine_scores.out \
      -e ${chromBPdir}/${celltype}_combine_scores.err \
      -w "$job_ids" \
-     python $repodir/utils/average_CNT_scores.py "$chromBPct_dir"
+     /bin/bash -c "source activate chrombpnet && python $repodir/utils/average_CNT_scores.py $chromBPct_dir"
+     
 
 ## Troubleshoot numpy (version installed should be 1.23.4)
 # python
