@@ -32,17 +32,17 @@ echo $fold_number
 cd $chromBPdir
 
 # Train chrombpnet model
-MODEL_H5=${celltype}_model/fold_$fold_number/models/chrombpnet_nobias.h5
+MODEL_H5=${celltype}_model/fold_${fold_number}/models/chrombpnet_nobias.h5
 
-if [ ! -f "${OUTPUT_PREFIX}" ]; then
+if [ ! -f "${MODEL_H5}" ]; then
     echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
 rm -r ${celltype}_model/fold_$fold_number/
 chrombpnet pipeline \
-    -ifrag fragments_$celltype.tsv \
+    -ifrag fragments_${celltype}.tsv \
     -d "ATAC" \
     -g $grefdir/genome_references/hg38.genome.fa \
     -c $grefdir/hg38.chrom.sizes \
-    -p peakset_$celltype.bed \
+    -p peakset_${celltype}.bed \
     -n  output_negatives.bed \
     -fl $grefdir/folds/fold_$fold_number.json \
     -b bias_model/models/model_bias.h5 \
@@ -52,10 +52,10 @@ else
 fi
 
 # Compute contribution scores
-REGIONS=peakset_$celltype.bed
+REGIONS=peakset_${celltype}.bed
 GENOME=$grefdir/genome_references/hg38.genome.fa
 CHROM_SIZES=$grefdir/hg38.chrom.sizes
-OUTPUT_PREFIX=${celltype}_model/fold_$fold_number/${celltype}_contribution_scores
+OUTPUT_PREFIX=${celltype}_model/fold_${fold_number}/${celltype}_contribution_scores
 if [ ! -f "${OUTPUT_PREFIX}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
     chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX
