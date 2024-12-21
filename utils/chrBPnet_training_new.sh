@@ -22,10 +22,14 @@ ml tensorrt/8.5.3.1
 
 source activate chrombpnet
 
-echo ${1}
-echo ${2}
-echo ${3}
-echo ${4}
+chromBPdir=${1}
+echo $chromBPdir
+grefdir=${2}
+echo $grefdir
+celltype=${3}
+echo $celltype
+fold_number=${4}
+echo $fold_number
 
 
 #mkdir $chromBPdir
@@ -33,13 +37,6 @@ cd $chromBPdir
 
 # Train chrombpnet model
 MODEL_H5=${celltype}_model/fold_${fold_number}/models/chrombpnet_nobias.h5
-echo $MODEL_H5
-echo $MODEL_H5
-echo $MODEL_H5
-echo $MODEL_H5
-
-echo $celltype
-echo ${celltype}
 
 if [ ! -f "${MODEL_H5}" ]; then
     echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
