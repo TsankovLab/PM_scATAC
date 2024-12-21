@@ -47,7 +47,7 @@ for fold_number in 1 2 3 4; do
          -R span[hosts=1] \
          -o ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.out \
          -e ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.err \
-         ${repodir}/utils/chrBPnet_training_new.sh $chromBPdir $grefdir $celltype $fold_number
+         ${repodir}/utils/chrBPnet_training_new.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number"
 done
 
 
