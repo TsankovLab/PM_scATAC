@@ -35,6 +35,8 @@ echo $celltype
 #mkdir $chromBPdir
 cd $chromBPdir
 
+job_ids=""
+
 for fold_number in 1 2 3 4; do
     bsub -J ${celltype}_cBP \
          -P acc_Tsankov_Normal_Lung \
@@ -47,9 +49,28 @@ for fold_number in 1 2 3 4; do
          -R span[hosts=1] \
          -o ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.out \
          -e ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.err \
-         ${repodir}/utils/chrBPnet_training_new.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number"
+         ${repodir}/utils/chrBPnet_training_new.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" \
+         | awk '{print $2}' | sed 's/<//;s/>//')
+    
+    # Append the job ID to the job_ids string
+    if [ -z "$job_ids" ]; then
+        job_ids="done(${job_id})"
+    else
+        job_ids="$job_ids && done(${job_id})"
+    fi
+
 done
 
+chromBPct_dir=${chromBPdir}/${celltype}_model
+echo $chromBPct_dir
+
+### Combine contribution scores 
+bsub -J ${celltype}_combS \
+     -P acc_Tsankov_Normal_Lung \
+     -o ${chromBPdir}/${celltype}_combine_scores.out \
+     -e ${chromBPdir}/${celltype}_combine_scores.err \
+     -w "$job_ids" \
+     python $repodir/utils/average_CNT_scores.py "$chromBPct_dir"
 
 ## Troubleshoot numpy (version installed should be 1.23.4)
 # python

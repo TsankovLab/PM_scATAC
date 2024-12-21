@@ -65,7 +65,7 @@ if [ ! -f "${count_scores_file}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
     chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX
 else
-    echo "Contribution scores file already exists: ${OUTPUT_PREFIX}"
+    echo "Contribution scores file already exists: ${count_scores_file}"
 fi
 
 #chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX 
