@@ -64,14 +64,19 @@ done
 chromBPct_dir=${chromBPdir}/${celltype}_model
 echo $chromBPct_dir
 
+# Wait for all jobs to complete
+bsub -w "$job_ids" -J wait_jobs -o wait.log -e wait.err /bin/bash -c "echo 'All jobs completed.'"
+
 ### Combine contribution scores 
 echo "combine contribution scores"
-bsub -J ${celltype}_combS \
-     -P acc_Tsankov_Normal_Lung \
-     -o ${chromBPdir}/${celltype}_combine_scores.out \
-     -e ${chromBPdir}/${celltype}_combine_scores.err \
-     -w "$job_ids" \
-     /bin/bash -c "source activate chrombpnet && python $repodir/utils/average_CNT_scores.py $chromBPct_dir"
+python $repodir/utils/average_CNT_scores.py $chromBPct_dir
+# bsub -J ${celltype}_combS \
+#      -P acc_Tsankov_Normal_Lung \
+#      -o ${chromBPdir}/${celltype}_combine_scores.out \
+#      -e ${chromBPdir}/${celltype}_combine_scores.err \
+#      -R rusage[mem=64000] \
+#      -w "$job_ids" \
+#      /bin/bash -c "source activate chrombpnet && python $repodir/utils/average_CNT_scores.py $chromBPct_dir"
      
 
 ## Troubleshoot numpy (version installed should be 1.23.4)
