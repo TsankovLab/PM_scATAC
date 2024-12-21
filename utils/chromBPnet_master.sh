@@ -36,9 +36,9 @@ echo $celltype
 cd $chromBPdir
 
 job_ids=""
-
+echo "run training model and contribution scores"
 for fold_number in 1 2 3 4; do
-    bsub -J ${celltype}_cBP \
+    job_id=$(bsub -J ${celltype}_cBP \
          -P acc_Tsankov_Normal_Lung \
          -q gpu \
          -n 8 \
@@ -65,6 +65,7 @@ chromBPct_dir=${chromBPdir}/${celltype}_model
 echo $chromBPct_dir
 
 ### Combine contribution scores 
+echo "combine contribution scores"
 bsub -J ${celltype}_combS \
      -P acc_Tsankov_Normal_Lung \
      -o ${chromBPdir}/${celltype}_combine_scores.out \
