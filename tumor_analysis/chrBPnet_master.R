@@ -135,6 +135,12 @@ h5ls(file_path)
 
 
 
-command <- paste ("bsub -J", paste0(celltype,'_cBPm'), "-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",file.path(chromBPdir,paste0('cBP_master_',celltype,'.out')), "-e" ,file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),file.path(repodir,'utils','chromBPnet_master.sh'))
-args <- paste(chromBPdir, grefdir, celltype)
+command <- paste ("bsub -J", paste0(celltype,'_cBPm'), 
+	"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",
+	file.path(chromBPdir,paste0('cBP_master_',celltype,'.out')), "-e" ,
+	file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),
+	file.path(repodir,'utils','chromBPnet_master.sh'))
+args <- paste(chromBPdir, grefdir, repodir, celltype) 
+system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_master.sh')), wait=FALSE) 
+system (paste0('chmod +x ',file.path(repodir,'utils','chrBPnet_training_new.sh')), wait=FALSE) 
 system (paste(command, args))

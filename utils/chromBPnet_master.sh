@@ -26,7 +26,9 @@ chromBPdir=${1}
 echo $chromBPdir
 grefdir=${2}
 echo $grefdir
-celltype=${3}
+repodir=${3}
+echo $repodir
+celltype=${4}
 echo $celltype
 
 
