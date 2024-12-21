@@ -37,7 +37,7 @@ cd $chromBPdir
 
 job_ids=""
 echo "run training model and contribution scores"
-for fold_number in 1 2 3 4; do
+for fold_number in 0 1 2 3 4; do
     job_id=$(bsub -J ${celltype}_cBP \
          -P acc_Tsankov_Normal_Lung \
          -q gpu \

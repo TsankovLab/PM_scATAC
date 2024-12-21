@@ -24,6 +24,11 @@ def average_h5_keys(files, key):
     count = 0     # Counter for the number of files
     
     for file in files:
+
+        if not os.path.exists(file):
+            print(f"Warning: File {file} does not exist.")
+            continue
+            
         with h5py.File(file, 'r') as h5_file:
             # Read the dataset
             data = h5_file[key][:]
@@ -34,8 +39,10 @@ def average_h5_keys(files, key):
             total += data
             count += 1
     
-    # Compute the average
-    return total / count
+    if count > 0:
+        return total / count
+    else:
+        raise ValueError("No valid files found to process.")
 
 # Keys to average
 keys = ["projected_shap/seq", "raw/seq", "shap/seq"]
