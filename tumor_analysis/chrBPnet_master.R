@@ -144,3 +144,4 @@ args <- paste(chromBPdir, grefdir, repodir, celltype)
 system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_master.sh')), wait=FALSE) 
 system (paste0('chmod +x ',file.path(repodir,'utils','chrBPnet_training_new.sh')), wait=FALSE) 
 system (paste(command, args))
+

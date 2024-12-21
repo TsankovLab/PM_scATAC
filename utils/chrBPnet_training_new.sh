@@ -22,10 +22,10 @@ ml tensorrt/8.5.3.1
 
 source activate chrombpnet
 
-echo $chromBPdir
-echo $grefdir
-echo $celltype
-echo $fold_number
+echo ${1}
+echo ${2}
+echo ${3}
+echo ${4}
 
 
 #mkdir $chromBPdir
