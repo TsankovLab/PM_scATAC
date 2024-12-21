@@ -19,7 +19,7 @@
 # ml java/11.0.2
 # ml tensorrt/8.5.3.1
 
-
+ml anaconda3/2022.10
 source activate chrombpnet
 
 chromBPdir=${1}
