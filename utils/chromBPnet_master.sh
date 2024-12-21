@@ -65,7 +65,7 @@ chromBPct_dir=${chromBPdir}/${celltype}_model
 echo $chromBPct_dir
 
 # Wait for all jobs to complete
-bsub -w "$job_ids" -J wait_jobs -o wait.log -e wait.err /bin/bash -c "echo 'All jobs completed.'"
+bsub -J wait_jobs -P acc_Tsankov_Normal_Lung -w "$job_ids"  -o wait.log -e wait.err /bin/bash -c "echo 'All jobs completed.'"
 
 ### Combine contribution scores 
 echo "combine contribution scores"
