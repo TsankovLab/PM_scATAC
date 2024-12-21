@@ -33,7 +33,7 @@ cd $chromBPdir
 
 # Train chrombpnet model
 MODEL_H5=${celltype}_model/fold_${fold_number}/models/chrombpnet_nobias.h5
-
+echo $MODEL_H5
 if [ ! -f "${MODEL_H5}" ]; then
     echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
 rm -r ${celltype}_model/fold_$fold_number/
