@@ -59,8 +59,9 @@ fi
 REGIONS=peakset_${celltype}.bed
 GENOME=$grefdir/genome_references/hg38.genome.fa
 CHROM_SIZES=$grefdir/hg38.chrom.sizes
-OUTPUT_PREFIX=${celltype}_model/fold_${fold_number}/${celltype}_contribution_scores
-if [ ! -f "${OUTPUT_PREFIX}" ]; then
+count_scores_file=${celltype}_model/fold_${fold_number}/${celltype}_contribution_scores.counts_scores.h5
+
+if [ ! -f "${count_scores_file}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
     chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX
 else
