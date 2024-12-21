@@ -5,7 +5,7 @@
 #BSUB -n 8
 #BSUB -W 48:00
 #BSUB -gpu num=2
-#BSUB -R v100
+#BSUB -R h100nvl
 #BSUB -R rusage[mem=32000]
 #BSUB -R span[hosts=1]
 #BSUB -o %J.stdout
@@ -22,22 +22,21 @@ ml tensorrt/8.5.3.1
 
 source activate chrombpnet
 
-chromBPdir=${1}
 echo $chromBPdir
-grefdir=${2}
 echo $grefdir
-celltype=${3}
 echo $celltype
-fold_number=${4}
 echo $fold_number
 
 
 #mkdir $chromBPdir
 cd $chromBPdir
 
-rm -r ${celltype}_model/fold_$fold_number/
-
 # Train chrombpnet model
+MODEL_H5=${celltype}_model/fold_$fold_number/models/chrombpnet_nobias.h5
+
+if [ ! -f "${OUTPUT_PREFIX}" ]; then
+    echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
+rm -r ${celltype}_model/fold_$fold_number/
 chrombpnet pipeline \
     -ifrag fragments_$celltype.tsv \
     -d "ATAC" \
@@ -48,14 +47,26 @@ chrombpnet pipeline \
     -fl $grefdir/folds/fold_$fold_number.json \
     -b bias_model/models/model_bias.h5 \
     -o ${celltype}_model/fold_$fold_number/
+else
+    echo "chrombpnet_nobias.h5 file found!"
+fi
 
 # Compute contribution scores
-MODEL_H5=${celltype}_model/fold_$fold_number/models/chrombpnet_nobias.h5
 REGIONS=peakset_$celltype.bed
 GENOME=$grefdir/genome_references/hg38.genome.fa
 CHROM_SIZES=$grefdir/hg38.chrom.sizes
 OUTPUT_PREFIX=${celltype}_model/fold_$fold_number/${celltype}_contribution_scores
-chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX 
+if [ ! -f "${OUTPUT_PREFIX}" ]; then
+    echo "Contribution scores file not found. Computing contribution scores..."
+    chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX
+else
+    echo "Contribution scores file already exists: ${OUTPUT_PREFIX}"
+fi
+
+#chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX 
+
+
+
 
 ## Troubleshoot numpy (version installed should be 1.23.4)
 # python

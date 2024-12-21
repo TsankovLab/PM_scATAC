@@ -117,6 +117,7 @@ average_by_group <- as.data.frame(archp@cellColData) %>%
   summarise(Average = mean(cNMF20))
 average_by_group = average_by_group[order(-average_by_group$Average),]
 sample_sarc_order = factor (archp$Sample3, levels = average_by_group$Sample3)
+archp$Sample3 = factor (archp$Sample3, levels = levels(sample_sarc_order))
 
 
 # ### Compare bins malignants normal ####
@@ -1397,7 +1398,7 @@ sp
 sp2
 dev.off()
 
-# P5 has the strongest correlation of SOX9 and sarc score in atac and rna ####
+# use P23 as having most cells and define sarc score high and low cells ####
 cnmf_module = 'cNMF20'
 cnmfs = archp@cellColData[,grep ('cNMF',colnames(archp@cellColData))]
 cnmfs = as.data.frame(cnmfs)
@@ -1416,7 +1417,7 @@ cnmf_labelled_df = do.call (rbind,cnmf_labelled)
 archp$epit_sarc = 0
 archp$epit_sarc = cnmf_labelled_df$subtype[match (rownames(archp@cellColData), cnmf_labelled_df$barcode)]
 archp$epit_sarc = paste0(archp$Sample3, '__',archp$epit_sarc)
-table (archp$epit_sarc)#, archp$Clusters)
+table (archp$epit_sarc) #, archp$Clusters)
 
 # Check groups have been assigned correctly ####
 pdf()
@@ -1458,6 +1459,126 @@ dev.off()
 pdf (file.path('Plots','sarcomatoid_score_groups_plots2.pdf'), width = 20, height = 20)
 print (wrap_plots (p,p1,p2, groups_p, ncol = 4))
 dev.off()
+
+# Prepare files for chromBPnet analysis ####
+source (file.path ('..','..','git_repo','tumor_analysis','chromBPnet_prepare_files_sarc_score.R'))
+
+
+
+### Combine TF modisco and finemo outputs to build network of co-occurring TFs across peaks ####
+library (httr)
+library (XML)
+library (igraph)
+
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
+fold_number = 0
+celltypes = c('P23__epithelioid','P23__sarcomatoid') # in new clustering is C1
+
+
+count_to_adj = function(data = NULL)
+  {
+  count1s <- function(x, y) colSums(x == 1 & y == 1)
+  n <- 1:ncol(data)
+  mat <- outer(n, n, function(x, y) count1s(data[, x], data[, y]))
+  diag(mat) <- 0
+  dimnames(mat) <- list(colnames(data), colnames(data))
+  return (mat)
+  }
+    
+ov_motif_peaks_adj_l = list()
+for (celltype in celltypes)
+  {
+  #celltype= 'IL1B'
+  modisco_motifs = as.data.frame(readHTMLTable(file.path(chromBPdir, paste0(celltype,'_model'),'fold_0','modisco','report','motifs.html')))
+  modisco_motifs$motif_match0 = sapply (modisco_motifs$NULL.match0, function(x) unlist(strsplit (x, '_'))[1])
+  modisco_motifs$motif_match1 = sapply (modisco_motifs$NULL.match1, function(x) unlist(strsplit (x, '_'))[1])
+  modisco_motifs$motif_match2 = sapply (modisco_motifs$NULL.match2, function(x) unlist(strsplit (x, '_'))[1])
+  
+  finemo_hits = read.table(file.path(chromBPdir,paste0(celltype,'_model'),'finemo_out','hits.tsv'), sep='\t', header=T)
+  finemo_hits$motif_name0 = modisco_motifs$motif_match0[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+  finemo_hits$motif_name1 = modisco_motifs$motif_match1[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+  finemo_hits$motif_name2 = modisco_motifs$motif_match2[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+  write.table (finemo_hits[,c(1,2,3,14,15,16)], paste0(celltype,'_finemo_to_genome_browser.tsv'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+  
+  peakset = read.table (file.path(chromBPdir,paste0('peakset_',celltype,'.bed')))
+  peakset = peakset[,1:3]
+  colnames (peakset) = c ('chr','start','end')
+  peakset = makeGRangesFromDataFrame (peakset)
+  finemo_hits = makeGRangesFromDataFrame (finemo_hits, keep.extra.columns = T)
+  
+  match_rank = c('motif_name0')#,'motif_name1','motif_name2')
+  ov_motif_peaks_mat_combined = list()
+  for (motif_match in match_rank)
+    {
+    finemo_hits_l = split (finemo_hits, finemo_hits@elementMetadata[,motif_match])
+    
+    ov_motif_peaks = lapply (finemo_hits_l, function(x) findOverlaps (peakset, x, select='first'))
+    ov_motif_peaks_mat = do.call (cbind, ov_motif_peaks)
+    rownames (ov_motif_peaks_mat) = as.character(peakset)
+    ov_motif_peaks_mat[is.na(ov_motif_peaks_mat)] = 0
+    ov_motif_peaks_mat[ov_motif_peaks_mat > 0] = 1
+    ov_motif_peaks_mat_combined[[motif_match]] = ov_motif_peaks_mat
+    #ov_motif_peaks_df = as.data.frame (ov_motif_peaks_mat)
+    }
+  ov_motif_peaks_mat_combined = do.call (cbind, ov_motif_peaks_mat_combined)  
+  tf_columns = colnames(ov_motif_peaks_mat_combined)
+  ov_motif_peaks_adj_l2 = as.data.frame (count_to_adj (data = ov_motif_peaks_mat_combined))
+  # From https://stackoverflow.com/questions/66515117/convert-dummy-coded-matrix-to-adjacency-matrix
+  ov_motif_peaks_adj_l[[celltype]] = ov_motif_peaks_adj_l2
+  }
+
+# Try with heatmaps 
+
+# Try with heatmaps 
+palette_cooccurence2 = paletteer::paletteer_c("grDevices::Oslo",100)
+all_TF = unique(unname(unlist(lapply (ov_motif_peaks_adj_l, function(x) unique(colnames(x))))))
+all_TF = all_TF[all_TF != 'NaN']
+ht_list = NULL 
+set.seed (1234)
+for (celltype in celltypes)
+{
+  hm_mat = as.data.frame (ov_motif_peaks_adj_l[[celltype]][match(all_TF, colnames(ov_motif_peaks_adj_l[[celltype]])),])
+  hm_mat = as.data.frame (t(hm_mat[all_TF,]))[all_TF,]
+  rownames (hm_mat) = all_TF
+  colnames (hm_mat) = all_TF
+  hm_mat[is.na(hm_mat)] = 0
+  #hm_mat = scale (hm_mat)
+  hm_mat = log2(hm_mat+1)
+  if (is.null(ht_list)) {
+  d = as.dist(t(1-cor(hm_mat)))
+  d[is.na(d)] = 1
+  hc = hclust(d)
+  column_order = colnames(hm_mat)[hc$order]
+  d = as.dist(1-cor(hm_mat))
+  d[is.na(d)] = 1
+  hc = hclust(as.dist(d))
+  row_order = colnames(hm_mat)[hc$order]
+  ht_list = Heatmap (
+    hm_mat, 
+    column_names_gp= gpar(fontsize=0),
+    row_names_gp= gpar(fontsize=3), column_order=column_order, row_order=row_order,
+    col = palette_cooccurence2, border=T, column_title = celltype)
+  } else {
+  ht_list = ht_list + Heatmap (
+  hm_mat[,column_order], cluster_columns=F,
+  column_names_gp= gpar(fontsize=0),
+  row_names_gp= gpar(fontsize=3),
+  col = palette_cooccurence2, border=T, column_title = celltype)
+  }
+}
+pdf (file.path ('Plots','combined_chromBPnet_cooccurrence_heatmaps.pdf'),width=10,height=4)
+ht_list
+dev.off()
+
+
+
+
+
+
+
+
+
+
 
 #### Check regions with SOX9 and SOX6 ####
 tf_name = 'SOX6'

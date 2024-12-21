@@ -199,7 +199,7 @@ pdf (file.path('Plots',paste0('Tregs_TFs.pdf')))
 VlnPlot (srt, features = c('POU2F3','POU2F2'), group.by = 'celltype2')
 dev.off()
 
-pdf (file.path('Plots',paste0('Tregs_TFs.pdf')))
+pdf (file.path('Plots',paste0('Cytox_markers.pdf')))
 VlnPlot (srt, features = c('PRF1','GZMB','KLRC1'), group.by = 'celltype2')
 dev.off()
 
@@ -215,10 +215,10 @@ dev.off()
 
 
 dp = DotPlot (srt,
-  features = c('NR4A1','NR4A2','NR4A3','TOX','TOX2','IRF1'),
+  features = c('NR4A1','NR4A2','NR4A3','TOX','TOX2','IRF1','GZMB','GZMA','KLRC1'),
   #col = palette_gene_expression2,
   group.by = 'celltype2') + gtheme_italic
-pdf (file.path('Plots','TNK_exhaustion_markers_dotplot.pdf'), height=2.6, width=4.6)
+pdf (file.path('Plots','TNK_exhaustion_markers_dotplot.pdf'), height=2.6, width=8.6)
 dp
 dev.off()  
 

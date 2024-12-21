@@ -11,6 +11,7 @@ if (!exists ('fragments')) fragments = unlist(getFragmentsFromProject (archp))
 force = F
 metagroup = 'C1' # HOX+ cluster
 metagroup = 'C2' # HOX- cluster
+
 if (!file.exists(paste0('fragments_',metagroup,'.tsv')) | force)
     {  
     #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
