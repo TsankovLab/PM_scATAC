@@ -34,6 +34,13 @@ cd $chromBPdir
 # Train chrombpnet model
 MODEL_H5=${celltype}_model/fold_${fold_number}/models/chrombpnet_nobias.h5
 echo $MODEL_H5
+echo $MODEL_H5
+echo $MODEL_H5
+echo $MODEL_H5
+
+echo $celltype
+echo ${celltype}
+
 if [ ! -f "${MODEL_H5}" ]; then
     echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
 rm -r ${celltype}_model/fold_$fold_number/
@@ -46,7 +53,7 @@ chrombpnet pipeline \
     -n  output_negatives.bed \
     -fl $grefdir/folds/fold_$fold_number.json \
     -b bias_model/models/model_bias.h5 \
-    -o ${celltype}_model/fold_$fold_number/
+    -o ${celltype}_model/fold_$fold_number
 else
     echo "chrombpnet_nobias.h5 file found!"
 fi
