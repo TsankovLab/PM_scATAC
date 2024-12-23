@@ -24,7 +24,7 @@ h5_counts_files = [
     f"fold_4/{celltype}_contribution_scores.counts_scores.h5"
 ]  # List of H5 file paths
 
-h5_profiles_files = [
+h5_profile_files = [
     f"fold_0/{celltype}_contribution_scores.profile_scores.h5",
     f"fold_1/{celltype}_contribution_scores.profile_scores.h5",
     f"fold_2/{celltype}_contribution_scores.profile_scores.h5",
@@ -72,7 +72,7 @@ print(f"Averaged data saved in: {output_file}")
 output_file = "averaged_contributions_profile.h5"
 
 # Open all files in parallel and compute the average
-with h5py.File(h5_profiles_files[0], 'r') as ref_file:  # Use the first file as a reference for structure
+with h5py.File(h5_profile_files[0], 'r') as ref_file:  # Use the first file as a reference for structure
     with h5py.File(output_file, 'w') as out_file:
         for group_key in ref_file.keys():  # Iterate through groups
             ref_group = ref_file[group_key]
@@ -80,7 +80,7 @@ with h5py.File(h5_profiles_files[0], 'r') as ref_file:  # Use the first file as 
             
             for subkey in ref_group.keys():  # Iterate through datasets in the group
                 # Load all corresponding datasets from all files
-                data_stack = np.array([h5py.File(f, 'r')[group_key][subkey][:] for f in h5_profiles_files])
+                data_stack = np.array([h5py.File(f, 'r')[group_key][subkey][:] for f in h5_profile_files])
                 
                 # Compute the average across the stacked datasets
                 averaged_data = np.mean(data_stack, axis=0)

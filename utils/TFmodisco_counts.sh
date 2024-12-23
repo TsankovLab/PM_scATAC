@@ -29,8 +29,8 @@ echo $celltype
 # Get contribution score bigwigs
 # Make sure to have version >=2.2.1  installed ny pulling from github like this: pip install git+https://github.com/jmschrei/tfmodisco-lite.git
 
-mkdir ${chromBPdir}/${celltype}_model/modisco/
-cd ${chromBPdir}/${celltype}_model/modisco/
+mkdir ${chromBPdir}/${celltype}_model/modisco_counts/
+cd ${chromBPdir}/${celltype}_model/modisco_counts/
 
 modisco motifs -i ../averaged_contributions_counts.h5 -n 1000000 -o modisco_results_counts.h5 #-w 2000
 
