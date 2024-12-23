@@ -25,11 +25,11 @@ h5_counts_files = [
 ]  # List of H5 file paths
 
 h5_profiles_files = [
-    f"fold_0/{celltype}_contribution_scores.profiles_scores.h5",
-    f"fold_1/{celltype}_contribution_scores.profiles_scores.h5",
-    f"fold_2/{celltype}_contribution_scores.profiles_scores.h5",
-    f"fold_3/{celltype}_contribution_scores.profiles_scores.h5",
-    f"fold_4/{celltype}_contribution_scores.profiles_scores.h5"
+    f"fold_0/{celltype}_contribution_scores.profile_scores.h5",
+    f"fold_1/{celltype}_contribution_scores.profile_scores.h5",
+    f"fold_2/{celltype}_contribution_scores.profile_scores.h5",
+    f"fold_3/{celltype}_contribution_scores.profile_scores.h5",
+    f"fold_4/{celltype}_contribution_scores.profile_scores.h5"
 ]  # List of H5 file paths
 
 # def check_h5_files(files):
@@ -69,7 +69,7 @@ with h5py.File(h5_counts_files[0], 'r') as ref_file:  # Use the first file as a 
 
 print(f"Averaged data saved in: {output_file}")
 
-output_file = "averaged_contributions_profiles.h5"
+output_file = "averaged_contributions_profile.h5"
 
 # Open all files in parallel and compute the average
 with h5py.File(h5_profiles_files[0], 'r') as ref_file:  # Use the first file as a reference for structure

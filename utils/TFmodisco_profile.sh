@@ -32,7 +32,7 @@ echo $celltype
 mkdir ${chromBPdir}/${celltype}_model/modisco/
 cd ${chromBPdir}/${celltype}_model/modisco/
 
-modisco motifs -i ../averaged_contributions_profiles.h5 -n 1000000 -o modisco_results_profiles.h5 #-w 2000
+modisco motifs -i ../averaged_contributions_profile.h5 -n 1000000 -o modisco_results_profile.h5 #-w 2000
 
-modisco report -i modisco_results_profiles.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
+modisco report -i modisco_results_profile.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
 
