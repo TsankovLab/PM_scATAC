@@ -38,7 +38,7 @@ cd $chromBPdir
 chmod +x ${repodir}/utils/chrBPnet_training_new.sh
 chmod +x ${repodir}/utils/average_CNT_scores.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
-chmod +x ${repodir}/utils/TFmodisco_profiles.sh
+chmod +x ${repodir}/utils/TFmodisco_profile.sh
 
 job_ids=""
 echo "run training model and contribution scores"
