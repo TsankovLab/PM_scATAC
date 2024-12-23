@@ -142,7 +142,6 @@ command <- paste ("bsub -J", paste0(celltype,'_cBPm'),
 	file.path(repodir,'utils','chromBPnet_master.sh'))
 args <- paste(chromBPdir, grefdir, repodir, celltype) 
 system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_master.sh')), wait=FALSE) 
-system (paste0('chmod +x ',file.path(repodir,'utils','chrBPnet_training_new.sh')), wait=FALSE) 
-system (paste0('chmod +x ',file.path(repodir,'utils','average_CNT_scores.py')), wait=FALSE) 
+
 system (paste(command, args))
 

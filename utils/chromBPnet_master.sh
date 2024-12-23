@@ -74,7 +74,7 @@ bsub -J wait_jobs -P acc_Tsankov_Normal_Lung -w "$job_ids"  -o wait.log -e wait.
 
 ### Combine contribution scores 
 echo "combine contribution scores"
-conda activate h5py # activate another environment with hdf5plugin installed to read h5 files
+source activate h5py # activate another environment with hdf5plugin installed to read h5 files
 python $repodir/utils/average_CNT_scores.py $chromBPct_dir $celltype
 
 
