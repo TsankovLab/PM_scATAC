@@ -35,6 +35,11 @@ echo $celltype
 #mkdir $chromBPdir
 cd $chromBPdir
 
+chmod +x ${repodir}/utils/chrBPnet_training_new.sh
+chmod +x ${repodir}/utils/average_CNT_scores.py
+chmod +x ${repodir}/utils/TFmodisco_counts.py
+chmod +x ${repodir}/utils/TFmodisco_profiles.py
+
 job_ids=""
 echo "run training model and contribution scores"
 for fold_number in 0 1 2 3 4; do
