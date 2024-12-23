@@ -13,4 +13,4 @@ python -c "import sys; print(sys.executable)"
 python -c "import hdf5plugin; print('hdf5plugin imported successfully')"
 
 # Run your script
-python /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/repodir/utils/average_CNT_scores.py
+python /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/average_CNT_scores.py
