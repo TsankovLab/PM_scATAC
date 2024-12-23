@@ -1,5 +1,5 @@
 #!/bin/bash
-module load anaconda.2020/11
+ml anaconda3/2020.11
 source activate h5py
 
 # Debugging: Output environment variables
