@@ -19,7 +19,7 @@
 # ml java/11.0.2
 # ml tensorrt/8.5.3.1
 
-ml anaconda3/2022.10
+ml anaconda3/2020.11
 source activate chrombpnet
 
 chromBPdir=${1}
@@ -37,8 +37,8 @@ cd $chromBPdir
 
 chmod +x ${repodir}/utils/chrBPnet_training_new.sh
 chmod +x ${repodir}/utils/average_CNT_scores.py
-chmod +x ${repodir}/utils/TFmodisco_counts.py
-chmod +x ${repodir}/utils/TFmodisco_profiles.py
+chmod +x ${repodir}/utils/TFmodisco_counts.sh
+chmod +x ${repodir}/utils/TFmodisco_profiles.sh
 
 job_ids=""
 echo "run training model and contribution scores"
