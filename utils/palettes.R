@@ -102,5 +102,6 @@ palette_deviation_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(ab
 palette_genescore = as.character(paletteer::paletteer_d("khroma::vik"))
 palette_genescore_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c(palette_genescore[1],'white',palette_genescore[length(palette_genescore)])))}
 #palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#2B5C8AFF','white','#9E3D22FF'))
-palette_fragments = paletteer::paletteer_c("grDevices::Oslo",n=40)
-palette_fragments = paletteer::paletteer_c("grDevices::Inferno",40)
+palette_fragments = rev(paletteer::paletteer_c("grDevices::Oslo",n=40))
+palette_fragments = paletteer::paletteer_c("grDevices::Plasma",40)
+palette_fragments = paletteer_c("ggthemes::Classic Orange-White-Blue",40)

@@ -69,7 +69,33 @@ bsub -J wait_jobs -P acc_Tsankov_Normal_Lung -w "$job_ids"  -o wait.log -e wait.
 
 ### Combine contribution scores 
 echo "combine contribution scores"
-python $repodir/utils/average_CNT_scores.py $chromBPct_dir
+conda activate h5py # activate another environment with hdf5plugin installed to read h5 files
+python $repodir/utils/average_CNT_scores.py $chromBPct_dir $celltype
+
+
+
+bsub -J ${celltype}_TFmd_c \
+    -P acc_Tsankov_Normal_Lung \
+    -q premium \
+    -n 8 \
+    -W 96:00 \
+    -R rusage[mem=64000] \
+    -R span[hosts=1] \
+    -o ${chromBPdir}/${celltype}_TFmodisco_counts.out \
+    -e ${chromBPdir}/${celltype}_TFmodisco_counts.err \
+    ${repodir}/utils/TFmodisco_counts.sh
+
+bsub -J ${celltype}_TFmd_p \
+    -P acc_Tsankov_Normal_Lung \
+    -q premium \
+    -n 8 \
+    -W 96:00 \
+    -R rusage[mem=64000] \
+    -R span[hosts=1] \
+    -o ${chromBPdir}/${celltype}_TFmodisco_profiles.out \
+    -e ${chromBPdir}/${celltype}_TFmodisco_profiles.err \
+    ${repodir}/utils/TFmodisco_profiles.sh
+
 # bsub -J ${celltype}_combS \
 #      -P acc_Tsankov_Normal_Lung \
 #      -o ${chromBPdir}/${celltype}_combine_scores.out \

@@ -83,6 +83,9 @@ source (file.path ('git_repo','utils','cnmf_prepare_inputs.R')) #  source cNMF t
 k_selection = 30   # select a K after examining error / performance cNMF plot
 source (file.path ('git_repo','utils','cnmf_format_spectra_files.R'))
 
+### Install conda env for averaging h5 files from chromBPnet
+conda create -n h5py python=3.8
+conda install conda-forge/label/cf202003::hdf5plugin
 
 
 

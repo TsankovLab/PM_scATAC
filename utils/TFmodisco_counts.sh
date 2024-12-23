@@ -24,18 +24,15 @@ chromBPdir=${1}
 echo $chromBPdir
 celltype=${2}
 echo $celltype
-fold_number=${3}
-echo $fold_number
 
 
 # Get contribution score bigwigs
 # Make sure to have version >=2.2.1  installed ny pulling from github like this: pip install git+https://github.com/jmschrei/tfmodisco-lite.git
 
-mkdir ${chromBPdir}/${celltype}_model/fold_${fold_number}/modisco_profile/
-cd ${chromBPdir}/${celltype}_model/fold_${fold_number}/modisco_profile/
+mkdir ${chromBPdir}/${celltype}_model/modisco/
+cd ${chromBPdir}/${celltype}_model/modisco/
 
-modisco motifs -i ../${celltype}_contribution_scores.profile_scores.h5 -n 1000000 -o modisco_results.h5
+modisco motifs -i ../averaged_contributions_counts.h5 -n 1000000 -o modisco_results_counts.h5 #-w 2000
 
-#modisco report -i modisco_results.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
+modisco report -i modisco_results_counts.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
 
-modisco report -i modisco_results.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/cisBP_db/Homo_sapiens.meme

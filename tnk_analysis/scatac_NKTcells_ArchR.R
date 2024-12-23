@@ -541,8 +541,9 @@ wrap_plots (TF_p, ncol=5)
 dev.off()
 
 # Check NR4A2 deviations
-tf_markers = c('NR4A3')
-tf_markers = c('RUNX2')
+tf_markers = c('RUNX1')
+tf_markers = c('NR4A2')
+tf_markers = c('JUN')
 markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs = grep ("z:", markerMotifs, value = TRUE)
 #archp = addImputeWeights (archp)
@@ -610,6 +611,7 @@ dev.off()
 # Find DAP ####
 #force = FALSE
 metaGroupName = 'celltype2'
+force=F
 if (!file.exists ('DAP_CD8_CD8_ext_pairwise.rds') | force)
   {
   DAP_list = getMarkerFeatures (
@@ -652,7 +654,7 @@ hyper_res = lapply (unique(km$cluster), function(mod) {
   print (phyper (q, m, n, k, lower.tail = FALSE, log.p = FALSE))
   })
 
-# Barplot of TF enrichment in TF modules
+# Barplot of module enrichment in CD8 ext peaks ####
 mod_df = data.frame (module = paste0('module',unique(km$cluster)), pval = -log10(unlist(hyper_res)+1e-9))
 bp = ggplot (mod_df, aes (x = module, y = pval, fill = module)) + 
 geom_bar (stat = 'identity',color='grey22') + 
@@ -661,6 +663,123 @@ gtheme
 pdf (file.path ('Plots','TFmodule_enrichments.pdf'), width=4,height=3)
 bp
 dev.off()
+
+# Km 1 is enriched in CD8 exhausted peaks. Find which TF in it is mostly enriched ####
+ext_module = 1
+hyper_res_TF = lapply (names(km$cluster[km$cluster== ext_module]), function(mod) {
+  module_peaks = rowRanges(mm)[which (rowSums (mmMat[,mod, drop=F]) > 0)]
+  q = length (queryHits (findOverlaps (module_peaks, GRanges (rownames(DAP_res_sig)))))
+  n = length(getPeakSet(archp)) - length(GRanges (rownames(DAP_res_sig)))
+  m = length(GRanges (rownames(DAP_res_sig)))
+  k = length(module_peaks)
+  #hyper_res[[mod]] = 
+  print (phyper (q, m, n, k, lower.tail = FALSE, log.p = FALSE))
+  })
+hyper_res_TF_df = data.frame (hyper = unlist(hyper_res_TF), TF= names(km$cluster[km$cluster== ext_module]))
+hyper_res_TF_df = hyper_res_TF_df[order(hyper_res_TF_df$hyper), ]
+
+# Barplot of enriched TFs in ext module enrichment in CD8 ext peaks ####
+hyper_res_TF_df$pval= -log10(hyper_res_TF_df$hyper+1e-9)
+hyper_res_TF_df$TF = factor (hyper_res_TF_df$TF, levels = rev(hyper_res_TF_df$TF))
+top_TF = 13
+hyper_res_TF_df$label = ifelse (hyper_res_TF_df$TF %in% head(hyper_res_TF_df$TF, top_TF), as.character(head(hyper_res_TF_df$TF, top_TF)), '')
+
+bp = ggplot (head(hyper_res_TF_df,50), aes (x = TF, y = pval, fill = pval)) + 
+geom_bar (stat = 'identity') + 
+scale_fill_gradient(low = "white", high = "darkred") +
+geom_text(aes(label = label, y = pval + .1), hjust = -0.05,na.rm = TRUE, angle=0,size=3, fontface = "italic") +
+ylim (c(0,11.5)) +
+gtheme_no_rot + 
+theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
+coord_flip()
+
+pdf (file.path ('Plots','TF_in_module_enrichments.pdf'), width=4,height=7)
+bp
+dev.off()
+
+
+# Compute co-occurrence of ext TFs ####
+TFs = names(km$cluster)[km$cluster == 1]
+motifMat = getPositions (archp)
+matches = getMatches (archp)
+matchesMat = assay (matches)
+colnames (matchesMat) = gsub ('_.*','',colnames (matchesMat))
+colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
+
+matchesMat = matchesMat[,TFs]
+matchesMat = matchesMat[rowSums (matchesMat) > 0,]
+
+cooc = matrix (ncol = ncol(matchesMat), nrow= ncol(matchesMat))
+
+for (i in 1:ncol(matchesMat))
+  {
+  for (z in 1:ncol(matchesMat)) 
+    {
+    ov = sum (rowSums (matchesMat[,c(i,z)]) == 2) / min (colSums(matchesMat[,c(i,z)]))
+    cooc[i,z] = ov
+    }
+  }
+
+colnames (cooc) = TFs
+rownames (cooc) = TFs
+diag (cooc) = 1
+
+cooc_hm = Heatmap (
+    cooc,
+    column_names_rot =45, 
+    row_names_gp = gpar(fontsize = 3),
+    column_names_gp = gpar(fontsize = 3),
+    col =palette_cooccurrence, 
+    cluster_rows=F,
+    cluster_columns = F,
+rect_gp = gpar (col = "white", lwd = 1))
+
+pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps.pdf'), width = 6,height=5)
+cooc_hm 
+dev.off()
+
+# Compute co-occurrence of ext TFs in ext peaks ####
+TFs = as.character(head(hyper_res_TF_df$TF, top_TF))
+motifMat = getPositions (archp)
+matches = getMatches (archp)
+matches = subsetByOverlaps (matches, GRanges(rownames(DAP_res_sig)))
+matchesMat = assay (matches)
+colnames (matchesMat) = gsub ('_.*','',colnames (matchesMat))
+colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
+
+matchesMat = matchesMat[,TFs]
+matchesMat = matchesMat[rowSums (matchesMat) > 0,]
+colSums (matchesMat)
+cooc = matrix (ncol = ncol(matchesMat), nrow= ncol(matchesMat))
+
+for (i in 1:ncol(matchesMat))
+  {
+  for (z in 1:ncol(matchesMat)) 
+    {
+    ov = sum (rowSums (matchesMat[,c(i,z)]) == 2) / min (colSums(matchesMat[,c(i,z)]))
+    cooc[i,z] = ov
+    }
+  }
+
+colnames (cooc) = TFs
+rownames (cooc) = TFs
+diag (cooc) = 0
+
+cooc_hm = Heatmap (
+    cooc,
+    column_names_rot =45, 
+    row_names_gp = gpar(fontsize = 6),
+    column_names_gp = gpar(fontsize = 6),
+    col =palette_cooccurrence, 
+    cluster_rows=F,
+    cluster_columns = F,
+rect_gp = gpar (col = "white", lwd = 1))
+
+pdf (file.path ('Plots','selected_TF_cooccurence_in_ext_peaks_heatmaps.pdf'), width = 6,height=5)
+cooc_hm 
+dev.off()
+
+
 
 # # Distance matrix ####
 # d <- as.dist(1 - cor(t(mMat), method='pearson'))
@@ -1083,35 +1202,119 @@ dev.off()
 
 
 
-# Compare NKT pseudobulks to peakset of exhausted CD8 from human meta-analysis Riegel et al ####
-if (!exists('fragments')) fragments = getFragmentsFromProject (archp)
-fragments = unlist(fragments)
+# Compare NKT pseudobulks to peakset of exhausted CD8 and from human meta-analysis Riegel et al ####
+if (!exists('fragments')) 
+  {
+  fragments = getFragmentsFromProject (archp)
+  fragments = unlist(fragments)
+  }
+
+# CD8 ext DAP ####
+DAP_res = readRDS ('DAP_CD8_CD8_ext_pairwise.rds')
+ext_ps_gr = GRanges (rownames(DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]))
+ext_ps_gr = extendGR (gr = ext_ps_gr, upstream = 3000, downstream = 3000)
+peak_windows = slidingWindows (x = ext_ps_gr, width = 50, step = 25)
+
+# Create peak enrichment plots with CD8 ext peaks ####
+metaGroupName = 'celltype2'
+force = TRUE
+ext_l = list()
+
+pb =progress::progress_bar$new(total = length (unique (as.character(archp@cellColData[,metaGroupName]))))
+if (!file.exists(paste0('ext_peaks_',metaGroupName,'.rds')) | force)
+  {
+  for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
+    {
+    pb$tick()            
+    #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
+    fragments_metagroup = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]]
+    fragments_metagroup_counts = lapply (peak_windows, function(x) countOverlaps (x, fragments_metagroup))
+    fragments_metagroup_counts_df = do.call (cbind, fragments_metagroup_counts)
+    fragments_metagroup_counts_df = (fragments_metagroup_counts_df / sum (archp$ReadsInTSS[as.logical(archp@cellColData[,metaGroupName] == metagroup)])) * 10e6
+    #colnames (fragments_metagroup_counts_df) = as.character(ext_hg38_ov)
+    # write.table (fragments_metagroup_counts_df, file.path(paste0('riegel_ext_peaks_windows_',metagroup,'.tsv')), sep='\t')
+    ext_l[[metagroup]] = fragments_metagroup_counts_df
+    }
+  saveRDS (ext_l, paste0('ext_peaks_',metaGroupName,'.rds'))
+  } else {
+  ext_l = readRDS (paste0('ext_peaks_',metaGroupName,'.rds'))
+  }
+
+#ext_df_long = gather (ext_df, coverage, celltype, 1:(ncol(ext_df)-1))
+ext_den = lapply (ext_l, function(x) rowSums(x))
+ext_den = as.data.frame (do.call (cbind, ext_den))
+#ext_den = ext_den[,1,drop=F]
+#ext_den = gather (as.data.frame(ext_den), celltype, coverage)
+ext_den$bin = 1:260
+#ext_den = split (ext_den, ext_den$celltype)
+den = lapply (c('NK_FGFBP2','CD4','CD8','NK_KLRC1','CD8_exhausted','Tregs'), function(x) ggplot (ext_den[,c(x,'bin')], aes_string (x= 'bin', y = x)) + 
+#geom_bar (stat= 'identity')
+geom_density(color="navyblue", fill="navyblue", alpha=0.5, stat='identity') +
+ylim (c(0, max(ext_den))) +
+gtheme_no_rot)
+#facet_wrap (~celltype, ncol=length(unique(ext_den$celltype)))
+
+pdf (file.path ('Plots',paste0('density_coverage_',metaGroupName,'_CD8_ext.pdf')), height=4,width=12)
+wrap_plots (den, ncol= length(unique(names (ext_l))))
+dev.off()
+
+median_celltype = lapply (ext_l, function(x) colMeans (x))
+median_celltype_order = sapply (median_celltype, mean)
+median_celltype_order = names(median_celltype_order)[order(median_celltype_order)]
+ext_l2 = lapply (seq_along(ext_l), function(x) ext_l[[x]][,order(-median_celltype[[x]])])
+ext_df = do.call (rbind, ext_l2)
+ext_df = apply (ext_df, c(1,2), function(x) as.numeric(x))
+ext_df = as.data.frame (t(log10(ext_df+1)))
+colnames (ext_df) = rep (names(ext_l), each=dim(ext_l[[1]])[1])
+#rownames(ext_df) = as.character(ext_hg38_sub)
+#ext_df$region = rownames(ext_df)
+#rownames (ext_df) = NULL
+#ext_df = as.data.frame(apply(ext_df, 2, function(x) sort(x, decreasing = TRUE)))
+#palette_fragments = paletteer::paletteer_c("ggthemes::Classic Area-Brown",n=40)
+ha = HeatmapAnnotation (bar1 = anno_barplot(colSums(ext_df),gp = gpar(fill = "azure4",border =NA,lty='blank'),border =FALSE, baseline=200,lty='blank'))
+ext_df2 = ext_df
+
+pdf (file.path ('Plots','CD8_ext_peakset_enrichments.pdf'), height=4,width=6)
+Heatmap (ext_df,
+  top_annotation = ha,
+#  column_split = , 
+  column_split=factor(colnames(ext_df), levels=median_celltype_order),
+  cluster_rows=F,
+  column_title_gp = gpar(
+fontsize = 8),
+  column_names_gp = gpar(
+fontsize = 0),
+  row_names_gp = gpar(
+fontsize = 0),
+  col = rev(palette_fragments), 
+  cluster_columns=F,
+  border=T)
+dev.off()
+
+
+# Riegel CD8 ext peaks ####
+library (liftOver)
 ext_ps = read.csv ('riegel_Text_list.csv')
 ext_clusters = c('C1','C2','C3','C4')
 ext_ps = ext_ps[ext_ps$group_name %in% ext_clusters,]
 ext_ps_gr = GRanges (ext_ps)
-
-library (liftOver)
-
 if(!file.exists('hg19ToHg38.over.chain'))
   {
   download.file("https://hgdownload.soe.ucsc.edu/gbdb/hg19/liftOver/hg19ToHg38.over.chain.gz", "hg19ToHg38.over.chain.gz")
   system("gzip -d hg19ToHg38.over.chain.gz")
   #system (paste0('wget (https://hgdownload.soe.ucsc.edu/goldenPath/mm10/liftOver/mm10ToHg38.over.chain.gz)', '-P', getwd()))
   }
-
 ch = import.chain ('hg19ToHg38.over.chain')
 #seqlevelsStyle(hub_hg19) = "UCSC"  # necessary
 ext_hg38 = unlist (liftOver(ext_ps_gr, ch))
 ext_hg38_sub = head (ext_hg38[ext_hg38$Log2FC > 3, ],1000)
-
 ext_hg38_sub = resize (ext_hg38_sub, 1, "center")
 ext_hg38_sub = extendGR (gr = ext_hg38_sub, upstream = 3000, downstream = 3000)
-peak_windows = slidingWindows (x = ext_hg38_sub, width = 50, step = 25)
+peak_windows_riegel = slidingWindows (x = ext_hg38_sub, width = 50, step = 25)
 # peak_windows = peak_windows[sapply(peak_windows, length) == 50]
 # peak_windows_l =  lapply (1:length(peak_windows[[1]]), function(x) unlist(lapply (peak_windows, function(y) y[x])))
 
-
+# Create peak enrichment plots with Riegel peaks ####
 metaGroupName = 'celltype2'
 force = FALSE
 ext_l = list()
@@ -1136,7 +1339,6 @@ if (!file.exists(paste0('riegel_ext_peaks_',metaGroupName,'.rds')) | force)
   ext_l = readRDS (paste0('riegel_ext_peaks_',metaGroupName,'.rds'))
   }
 
-
 #ext_df_long = gather (ext_df, coverage, celltype, 1:(ncol(ext_df)-1))
 ext_den = lapply (ext_l, function(x) rowSums(x))
 ext_den = as.data.frame (do.call (cbind, ext_den))
@@ -1155,7 +1357,11 @@ pdf (file.path ('Plots',paste0('density_coverage_',metaGroupName,'2.pdf')), heig
 wrap_plots (den, ncol= length(unique(names (ext_l))))
 dev.off()
 
-ext_df = do.call (rbind, ext_l)
+median_celltype = lapply (ext_l, function(x) colMeans (x))
+median_celltype_order = sapply (median_celltype, mean)
+median_celltype_order = names(median_celltype_order)[order(median_celltype_order)]
+ext_l2 = lapply (seq_along(ext_l), function(x) ext_l[[x]][,order(-median_celltype[[x]])])
+ext_df = do.call (rbind, ext_l2)
 ext_df = apply (ext_df,c(1,2), function(x) as.numeric(x))
 ext_df = as.data.frame (t(log10(ext_df+1)))
 colnames (ext_df) = rep (names(ext_l), each=240)
@@ -1165,11 +1371,11 @@ rownames(ext_df) = as.character(ext_hg38_sub)
 #ext_df = as.data.frame(apply(ext_df, 2, function(x) sort(x, decreasing = TRUE)))
 #palette_fragments = paletteer::paletteer_c("ggthemes::Classic Area-Brown",n=40)
 ha = HeatmapAnnotation (bar1 = anno_barplot(colSums(ext_df),gp = gpar(fill = "azure4",border =NA,lty='blank'),border =FALSE, baseline=200,lty='blank'))
-pdf (file.path ('Plots','ext_peakset_riegel2.pdf'), height=4,width=6)
+pdf (file.path ('Plots','Riegel_ext_peakset_enrichments.pdf'), height=4,width=6)
 Heatmap (ext_df,
   top_annotation = ha,
 #  column_split = , 
-  column_split=factor(rep (names(ext_l), each=240), levels=c('NK_FGFBP2','CD4','CD8','NK_KLRC1','CD8_exhausted','Tregs')),
+  column_split=factor(rep (names(ext_l), each=240), levels=median_celltype_order),
   cluster_rows=F,
   column_title_gp = gpar(
 fontsize = 8),
@@ -1177,7 +1383,7 @@ fontsize = 8),
 fontsize = 0),
   row_names_gp = gpar(
 fontsize = 0),
-  col = palette_fragments, 
+  col = rev(palette_fragments), 
   cluster_columns=F,
   border=T)
 dev.off()
