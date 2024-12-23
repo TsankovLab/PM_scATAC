@@ -1,5 +1,6 @@
 #!/bin/bash
-ml anaconda3/2020.11
+#ml anaconda3/2020.11
+conda env list
 source activate h5py
 
 # Debugging: Output environment variables
