@@ -88,7 +88,7 @@ bsub -J ${celltype}_TFmd_c \
     -R span[hosts=1] \
     -o ${chromBPdir}/${celltype}_TFmodisco_counts.out \
     -e ${chromBPdir}/${celltype}_TFmodisco_counts.err \
-    ${repodir}/utils/TFmodisco_counts.sh
+    ${repodir}/utils/TFmodisco_counts.sh $chromBPdir $celltype
 
 bsub -J ${celltype}_TFmd_p \
     -P acc_Tsankov_Normal_Lung \
@@ -99,7 +99,7 @@ bsub -J ${celltype}_TFmd_p \
     -R span[hosts=1] \
     -o ${chromBPdir}/${celltype}_TFmodisco_profiles.out \
     -e ${chromBPdir}/${celltype}_TFmodisco_profiles.err \
-    ${repodir}/utils/TFmodisco_profiles.sh
+    ${repodir}/utils/TFmodisco_profiles.sh $chromBPdir $celltype
 
 # bsub -J ${celltype}_combS \
 #      -P acc_Tsankov_Normal_Lung \
