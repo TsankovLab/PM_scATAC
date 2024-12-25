@@ -39,6 +39,7 @@ chmod +x ${repodir}/utils/chrBPnet_training_new.sh
 chmod +x ${repodir}/utils/average_CNT_scores.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
 chmod +x ${repodir}/utils/TFmodisco_profile.sh
+chmod +x ${repodir}/utils/finemo_calls_new.sh
 
 job_ids=""
 echo "run training model and contribution scores"
@@ -138,7 +139,7 @@ bsub -J ${celltype}_finemo \
          -o ${chromBPdir}/finemo_${celltype}.out \
          -e ${chromBPdir}/finemo_${celltype}.err \
          -w "done(${celltype}_TFmd_c) && done(${celltype}_TFmd_p)" \
-         ${repodir}/utils/chrBPnet_training_new.sh "$chromBPdir" "$celltype"
+         ${repodir}/utils/finemo_calls_new.sh "$chromBPdir" "$celltype"
 
 
 # bsub -J ${celltype}_combS \
