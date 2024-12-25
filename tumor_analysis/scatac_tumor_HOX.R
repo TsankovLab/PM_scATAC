@@ -452,7 +452,7 @@ library (igraph)
 
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
 fold_number = 0
-celltype = c('C1', 'C2') # in new clustering is C1
+celltype = c('C2') # in new clustering is C1
 
 
 count_to_adj = function(data = NULL)
