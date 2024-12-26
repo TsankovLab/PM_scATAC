@@ -25,9 +25,6 @@ chromBPdir=${1}
 echo $chromBPdir
 celltype=${2}
 echo $celltype
-fold_number=${3}
-echo $fold_number
-
 
 
 cd ${chromBPdir}/${celltype}_model/
@@ -37,6 +34,20 @@ cd ${chromBPdir}/${celltype}_model/
 
 source activate finemo
 
-finemo extract-regions-chrombpnet-h5 -c fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 -o motif_calls -w 2000 #fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 fold_2/${celltype}_contribution_scores.counts_scores.h5 fold_3/${celltype}_contribution_scores.counts_scores.h5 fold_4/${celltype}_contribution_scores.counts_scores.h5 
-finemo call-hits -r motif_calls.npz -m fold_$fold_number/modisco/modisco_results.h5 -o finemo_out -p ../peakset_${celltype}.bed -J
-finemo report -r motif_calls.npz -H finemo_out/hits.tsv -p ../peakset_${celltype}.bed -m fold_$fold_number/modisco/modisco_results.h5 -o finemo_out/report -W 2000
+if [ ! -f "finemo_out/hits_counts.tsv" ]; then
+    echo "hits_counts.tsv file not found. Running finemo on TFmodisco outputs from contribution score counts ..."
+finemo extract-regions-chrombpnet-h5 -c averaged_contributions_counts.h5 -o motif_calls_counts -w 2000 #fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 fold_2/${celltype}_contribution_scores.counts_scores.h5 fold_3/${celltype}_contribution_scores.counts_scores.h5 fold_4/${celltype}_contribution_scores.counts_scores.h5 
+finemo call-hits -r motif_calls_counts.npz -m modisco_counts/modisco_results_counts.h5 -o finemo_out -p ../peakset_${celltype}.bed -J
+finemo report -r motif_calls_counts.npz -H finemo_out/hits_counts.tsv -p ../peakset_${celltype}.bed -m modisco_counts/modisco_results_counts.h5 -o finemo_out/report_counts -W 2000
+else
+    echo "hits_counts.tsv file found!"
+fi
+
+if [ ! -f "finemo_out/hits_profile.tsv" ]; then
+    echo "hits_profile.tsv file not found. Running finemo on TFmodisco outputs from contribution score profile ..."
+finemo extract-regions-chrombpnet-h5 -c averaged_contributions_profile.h5 -o motif_calls_profile -w 2000 #fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 fold_2/${celltype}_contribution_scores.counts_scores.h5 fold_3/${celltype}_contribution_scores.counts_scores.h5 fold_4/${celltype}_contribution_scores.counts_scores.h5 
+finemo call-hits -r motif_calls_profile.npz -m modisco_profile/modisco_results_profile.h5 -o finemo_out -p ../peakset_${celltype}.bed -J
+finemo report -r motif_calls_profile.npz -H finemo_out/hits_profile.tsv -p ../peakset_${celltype}.bed -m modisco_profile/modisco_results_profile.h5 -o finemo_out/report_profile -W 2000
+else
+    echo "hits_profile.tsv file found!"
+fi

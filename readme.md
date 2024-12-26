@@ -86,6 +86,8 @@ source (file.path ('git_repo','utils','cnmf_format_spectra_files.R'))
 ### Install conda env for averaging h5 files from chromBPnet
 conda create -n h5py python=3.8
 conda install conda-forge/label/cf202003::hdf5plugin
+conda install bioconda::wiggletools
+conda install bioconda::ucsc-wigtobigwig
 
 
 

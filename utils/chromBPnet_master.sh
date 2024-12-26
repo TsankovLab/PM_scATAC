@@ -39,7 +39,7 @@ chmod +x ${repodir}/utils/chrBPnet_training_new.sh
 chmod +x ${repodir}/utils/average_CNT_scores.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
 chmod +x ${repodir}/utils/TFmodisco_profile.sh
-chmod +x ${repodir}/utils/finemo_calls_new.sh
+chmod +x ${repodir}/utils/finemo_motif_calls.sh
 
 job_ids=""
 echo "run training model and contribution scores"
@@ -75,10 +75,11 @@ bsub -J wait_jobs -P acc_Tsankov_Normal_Lung -w "$job_ids"  -o wait.log -e wait.
 
 ### Combine contribution scores 
 echo "combine contribution scores"
-ml anaconda3/2020.11
-source deactivate
+#ml anaconda3/2020.11
+#source deactivate
 source activate h5py # activate another environment with hdf5plugin installed to read h5 files
-# Explicitly set PATH
+
+# Explicitly set PATH to detect hdf5plugin
 # Fix environment variables
 export PATH=/sc/arion/work/giottb01/conda/envs/h5py/bin:$PATH
 unset PYTHONPATH
@@ -93,14 +94,18 @@ wiggletools mean ${chromBPct_dir}/fold_0/${celltype}_contribution_scores.counts_
 ${chromBPct_dir}/fold_1/${celltype}_contribution_scores.counts_scores.bw \
 ${chromBPct_dir}/fold_2/${celltype}_contribution_scores.counts_scores.bw \
 ${chromBPct_dir}/fold_3/${celltype}_contribution_scores.counts_scores.bw \
-${chromBPct_dir}/fold_4/${celltype}_contribution_scores.counts_scores.bw | wigToBigWig stdin grefdir/hg38.chrom.sizes averaged_contribution_scores_counts.bw
+${chromBPct_dir}/fold_4/${celltype}_contribution_scores.counts_scores.bw \
+> temp_contribution_counts_score.wig
+wigToBigWig temp_contribution_counts_score.wig ${grefdir}/hg38.chrom.sizes averaged_contribution_scores_counts.bw
 
 echo "Take average of bigwig files profile"
 wiggletools mean ${chromBPct_dir}/fold_0/${celltype}_contribution_scores.profile_scores.bw \
 ${chromBPct_dir}/fold_1/${celltype}_contribution_scores.profile_scores.bw \
 ${chromBPct_dir}/fold_2/${celltype}_contribution_scores.profile_scores.bw \
 ${chromBPct_dir}/fold_3/${celltype}_contribution_scores.profile_scores.bw \
-${chromBPct_dir}/fold_4/${celltype}_contribution_scores.profile_scores.bw | wigToBigWig stdin grefdir/hg38.chrom.sizes averaged_contribution_scores_profile.bw
+${chromBPct_dir}/fold_4/${celltype}_contribution_scores.profile_scores.bw \
+> temp_contribution_profile_score.wig
+wigToBigWig temp_contribution_profile_score.wig ${grefdir}/hg38.chrom.sizes averaged_contribution_scores_profile.bw
 
 echo "Run TFmodisco on averaged h5 contribution counts and profile files"
 bsub -J ${celltype}_TFmd_c \
@@ -139,7 +144,7 @@ bsub -J ${celltype}_finemo \
          -o ${chromBPdir}/finemo_${celltype}.out \
          -e ${chromBPdir}/finemo_${celltype}.err \
          -w "done(${celltype}_TFmd_c) && done(${celltype}_TFmd_p)" \
-         ${repodir}/utils/finemo_calls_new.sh "$chromBPdir" "$celltype"
+         ${repodir}/utils/finemo_motif_calls.sh "$chromBPdir" "$celltype"
 
 
 # bsub -J ${celltype}_combS \
