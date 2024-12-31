@@ -29,6 +29,7 @@ echo $celltype
 
 cd ${chromBPdir}/${celltype}_model/
 
+
 # Take mean of contribution bw 
 #wiggletools mean fold_0/${celltype}_contribution_scores.counts_scores.bw fold_1/${celltype}_contribution_scores.counts_scores.bw fold_2/${celltype}_contribution_scores.counts_scores.bw fold_3/${celltype}_contribution_scores.counts_scores.bw fold_4/${celltype}_contribution_scores.counts_scores.bw > ${celltype}_cntr_score_counts_mean.bw
 

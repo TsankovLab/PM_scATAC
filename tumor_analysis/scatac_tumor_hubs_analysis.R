@@ -1,3 +1,19 @@
+conda activate meso_scatac
+R
+
+set.seed(1234)
+
+####### ANALYSIS of TUMOR compartment #######
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
+dir.create (file.path (projdir,'Plots'), recursive =T)
+setwd (projdir)
+
+# Load utils functions palettes and packages ####
+source (file.path('..','..','git_repo','utils','load_packages.R'))
+source (file.path('..','..','git_repo','utils','useful_functions.R'))
+source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','..','git_repo','utils','palettes.R'))
 
 # Load functions for hub detection ####
 source (file.path('..','..','git_repo','utils','knnGen.R'))
@@ -6,8 +22,27 @@ source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads(threads = 8) 
-addArchRGenome("hg38")
+addArchRThreads (threads = 8)
+addArchRGenome ("hg38")
+
+if (!file.exists ('Save-ArchR-Project.rds')) 
+  { source (file.path('..','..','PM_scATAC','scatac_tumor_create_ArchRobj.R'))
+  } else {
+ archp = loadArchRProject (projdir)   
+  }
+
+archp$Sample3 = archp$Sample2
+archp$Sample3[archp$Clusters == 'C1'] = 'P11_HOX'
+
+
+# Load RNA ####
+srt = readRDS (file.path('..','scrna','srt.rds'))
+srt$sampleID3[srt$sampleID3 %in% c('HU37','HU62')] = 'normal_pleura'
+srt_NN = srt[,!srt$sampleID %in% c("HU37','HU62")]
+sarc_order = read.csv (file.path('..','scrna','cnmf20_sarcomatoid_sample_order.csv'), row.names=1)
+sarc_order = sarc_order[! sarc_order$sampleID %in% c('HU37','HU62'),]
+sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
+#archp$Sample2 = factor (archp$Sample2, levels = sarc_order$sampleID)
 
 # Export bigiwg files ####
 metaGroupName = 'SampleP11'
@@ -52,7 +87,7 @@ k= 100
 metaGroupName = 'Sample3'
 archp_NN = archp[archp$Sample3 != 'normal_pleura']
 
-force = T
+force = F
 if (!file.exists(paste0 ('KNNs_',metaGroupName,'k_',k,'.rds')) | force)
   {
   KNNs = knnGen (
@@ -101,7 +136,7 @@ if (run_coax)
   }
 
 ### Run hub finder ####
-force=T
+force=F
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (
@@ -154,7 +189,7 @@ hubsSample_mat = as.data.frame (hubsSample_mat)
 ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
 hm = Heatmap (
   scale (t(hubsSample_mat)), 
-#  top_annotation = ha, 
+  top_annotation = ha, 
   column_names_gp = gpar(fontsize = 0),
   show_column_dend = F,
   #row_dend_width = unit(5,'mm'),
@@ -162,7 +197,7 @@ hm = Heatmap (
   col = rev(palette_hubs_accessibility),
   border=T,
   name = 'Hubs')
-pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=2.2)
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=3.2,width=6)
 hm
 dev.off()
 
@@ -193,25 +228,25 @@ hubsCell_mat = as.data.frame (hubsCell_mat)
 
 
 
-# Check if there are hub size differences between normal and tumor sample ####
-library (presto)
-tumor_sample = unique (archp$Sample2)[unique(archp$Sample2) != 'normal_pleura']
-wlc_res = lapply (tumor_sample, function(x) 
-  {
-  hubsCell_mat_comp = hubsCell_mat[,archp$Sample2 %in% c(x,'normal_pleura')]
-  comparison = archp$Sample2[archp$Sample2 %in% c(x,'normal_pleura')]
-  res = wilcoxauc (log2(hubsCell_mat_comp+1), comparison)
-  res[res$group == 'normal_pleura',]
-  })
-names (wlc_res) = tumor_sample
-size_comp = lapply (wlc_res, function(x)
-   {
-    x$width = width (hubs_obj$hubsCollapsed)
-    x$group = ifelse (x$logFC < 0, 'normal_pleura','tumor')
-    x
-   })
+# # Check if there are hub size differences between normal and tumor sample ####
+# library (presto)
+# tumor_sample = unique (archp$Sample2)[unique(archp$Sample2) != 'normal_pleura']
+# wlc_res = lapply (tumor_sample, function(x) 
+#   {
+#   hubsCell_mat_comp = hubsCell_mat[,archp$Sample2 %in% c(x,'normal_pleura')]
+#   comparison = archp$Sample2[archp$Sample2 %in% c(x,'normal_pleura')]
+#   res = wilcoxauc (log2(hubsCell_mat_comp+1), comparison)
+#   res[res$group == 'normal_pleura',]
+#   })
+# names (wlc_res) = tumor_sample
+# size_comp = lapply (wlc_res, function(x)
+#    {
+#     x$width = width (hubs_obj$hubsCollapsed)
+#     x$group = ifelse (x$logFC < 0, 'normal_pleura','tumor')
+#     x
+#    })
 
-size_comp_df = do.call (rbind, size_comp)
+# size_comp_df = do.call (rbind, size_comp)
 
 
 
@@ -244,7 +279,7 @@ sapply (TF_hub_cor, function(x) x[grepl ('^MED1$', rownames(x))])
 
 
 
-# # Compute differential hub accessibility DHA ####
+# # Compute differential hub accessibility (DHA) between normal and tumor samples ####
 library (presto)
 archp$tumor_vs_normal = ifelse (archp$Sample2 == 'normal_pleura', 'normal','tumor')
 #hubsCell_mat_comp = hubsCell_mat[,archp$Sample2 %in% c('P1','normal_pleura')]
@@ -279,7 +314,44 @@ vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
     #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
     scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + theme_light()
 
-pdf (file.path (hubs_dir, 'DAH_volcano.pdf'),4,4)
+pdf (file.path (hubs_dir,'Plots', 'DAH_volcano.pdf'),4,4)
+vp
+dev.off()
+
+
+# # Compute differential hub accessibility (DHA) between cancers ####
+library (presto)
+res = wilcoxauc (log2(hubsCell_mat+1), archp$Sample3)
+res_sub = res[res$group == 'P4',]
+res_sub = res_sub[order (res_sub$padj),]
+head (res_sub[order(-res_sub$logFC),])
+as.character(seqnames(hubs_obj$hubsCollapsed[match(head (res_sub$feature[order(-res_sub$logFC)],20), hubs_obj$hubs_id)]))
+hubs_obj$hubsCollapsed[match(head (res_sub$feature[order(-res_sub$logFC)],20), hubs_obj$hubs_id)]
+
+
+logfcThreshold = 1
+pvalAdjTrheshold = 0.05
+res$sig = ifelse (abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold, 1,0)
+res$sig = res$sig * sign (res$logFC)
+res$sig = as.character(res$sig)
+res_filtered = res[abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold,]
+res_filtered = head (res_filtered$feature[order (-abs(res_filtered$logFC))],20)
+res$labels = ''
+res$labels[match (res_filtered, res$feature)] = res_filtered
+vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
+    geom_point(size=1, shape=19, aes (color = sig), alpha=.5) +
+    geom_vline(xintercept = logfcThreshold, linetype="dotted", 
+                color = "grey20", size=1) +
+    geom_vline(xintercept = -logfcThreshold, linetype="dotted", 
+                color = "grey20", size=1) +
+    geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dotted", 
+                color = "grey20", size=1) + 
+    geom_text_repel (size=2, data = res, aes(label = labels)) + 
+    ggtitle ('Hubs differential accessibility') +
+    #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
+    scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + theme_light()
+
+pdf (file.path (hubs_dir,'Plots', 'DAH_volcano.pdf'),4,4)
 vp
 dev.off()
 
@@ -294,28 +366,63 @@ pdf (file.path (hubs_dir, 'Plots','DAH_size.pdf'),4,4)
 vp
 dev.off()
 
-mega_hubs = range (hubs_obj$hubsCollapsed[1:8])
+mega_hubs = range (hubs_obj$hubsCollapsed[1:4])
 
 # Check mega hubs found in P11 ####
-meso_markers <- plotBrowserTrack(
-      ArchRProj = archp, 
-      groupBy = metaGroupName, 
-#      geneSymbol = celltype_markers,
-      #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
-      #region = ext_range (hubs_obj$hubsCollapsed[1]),
-      region = mega_hubs,
-      pal = palette_sample,
-      #upstream = 150000,
-      #downstream = 150000,
-      loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
-      #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
-      #loops = getCoAccessibility (archp, corCutOff = 0.3,
-      #  returnLoops = TRUE),
-      useGroups= NULL
-  )
-#width (hubs_obj$hubsCollapsed[1])
+metaGroupName='Sample3'
+matching_samples=c('normal_pleura','P1','P4','P5','P8','P11','P11_HOX','P12','P14')
+pdf()
+meso_markers <- plotBrowserTrack2 (
+    ArchRProj = archp[archp$Sample3 %in% matching_samples], 
+    sizes = c(6, 1, 1, 1,1,1),
+    groupBy = metaGroupName, 
+    region = mega_hubs,
+    genelabelsize=0,
+    #geneSymbol = TF,
+    normMethod = "ReadsInTSS",
+    scCellsMax=3000,
+    plotSummary = c("bulkTrack", "featureTrack", 
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+    upstream = 50000,
+    pal = palette_sample,
+    #ylim=c(0,0.1),
+    downstream = 300000,
+    #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+#    loops = getCoAccessibility (archp, corCutOff = 0.25),
+    #  returnLoops = TRUE),
+    useGroups= NULL,
+    loops = getPeak2GeneLinks (archp, corCutOff = 0.2,returnLoops = TRUE),
+    #hubs = hubs_obj$peakLinks2
+)
+dev.off()
 
-plotPDF (meso_markers, ArchRProj = archp, width=14, name ='mega_hubs_coveragePlots.pdf')
+plotPDF (meso_markers, ArchRProj = archp, 
+  width=5,height=3, 
+  name =paste0('region_coveragePlots.pdf'),
+  addDOC = F)
+
+metaGroupName = 'sampleID3'
+genes_in_region = unique(getPeakSet (archp)[subjectHits (findOverlaps (mega_hubs, getPeakSet (archp)))]$nearestGene)
+top_dah = data.frame (
+gene = colMeans (srt@assays$RNA@data[rownames(srt) %in% genes_in_region,]),
+group = srt@meta.data[,metaGroupName])
+top_dah$group = factor (top_dah$group, levels =rev(c('normal_pleura','P1','P4','P5','P8','P11','P11_HOX','P12','P14')))
+top_dah = na.omit(top_dah)
+bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
+vlp + 
+bxpv + 
+scale_fill_manual (values = palette_sample) +
+#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+gtheme_no_rot
+
+pdf (file.path ('Plots', paste0('scrna_region_boxplots.pdf')), height=4, width=4)
+bp
+dev.off()
+
 
 # Export ranges of top HUBs
 saveRDS (mega_hubs, 'P11_chr18_region.rds')

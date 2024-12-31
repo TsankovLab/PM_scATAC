@@ -202,6 +202,9 @@ saveRDS (meso_bulk_meta_l, 'bulk_RNA_studies_metadata.rds')
 
 
 ### Query bulk data ####
+studies = c('bueno','tcga','mesomics')
+
+
 module_l = c(LAG3 = 'LAG3', HAVCR2 = 'HAVCR2', PDCD1 = 'PDCD1', TIGIT = 'TIGIT', CTLA4 = 'CTLA4')
 module_l = c(neuroendocrine1 = 'PMP2', neuroendocrine2 = 'VGF')
 module_l = c(sox9 = 'SOX9', twist1 = 'TWIST1',SMARCC2 = 'SMARCC2',pitx2 = 'PITX2', mesp1 = 'MESP1', mef2a='MEF2A')
@@ -210,7 +213,6 @@ module_l = c(SNAI2 = 'SNAI2')
 module_l = c(CD90 = 'CD44', stem='CD73',stem='CD146')
 module_l = c(ELK4 = 'ELK4')
 module_l = c(HOXB13 = 'HOXB13')
-studies = c('bueno','tcga','mesomics')
 
 
 # Make gene modules overlapping megahubs regions in P11 ####
@@ -222,6 +224,7 @@ module_l = c(TXNL4A = 'TXNL4A')
 module_l = list(HOXB13 = 'HOXB13', HOXC13 = 'HOXC13',sarc='AXL')
 module_l = sarc_score
 module_l = list(SOX9 = 'SOX9',SOX6 = 'SOX6')
+module_l = list(NTM='NTM')
 
 # Run genes on bulk datasets ####
 stat_testL2 = list()

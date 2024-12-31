@@ -35,7 +35,7 @@ echo $celltype
 #mkdir $chromBPdir
 cd $chromBPdir
 
-chmod +x ${repodir}/utils/chrBPnet_training_new.sh
+chmod +x ${repodir}/utils/chrBPnet_training.sh
 chmod +x ${repodir}/utils/average_CNT_scores.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
 chmod +x ${repodir}/utils/TFmodisco_profile.sh
@@ -55,7 +55,7 @@ for fold_number in 0 1 2 3 4; do
          -R span[hosts=1] \
          -o ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.out \
          -e ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.err \
-         ${repodir}/utils/chrBPnet_training_new.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" \
+         ${repodir}/utils/chrBPnet_training.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" \
          | awk '{print $2}' | sed 's/<//;s/>//')
     
     # Append the job ID to the job_ids string

@@ -66,6 +66,7 @@ plotBrowserTrack2 <- function(
   log2Norm = TRUE,
   upstream = 50000,
   downstream = 50000,
+  genelabelsize = 2,
   tileSize = 250, 
   minCells = 25,
   normMethod = "ReadsInTSS",
@@ -279,7 +280,8 @@ plotBrowserTrack2 <- function(
     if("genetrack" %in% tolower(plotSummary)){
       .logDiffTime(sprintf("Adding Gene Tracks (%s of %s)",x,length(region)), t1=tstart, verbose=verbose, logFile=logFile)
       plotList$genetrack <- .geneTracks(
-        geneAnnotation = geneAnnotation, 
+        geneAnnotation = geneAnnotation,
+        labelSize=genelabelsize, 
         region = region[x], 
         facetbaseSize = facetbaseSize,
         title = "Genes",
@@ -906,7 +908,7 @@ plotBrowserTrack2 <- function(
 
 
 #######################################################
-# Feature Tracks
+# hub region Tracks
 #######################################################
 .hubregionTracks <- function(
   features = NULL, 

@@ -37,113 +37,207 @@ archp$Sample3[archp$Clusters == 'C1'] = 'P11_HOX'
 
 # Load RNA ####
 srt = readRDS (file.path('..','scrna','srt.rds'))
-srt_NN = srt[,!srt$sampleID %in% c("HU37','HU62")]
+srt$sampleID2 = srt$sampleID
+srt$sampleID2[srt$sampleID2 %in% c('HU37','HU62')] = 'normal_pleura'
+srt_NN = srt[,!srt$sampleID2 %in% c("normal_pleura")]
 sarc_order = read.csv (file.path('..','scrna','cnmf20_sarcomatoid_sample_order.csv'), row.names=1)
-sarc_order = sarc_order[! sarc_order$sampleID %in% c('HU37','HU62'),]
+sarc_order = sarc_order[! sarc_order$sampleID2 %in% c('normal_pleura'),]
 sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
 #archp$Sample2 = factor (archp$Sample2, levels = sarc_order$sampleID)
 
-
-### Run TF correlation to identify TF modules across cancers #### 
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = as.matrix (mMat)#[selected_TF,])
-
-# Filter by RNA expression ####
-metaGroupName = 'sampleID'
-active_TFs = exp_genes (srt_NN, rownames(mMat), min_exp = 0.5, metaGroupName)
-mMat = mMat[active_TFs, ]
-
+# Subset ArchR project to remove normal sample ####
 archp_NN = archp[archp$Sample2 != 'normal_pleura']
-mMat_NN = mMat[,archp$Sample2 != 'normal_pleura']
-sampleN=500
-mMat_NN = lapply (unique(archp_NN$Sample2), function(sam) {
-  if (sampleN > sum(archp_NN$Sample2 == sam)) sampled_bc = rownames(archp_NN@cellColData)[archp_NN$Sample2 == sam] else
-    sampled_bc = sample (rownames(archp_NN@cellColData)[archp_NN$Sample2 == sam],sampleN)
-  mMat_NN[,sampled_bc]
-})
-mMat_NN = do.call (cbind, mMat_NN)
-mMat_cor = cor (as.matrix(t(scale(mMat_NN))), method = 'spearman')
 
-# Correlate module scores with TFs ####
-set.seed(123)
-centers=5
-km = kmeans (mMat_cor, centers=centers)
-
-pdf ()
-cor_mMat_hm = draw (Heatmap (mMat_cor,
-  clustering_distance_rows='euclidean' ,
-  clustering_distance_columns = 'euclidean', 
-  col=palette_deviation_cor_fun, 
-  row_split = km$cluster,
-  column_split = km$cluster,
-  border=T,
-  row_names_gp = gpar(fontsize = 0), 
-  column_names_gp = gpar(fontsize = 0)))
+# Plot UMAP of samples and clusters ####
+metaGroupNames = c('Sample2','Clusters')
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "cellColData", 
+    name = metaGroupNames[1], 
+    embedding = "UMAP",
+    pal = palette_sample,
+    labelMeans =F
+#    imputeWeights = getImputeWeights(archp)
+)
 dev.off()
 
-pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
-cor_mMat_hm
+pdf (file.path('Plots','samples_umap.pdf'))
+p
 dev.off()
 
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "cellColData", 
+    name = metaGroupNames[2], 
+    embedding = "UMAP"#,
+#    pal = palette_expression,
+#    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+
+pdf (file.path('Plots','clusters_umap.pdf'))
+p
+dev.off()
+
+
+# ### Run TF correlation to identify TF modules across cancers #### 
+# if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData (mSE)$name
+# mMat = as.matrix (mMat)#[selected_TF,])
+# mMat_NN = mMat[,rownames(archp_NN@cellColData)]
+
+# # Filter by RNA expression ####
+# metaGroupName = 'sampleID'
+# active_TFs = exp_genes (srt_NN, rownames(mMat), min_exp = 0.5, metaGroupName)
+# mMat = mMat[active_TFs, ]
+
+# sampleN=500
+# set.seed(123)
+# mMat_NN = lapply (unique(archp_NN$Sample2), function(sam) {
+#   if (sampleN > sum(archp_NN$Sample2 == sam)) sampled_bc = rownames(archp_NN@cellColData)[archp_NN$Sample2 == sam] else
+#     sampled_bc = sample (rownames(archp_NN@cellColData)[archp_NN$Sample2 == sam],sampleN)
+#   mMat_NN[,sampled_bc]
+# })
+# mMat_NN = do.call (cbind, mMat_NN)
+# mMat_cor = cor (as.matrix(t(scale(mMat_NN))), method = 'spearman')
+
+# # Correlate module scores with TFs ####
+# set.seed(123)
+# centers=5
+# km = kmeans (mMat_cor, centers=centers)
+# km_df = as.data.frame (km$cluster)
+# km_df = km_df[order (km_df[,1]),,drop=F]
+# write.csv (km_df, 'kmeans_TF_modules.csv')
+# pdf ()
+# cor_mMat_hm = draw (Heatmap (mMat_cor,
+#   clustering_distance_rows='euclidean' ,
+#   clustering_distance_columns = 'euclidean', 
+#   col=palette_deviation_cor_fun, 
+#   row_split = km$cluster,
+#   column_split = km$cluster,
+#   border=T,
+#   row_names_gp = gpar(fontsize = 0), 
+#   column_names_gp = gpar(fontsize = 0)))
+# dev.off()
+
+# pdf (file.path ('Plots','TF_modules_heatmap2.pdf'), width = 4,height=3)
+# cor_mMat_hm
+# dev.off()
+
+# Clusters_sample = paste0(archp_NN$Clusters, '_',archp_NN$Sample2)
+# remove_low_clusters = !Clusters_sample %in% names(table (Clusters_sample)[table (Clusters_sample) < 10])
+# Clusters_sample = Clusters_sample[remove_low_clusters]
+# archp_NN = archp_NN[remove_low_clusters]
+
+# mMat_NN = mMat[,rownames(archp_NN@cellColData)]
+# tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat_NN[names(km$cluster[km$cluster == x]),]))
+# names (tf_modules) = paste0('mod_',unique(km$cluster))
+# tf_modules = do.call (cbind, tf_modules)
+# archp_NN@cellColData = archp_NN@cellColData[!colnames(archp_NN@cellColData) %in% paste0('mod_',unique(km$cluster))]
+# all (rownames(archp_NN@cellColData) == colnames(mMat_NN))
+# archp_NN@cellColData = cbind (archp_NN@cellColData, tf_modules) 
+
+# archp_NN = addImputeWeights (archp_NN)
+# pdf()
+# TF_p = plotEmbedding (
+#     ArchRProj = archp_NN,
+#     colorBy = "cellColData",
+#     name = paste0('mod_',unique(km$cluster)), 
+#     pal = rev(palette_deviation),
+#     #useSeqnames='z',
+#     embedding = "UMAP")
+# dev.off()
+# pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 20,height=6)
+# wrap_plots (TF_p, ncol=5)
+# dev.off()
+
+# # Check individual TFs
+
+# tf_markers = c('NFKB1','NFKB2','SNAI2','SOX9','SOX6','TWIST1','ZEB1','HOXB13')
+# markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
+# markerMotifs = grep ("z:", markerMotifs, value = TRUE)
+# #archp = addImputeWeights (archp)
+# pdf()
+# TF_p = plotEmbedding(
+#     ArchRProj = archp, 
+#     colorBy = "MotifMatrix", 
+#     name = sort(markerMotifs), 
+#     embedding = "UMAP",
+#     pal = rev (palette_deviation),
+#     imputeWeights = getImputeWeights(archp)
+# )
+# dev.off()
+# pdf (file.path ('Plots','top_TF_markers.pdf'), width = 30, height=18)
+# wrap_plots (TF_p, ncol=4)
+# dev.off()
+
+# # ridge plots of TF modules ####
+# tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat_NN[names(km$cluster[km$cluster == x]),]))
+# names (tf_modules) = paste0('mod_',unique(km$cluster))
+# tf_modules = as.data.frame (do.call (cbind, tf_modules))
+# tf_modules$Clusters_Sample = Clusters_sample
+# tf_modules$Sample = sapply (tf_modules$Clusters_Sample, function(x) unlist(strsplit(x, '_'))[2])
+# palette_clusters_sample = setNames (palette_sample[tf_modules$Sample], tf_modules$Clusters_Sample)
+# palette_clusters_sample = palette_clusters_sample[!duplicated(palette_clusters_sample)]
+# tf_modules = gather (tf_modules, module, expression,1:centers)
+# tf_modules$module = factor (tf_modules$module, levels = paste0('mod_',names (row_order (cor_mMat_hm))))
+
+# dp = ggplot (tf_modules) +
+#   geom_density(aes(x=expression,fill=Clusters_Sample),color='white',
+#                       alpha = 0.6) +
+#   facet_wrap (~module, nrow = 7, scales = 'free',strip.position = "left") +
+#   scale_fill_manual (values = palette_clusters_sample) +
+#   gtheme_no_rot
+
+# pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 5,height=8)
+# dp
+# dev.off()
+
+# Alternatively run DAM per cluster / sample ####
+archp$Clusters_sample = paste0(archp_NN$Clusters, '_',archp_NN$Sample2)
 Clusters_sample = paste0(archp_NN$Clusters, '_',archp_NN$Sample2)
 remove_low_clusters = !Clusters_sample %in% names(table (Clusters_sample)[table (Clusters_sample) < 10])
 Clusters_sample = Clusters_sample[remove_low_clusters]
 archp_NN = archp_NN[remove_low_clusters]
+archp2 = archp # store whole archr object in secondary object to run script only for the subset
+archp = archp_NN
+metaGroupName = "Clusters_sample"
+force=TRUE
+source (file.path('..','..','git_repo','utils','DAM.R'))
+archp = archp2
 
-mMat_NN = mMat[,rownames(archp_NN@cellColData)]
-tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat_NN[names(km$cluster[km$cluster == x]),]))
-names (tf_modules) = paste0('mod_',unique(km$cluster))
-tf_modules = do.call (cbind, tf_modules)
-archp_NN@cellColData = archp_NN@cellColData[!colnames(archp_NN@cellColData) %in% paste0('mod_',unique(km$cluster))]
-all (rownames(archp_NN@cellColData) == colnames(mMat_NN))
-archp_NN@cellColData = cbind (archp_NN@cellColData, tf_modules) 
+ha = rowAnnotation (foo = anno_mark(at = match(head(DAM_df$gene[DAM_df$comparison=='C1_P11'],top_genes),colnames(mMat_mg)), 
+    labels = head(DAM_df$gene[DAM_df$comparison=='C1_P11'],top_genes), labels_gp = gpar(fontsize = 6, fontface = 'italic')))
+ha2 = HeatmapAnnotation (sample = sapply (rownames(mMat_mg), function(x) unlist(strsplit(x,'_'))[2]), col= list(sample = palette_sample))
+DAM_hm = Heatmap (t(scale(mMat_mg)), 
+          top_annotation = ha2,
+          column_split = sapply (rownames(mMat_mg), function(x) unlist(strsplit(x,'_'))[2]),
+          right_annotation = ha,
+          row_labels = colnames (mMat_mg),
+          column_title = paste('top',top_genes),
+          clustering_distance_columns = 'euclidean',
+          clustering_distance_rows = 'euclidean',
+          cluster_rows = F,
+          #col = pals_heatmap[[5]],
+          cluster_columns=F,#col = pals_heatmap[[1]],
+          row_names_gp = gpar(fontsize = 0, fontface = 'italic'),
+          column_names_gp = gpar(fontsize = 8),
+          column_names_rot = 45,
+          name = 'TFactivity',
+          #rect_gp = gpar(col = "white", lwd = .5),
+          border=TRUE,
+          col = palette_deviation_fun(scale(mMat_mg))
 
-archp_NN = addImputeWeights (archp_NN)
-pdf()
-TF_p = plotEmbedding (
-    ArchRProj = archp_NN,
-    colorBy = "cellColData",
-    name = paste0('mod_',unique(km$cluster)), 
-    pal = rev(palette_deviation),
-    #useSeqnames='z',
-    embedding = "UMAP")
+          #right_annotation = motif_ha
+          )
+
+  #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmaps.pdf')), width = 6.5, height = 3.5)
+print(DAM_hm)
 dev.off()
-pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 20,height=6)
-wrap_plots (TF_p, ncol=5)
-dev.off()
-
-# ridge plots of TF modules ####
-tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat_NN[names(km$cluster[km$cluster == x]),]))
-names (tf_modules) = paste0('mod_',unique(km$cluster))
-tf_modules = as.data.frame (do.call (cbind, tf_modules))
-tf_modules$Clusters_Sample = Clusters_sample
-tf_modules$Sample = sapply (tf_modules$Clusters_Sample, function(x) unlist(strsplit(x, '_'))[2])
-palette_clusters_sample = setNames (palette_sample[tf_modules$Sample], tf_modules$Clusters_Sample)
-palette_clusters_sample = palette_clusters_sample[!duplicated(palette_clusters_sample)]
-tf_modules = gather (tf_modules, module, expression,1:centers)
-tf_modules$module = factor (tf_modules$module, levels = paste0('mod_',names (row_order (cor_mMat_hm))))
-
-dp = ggplot (tf_modules) +
-  geom_density(aes(x=expression,fill=Clusters_Sample),color='white',
-                      alpha = 0.6) +
-  facet_wrap (~module, nrow = 7, scales = 'free',strip.position = "left") +
-  scale_fill_manual (values = palette_clusters_sample) +
-  gtheme_no_rot
-
-pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 5,height=8)
-dp
-dev.off()
-
-# Alternatively run DAM per cluster / sample ####
-# archp2 = archp
-# archp = archp_NN
-# metaGroupName = "Clusters_sample"
-# force=TRUE
-# source (file.path('..','..','git_repo','utils','DAM.R'))
-# archp = archp2
-
 
 # Compare HOX+ vs HOX- P11 clusters using also scRNA ####
 library (presto)
@@ -236,7 +330,7 @@ pdf (file.path('Plots','HOX_signature_dotplot.pdf'), width=30)
 DotPlot (srt, feature = hox_sig) + gtheme
 dev.off()
 
-hox_sig_specific = c('HOXB13','CA8','SULT1E1','SYT1')#,#'GAS2',#'WDR72','CHST9','RPRM',
+hox_sig_specific = c('HOXB13')#,'CA8','SULT1E1','SYT1')#,#'GAS2',#'WDR72','CHST9','RPRM',
 #'LY6G6D')#,'COL9A1','MPPED2','TEKT3','CLIC5','NKX2−5','S100A7','ASPG','BEX1','GABRA2','PKP2','TDRD10','GRM1','PLPPR3',
   #'PI3','ACTR3B','LY6H','TNNT2','CXCL14')
 
@@ -413,14 +507,47 @@ for (study in names (cfit_study))
     theme_void() +
     theme(axis.text.x = element_text(face = 'bold'))
     
-    pdf (paste0('Plots/cox_regression_',study,'_',survival_name,'.pdf'), height=8,5)
+    pdf (file.path('Plots',paste0('cox_regression_',study,'_',survival_name,'.pdf')), height=8,5)
     print (forest + tab + plot_layout(ncol = 2, widths = c(1, 3)))
     dev.off()
-    pdf (paste0('Plots/cox_regression_',study,'_stratified_',survival_name,'.pdf'), height = 2.8,3)
+    pdf (file.path('Plots',paste0('cox_regression_',study,'_stratified_',survival_name,'.pdf')), height = 2.8,3)
     print (plot_study[[study]])
     dev.off()
   }
   
+  # Merge forest plots
+  cfit_study_df = do.call (rbind, cfit_study)
+  cfit_study_df$Index = rownames(cfit_study_df)
+  cfit_study_df$Index = factor (cfit_study_df$Index, levels = rev(cfit_study_df$Index))
+
+   forest <- ggplot(cfit_study_df, aes(y = Index, x = HR)) + 
+    geom_point(shape = 18, size = 5) +  
+    geom_errorbarh(aes(xmin = LL, xmax = UL), height = 0.25) +
+    geom_vline(xintercept = 1, color = "red", linetype = "dashed", cex = 1, alpha = 0.5) +
+    #scale_y_continuous(name = "", breaks=1:nrow(cfit_study[[study]]), labels = cfit_study[[study]]$label, trans = "reverse", expand = expansion(add = 0.5)) +
+    #scale_x_continuous(trans = 'log10')   + 
+    xlab("Hazard Ratio") + 
+    ylab(" ") + 
+    theme_classic()
+
+  tab <- ggplot(cfit_study_df, aes(y = Index)) +
+    geom_text(aes(x = 0, label = sprintf("%0.1f", round(HR, digits = 2))), size = 4) +
+    geom_text(aes(x = 1, label = CI), size = 4) + 
+    geom_text(aes(x = 2, label = P_value_C), size = 4) + 
+    #geom_text(aes(x = 3, label = P_value_S), size = 3) + 
+    #scale_y_continuous(trans = 'reverse', expand = expansion(add = 0.5)) +
+    scale_x_continuous(
+      breaks = 0:3, labels = c('HR', 'CI', 'P value (C)','P value (S)'), 
+      position = 'top', expand = expansion(add = 0.3)) +
+    theme_void() +
+    theme(axis.text.x = element_text(face = 'bold'))
+    
+    pdf (file.path('Plots',paste0('cox_regression_',survival_name,'.pdf')), height=4,5)
+    print (forest + tab + plot_layout(ncol = 2, widths = c(3, 3)))
+    dev.off()
+   
+
+
 
 
 
@@ -452,7 +579,7 @@ library (igraph)
 
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
 fold_number = 0
-celltype = c('C2') # in new clustering is C1
+celltypes = c('C1','C2') 
 
 
 count_to_adj = function(data = NULL)
@@ -465,45 +592,100 @@ count_to_adj = function(data = NULL)
   return (mat)
   }
     
-
 ov_motif_peaks_adj_l = list()
-#celltype= 'IL1B'
-modisco_motifs = as.data.frame(readHTMLTable(file.path(chromBPdir, paste0(celltype,'_model'),'fold_0','modisco','report','motifs.html')))
-modisco_motifs$motif_match0 = sapply (modisco_motifs$NULL.match0, function(x) unlist(strsplit (x, '_'))[1])
-modisco_motifs$motif_match1 = sapply (modisco_motifs$NULL.match1, function(x) unlist(strsplit (x, '_'))[1])
-modisco_motifs$motif_match2 = sapply (modisco_motifs$NULL.match2, function(x) unlist(strsplit (x, '_'))[1])
-
-finemo_hits = read.table(file.path(chromBPdir,paste0(celltype,'_model'),'finemo_out','hits.tsv'), sep='\t', header=T)
-finemo_hits$motif_name0 = modisco_motifs$motif_match0[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
-finemo_hits$motif_name1 = modisco_motifs$motif_match1[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
-finemo_hits$motif_name2 = modisco_motifs$motif_match2[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
-write.table (finemo_hits[,c(1,2,3,14,15,16)], paste0(celltype,'_finemo_to_genome_browser.tsv'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
-
-peakset = read.table (file.path(chromBPdir,paste0('peakset_',celltype,'.bed')))
-peakset = peakset[,1:3]
-colnames (peakset) = c ('chr','start','end')
-peakset = makeGRangesFromDataFrame (peakset)
-finemo_hits = makeGRangesFromDataFrame (finemo_hits, keep.extra.columns = T)
-
-match_rank = c('motif_name0')#,'motif_name1','motif_name2')
-ov_motif_peaks_mat_combined = list()
-for (motif_match in match_rank)
+finemo_hits_l2 = list()
+for (celltype in celltypes)
   {
-  finemo_hits_l = split (finemo_hits, finemo_hits@elementMetadata[,motif_match])
+  #celltype= 'IL1B'
+  modisco_motifs = as.data.frame(readHTMLTable(file.path(chromBPdir, paste0(celltype,'_model'),'fold_0','modisco','report','motifs.html')))
+  modisco_motifs$motif_match0 = sapply (modisco_motifs$NULL.match0, function(x) unlist(strsplit (x, '_'))[1])
+  modisco_motifs$motif_match1 = sapply (modisco_motifs$NULL.match1, function(x) unlist(strsplit (x, '_'))[1])
+  modisco_motifs$motif_match2 = sapply (modisco_motifs$NULL.match2, function(x) unlist(strsplit (x, '_'))[1])
   
-  ov_motif_peaks = lapply (finemo_hits_l, function(x) findOverlaps (peakset, x, select='first'))
-  ov_motif_peaks_mat = do.call (cbind, ov_motif_peaks)
-  rownames (ov_motif_peaks_mat) = as.character(peakset)
-  ov_motif_peaks_mat[is.na(ov_motif_peaks_mat)] = 0
-  ov_motif_peaks_mat[ov_motif_peaks_mat > 0] = 1
-  ov_motif_peaks_mat_combined[[motif_match]] = ov_motif_peaks_mat
-  #ov_motif_peaks_df = as.data.frame (ov_motif_peaks_mat)
+  finemo_hits = read.table(file.path(chromBPdir,paste0(celltype,'_model'),'finemo_out','hits.tsv'), sep='\t', header=T)
+  finemo_hits$motif_name0 = modisco_motifs$motif_match0[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+  finemo_hits$motif_name1 = modisco_motifs$motif_match1[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+  finemo_hits$motif_name2 = modisco_motifs$motif_match2[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
+  finemo_hits$sample = celltype
+  finemo_hits_l2[[celltype]] = finemo_hits
+  write.table (finemo_hits[,c(1,2,3,14,15,16)], paste0(celltype,'_finemo_to_genome_browser.tsv'), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+  
+  peakset = read.table (file.path(chromBPdir,paste0('peakset_',celltype,'.bed')))
+  peakset = peakset[,1:3]
+  colnames (peakset) = c ('chr','start','end')
+  peakset = makeGRangesFromDataFrame (peakset)
+  finemo_hits = makeGRangesFromDataFrame (finemo_hits, keep.extra.columns = T)
+  
+  match_rank = c('motif_name0')#,'motif_name1','motif_name2')
+  ov_motif_peaks_mat_combined = list()
+  for (motif_match in match_rank)
+    {
+    finemo_hits_l = split (finemo_hits, finemo_hits@elementMetadata[,motif_match])
+    
+    ov_motif_peaks = lapply (finemo_hits_l, function(x) findOverlaps (peakset, x, select='first'))
+    ov_motif_peaks_mat = do.call (cbind, ov_motif_peaks)
+    rownames (ov_motif_peaks_mat) = as.character(peakset)
+    ov_motif_peaks_mat[is.na(ov_motif_peaks_mat)] = 0
+    ov_motif_peaks_mat[ov_motif_peaks_mat > 0] = 1
+    ov_motif_peaks_mat_combined[[motif_match]] = ov_motif_peaks_mat
+    #ov_motif_peaks_df = as.data.frame (ov_motif_peaks_mat)
+    }
+  ov_motif_peaks_mat_combined = do.call (cbind, ov_motif_peaks_mat_combined)  
+  tf_columns = colnames(ov_motif_peaks_mat_combined)
+  ov_motif_peaks_adj_l2 = as.data.frame (count_to_adj (data = ov_motif_peaks_mat_combined))
+  # From https://stackoverflow.com/questions/66515117/convert-dummy-coded-matrix-to-adjacency-matrix
+  ov_motif_peaks_adj_l[[celltype]] = ov_motif_peaks_adj_l2 
   }
-ov_motif_peaks_mat_combined = do.call (cbind, ov_motif_peaks_mat_combined)  
-tf_columns = colnames(ov_motif_peaks_mat_combined)
-ov_motif_peaks_adj_l2 = as.data.frame (count_to_adj (data = ov_motif_peaks_mat_combined))
-# From https://stackoverflow.com/questions/66515117/convert-dummy-coded-matrix-to-adjacency-matrix
-ov_motif_peaks_adj_l[[celltype]] = ov_motif_peaks_adj_l2
+
+### Make barplot of top pioneer factors between C1 and C2 ####
+finemo_hits_df = do.call (rbind, finemo_hits_l2)
+top_finemo_hits = c(
+  head(table (finemo_hits_df$motif_name0[finemo_hits_df$sample == 'C1'])[order(-table (finemo_hits_df$motif_name0[finemo_hits_df$sample == 'C1']))],8),
+  head(table (finemo_hits_df$motif_name0[finemo_hits_df$sample == 'C2'])[order(-table (finemo_hits_df$motif_name0[finemo_hits_df$sample == 'C2']))],8))
+finemo_hits_df_sub = finemo_hits_df[finemo_hits_df$motif_name0 %in% names(top_finemo_hits),]
+palette_finemo_HOX = paletteer::paletteer_d("ochRe::olsen_seq")
+bp = cellComp(
+  seurat_obj = finemo_hits_df_sub,
+  metaGroups = c('sample','motif_name0'),
+  plot_as = 'bar',
+  pal = palette_finemo_HOX
+  )
+
+pdf (file.path('Plots',paste0('chrombpnet_finemo_calls_',paste(celltypes, collapse='_'),'.pdf')))
+bp
+dev.off()
+
+# Get partners in crime of HOXB13
+celltype= 'C1'
+pic = unlist(as.vector(ov_motif_peaks_adj_l[[celltype]]['HXB13',]))
+pic[order(-pic)]
+
+TFs = c(head(names(pic[order(-pic)]),5),'HOXB13')
+TFs = c(TFs, 'ELK4')
+pdf (file.path ('Plots','expression_of_TFs_binding_HOXB13_locus.pdf'),width=20)
+DotPlot (srt, TFs, group.by='seurat_clusters') + gtheme
+dev.off()
+
+
+### Make barplot of top pioneer factors between C1 and C2 ####
+finemo_hits_df = do.call (rbind, finemo_hits_l2)
+peakset = lapply (celltypes, function(x) 
+  {
+  peakset = read.table (file.path(chromBPdir,paste0('peakset_',x,'.bed')))
+  peakset = peakset[,1:3]
+  colnames (peakset) = c ('chr','start','end')
+  makeGRangesFromDataFrame (peakset)})
+names(peakset) = celltypes
+peaks_diff = peakset[['C1']][-queryHits(findOverlaps (peakset[['C1']], peakset[['C2']]))]
+finemo_hits_gr = makeGRangesFromDataFrame(finemo_hits_l2[['C1']], keep.extra.columns=T)
+finemo_hits_gr = finemo_hits_gr[finemo_hits_gr$motif_name0 == 'HXB13',]
+hxb13_peaks = countOverlaps (peaks_diff, finemo_hits_gr)
+hxb13_peaks = ifelse(hxb13_peaks >0,1,0)
+table (hxb13_peaks)
+
+hxb13_peaks = peaks_diff[unique(queryHits (findOverlaps (peaks_diff, finemo_hits_gr)))]
+job = submitGreatJob (hxb13_peaks, species = 'hg38')
+tbl = getEnrichmentTables(job)
 
 
 # Try with heatmaps 
