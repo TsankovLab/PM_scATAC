@@ -54,6 +54,7 @@ plotBrowserTrack2 <- function(
   region = NULL, 
   groupBy = "Clusters",
   useGroups = NULL, 
+  sample_levels = NULL,
   plotSummary = c("bulkTrack", "featureTrack", "loopTrack", "geneTrack", "hubTrack",'hubregiontrack'),
   sizes = c(10, 1.5, 3, 4,3, 3),
   features = getPeakSet(ArchRProj),
@@ -406,7 +407,6 @@ plotBrowserTrack2 <- function(
   # Plot Track
   ######################################################
   if(!is.null(ylim)){
-    ylim <- quantile(df$y, ylim)
     df$y[df$y < ylim[1]] <- ylim[1]
     df$y[df$y > ylim[2]] <- ylim[2]
   }else{
@@ -419,6 +419,7 @@ plotBrowserTrack2 <- function(
     uniqueGroups <- unique(useGroups)
   }
   df$group <- factor(df$group, levels = uniqueGroups)
+  #if (!is.null (sample_levels)) df$group = levels (sample_levels)
   title <- paste0(as.character(seqnames(region)),":", start(region)-1, "-", end(region), " ", title)
 
   allGroups <- gtools::mixedsort(unique(getCellColData(ArchRProj = ArchRProj, select = groupBy, drop = TRUE)))
@@ -471,11 +472,11 @@ plotBrowserTrack2 <- function(
   normMethod = NULL,
   verbose = FALSE,
   minCells = 25,
-  maxCells = 500,
+  maxCells = Inf, # Changed from 500 
   threads = NULL,
   logFile = NULL
   ){
-
+  
   #Group Info
   cellGroups <- getCellColData(ArchRProj, groupBy, drop = TRUE)
   if(!is.null(minCells)){

@@ -22,7 +22,7 @@ source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads (threads = 8)
+addArchRThreads (threads = 1)
 addArchRGenome ("hg38")
 
 if (!file.exists ('Save-ArchR-Project.rds')) 
@@ -91,8 +91,9 @@ rownames (gsMat) = rowData (gsSE)$name
 
 nfeat=5000
 k=25
+top_genes=50
 cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
-cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x, 50)[head(x, 50) %in% rownames (gsMat)])
+cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x, top_genes)[head(x, top_genes) %in% rownames (gsMat)])
 
 force = FALSE
 if (!all (names (cnmf_spectra_unique) %in% colnames (archp@cellColData)) | force)
@@ -118,7 +119,7 @@ average_by_group <- as.data.frame(archp@cellColData) %>%
   summarise(Average = mean(cNMF20))
 average_by_group = average_by_group[order(-average_by_group$Average),]
 sample_sarc_order = factor (archp$Sample3, levels = average_by_group$Sample3)
-archp$Sample3 = factor (archp$Sample3, levels = levels(sample_sarc_order))
+
 
 
 # ### Compare bins malignants normal ####
@@ -248,7 +249,9 @@ hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))
 pdf()
 meso_markers <- plotBrowserTrack2 (
     ArchRProj = archp[archp$Sample3 != 'P11_HOX'],#[!archp$Sample3 %in% c('P11_HOX')], 
+    group_order = sample_levels, 
     groupBy = metaGroupName, 
+    sample_levels = sample_sarc_order,
     minCells = 10,
     geneSymbol = celltype_markers,
     pal = palette_sample,
@@ -912,16 +915,41 @@ hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_
 dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))  
 hubsCell_mat = readRDS (file.path (hubs_dir,paste0('hubs_cells_mat.rds')))  
-hubsCell_mat = scale (hubsCell_mat)
-
-bin_width <- 100   # Number of observations per bin
-overlap <- 50    
 
 # Select samples ####
 sams = as.character(unique(archp$Sample3))
 sams = sams[!sams %in% c('normal_pleura','P3','P13','P11_HOX')] # remove normal,low cell numbers and outlier samples
 
+# Identify hubs higher in malignant ####
+  library (presto)
+  pval_threshold = 0.01
+  occurrence_threshold = 4
+
+  test_comparisons = as.list(
+    paste0(sams, ' normal_pleura'))
+  names(test_comparisons) = sams
+test_comparisons = lapply (test_comparisons, function(x) unlist(strsplit(x, ' ')))
+all (colnames(hubsCell_mat) == rownames(archp@cellColData))
+test_res = lapply (test_comparisons, function(sam_pair) 
+  wilcoxauc (log2(hubsCell_mat+1), y= archp$Sample3, groups_use = sam_pair))
+test_res = lapply (test_res, function(x) x[x$logFC > 0,])
+test_res = do.call (rbind, test_res)
+test_res$gene = hubs_obj$hubsCollapsed$gene[match(test_res$feature, hubs_obj$hubs_id)]
+test_res = test_res[test_res$padj < pval_threshold,]
+test_res = test_res[test_res$group != 'normal_pleura',]
+test_res = test_res[test_res$avgExpr > 1,]
+test_res = test_res[test_res$logFC > 1,]
+malig_hubs = names(table (test_res$feature)[table (test_res$feature) > occurrence_threshold])
+
+hubsCell_mat_sub = scale (hubsCell_mat[malig_hubs,])
+
+bin_width <- 100   # Number of observations per bin
+overlap <- 50    
+sarc_module = 'cNMF20'
+
+
 # Get cnmf modules ####
+archp_meta = as.data.frame (archp@cellColData)
 cnmf_mat = archp@cellColData[,grep ('cNMF',colnames(archp@cellColData))]
 cnmf_mat = as.data.frame (t(scale (t(cnmf_mat))))
 cnmf_mat = lapply (sams, function(x) cnmf_mat[archp_meta$Sample3 == x, ])
@@ -934,10 +962,10 @@ cnmfMat_ordered_avg = lapply (sams, function (sam) as.data.frame (lapply (as.dat
 })))
 names (cnmfMat_ordered_avg) = sams
 
-all (colnames(hubsCell_mat) == rownames(archp@cellColData))
-hubsCell_mat = lapply (sams, function(x) hubsCell_mat[,archp_meta$Sample3 == x])
-names (hubsCell_mat) = sams
-hubsMat_ordered = lapply (sams, function(sam) hubsCell_mat[[sam]][,order(cnmf_mat[[sam]][,sarc_module])])
+all (colnames(hubsCell_mat_sub) == rownames(archp@cellColData))
+hubsCell_mat_sub = lapply (sams, function(x) hubsCell_mat_sub[,archp_meta$Sample3 == x])
+names (hubsCell_mat_sub) = sams
+hubsMat_ordered = lapply (sams, function(sam) hubsCell_mat_sub[[sam]][,order(cnmf_mat[[sam]][,sarc_module])])
 names(hubsMat_ordered) = sams
 hubsMat_ordered_avg = lapply (sams, function (sam) as.data.frame (lapply (as.data.frame (t(hubsMat_ordered[[sam]])), function(x) {
   zoo::rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
@@ -956,16 +984,64 @@ for (sam in sams)
   hub_cor_l[[sam]] = tmp
   }
 
+
+
+
+# load cnmf modules to exclude labelling any genes in the sarcomatoid module ####
+nfeat=5000
+k=25
+top_genes=50
+sarc_module = 'cNMF20'
+cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
+cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x,top_genes))
+sarc_module_genes = cnmf_spectra_unique[[sarc_module]]
+#cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x, 50)[head(x, 50) %in% rownames (gsMat)])
+
+
+# TF motifs in hubs correlating with sarcomatoid score ####
+TFmatch = getMatches (archp)
+TFpositions = getPositions (archp)
+names(TFpositions) = gsub ('_.*','',names(TFpositions))
+names(TFpositions) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", names(TFpositions))
+TFs = c('SOX9','RUNX2','HIC2','SOX5','SOX6','ZEB1','TWIST1')
+TFpositions = TFpositions[TFs]
+top_hubs_gr = lapply (top_hubs, function(x) unlist(lapply (TFpositions, function(y)
+  sum(countOverlaps(y, hubs_obj$hubsCollapsed[match(x,hubs_obj$hubs_id)])))))
+top_hubs_mat = do.call (cbind, top_hubs_gr)
+top_hubs_df = as.data.frame (top_hubs_mat)
+colnames(top_hubs_df) = top_hubs
+top_hubs_df$TF = rownames(top_hubs_df)
+top_hubs_df = gather (top_hubs_df, hub, hit, 1:(ncol(top_hubs_df) - 1))
+top_hubs_df$hub = factor (top_hubs_df$hub, levels = top_hubs_df$hub)
+#colnames(top_hubs_df)[1] = 'hit'
+top_hubs_df$hit[top_hubs_df$hit == 0] = NA
+dp = ggplot(top_hubs_df, aes(x = hub, y = TF)) +
+  geom_point(aes (size = hit), color = 'darkred') + # Adds the points
+  labs(title = "motif hit") +#+ # Labels
+  gtheme
+  #scale_color_manual (values = c(epithelioid = 'darkgreen',sarcomatoid = 'firebrick2')) + gtheme
+
+pdf (file.path ('Plots','Motif_hit_sarc_hubs.pdf'), height=3)
+dp
+dev.off()
+
 hubs_cor_df = do.call (rbind, hub_cor_l)
+hubs_cor_df$score[is.na(hubs_cor_df$score)] = 0
 hub_cor_levels = hubs_cor_df %>% group_by(hub_id) %>% summarise(median_value = median(score)) %>% arrange (-median_value)
 hub_cor_levels$hub_id = factor (hub_cor_levels$hub_id, levels = hub_cor_levels$hub_id)
-hub_cor_levels$gene = hubs_obj$hubsCollapsed$gene[match(hub_cor_levels$hub_id, hubs_obj$hubs_id)]
+hub_cor_levels$gene = paste0(hubs_obj$hubs_id,'-',hubs_obj$hubsCollapsed$gene)[match(hub_cor_levels$hub_id, hubs_obj$hubs_id)]
+hub_cor_levels$in_module = as.character(rowSums (sapply (sarc_module_genes, function(x) grepl (x, hub_cor_levels$gene))))
 hub_cor_levels$labels = ''
-top_labels=10
+sox9_hubs = na.omit(top_hubs_df)[na.omit(top_hubs_df)$TF == 'SOX9' & na.omit(top_hubs_df)$hit == 1,'hub']
+hub_cor_levels$SOX9 = hub_cor_levels$hub_id %in% sox9_hubs
+top_labels=20
 hub_cor_levels$labels[1:top_labels] = head(hub_cor_levels$gene,top_labels)
-bp = ggplot (head (hub_cor_levels,100), aes (x= hub_id, y = median_value, label = labels)) + 
-geom_point() +
-geom_text_repel () +
+bp = ggplot (hub_cor_levels[hub_cor_levels$median_value > 0,], aes (x= hub_id, y = median_value, label = labels, fill = in_module), color='white') + 
+geom_bar (stat = 'identity') +
+scale_fill_manual (values = c(`1` = 'darkred',`0` = 'grey66')) + 
+#scale_color_manual (values = c(`TRUE` = 'darkred',`FALSE` = 'grey66')) + 
+geom_text_repel (size=2, max.overlaps=10, nudge_x = 2) +
+#geom_text(aes(label = labels, y = median_value + .001), hjust = -0.05,na.rm = TRUE, angle=90,size=1) +
 gtheme_no_rot +
   theme(
     nudge_x= 0.2,
@@ -976,7 +1052,7 @@ gtheme_no_rot +
   ) 
 
 
-pdf (file.path ('Plots','hubs_cor_ranked.pdf'), width=4, height=5)
+pdf (file.path ('Plots','hubs_cor_ranked.pdf'), width=4, height=3)
 bp
 dev.off()
 
@@ -1006,59 +1082,35 @@ dev.off()
 
 
 
-# TF motifs in hubs correlating with sarcomatoid score ####
-TFmatch = getMatches (archp)
-TFpositions = getPositions (archp)
-names(TFpositions) = gsub ('_.*','',names(TFpositions))
-names(TFpositions) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", names(TFpositions))
-TFs = c('SOX9','RUNX2','HIC2','SOX5','SOX6','ZEB1','TWIST1')
-TFpositions = TFpositions[TFs]
-top_hubs_gr = lapply (top_hubs, function(x) unlist(lapply (TFpositions, function(y)
-  sum(countOverlaps(y, hubs_obj$hubsCollapsed[match(x,hubs_obj$hubs_id)])))))
-top_hubs_mat = do.call (cbind, top_hubs_gr)
-top_hubs_df = as.data.frame (top_hubs_mat)
-colnames(top_hubs_df) = top_hubs
-top_hubs_df$TF = rownames(top_hubs_df)
-top_hubs_df = gather (top_hubs_df, hub, hit, 1:(ncol(top_hubs_df)-1))
-top_hubs_df$hub = factor (top_hubs_df$hub, levels = top_hubs_df$hub)
-#colnames(top_hubs_df)[1] = 'hit'
-top_hubs_df$hit[top_hubs_df$hit == 0] = NA
-dp = ggplot(top_hubs_df, aes(x = hub, y = TF)) +
-  geom_point(aes (size = hit), color = 'darkred') + # Adds the points
-  labs(title = "motif hit") +#+ # Labels
-  gtheme
-  #scale_color_manual (values = c(epithelioid = 'darkgreen',sarcomatoid = 'firebrick2')) + gtheme
-
-pdf (file.path ('Plots','Motif_hit_sarc_hubs.pdf'), height=3)
-dp
-dev.off()
-
-
 
 
 
 # Check top correlated hubs on browser track ####
+top_hubs = as.character(head(hub_cor_levels$hub_id, 50))
 metaGroupName='Sample3'
-matching_samples=c('normal_pleura','P1','P4','P5','P8','P11','P11_HOX','P12','P14')
+matching_samples=c('normal_pleura','P1','P3','P4','P5','P8','P11','P11_HOX','P12','P14','P23')
+TF = 'SOX9'
 pdf()
 meso_markers <- plotBrowserTrack2 (
     ArchRProj = archp[archp$Sample3 %in% matching_samples], 
     sizes = c(6, 1, 1, 1,1,1),
     groupBy = metaGroupName, 
-    region = hubs_obj$hubsCollapsed[match(top_hubs[1], hubs_obj$hubs_id)],
-    genelabelsize=0,
+    region = ext_range(hubs_obj$hubsCollapsed[match(top_hubs, hubs_obj$hubs_id)],50000,50000),
+    sample_levels = NULL,
+    #geneSymbol = TF,
+    genelabelsize=2,
     #geneSymbol = TF,
     normMethod = "ReadsInTSS",
-    scCellsMax=3000,
+    scCellsMax=100,
     plotSummary = c("bulkTrack", "featureTrack", 
         "loopTrack","geneTrack", 
         "hubTrack",'hubregiontrack'),
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-    upstream = 50000,
+    upstream = 150000,
     pal = palette_sample,
-    #ylim=c(0,0.1),
-    downstream = 300000,
+    #ylim=c(0,0.4),
+    downstream = 150000,
     #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
     #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
 #    loops = getCoAccessibility (archp, corCutOff = 0.25),
@@ -1071,11 +1123,14 @@ dev.off()
 
 plotPDF (meso_markers, ArchRProj = archp, 
   width=5,height=3, 
-  name =paste0('region_coveragePlots.pdf'),
+  name =paste0(TF,'_sarc_cor_hubs_coveragePlots.pdf'),
   addDOC = F)
 
 metaGroupName = 'sampleID3'
-genes_in_region = unique(getPeakSet (archp)[subjectHits (findOverlaps (mega_hubs, getPeakSet (archp)))]$nearestGene)
+hub_id = 'HUB6922'
+hub_gr = hubs_obj$hubsCollapsed[match (hub_id, hubs_obj$hubs_id)]
+genes_in_region = unique(getPeakSet (archp)[subjectHits (findOverlaps (hub_gr, getPeakSet (archp)))]$nearestGene)
+genes_in_region = c(genes_in_region,'RIMKLB')
 top_dah = data.frame (
 gene = colMeans (srt@assays$RNA@data[rownames(srt) %in% genes_in_region,]),
 group = srt@meta.data[,metaGroupName])
@@ -1279,6 +1334,7 @@ metacells = readRDS (file.path('..','scrna','metacells.rds'))
 metacells$sampleID = metacells$sampleID3
 nfeat=5000
 k=25
+top_genes=50
 cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
 
 

@@ -203,7 +203,8 @@ dev.off()
 
 
 # Generate matrix of fragment counts of hubs x barcodes ####
-if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))))
+force = T
+if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))) | force)
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
     ArchRProj = archp))    
@@ -219,7 +220,7 @@ if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))))
     hubsCell_mat[,cell] = fragments_in_cell_in_hubs
     }
   all (colnames (hubsCell_mat) == rownames(archp@cellColData))  
-  hubsCell_mat = t(t(hubsCell_mat) * (10^6 / archp$nFrags)) # scale
+  hubsCell_mat = t(t(hubsCell_mat) * (10^6 / archp$ReadsInTSS)) # scale
   saveRDS (hubsCell_mat, file.path (hubs_dir,paste0('hubs_cells_mat.rds')))
   } else {
   hubsCell_mat = readRDS (file.path (hubs_dir,paste0('hubs_cells_mat.rds')))  
