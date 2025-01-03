@@ -36,10 +36,10 @@ echo $fold_number
 cd ${chromBPdir}/${celltype}
 
 # Train chrombpnet bias model
-BIAS_MODEL_H5=${celltype}_bias_model/fold_${fold_number}/models/model_bias.h5
-if [ ! -f "${BIAS_MODEL_H5}" ]; then
-    rm -r ${celltype}_model/fold_$fold_number/
-    echo "run training bias model"
+# BIAS_MODEL_H5=${celltype}_bias_model/fold_${fold_number}/models/model_bias.h5
+# if [ ! -f "${BIAS_MODEL_H5}" ]; then
+#     rm -r ${celltype}_model/fold_$fold_number/
+#     echo "run training bias model"
 
 # Train bias model
 chrombpnet bias pipeline \

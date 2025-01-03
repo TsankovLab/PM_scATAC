@@ -46,13 +46,14 @@ done
     
 
 # Train chrombpnet bias model
+job_ids=""
 for fold_number in 0 1 2 3 4; do
-BIAS_MODEL_H5=${celltype}_bias_model/fold_${fold_number}/models/model_bias.h5
-if [ ! -f "${BIAS_MODEL_H5}" ]; then
-    rm -r ${celltype}_model/fold_$fold_number/
+    BIAS_MODEL_H5=bias_model/fold_${fold_number}/models/model_bias.h5
+    if [ ! -f "${BIAS_MODEL_H5}" ]; then
+    rm -r bias_model/fold_$fold_number
     echo "run training bias model"
-
-     job_id=$(bsub -J ${celltype}_bias \
+     job_id=$(
+        bsub -J ${celltype}_bias \
          -P acc_Tsankov_Normal_Lung \
          -q gpu \
          -n 8 \
@@ -67,16 +68,16 @@ if [ ! -f "${BIAS_MODEL_H5}" ]; then
          | awk '{print $2}' | sed 's/<//;s/>//')
     
     # Append the job ID to the job_ids string
-    if [ -z "$job_ids" ]; then
-        job_ids="done(${job_id})"
-    else
-        job_ids="$job_ids && done(${job_id})"
-    fi
+        if [ -z "$job_ids" ]; then
+            job_ids="done(${job_id})"
+        else
+            job_ids="$job_ids && done(${job_id})"
+        fi
  
-else
+    else
     echo "model_bias.h5 file found!"
-fi
-
+    fi
+done
 
 # Wait for all jobs to complete
 bsub -J wait_jobs -P acc_Tsankov_Normal_Lung -w "$job_ids"  -o wait.log -e wait.err /bin/bash -c "echo 'All jobs completed.'"
