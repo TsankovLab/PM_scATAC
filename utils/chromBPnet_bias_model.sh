@@ -36,15 +36,15 @@ for fold_number in 0 1 2 3 4; do
     echo "negatives file not found. Identifying background peaks..."
     #rm -r output_auxiliary
     chrombpnet prep nonpeaks \
-    	-g ${grefdir}/genome_references/hg38.genome.fa -p \
-    	peakset_all_no_blacklist.bed \
+    	-g ${grefdir}/genome_references/hg38.genome.fa \
+        -p peakset_all_no_blacklist.bed \
     	-c ${grefdir}/hg38.chrom.sizes \
     	-fl ${grefdir}/folds/fold_${fold_number}.json \
     	-br ${grefdir}/blacklist.bed.gz \
     	-o bias_model/fold_${fold_number}/output_negatives
     fi
-done    
-    
+done
+
 
 # Train chrombpnet bias model
 job_ids=""
