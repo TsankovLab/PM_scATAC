@@ -167,6 +167,7 @@ plotBrowserTrack2 <- function(
         region = region[x], 
         tileSize = tileSize, 
         groupBy = groupBy,
+        sample_levels = sample_levels,
         threads = threads, 
         minCells = minCells,
         pal = pal,
@@ -367,6 +368,7 @@ plotBrowserTrack2 <- function(
   tileSize = 100, 
   minCells = 25,
   groupBy = "Clusters",
+  sample_levels = NULL,
   useGroups = NULL,
   normMethod = "ReadsInTSS",
   threads = 1, 
@@ -419,7 +421,7 @@ plotBrowserTrack2 <- function(
     uniqueGroups <- unique(useGroups)
   }
   df$group <- factor(df$group, levels = uniqueGroups)
-  #if (!is.null (sample_levels)) df$group = levels (sample_levels)
+  if (!is.null (sample_levels)) levels(df$group) = sample_levels[sample_levels %in% levels(df$group)]
   title <- paste0(as.character(seqnames(region)),":", start(region)-1, "-", end(region), " ", title)
 
   allGroups <- gtools::mixedsort(unique(getCellColData(ArchRProj = ArchRProj, select = groupBy, drop = TRUE)))

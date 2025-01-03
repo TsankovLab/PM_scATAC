@@ -997,34 +997,6 @@ cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x,top_genes)
 sarc_module_genes = cnmf_spectra_unique[[sarc_module]]
 #cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x, 50)[head(x, 50) %in% rownames (gsMat)])
 
-
-# TF motifs in hubs correlating with sarcomatoid score ####
-TFmatch = getMatches (archp)
-TFpositions = getPositions (archp)
-names(TFpositions) = gsub ('_.*','',names(TFpositions))
-names(TFpositions) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", names(TFpositions))
-TFs = c('SOX9','RUNX2','HIC2','SOX5','SOX6','ZEB1','TWIST1')
-TFpositions = TFpositions[TFs]
-top_hubs_gr = lapply (top_hubs, function(x) unlist(lapply (TFpositions, function(y)
-  sum(countOverlaps(y, hubs_obj$hubsCollapsed[match(x,hubs_obj$hubs_id)])))))
-top_hubs_mat = do.call (cbind, top_hubs_gr)
-top_hubs_df = as.data.frame (top_hubs_mat)
-colnames(top_hubs_df) = top_hubs
-top_hubs_df$TF = rownames(top_hubs_df)
-top_hubs_df = gather (top_hubs_df, hub, hit, 1:(ncol(top_hubs_df) - 1))
-top_hubs_df$hub = factor (top_hubs_df$hub, levels = top_hubs_df$hub)
-#colnames(top_hubs_df)[1] = 'hit'
-top_hubs_df$hit[top_hubs_df$hit == 0] = NA
-dp = ggplot(top_hubs_df, aes(x = hub, y = TF)) +
-  geom_point(aes (size = hit), color = 'darkred') + # Adds the points
-  labs(title = "motif hit") +#+ # Labels
-  gtheme
-  #scale_color_manual (values = c(epithelioid = 'darkgreen',sarcomatoid = 'firebrick2')) + gtheme
-
-pdf (file.path ('Plots','Motif_hit_sarc_hubs.pdf'), height=3)
-dp
-dev.off()
-
 hubs_cor_df = do.call (rbind, hub_cor_l)
 hubs_cor_df$score[is.na(hubs_cor_df$score)] = 0
 hub_cor_levels = hubs_cor_df %>% group_by(hub_id) %>% summarise(median_value = median(score)) %>% arrange (-median_value)
@@ -1055,6 +1027,35 @@ gtheme_no_rot +
 pdf (file.path ('Plots','hubs_cor_ranked.pdf'), width=4, height=3)
 bp
 dev.off()
+
+
+# TF motifs in hubs correlating with sarcomatoid score ####
+TFmatch = getMatches (archp)
+TFpositions = getPositions (archp)
+names(TFpositions) = gsub ('_.*','',names(TFpositions))
+names(TFpositions) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", names(TFpositions))
+TFs = c('SOX9','RUNX2','HIC2','SOX5','SOX6','ZEB1','TWIST1')
+TFpositions = TFpositions[TFs]
+top_hubs_gr = lapply (top_hubs, function(x) unlist(lapply (TFpositions, function(y)
+  sum(countOverlaps(y, hubs_obj$hubsCollapsed[match(x,hubs_obj$hubs_id)])))))
+top_hubs_mat = do.call (cbind, top_hubs_gr)
+top_hubs_df = as.data.frame (top_hubs_mat)
+colnames(top_hubs_df) = top_hubs
+top_hubs_df$TF = rownames(top_hubs_df)
+top_hubs_df = gather (top_hubs_df, hub, hit, 1:(ncol(top_hubs_df) - 1))
+top_hubs_df$hub = factor (top_hubs_df$hub, levels = top_hubs_df$hub)
+#colnames(top_hubs_df)[1] = 'hit'
+top_hubs_df$hit[top_hubs_df$hit == 0] = NA
+dp = ggplot(top_hubs_df, aes(x = hub, y = TF)) +
+  geom_point(aes (size = hit), color = 'darkred') + # Adds the points
+  labs(title = "motif hit") +#+ # Labels
+  gtheme
+  #scale_color_manual (values = c(epithelioid = 'darkgreen',sarcomatoid = 'firebrick2')) + gtheme
+
+pdf (file.path ('Plots','Motif_hit_sarc_hubs.pdf'), height=3)
+dp
+dev.off()
+
 
 # plot top correlated hubs ####
 hubs_cor_df$hub_id = factor (hubs_cor_df$hub_id, levels = hub_cor_levels$hub_id)
@@ -1090,13 +1091,17 @@ top_hubs = as.character(head(hub_cor_levels$hub_id, 50))
 metaGroupName='Sample3'
 matching_samples=c('normal_pleura','P1','P3','P4','P5','P8','P11','P11_HOX','P12','P14','P23')
 TF = 'SOX9'
+sample_sarc_order_levels = levels(sample_sarc_order)
+sample_sarc_order_levels = sample_sarc_order_levels[c(7,1:6,8:13)]
+
+
 pdf()
 meso_markers <- plotBrowserTrack2 (
-    ArchRProj = archp[archp$Sample3 %in% matching_samples], 
+    ArchRProj = archp, 
     sizes = c(6, 1, 1, 1,1,1),
     groupBy = metaGroupName, 
     region = ext_range(hubs_obj$hubsCollapsed[match(top_hubs, hubs_obj$hubs_id)],50000,50000),
-    sample_levels = NULL,
+    sample_levels = sample_sarc_order_levels,
     #geneSymbol = TF,
     genelabelsize=2,
     #geneSymbol = TF,
@@ -1109,6 +1114,7 @@ meso_markers <- plotBrowserTrack2 (
     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
     upstream = 150000,
     pal = palette_sample,
+    minCells = 25,
     #ylim=c(0,0.4),
     downstream = 150000,
     #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
