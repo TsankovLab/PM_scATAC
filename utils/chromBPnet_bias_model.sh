@@ -16,6 +16,7 @@ cd $chromBPdir/$celltype
 
 chmod +x ${repodir}/utils/bias_training.sh
 
+
 # Remove regions overlapping black listed regions
 bedtools slop -i ${grefdir}/blacklist.bed.gz -g ${grefdir}/hg38.chrom.sizes -b 1057 > temp.bed
 bedtools intersect -v -a peakset_all.bed -b temp.bed  > peakset_all_no_blacklist.bed

@@ -49,7 +49,7 @@ chrombpnet bias pipeline \
         -c ${grefdir}/hg38.chrom.sizes \
         -p peakset_all_no_blacklist.bed \
         -n bias_model/fold_${fold_number}/output_negatives_${fold_number}.bed \
-        -fl ${grefdir}/splits/fold_${foldr_number}.json \
+        -fl ${grefdir}/folds/fold_${fold_number}.json \
         -b 0.5 \
         -o bias_model/fold_${fold_number}/ #\
         #-fp 

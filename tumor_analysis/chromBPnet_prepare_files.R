@@ -26,27 +26,37 @@ for (metagroup in metagroups)
   }
 
 
-### Run peak calling ####
-metaGroupName = "epit_sarc2"
-force=TRUE
-peak_reproducibility=2
-archp = archp[as.character(archp@cellColData[,metaGroupName]) %in% metagroups]
-if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source (file.path('..','..','git_repo','utils','callPeaks.R'))
+pval_thresh=0.01
+NPEAKS=200000 # capping number of peaks called from MACS2
+smooth_window=150 # default
+shiftsize=$(( -$smooth_window/2 ))
+fragment_file = 
+macs2 callpeak \
+    -t $fragment_file -f BED -n $prefix -g 1.3e+8 -p $pval_thresh \
+   --shift $shiftsize  --extsize $smooth_window --nomodel --keep-dup all --call-summits
 
 
-# Export peak sets by meta group ####
-peaksets = lapply (metagroups,
-  function(x)
-  {
-   tmp = readRDS (file.path('PeakCalls',paste0(x, '-reproduciblePeaks.gr.rds')))
-   tmp = extendGR(gr = tmp, upstream = 1500 - 250, downstream = 1500 - 250)
+# ### Run peak calling ####
+# metaGroupName = "epit_sarc2"
+# force=TRUE
+# peak_reproducibility=2
+# archp = archp[as.character(archp@cellColData[,metaGroupName]) %in% metagroups]
+# if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source (file.path('..','..','git_repo','utils','callPeaks.R'))
 
-   tmp = data.frame (tmp)
-   tmp = tmp[,1:10]
-   tmp[[10]] = 1500
-   tmp[,4:9] = '.'
-   write.table (tmp, row.names =FALSE, col.names=FALSE, quote=FALSE, sep='\t',file.path('chromBPnet',paste0('peakset_',x,'.bed')))
-  })
+
+# # Export peak sets by meta group ####
+# peaksets = lapply (metagroups,
+#   function(x)
+#   {
+#    tmp = readRDS (file.path('PeakCalls',paste0(x, '-reproduciblePeaks.gr.rds')))
+#    tmp = extendGR(gr = tmp, upstream = 1500 - 250, downstream = 1500 - 250)
+
+#    tmp = data.frame (tmp)
+#    tmp = tmp[,1:10]
+#    tmp[[10]] = 1500
+#    tmp[,4:9] = '.'
+#    write.table (tmp, row.names =FALSE, col.names=FALSE, quote=FALSE, sep='\t',file.path('chromBPnet',paste0('peakset_',x,'.bed')))
+#   })
 
 # also export merged peakset
 ps = getPeakSet(archp)
