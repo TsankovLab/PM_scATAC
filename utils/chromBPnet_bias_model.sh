@@ -41,7 +41,7 @@ for fold_number in 0 1 2 3 4; do
     	-c ${grefdir}/hg38.chrom.sizes \
     	-fl ${grefdir}/folds/fold_${fold_number}.json \
     	-br ${grefdir}/blacklist.bed.gz \
-    	-o bias_model/fold_${fold_number}/output_negatives
+    	-o bias_model/output_negatives_f${fold_number}
     fi
 done
 
