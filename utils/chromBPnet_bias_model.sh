@@ -89,6 +89,9 @@ echo "combine bias models"
 #source deactivate
 source activate h5py # activate another environment with hdf5plugin installed to read h5 files
 
+chromBPct_dir=${chromBPdir}/${celltype}_model
+echo $chromBPct_dir
+
 # Explicitly set PATH to detect hdf5plugin
 # Fix environment variables
 export PATH=/sc/arion/work/giottb01/conda/envs/h5py/bin:$PATH
@@ -97,4 +100,4 @@ export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_P
 
 conda list | grep hdf5plugin
 /sc/arion/work/giottb01/conda/envs/h5py/bin/python -c "import hdf5plugin; print('hdf5plugin is installed')"
-/sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/average_bias_models.py $chromBPct_dir $celltype
+/sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/average_bias_models.py $chromBPct_dir
