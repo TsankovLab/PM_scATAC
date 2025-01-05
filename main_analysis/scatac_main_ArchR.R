@@ -564,11 +564,23 @@ subsetArchRProject(
 )
 
 
+metaGroupName = 'celltype_lv1'
+subsetArchRProject(
+  ArchRProj = archp,
+  cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% c('Endothelial','Fibroblasts','Mesothelium','SmoothMuscle')],
+  outputDirectory = file.path('..','..','stroma','scatac_ArchR'),
+  dropCells = TRUE,
+  logFile = NULL,
+  threads = getArchRThreads(),
+  force = TRUE
+)
+
+
 
 
 # Show that enhancer linked to NR4A2 is only up in NK KLRC1 and CD8 exhausted across all cells ####
-nkt_ann = read.csv (file.path('..','..','NKT_cells','scatac_ArchR','barcode_annotation.csv'))
-mye_ann = read.csv (file.path('..','..','myeloid_cells','scatac_ArchR','barcode_annotation.csv'))
+nkt_ann = read.csv (file.path('..','..','NKT_cells','scatac_ArchR','barcode_annotation_nkt.csv'))
+mye_ann = read.csv (file.path('..','..','myeloid_cells','scatac_ArchR','barcode_annotation_main.csv'))
 archp$celltype2 = archp$celltype_revised
 archp$celltype2[match(nkt_ann$barcode, rownames(archp@cellColData))] = nkt_ann$celltype
 archp$celltype2[match(mye_ann$barcode, rownames(archp@cellColData))] = mye_ann$celltype

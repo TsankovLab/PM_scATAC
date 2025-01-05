@@ -48,7 +48,7 @@ chrombpnet bias pipeline \
         -g ${grefdir}/genome_references/hg38.genome.fa \
         -c ${grefdir}/hg38.chrom.sizes \
         -p peakset_all_no_blacklist.bed \
-        -n bias_model/output_negatives_f${fold_number}.bed \
+        -n bias_model/output_negatives_f${fold_number}_negatives.bed \
         -fl ${grefdir}/folds/fold_${fold_number}.json \
         -b 0.5 \
         -o bias_model/fold_${fold_number}/ #\
