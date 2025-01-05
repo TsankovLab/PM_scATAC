@@ -5,7 +5,7 @@ import os
 import hdf5plugin
 
 # Get variables from sys.argv
-# chromBPct_dir = sys.argv[1]  # First argument
+chromBPct_dir = sys.argv[1]  # First argument
 # celltype = sys.argv[2]
 #var2 = sys.argv[2]  # Second argument
 #var3 = sys.argv[3]  # Third argument
