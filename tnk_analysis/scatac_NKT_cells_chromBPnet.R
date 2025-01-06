@@ -28,68 +28,58 @@ addArchRGenome("hg38")
 
 archp = loadArchRProject (projdir)
 archp$TNK_cells = 'TNK_cells'
-### Preprocess files for launching chromBPnet bias model ####
 
-# Export fragments by meta group
+### Call peaks with MACS2 by metaGroupName ####
 metaGroupName = 'TNK_cells'
-if (!exists ('fragments')) fragments = unlist(getFragmentsFromProject (archp))
+source ('../../git_repo/chromBPnet_call_peaks.R')
 
-force = F
-for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
-if (!file.exists(paste0('fragments_',metagroup,'.tsv')) | force)
-    {  
-    #fragments = ReadFragments(fragment_paths[sam], cutSite = FALSE)
-    fragments_metagroup = as.data.frame (fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]], row.names=NULL)
-    fragments_metagroup$strand = '.'
-    fragments_metagroup = fragments_metagroup[,c(1:3,5)]
-    write.table (fragments_metagroup, file.path('chromBPnet',paste0('fragments_',metagroup,'.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
-    }
+### Run chromBPnet bias model or provide folder of bias_model.h5 file ####
+# Note: you need to have a bias model for each of the fold used in the no bias model
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet'
+repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
+celltype = 'TNK_cells'
 
-# Call peaks with MACS2 following ENCODE specifications 
+command <- paste ("bsub -J", paste0(celltype,'_cBP_bias'), 
+	"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",
+	file.path(chromBPdir,paste0('cBP_master_bias_',celltype,'.out')), "-e" ,
+	file.path(chromBPdir,paste0('cBP_master_bias_',celltype,'.err')),
+	file.path(repodir,'utils','chromBPnet_bias_master.sh'))
+args <- paste(chromBPdir, grefdir, repodir, celltype) 
+system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_bias_master.sh')), wait=FALSE)
 
-# pval_thresh=0.01
+system (paste(command, args))
 
-# smooth_window=150 # default
-# shiftsize=$(( -$smooth_window/2 ))
-# fragment_file = 
-# macs2 callpeak \
-#     -t $fragment_file -f BED -n $prefix -g 1.3e+8 -p $pval_thresh \
-#    --shift $shiftsize  --extsize $smooth_window --nomodel --keep-dup all --call-summits
-# Set parameters
-smooth_window <- 150
-shiftsize <- -smooth_window / 2
-prefix <- metagroup # Replace with your desired prefix
-pval_thresh <- 0.01 # Replace with your p-value threshold
 
-for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
+
+# Run no bias chromBPnet model for each NKT cell subtype ####
+
+### Call peaks with MACS2 by metaGroupName ####
+metaGroupName = 'celltype2'
+source ('../../git_repo/chromBPnet_call_peaks.R')
+
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet'
+repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
+biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
+
+celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
+
+for (celltype in celltypes)
 	{
-	fragment_file <- file.path('chromBPnet',paste0('fragments_',metagroup,'.tsv')) # Replace with actual file path
-	# Construct the command
-	command <- paste(
-	  "macs2 callpeak",
-	  "-t", shQuote(fragment_file),
-	  "-f BED",
-	  "-n", shQuote(prefix),
-	  "-g 1.3e+8",
-	  "-p", pval_thresh,
-	  "--shift", shiftsize,
-	  "--extsize", smooth_window,
-	  "--nomodel --keep-dup all --call-summits",
-	  "--outdir", paste0('chromBPnet/','MACS2_',metagroup)
-	)
+	command <- paste ("bsub -J", paste0(celltype,'_cBPnet'), 
+		"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",
+		file.path(chromBPdir,paste0('cBP_master_',celltype,'.out')), "-e" ,
+		file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),
+		file.path(repodir,'utils','chromBPnet_master.sh'))
+	args <- paste(chromBPdir, grefdir, repodir, celltype, biasdir) 
+	system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_master.sh')), wait=FALSE)
 	
-	# Run the command
-	system(command)
+	system (paste(command, args))
 	}
 
-# Read back MACS2 output and cap peaks to no more than 200K ####
-NPEAKS=200000 # capping number of peaks called from MACS2
-for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
-	{
-	peaks = read.table (file.path ('chromBPnet',paste0('MACS2_',metagroup), paste0(metagroup,'_peaks.narrowPeak')), sep='\t')	
-	peaks = head (peaks[order(-peaks[,7]),], NPEAKS)
-	write.table (peaks, file.path('chromBPnet',paste0('MACS2_',metagroup), paste0(metagroup,'_peaks_capped.narrowPeak')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
-	}
+
+
 
 
 

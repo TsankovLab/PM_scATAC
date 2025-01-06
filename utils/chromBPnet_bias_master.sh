@@ -19,7 +19,7 @@ chmod +x ${repodir}/utils/bias_training.sh
 
 # Remove regions overlapping black listed regions
 bedtools slop -i ${grefdir}/blacklist.bed.gz -g ${grefdir}/hg38.chrom.sizes -b 1057 > temp.bed
-bedtools intersect -v -a MACS2_${celltype}/${celltype}_peaks_capped.narrowPeak -b temp.bed  > ${celltype}_peakset_all_no_blacklist.bed
+bedtools intersect -v -a ../MACS2_${celltype}/${celltype}_peaks_capped.narrowPeak -b temp.bed  > ${celltype}_peakset_all_no_blacklist.bed
 wc -l ${celltype}_peakset_all_no_blacklist.bed # # Make sure number of peaks is not more than 250K
 
 # Generate training validation and test chromosome sets
@@ -31,7 +31,7 @@ head -n 23  ${grefdir}/hg38.chrom.sizes >  hg38.chrom.subset.sizes
 # Train chrombpnet bias model
 for fold_number in 0 1 2 3 4; do
     
-    negatives_file=${celltype}_bias_model/fold_${fold_number}/output_negatives_${fold_number}
+    negatives_file=bias_model/fold_${fold_number}/output_negatives_${fold_number}
     if [ ! -f "${negatives_file}" ]; then
     echo "negatives file not found. Identifying background peaks..."
     #rm -r output_auxiliary

@@ -34,10 +34,12 @@ biasdir=${5}
 echo $biasdir
 
 #mkdir $chromBPdir
-cd $chromBPdir
+mkdir $chromBPdir/$celltype
+cd ${chromBPdir}/${celltype}
+
 
 # Train chrombpnet model
-MODEL_H5=${celltype}_model/fold_${fold_number}/models/chrombpnet_nobias.h5
+MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
 
 if [ ! -f "${MODEL_H5}" ]; then
     echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
@@ -47,24 +49,24 @@ chrombpnet pipeline \
     -d "ATAC" \
     -g $grefdir/genome_references/hg38.genome.fa \
     -c $grefdir/hg38.chrom.sizes \
-    -p peakset_${celltype}.bed \
-    -n  output_negatives.bed \
+    -p ${celltype}_peakset_all_no_blacklist.bed \
+    -n  no_bias_model/output_negatives_f${fold_number}_negatives.bed \
     -fl $grefdir/folds/fold_$fold_number.json \
     -b ${biasdir}/fold_${fold_number}/models/bias.h5 \
-    -o ${celltype}_model/fold_$fold_number
+    -o no_bias_model/fold_$fold_number
 else
     echo "chrombpnet_nobias.h5 file found!"
 fi
 
 # Compute contribution scores
-REGIONS=peakset_${celltype}.bed
+REGIONS=${celltype}_peakset_all_no_blacklist.bed
 GENOME=$grefdir/genome_references/hg38.genome.fa
 CHROM_SIZES=$grefdir/hg38.chrom.sizes
-count_scores_file=${celltype}_model/fold_${fold_number}/${celltype}_contribution_scores.counts_scores.h5
+count_scores_file=no_bias_model/fold_${fold_number}/${celltype}_contribution_scores.counts_scores.h5
 
 if [ ! -f "${count_scores_file}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
-    chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX
+    chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES #-op $OUTPUT_PREFIX
 else
     echo "Contribution scores file already exists: ${count_scores_file}"
 fi

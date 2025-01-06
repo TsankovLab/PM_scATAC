@@ -31,15 +31,44 @@ echo $repodir
 celltype=${4}
 echo $celltype
 biasdir=${5}
+echo $biasdir
 
 #mkdir $chromBPdir
-cd $chromBPdir
+mkdir $chromBPdir/$celltype
+cd $chromBPdir/$celltype
 
 chmod +x ${repodir}/utils/chrBPnet_training.sh
 chmod +x ${repodir}/utils/average_CNT_scores.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
 chmod +x ${repodir}/utils/TFmodisco_profile.sh
 chmod +x ${repodir}/utils/finemo_motif_calls.sh
+
+### Create background regions file - Go in the output chromBPnet folder ####
+# Remove regions overlapping black listed regions
+bedtools slop -i ${grefdir}/blacklist.bed.gz -g ${grefdir}/hg38.chrom.sizes -b 1057 > temp.bed
+bedtools intersect -v -a ../MACS2_${celltype}/${celltype}_peaks_capped.narrowPeak -b temp.bed  > ${celltype}_peakset_all_no_blacklist.bed
+wc -l ${celltype}_peakset_all_no_blacklist.bed # # Make sure number of peaks is not more than 250K
+
+# Generate training validation and test chromosome sets
+head -n 23  ${grefdir}/hg38.chrom.sizes >  hg38.chrom.subset.sizes
+
+# Train chrombpnet bias model
+for fold_number in 0 1 2 3 4; do
+    
+    negatives_file=no_bias_model/fold_${fold_number}/output_negatives_${fold_number}
+    if [ ! -f "${negatives_file}" ]; then
+    echo "negatives file not found. Identifying background peaks..."
+    #rm -r output_auxiliary
+    chrombpnet prep nonpeaks \
+        -g ${grefdir}/genome_references/hg38.genome.fa \
+        -p ${celltype}_peakset_all_no_blacklist.bed \
+        -c ${grefdir}/hg38.chrom.sizes \
+        -fl ${grefdir}/folds/fold_${fold_number}.json \
+        -br ${grefdir}/blacklist.bed.gz \
+        -o no_bias_model/output_negatives_f${fold_number}
+    fi
+done
+
 
 job_ids=""
 echo "run training model and contribution scores"

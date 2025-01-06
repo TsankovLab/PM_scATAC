@@ -136,6 +136,17 @@
 # h5ls(file_path)
 
 
+# Train bias model first if not already done ####
+command <- paste ("bsub -J", paste0(celltype,'_cBP_bias'), 
+	"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",
+	file.path(chromBPdir,paste0('cBP_master_bias_',celltype,'.out')), "-e" ,
+	file.path(chromBPdir,paste0('cBP_master_bias_',celltype,'.err')),
+	file.path(repodir,'utils','chromBPnet_bias_master.sh'))
+args <- paste(chromBPdir, grefdir, repodir, celltype) 
+system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_bias_master.sh')), wait=FALSE)
+
+system (paste(command, args))
+
 
 
 
@@ -146,7 +157,7 @@ command <- paste ("bsub -J", paste0(celltype,'_cBPm'),
 	file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),
 	file.path(repodir,'utils','chromBPnet_master.sh'))
 args <- paste(chromBPdir, grefdir, repodir, celltype) 
-system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_master.sh')), wait=FALSE) 
+system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_master.sh')), wait=FALSE)
 
 system (paste(command, args))
 
