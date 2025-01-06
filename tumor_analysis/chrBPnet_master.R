@@ -3,6 +3,7 @@
 # chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet'
 # repodir='/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 # grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
+# biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
 # celltype='SPP1'
 # celltype='Mono'
 # celltype='C1Q'
