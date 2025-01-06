@@ -19,8 +19,8 @@ chmod +x ${repodir}/utils/bias_training.sh
 
 # Remove regions overlapping black listed regions
 bedtools slop -i ${grefdir}/blacklist.bed.gz -g ${grefdir}/hg38.chrom.sizes -b 1057 > temp.bed
-bedtools intersect -v -a peakset_all.bed -b temp.bed  > peakset_all_no_blacklist.bed
-wc -l peakset_all_no_blacklist.bed # # Make sure number of peaks is not more than 250K
+bedtools intersect -v -a MACS2_${celltype}/${celltype}_peaks_capped.narrowPeak -b temp.bed  > ${celltype}_peakset_all_no_blacklist.bed
+wc -l ${celltype}_peakset_all_no_blacklist.bed # # Make sure number of peaks is not more than 250K
 
 # Generate training validation and test chromosome sets
 head -n 23  ${grefdir}/hg38.chrom.sizes >  hg38.chrom.subset.sizes
@@ -37,7 +37,7 @@ for fold_number in 0 1 2 3 4; do
     #rm -r output_auxiliary
     chrombpnet prep nonpeaks \
     	-g ${grefdir}/genome_references/hg38.genome.fa \
-        -p peakset_all_no_blacklist.bed \
+        -p ${celltype}_peakset_all_no_blacklist.bed \
     	-c ${grefdir}/hg38.chrom.sizes \
     	-fl ${grefdir}/folds/fold_${fold_number}.json \
     	-br ${grefdir}/blacklist.bed.gz \
@@ -80,24 +80,3 @@ for fold_number in 0 1 2 3 4; do
     fi
 done
 
-# Wait for all jobs to complete
-bsub -J wait_jobs -P acc_Tsankov_Normal_Lung -w "$job_ids"  -o wait.log -e wait.err /bin/bash -c "echo 'All jobs completed.'"
-
-### Combine contribution scores 
-echo "combine bias models"
-#ml anaconda3/2020.11
-#source deactivate
-source activate h5py # activate another environment with hdf5plugin installed to read h5 files
-
-chromBPct_dir=${chromBPdir}/${celltype}
-echo $chromBPct_dir
-
-# Explicitly set PATH to detect hdf5plugin
-# Fix environment variables
-export PATH=/sc/arion/work/giottb01/conda/envs/h5py/bin:$PATH
-unset PYTHONPATH
-export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_PATH
-
-conda list | grep hdf5plugin
-/sc/arion/work/giottb01/conda/envs/h5py/bin/python -c "import hdf5plugin; print('hdf5plugin is installed')"
-/sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/average_bias_models.py $chromBPct_dir

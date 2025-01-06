@@ -26,7 +26,7 @@ for (metagroup in metagroups)
   }
 
 
-pval_thresh=0.01
+# pval_thresh=0.01
 NPEAKS=200000 # capping number of peaks called from MACS2
 smooth_window=150 # default
 shiftsize=$(( -$smooth_window/2 ))
@@ -45,18 +45,18 @@ macs2 callpeak \
 
 
 # # Export peak sets by meta group ####
-# peaksets = lapply (metagroups,
-#   function(x)
-#   {
-#    tmp = readRDS (file.path('PeakCalls',paste0(x, '-reproduciblePeaks.gr.rds')))
-#    tmp = extendGR(gr = tmp, upstream = 1500 - 250, downstream = 1500 - 250)
+peaksets = lapply (metagroups,
+  function(x)
+  {
+   tmp = readRDS (file.path('PeakCalls',paste0(x, '-reproduciblePeaks.gr.rds')))
+   tmp = extendGR(gr = tmp, upstream = 1500 - 250, downstream = 1500 - 250)
 
-#    tmp = data.frame (tmp)
-#    tmp = tmp[,1:10]
-#    tmp[[10]] = 1500
-#    tmp[,4:9] = '.'
-#    write.table (tmp, row.names =FALSE, col.names=FALSE, quote=FALSE, sep='\t',file.path('chromBPnet',paste0('peakset_',x,'.bed')))
-#   })
+   tmp = data.frame (tmp)
+   tmp = tmp[,1:10]
+   tmp[[10]] = 1500
+   tmp[,4:9] = '.'
+   write.table (tmp, row.names =FALSE, col.names=FALSE, quote=FALSE, sep='\t',file.path('chromBPnet',paste0('peakset_',x,'.bed')))
+  })
 
 # also export merged peakset
 ps = getPeakSet(archp)
