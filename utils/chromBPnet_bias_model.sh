@@ -89,7 +89,7 @@ echo "combine bias models"
 #source deactivate
 source activate h5py # activate another environment with hdf5plugin installed to read h5 files
 
-chromBPct_dir=${chromBPdir}/${celltype}_model
+chromBPct_dir=${chromBPdir}/${celltype}
 echo $chromBPct_dir
 
 # Explicitly set PATH to detect hdf5plugin

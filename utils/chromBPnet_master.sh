@@ -30,7 +30,7 @@ repodir=${3}
 echo $repodir
 celltype=${4}
 echo $celltype
-
+biasdir=${5}
 
 #mkdir $chromBPdir
 cd $chromBPdir
@@ -55,7 +55,7 @@ for fold_number in 0 1 2 3 4; do
          -R span[hosts=1] \
          -o ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.out \
          -e ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.err \
-         ${repodir}/utils/chrBPnet_training.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" \
+         ${repodir}/utils/chrBPnet_training.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" \
          | awk '{print $2}' | sed 's/<//;s/>//')
     
     # Append the job ID to the job_ids string

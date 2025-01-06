@@ -30,7 +30,8 @@ celltype=${3}
 echo $celltype
 fold_number=${4}
 echo $fold_number
-
+biasdir=${5}
+echo $biasdir
 
 #mkdir $chromBPdir
 cd $chromBPdir
@@ -49,7 +50,7 @@ chrombpnet pipeline \
     -p peakset_${celltype}.bed \
     -n  output_negatives.bed \
     -fl $grefdir/folds/fold_$fold_number.json \
-    -b bias_model/models/model_bias.h5 \
+    -b ${biasdir}/fold_${fold_number}/models/bias.h5 \
     -o ${celltype}_model/fold_$fold_number
 else
     echo "chrombpnet_nobias.h5 file found!"
