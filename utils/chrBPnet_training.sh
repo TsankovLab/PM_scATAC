@@ -63,6 +63,7 @@ REGIONS=${celltype}_peakset_all_no_blacklist.bed
 GENOME=$grefdir/genome_references/hg38.genome.fa
 CHROM_SIZES=$grefdir/hg38.chrom.sizes
 count_scores_file=no_bias_model/fold_${fold_number}/${celltype}_contribution_scores.counts_scores.h5
+OUTPUT_PREFIX=''
 
 if [ ! -f "${count_scores_file}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
