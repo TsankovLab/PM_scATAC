@@ -52,7 +52,7 @@ chrombpnet pipeline \
     -p ${celltype}_peakset_all_no_blacklist.bed \
     -n  no_bias_model/output_negatives_f${fold_number}_negatives.bed \
     -fl $grefdir/folds/fold_$fold_number.json \
-    -b ${biasdir}/fold_${fold_number}/models/bias.h5 \
+    -b $biasdir/fold_${fold_number}/models/bias.h5 \
     -o no_bias_model/fold_$fold_number
 else
     echo "chrombpnet_nobias.h5 file found!"
