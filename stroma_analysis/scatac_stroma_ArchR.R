@@ -65,11 +65,15 @@ archp = addClusters (input = archp,
     name='Clusters_H',
     force = TRUE)
 
+archp = addClusters (input = archp,
+    reducedDims = "Harmony",
+    name='Clusters_H_2', resolution = 2,
+    force = FALSE)
   
-  # Run genescore DAG ####
-  metaGroupName = "Clusters_H"
-  force = TRUE
-  if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
+# Run genescore DAG ####
+metaGroupName = "Clusters_H"
+force = TRUE
+if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
 
 pdf()
   umap_p3 = plotEmbedding (ArchRProj = archp, 
@@ -78,11 +82,16 @@ pdf()
   umap_p5 = plotEmbedding (ArchRProj = archp, 
     colorBy = "cellColData", name = "Clusters_H",
      embedding = "UMAP_H")
+  umap_p6 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Clusters_H_2",
+   embedding = "UMAP_H")
 dev.off()
-  pdf (file.path('Plots','clusters_umap.pdf'),5,5)
-  print (umap_p3)
-  print (umap_p5)
-  dev.off()
+
+pdf (file.path('Plots','clusters_umap.pdf'),5,5)
+print (umap_p3)
+print (umap_p5)
+print (umap_p6)
+dev.off()
   
   # Check LEC markers to reannotate cluster
   genes = c('TFF3','PECAM1','VWF','PLVAP','NOTCH4','COL1A1','COL1A2','ACTA2','MYL9','HP','WT1')
@@ -110,6 +119,7 @@ dev.off()
   archp$celltype[archp$Clusters_H %in% c('C7','C8','C9','C10')] = 'Fibroblasts'
   archp$celltype[archp$Clusters_H %in% c('C6')] = 'Smooth Muscle'
   archp$celltype[archp$Clusters_H %in% c('C1')] = 'LEC'
+  archp$celltype[archp$Clusters_H_2 %in% c('C10')] = 'Mesothelium'
   archp$celltype[archp$Clusters_H %in% c('C5')] = 'Unknown'
 
   pdf()
@@ -159,10 +169,14 @@ source (file.path ('..','..','git_repo','utils','chromVAR.R'))
 #     corGSM_MM = readRDS ('TF_activators_genescore.rds') 
 #   }
 
+# Run genescore DAG ####
+metaGroupName = "celltype"
+force = TRUE
+if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
 
 # Differential Accessed motifs ####
 metaGroupName = "celltype"
-force=FALSE
+force=TRUE
 source (file.path('..','..','git_repo','utils','DAM.R'))
 
 mMat = assays (mSE)[[1]]
