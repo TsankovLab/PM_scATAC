@@ -45,7 +45,7 @@
   ps = log2(as.data.frame (AverageExpression (srt, 
   features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
   group.by = metaGroupName)[[1]]) +1)
-  min_exp = 0.5
+  min_exp = .5
   ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
   active_TFs = rownames(ps)[rowSums(ps) > 0]
 

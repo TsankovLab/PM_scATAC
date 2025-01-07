@@ -121,6 +121,7 @@ dev.off()
   archp$celltype[archp$Clusters_H %in% c('C1')] = 'LEC'
   archp$celltype[archp$Clusters_H_2 %in% c('C10')] = 'Mesothelium'
   archp$celltype[archp$Clusters_H %in% c('C5')] = 'Unknown'
+  archp = archp[archp$celltype != 'Unknown']
 
   pdf()
   umap_p3 = plotEmbedding (ArchRProj = archp, 
@@ -268,7 +269,7 @@ rownames (mMat) = rowData (mSE)$name
 # Subset only for expressed TFs ####
 metaGroupName = 'celltype'
 ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
-min_exp = 0.1
+min_exp = 0.5
 ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
 active_TFs = rownames(ps)[rowSums(ps) > 0]
 #positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0]
@@ -281,7 +282,7 @@ rownames (mMat) = mMat[,1]
 mMat = mMat[,-1]
 
 mMat_cor = cor (as.matrix(mMat), method = 'pearson')
-km = kmeans (mMat_cor, centers=5)
+km = kmeans (mMat_cor, centers=3)
 
 pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
 cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
@@ -332,11 +333,31 @@ TF_p = plotEmbedding (
     name = paste0('mod_',unique(km$cluster)), 
     pal = rev(palette_deviation),
     #useSeqnames='z',
-    embedding = "UMAP")
+    embedding = "UMAP_H")
 dev.off()
 pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 20,height=6)
 wrap_plots (TF_p, ncol=5)
 dev.off()
+
+tf_markers = c("WT1",'GATA4','GATA6','HIF1A','TGIF1')
+markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
+markerMotifs = grep ("z:", markerMotifs, value = TRUE)
+archp = addImputeWeights (archp)
+pdf ()
+TF_p = plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "MotifMatrix", 
+    name = sort(markerMotifs), 
+    embedding = "UMAP_H",
+    pal = rev (palette_deviation),
+#    imputeWeights = getImputeWeights(archp),
+    imputeWeights = NULL
+)
+dev.off()
+pdf (file.path ('Plots','selected_TF_umap.pdf'), width = 20,height=6)
+wrap_plots (TF_p, ncol=5)
+dev.off()
+
 
 #colnames(TF_hm@ht_list$chromVAR@matrix)[unlist(column_order(TF_hm)[c('2','3','4','5')])]
 #which (colnames(mMat) == 'NR4A2')
