@@ -1,6 +1,6 @@
 if (!exists ('fragments')) fragments = unlist(getFragmentsFromProject (archp))
 
-force = F
+force = T
 for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
 if (!file.exists(paste0('fragments_',metagroup,'.tsv')) | force)
     { 
@@ -25,11 +25,11 @@ if (!file.exists(paste0('fragments_',metagroup,'.tsv')) | force)
 # Set parameters
 smooth_window <- 150
 shiftsize <- -smooth_window / 2
-prefix <- metagroup # Replace with your desired prefix
 pval_thresh <- 0.01 # Replace with your p-value threshold
 
 for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
 	{
+	prefix <- metagroup # Replace with your desired prefix
 	message (paste('call peaks with MACS2 for:', metagroup))	
 	fragment_file <- file.path('chromBPnet',paste0('fragments_',metagroup,'.tsv')) # Replace with actual file path
 	# Construct the command
@@ -60,6 +60,22 @@ for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
 	write.table (peaks, file.path('chromBPnet',paste0('MACS2_',metagroup), paste0(metagroup,'_peaks_capped.narrowPeak')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
 	}
 message ('done!')	
+
+
+
+# Run chromBPnet no bias model ####
+for (celltype in unique(as.character(archp@cellColData[,metaGroupName])))
+	{
+	command <- paste ("bsub -J", paste0(celltype,'_cBPm'), 
+		"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",
+		file.path(chromBPdir,paste0('cBP_master_',celltype,'.out')), "-e" ,
+		file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),
+		file.path(repodir,'utils','chromBPnet_master.sh'))
+	args <- paste(chromBPdir, grefdir, repodir, celltype) 
+	system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_master.sh')), wait=FALSE)
+	
+	system (paste(command, args))
+	}
 
 
 

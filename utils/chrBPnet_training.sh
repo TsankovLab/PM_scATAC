@@ -45,7 +45,7 @@ if [ ! -f "${MODEL_H5}" ]; then
     echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
 rm -r ${celltype}_model/fold_$fold_number/
 chrombpnet pipeline \
-    -ifrag fragments_${celltype}.tsv \
+    -ifrag ../fragments_${celltype}.tsv \
     -d "ATAC" \
     -g $grefdir/genome_references/hg38.genome.fa \
     -c $grefdir/hg38.chrom.sizes \
