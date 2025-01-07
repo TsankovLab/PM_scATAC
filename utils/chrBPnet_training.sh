@@ -43,7 +43,7 @@ MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
 
 if [ ! -f "${MODEL_H5}" ]; then
     echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
-rm -r ${celltype}_model/fold_$fold_number/
+rm -r no_bias_model/fold_$fold_number/
 chrombpnet pipeline \
     -ifrag ../fragments_${celltype}.tsv \
     -d "ATAC" \
@@ -66,7 +66,7 @@ count_scores_file=no_bias_model/fold_${fold_number}/${celltype}_contribution_sco
 
 if [ ! -f "${count_scores_file}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
-    chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES #-op $OUTPUT_PREFIX
+    chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX
 else
     echo "Contribution scores file already exists: ${count_scores_file}"
 fi

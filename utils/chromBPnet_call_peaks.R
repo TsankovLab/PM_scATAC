@@ -76,7 +76,3 @@ for (celltype in unique(as.character(archp@cellColData[,metaGroupName])))
 	
 	system (paste(command, args))
 	}
-
-
-
-

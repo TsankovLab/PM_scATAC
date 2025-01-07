@@ -55,7 +55,7 @@ head -n 23  ${grefdir}/hg38.chrom.sizes >  hg38.chrom.subset.sizes
 # Train chrombpnet bias model
 for fold_number in 0 1 2 3 4; do
     
-    negatives_file=no_bias_model/fold_${fold_number}/output_negatives_${fold_number}
+    negatives_file=no_bias_model/output_negatives_f${fold_number}_negatives.bed
     if [ ! -f "${negatives_file}" ]; then
     echo "negatives file not found. Identifying background peaks..."
     #rm -r output_auxiliary
