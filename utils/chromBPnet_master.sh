@@ -96,7 +96,7 @@ for fold_number in 0 1 2 3 4; do
 
 done
 
-chromBPct_dir=${chromBPdir}/${celltype}_model
+chromBPct_dir=${chromBPdir}/${celltype}
 echo $chromBPct_dir
 
 # Wait for all jobs to complete
