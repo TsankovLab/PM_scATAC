@@ -14,7 +14,7 @@ echo $celltype
 mkdir $chromBPdir/$celltype
 cd $chromBPdir/$celltype
 
-chmod +x ${repodir}/utils/bias_training.sh
+chmod +x ${repodir}/utils/chromBPnet_bias_training.sh
 
 
 # Remove regions overlapping black listed regions
@@ -28,10 +28,10 @@ head -n 23  ${grefdir}/hg38.chrom.sizes >  hg38.chrom.subset.sizes
 # mkdir splits
 # chrombpnet prep splits -c hg38.chrom.subset.sizes -tcr chr1 chr3 chr6 -vcr chr8 chr20 -op splits/fold_0
 
-# Train chrombpnet bias model
+# Generate background regions
 for fold_number in 0 1 2 3 4; do
     
-    negatives_file=bias_model/fold_${fold_number}/output_negatives_${fold_number}
+    negatives_file=bias_model/fold_${fold_number}/output_negatives_f${fold_number}_negatives.bed
     if [ ! -f "${negatives_file}" ]; then
     echo "negatives file not found. Identifying background peaks..."
     #rm -r output_auxiliary
@@ -65,7 +65,7 @@ for fold_number in 0 1 2 3 4; do
          -R span[hosts=1] \
          -o ${chromBPdir}/bias_training_${celltype}_f${fold_number}.out \
          -e ${chromBPdir}/bias_training_${celltype}_f${fold_number}.err \
-         ${repodir}/utils/bias_training.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" \
+         ${repodir}/utils/chromBPnet_bias_training.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" \
          | awk '{print $2}' | sed 's/<//;s/>//')
     
     # Append the job ID to the job_ids string

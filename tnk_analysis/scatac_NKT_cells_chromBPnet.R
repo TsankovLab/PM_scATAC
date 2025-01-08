@@ -32,14 +32,16 @@ archp = loadArchRProject (projdir)
 archp$TNK_cells = 'TNK_cells'
 
 ### Call peaks with MACS2 by metaGroupName ####
-metaGroupName = 'TNK_cells'
+#metaGroupName = 'TNK_cells'
+metaGroupName = 'celltype2'
 source ('../../git_repo/chromBPnet_call_peaks.R')
 
 # Note: you need to have a bias model for each of the fold used in the no bias model
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet'
 repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
-celltype = 'TNK_cells'
+#celltype = 'TNK_cells'
+celltype = 'NK_KLRC1'
 
 command <- paste ("bsub -J", paste0(celltype,'_cBP_bias'), 
 	"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",

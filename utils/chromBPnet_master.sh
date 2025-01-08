@@ -52,7 +52,7 @@ wc -l ${celltype}_peakset_all_no_blacklist.bed # # Make sure number of peaks is 
 # Generate training validation and test chromosome sets
 head -n 23  ${grefdir}/hg38.chrom.sizes >  hg38.chrom.subset.sizes
 
-# Train chrombpnet bias model
+# Generate background regions
 for fold_number in 0 1 2 3 4; do
     
     negatives_file=no_bias_model/output_negatives_f${fold_number}_negatives.bed
