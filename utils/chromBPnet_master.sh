@@ -147,7 +147,7 @@ no_bias_model/fold_4/contribution_scores.profile_scores.bw \
 wigToBigWig no_bias_model/temp_contribution_profile_score.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
 
 echo "Run TFmodisco on averaged h5 contribution counts and profile files"
-bsub -J ${celltype}_TFmd_c \
+TFmd_c_id=bsub -J ${celltype}_TFmd_c \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
     -n 8 \
@@ -156,9 +156,9 @@ bsub -J ${celltype}_TFmd_c \
     -R span[hosts=1] \
     -o ${chromBPdir}/${celltype}_TFmodisco_counts.out \
     -e ${chromBPdir}/${celltype}_TFmodisco_counts.err \
-    ${repodir}/utils/TFmodisco_counts.sh $chromBPdir $celltype
+    ${repodir}/utils/TFmodisco_counts.sh $chromBPdir $celltype | awk '{print $2}' | sed 's/<//;s/>//')
 
-bsub -J ${celltype}_TFmd_p \
+TFmd_p_id=bsub -J ${celltype}_TFmd_p \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
     -n 8 \
@@ -167,7 +167,7 @@ bsub -J ${celltype}_TFmd_p \
     -R span[hosts=1] \
     -o ${chromBPdir}/${celltype}_TFmodisco_profiles.out \
     -e ${chromBPdir}/${celltype}_TFmodisco_profiles.err \
-    ${repodir}/utils/TFmodisco_profile.sh $chromBPdir $celltype
+    ${repodir}/utils/TFmodisco_profile.sh $chromBPdir $celltype | awk '{print $2}' | sed 's/<//;s/>//')
 
 
 echo "Run finemo for motif calls"
@@ -182,7 +182,7 @@ bsub -J ${celltype}_finemo \
          -R span[hosts=1] \
          -o ${chromBPdir}/finemo_${celltype}.out \
          -e ${chromBPdir}/finemo_${celltype}.err \
-         -w "done(${celltype}_TFmd_c) && done(${celltype}_TFmd_p)" \
+         -w "done(${TFmd_c_id}) && done(${TFmd_p_id})" \
          ${repodir}/utils/finemo_motif_calls.sh "$chromBPdir" "$celltype"
 
 
