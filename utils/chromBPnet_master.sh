@@ -38,7 +38,7 @@ mkdir $chromBPdir/$celltype
 cd $chromBPdir/$celltype
 
 chmod +x ${repodir}/utils/chrBPnet_training.sh
-chmod +x ${repodir}/utils/average_CNT_scores.py
+chmod +x ${repodir}/utils/chromBPnet_average_CNT_scores.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
 chmod +x ${repodir}/utils/TFmodisco_profile.sh
 chmod +x ${repodir}/utils/finemo_motif_calls.sh
@@ -126,7 +126,7 @@ export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_P
 
 conda list | grep hdf5plugin
 /sc/arion/work/giottb01/conda/envs/h5py/bin/python -c "import hdf5plugin; print('hdf5plugin is installed')"
-/sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/average_CNT_scores.py $chromBPct_dir $celltype
+/sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores.py $chromBPct_dir $celltype
 
 echo "Take average of bigwig files counts"
 wiggletools mean no_bias_model/fold_0/contribution_scores.counts_scores.bw \
@@ -170,21 +170,34 @@ TFmd_p_id=$(bsub -J ${celltype}_TFmd_p \
     ${repodir}/utils/TFmodisco_profile.sh $chromBPdir $celltype | awk '{print $2}' | sed 's/<//;s/>//')
 
 
+# Submit the finemo job
 echo "Run finemo for motif calls"
-bsub -J ${celltype}_finemo \
-         -P acc_Tsankov_Normal_Lung \
-         -q gpu \
-         -n 8 \
-         -W 96:00 \
-         -gpu num=2 \
-         -R h100nvl \
-         -R rusage[mem=32000] \
-         -R span[hosts=1] \
-         -o ${chromBPdir}/finemo_${celltype}.out \
-         -e ${chromBPdir}/finemo_${celltype}.err \
-         -w "done(${TFmd_c_id}) && done(${TFmd_p_id})" \
-         ${repodir}/utils/finemo_motif_calls.sh "$chromBPdir" "$celltype"
+finemo_job_id=$(bsub -J ${celltype}_finemo \
+    -P acc_Tsankov_Normal_Lung \
+    -q gpu \
+    -n 8 \
+    -W 96:00 \
+    -gpu num=2 \
+    -R h100nvl \
+    -R rusage[mem=32000] \
+    -R span[hosts=1] \
+    -o ${chromBPdir}/finemo_${celltype}.out \
+    -e ${chromBPdir}/finemo_${celltype}.err \
+    -w "done(${TFmd_c_id}) && done(${TFmd_p_id})" \
+    ${repodir}/utils/finemo_motif_calls.sh "$chromBPdir" "$celltype" \
+    | awk '{print $2}' | sed 's/<//;s/>//')
 
+echo "Submitted finemo job with ID: $finemo_job_id"
+
+# Wait for the finemo job to complete
+echo "Waiting for the finemo job to finish..."
+bwait -w "done(${finemo_job_id})"
+
+# Run the R script
+echo "Running R script for finemo motif labels..."
+Rscript $repodir/utils/chromBPnet_finemo_motif_labels.R $chromBPdir $celltype
+
+echo "R script execution completed."
 
 # bsub -J ${celltype}_combS \
 #      -P acc_Tsankov_Normal_Lung \
