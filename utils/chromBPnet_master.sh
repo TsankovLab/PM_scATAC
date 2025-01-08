@@ -147,7 +147,7 @@ no_bias_model/fold_4/contribution_scores.profile_scores.bw \
 wigToBigWig no_bias_model/temp_contribution_profile_score.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
 
 echo "Run TFmodisco on averaged h5 contribution counts and profile files"
-TFmd_c_id=bsub -J ${celltype}_TFmd_c \
+TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
     -n 8 \
@@ -158,7 +158,7 @@ TFmd_c_id=bsub -J ${celltype}_TFmd_c \
     -e ${chromBPdir}/${celltype}_TFmodisco_counts.err \
     ${repodir}/utils/TFmodisco_counts.sh $chromBPdir $celltype | awk '{print $2}' | sed 's/<//;s/>//')
 
-TFmd_p_id=bsub -J ${celltype}_TFmd_p \
+TFmd_p_id=$(bsub -J ${celltype}_TFmd_p \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
     -n 8 \
