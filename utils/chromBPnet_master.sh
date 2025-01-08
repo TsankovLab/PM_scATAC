@@ -129,22 +129,22 @@ conda list | grep hdf5plugin
 /sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/average_CNT_scores.py $chromBPct_dir $celltype
 
 echo "Take average of bigwig files counts"
-wiggletools mean ${chromBPct_dir}/fold_0/contribution_scores.counts_scores.bw \
-${chromBPct_dir}/fold_1/contribution_scores.counts_scores.bw \
-${chromBPct_dir}/fold_2/contribution_scores.counts_scores.bw \
-${chromBPct_dir}/fold_3/contribution_scores.counts_scores.bw \
-${chromBPct_dir}/fold_4/contribution_scores.counts_scores.bw \
-> temp_contribution_counts_score.wig
-wigToBigWig temp_contribution_counts_score.wig ${grefdir}/hg38.chrom.sizes ${celltype}_averaged_contribution_scores_counts.bw
+wiggletools mean no_bias_model/fold_0/contribution_scores.counts_scores.bw \
+no_bias_model/fold_1/contribution_scores.counts_scores.bw \
+no_bias_model/fold_2/contribution_scores.counts_scores.bw \
+no_bias_model/fold_3/contribution_scores.counts_scores.bw \
+no_bias_model/fold_4/contribution_scores.counts_scores.bw \
+> no_bias_model/temp_contribution_counts_score.wig
+wigToBigWig no_bias_model/temp_contribution_counts_score.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_counts.bw
 
 echo "Take average of bigwig files profile"
-wiggletools mean ${chromBPct_dir}/fold_0/contribution_scores.profile_scores.bw \
-${chromBPct_dir}/fold_1/contribution_scores.profile_scores.bw \
-${chromBPct_dir}/fold_2/contribution_scores.profile_scores.bw \
-${chromBPct_dir}/fold_3/contribution_scores.profile_scores.bw \
-${chromBPct_dir}/fold_4/contribution_scores.profile_scores.bw \
-> temp_contribution_profile_score.wig
-wigToBigWig temp_contribution_profile_score.wig ${grefdir}/hg38.chrom.sizes ${celltype}_averaged_contribution_scores_profile.bw
+wiggletools mean no_bias_model/fold_0/contribution_scores.profile_scores.bw \
+no_bias_model/fold_1/contribution_scores.profile_scores.bw \
+no_bias_model/fold_2/contribution_scores.profile_scores.bw \
+no_bias_model/fold_3/contribution_scores.profile_scores.bw \
+no_bias_model/fold_4/contribution_scores.profile_scores.bw \
+> no_bias_model/temp_contribution_profile_score.wig
+wigToBigWig no_bias_model/temp_contribution_profile_score.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
 
 echo "Run TFmodisco on averaged h5 contribution counts and profile files"
 bsub -J ${celltype}_TFmd_c \

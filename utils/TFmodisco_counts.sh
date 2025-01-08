@@ -29,8 +29,8 @@ echo $celltype
 # Get contribution score bigwigs
 # Make sure to have version >=2.2.1  installed ny pulling from github like this: pip install git+https://github.com/jmschrei/tfmodisco-lite.git
 
-mkdir ${chromBPdir}/${celltype}_model/modisco_counts/
-cd ${chromBPdir}/${celltype}_model/modisco_counts/
+mkdir ${chromBPdir}/${celltype}/no_bias_model/modisco_counts/
+cd ${chromBPdir}/${celltype}/no_bias_model/modisco_counts/
 
 if [ ! -f "modisco_results_counts.h5" ]; then
     echo "modisco_results_counts.h5 file not found. Running TFmodisco on contribution score counts ..."
