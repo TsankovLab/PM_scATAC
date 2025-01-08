@@ -2,46 +2,31 @@ conda activate meso_scatac
 #use UGER
 R
 
-####### ANALYSIS of TUMOR compartment #######
-set.seed(1234)
-library (ArchR)
-#devtools::load_all('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/ArchR_fixed_branch/ArchR/')
- packages = c(
-  'Signac',
-  'Seurat',
-  'ggplot2',
-  'patchwork',
-  'scATACutils',
-  'SummarizedExperiment',
-  'epiAneufinder',
-  'JASPAR2020',
-  'TFBSTools',
-  'TxDb.Hsapiens.UCSC.hg38.knownGene',
-  'EnsDb.Hsapiens.v86',
-  'gplots',
-  'regioneR',
-  'ComplexHeatmap',
-  'BSgenome.Hsapiens.UCSC.hg38',
-  'tidyverse',
-  'ggrepel',
-  'RColorBrewer')
- lapply(packages, require, character.only = TRUE)
 
-####### ANALYSIS of TUMOR compartment #######
+set.seed(1234)
+
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/Endothelial/scatac_ArchR'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
-
-#devtools::install_github("immunogenomics/presto") #needed for DAA
+####### ANALYSIS of endothelial cells #######
+# Load utils functions palettes and packages ####
+source (file.path('..','..','git_repo','utils','load_packages.R'))
 source (file.path('..','..','git_repo','utils','useful_functions.R'))
 source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
 source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 source (file.path('..','..','git_repo','utils','palettes.R'))
 
-set.seed (1234)
-addArchRThreads (threads = 1) 
-addArchRGenome ("Hg38")
+# Load functions for hub detection ####
+source (file.path('..','..','git_repo','utils','knnGen.R'))
+source (file.path('..','..','git_repo','utils','addCoax.R'))
+source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','..','git_repo','utils','hubs_track.R'))
+#source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+
+# Set # of threads and genome reference ####
+addArchRThreads(threads = 1) 
+addArchRGenome("hg38")
 
 
 # Load RNA
@@ -66,7 +51,7 @@ archp = loadArchRProject (projdir)
     ArchRProj = archp,
     reducedDims = "IterativeLSI",
     name = "Harmony",
-    groupBy = "Sample2", force=TRUE
+    groupBy = "Sample", force=TRUE
 )
 
 archp = addUMAP (ArchRProj = archp, 
@@ -78,85 +63,41 @@ archp = addClusters (input = archp,
     name='Clusters_H',
     force = TRUE)
 
-  archp = addClusters (input = archp, resolution = 3,
-    reducedDims = "IterativeLSI", maxClusters = 100,
-    force = TRUE)
-  archp = addUMAP (ArchRProj = archp, 
-    reducedDims = "IterativeLSI",
-    force = TRUE)
-  # archp = addTSNE (ArchRProj = archp, 
-  #   reducedDims = "IterativeLSI",
-  #   force = TRUE)
   
-  # Check LEC markers to reannotate cluster
-  genes = c('PLVAP','COL4A1')
-  archp = addImputeWeights (archp)
-
-  pdf (file.path ('Plots',paste0('markers_fetal_endo_umap.pdf')), width = 30,height=14)
-  TF_p = plotEmbedding(
-      ArchRProj = archp, 
-      colorBy = "GeneScoreMatrix", 
-      name = genes, 
-      embedding = "UMAP_H",
-      pal = palette_expression,
-      imputeWeights = getImputeWeights(archp)
-  )
-  TF_p
-  dev.off()
-  archp$celltype[archp$Clusters_H == 'C3'] = 'fetal'
 
   pdf (file.path('Plots','celltype_umap.pdf'),5,5)
   umap_p3 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "Sample2",labelMeans =F,
+    colorBy = "cellColData", name = "Sample",labelMeans =F,
      embedding = "UMAP_H", pal = palette_sample)
-  umap_p4 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "celltype",labelMeans =F,
-     embedding = "UMAP_H", pal = palette_stroma)
+  # umap_p4 = plotEmbedding (ArchRProj = archp, 
+  #   colorBy = "cellColData", name = "celltype",labelMeans =F,
+  #    embedding = "UMAP_H", pal = palette_stroma)
   umap_p5 = plotEmbedding (ArchRProj = archp, 
     colorBy = "cellColData", name = "Clusters_H",
      embedding = "UMAP_H")
-
+  
   print (umap_p3)
-  print (umap_p4)
   print (umap_p5)
   dev.off()
   
-
   archp = saveArchRProject (archp, load = T, dropCells=T)
   
   } else {
   archp = loadArchRProject (projdir)
   }
 
-metaGroupName = 'fetal_gss2'
-exp_bigwig = T
-if (exp_bigwig)
-  {
-  getGroupBW(
-    ArchRProj = archp,
-    groupBy = metaGroupName,
-    normMethod = "ReadsInTSS",
-    tileSize = 100,
-    maxCells = 1000,
-    ceiling = 4,
-    verbose = TRUE,
-    threads = getArchRThreads(),
-    logFile = createLogFile("getGroupBW")
-  )
-  }
-
 ### Call peaks on celltypes ####
 metaGroupName = 'Clusters_H'
 force=TRUE
-peak_reproducibility=2
+peak_reproducibility='2'
 pdf() # This is necessary cause cairo throws error and stops the script
-if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) 
+if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds'))) | force) 
 source (file.path('..','..','git_repo','utils','callPeaks.R'))
 dev.off()
 
 
 ### chromVAR analysis ####
-force=FALSE
+force=TRUE
 if (!all(file.exists(file.path('Annotations',
   c('Motif-Matches-In-Peaks.rds',
     'Motif-Positions-In-Peaks.rds',

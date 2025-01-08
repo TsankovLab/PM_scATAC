@@ -34,8 +34,8 @@ cd ${chromBPdir}/${celltype}_model/modisco_profile/
 
 if [ ! -f "modisco_results_profile.h5" ]; then
     echo "modisco_results_profile.h5 file not found. Running TFmodisco on contribution score profile ..."
-modisco motifs -i ../averaged_contributions_profile.h5 -n 1000000 -o modisco_results_profile.h5 #-w 2000
-modisco report -i modisco_results_profile.h5 -o report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
+modisco motifs -i ../${celltype}_averaged_contributions_profile.h5 -n 1000000 -o modisco_results_profile.h5 #-w 2000
+modisco report -i modisco_results_profile.h5 -o ${celltype}_report/ -s report/ -m /sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
 else
     echo "modisco_results_profile file found!"
 fi

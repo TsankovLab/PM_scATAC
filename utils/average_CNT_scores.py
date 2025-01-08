@@ -17,19 +17,19 @@ os.chdir (chromBPct_dir)
 
 
 h5_counts_files = [
-    f"fold_0/{celltype}_contribution_scores.counts_scores.h5",
-    f"fold_1/{celltype}_contribution_scores.counts_scores.h5",
-    f"fold_2/{celltype}_contribution_scores.counts_scores.h5",
-    f"fold_3/{celltype}_contribution_scores.counts_scores.h5",
-    f"fold_4/{celltype}_contribution_scores.counts_scores.h5"
+    f"fold_0/contribution_scores.counts_scores.h5",
+    f"fold_1/contribution_scores.counts_scores.h5",
+    f"fold_2/contribution_scores.counts_scores.h5",
+    f"fold_3/contribution_scores.counts_scores.h5",
+    f"fold_4/contribution_scores.counts_scores.h5"
 ]  # List of H5 file paths
 
 h5_profile_files = [
-    f"fold_0/{celltype}_contribution_scores.profile_scores.h5",
-    f"fold_1/{celltype}_contribution_scores.profile_scores.h5",
-    f"fold_2/{celltype}_contribution_scores.profile_scores.h5",
-    f"fold_3/{celltype}_contribution_scores.profile_scores.h5",
-    f"fold_4/{celltype}_contribution_scores.profile_scores.h5"
+    f"fold_0/contribution_scores.profile_scores.h5",
+    f"fold_1/contribution_scores.profile_scores.h5",
+    f"fold_2/contribution_scores.profile_scores.h5",
+    f"fold_3/contribution_scores.profile_scores.h5",
+    f"fold_4/contribution_scores.profile_scores.h5"
 ]  # List of H5 file paths
 
 # def check_h5_files(files):
@@ -48,7 +48,7 @@ h5_profile_files = [
 
 # List of input H5 files
 #h5_files = ["file1.h5", "file2.h5", "file3.h5"]  # Replace with your file paths
-output_file = "averaged_contributions_counts.h5"
+output_file = f"{celltype}_averaged_contributions_counts.h5"
 
 # Open all files in parallel and compute the average
 with h5py.File(h5_counts_files[0], 'r') as ref_file:  # Use the first file as a reference for structure
@@ -69,7 +69,7 @@ with h5py.File(h5_counts_files[0], 'r') as ref_file:  # Use the first file as a 
 
 print(f"Averaged data saved in: {output_file}")
 
-output_file = "averaged_contributions_profile.h5"
+output_file = f"{celltype}_averaged_contributions_profile.h5"
 
 # Open all files in parallel and compute the average
 with h5py.File(h5_profile_files[0], 'r') as ref_file:  # Use the first file as a reference for structure

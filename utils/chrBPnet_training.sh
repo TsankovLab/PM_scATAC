@@ -66,7 +66,7 @@ count_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.counts_s
 
 if [ ! -f "${count_scores_file}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
-    chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op no_bias_model/fold_${fold_number}/
+    chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op no_bias_model/fold_${fold_number}/contribution_scores
 else
     echo "Contribution scores file already exists: ${count_scores_file}"
 fi
