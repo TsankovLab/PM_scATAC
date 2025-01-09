@@ -29,19 +29,19 @@ addArchRGenome("hg38")
 archp = loadArchRProject (projdir)
 
 ### Run chromBPnet bias model or provide folder of bias_model.h5 file ####
-archp$TNK_cells = 'TNK_cells'
+archp$TNK_cells_sample = paste0('TNK_cells', archp$Sample)
 
 ### Call peaks with MACS2 by metaGroupName ####
 #metaGroupName = 'TNK_cells'
-metaGroupName = 'celltype2'
-source ('../../git_repo/chromBPnet_call_peaks.R')
+metaGroupName = 'TNK_cells_sample'
+source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 # Note: you need to have a bias model for each of the fold used in the no bias model
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet'
 repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 #celltype = 'TNK_cells'
-celltype = 'NK_KLRC1'
+celltype = 'TNK_cellsP10'
 
 command <- paste ("bsub -J", paste0(celltype,'_cBP_bias'), 
 	"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",

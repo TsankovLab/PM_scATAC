@@ -89,7 +89,7 @@ archp = addClusters (input = archp,
 ### Call peaks on celltypes ####
 metaGroupName = 'Clusters_H'
 force=TRUE
-peak_reproducibility='1'
+peak_reproducibility='2'
 pdf() # This is necessary cause cairo throws error and stops the script
 if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds'))) | force) 
 source (file.path('..','..','git_repo','utils','callPeaks.R'))
@@ -120,7 +120,7 @@ projects_peaks = unlist (projects_peaks, recursive=F)
 #### chromVAR analysis ####
 archp = addBgdPeaks (archp, force= TRUE)
 archp = addPeakAnnotations (ArchRProj = archp, 
-     regions = projects_peaks, name = "scATAC_datasets")
+     regions = projects_peaks, name = "scATAC_datasets", force= TRUE)
 
 archp = addDeviationsMatrix (
   ArchRProj = archp, 
@@ -521,7 +521,7 @@ archp = saveArchRProject (archp)
 
 
 ### Make heatmap ordered by module score of fetal markers ####
-sams = c('P1','P10','P11','P14','P4', 'P23')
+sams = c('P1','P10','P11','P14','P4') # Select samples that have at least 100 endothelial cells
 
 if (!exists('fSE')) fSE = fetch_mat(archp, 'scATAC_datasets')
 fMat = assays (fSE)[[1]]
@@ -536,8 +536,8 @@ mMat = as.data.frame (t(scale(assays (mSE)[[1]])))
 colnames (mMat) = rowData (mSE)$name
 
 metaGroupName = 'celltype2'
-ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
-min_exp = 0.1
+ps = log2(as.data.frame (AverageExpression (srt, features = colnames(mMat), group.by = metaGroupName)[[1]]) +1)
+min_exp = 0.5
 active_TFs = rownames(ps)[rowSums(ps) > min_exp]
 #positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0]
 mMat = mMat[,active_TFs]
@@ -564,7 +564,7 @@ for (sam in sams)
   
   mMats = mMat[archp$Sample %in% sam,]
   cor_tfs = cor (mMats, modMats$fetal.COL4A1, method='spearman')
-  mMats = as.data.frame(mMats[fetal_order,head(order (-cor_tfs[,1]),top_TFs)])
+  mMats = as.data.frame(scale(mMats[fetal_order,head(order (-cor_tfs[,1]),top_TFs)]))
   mMats_l[[sam]] = mMats
   
   fnmMats = fnmMat[archp$Sample %in% sam,]
@@ -581,7 +581,7 @@ fscore = modMats$fetal.COL4A1[fetal_order]
 
 mMats = mMat[archp$Sample %in% sam,]
 cor_tfs = cor (mMats, modMats$fetal.COL4A1, method='spearman')
-mMats = as.data.frame(mMats[fetal_order,head(order (-cor_tfs[,1]),top_TFs)])
+mMats = as.data.frame(scale(mMats[fetal_order,head(order (-cor_tfs[,1]),top_TFs)]))
 
 fnmMats = fnmMat[archp$Sample %in% sam,]
 fnmMats = as.data.frame(fnmMats[fetal_order,])
@@ -589,7 +589,7 @@ fnmMats = as.data.frame(fnmMats[fetal_order,])
 # Apply rolling mean for each column with overlapping bins
 library(zoo)
 bin_width <- 10   # Number of observations per bin
-overlap <- 5
+overlap <- 1
 
 fscore = rollapply(fscore, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
 fnmMats <- as.data.frame(lapply(fnmMats, function(x) {
@@ -666,3 +666,163 @@ archp$fetal_gss2[match(fetal_barcodes, rownames(archp@cellColData))] = 'fetal'
 
 
 
+
+# ### Make heatmap ordered by module score of fetal markers ####
+sams = c('P1','P10','P11','P14','P4')
+
+if (!exists('fSE')) fSE = fetch_mat(archp, 'scATAC_datasets')
+fMat = assays (fSE)[[1]]
+rownames (fMat) = gsub ('rawlins_fetal_lung_','', rownames (fMat))
+
+if (!exists('nSE')) nSE = fetch_mat(archp, 'scATAC_normal2')
+nMat = assays (nSE)[[1]]
+rownames (nMat) = gsub ('Tsankov_lung_','', rownames (nMat))
+
+if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+
+metaGroupName = 'celltype2'
+ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
+min_exp = 0.1
+active_TFs = rownames(ps)[rowSums(ps) > min_exp]
+#positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0]
+mMat = mMat[active_TFs,]
+
+modMat = archp@cellColData[, c('fetal.Artery','fetal.COL4A1','fetal.Vein')]
+
+
+fetal_normal_endo = c('Latecap','Midcap','Endothelial')
+fnmMat = cbind (t(fMat), t(nMat))
+fnmMat = fnmMat[, fetal_normal_endo]
+
+fscore_l = list()
+mMats_l = list()
+fnmMats_l = list()
+top_TFs=20
+
+for (sam in sams)
+  {
+  modMats = as.data.frame (t(scale(t(modMat))))
+  modMats = modMats[archp$Sample %in% sam,]
+  fetal_order = order(modMats$fetal.COL4A1)
+  fscore = modMats$fetal.COL4A1[fetal_order]
+  fscore_l[[sam]] = fscore
+  
+  mMats = as.data.frame (t(scale(mMat)))
+  mMats = mMats[archp$Sample %in% sam,]
+  cor_tfs = cor (mMats, modMats$fetal.COL4A1, method='spearman')
+  mMats = as.data.frame(mMats[fetal_order,head(order (-cor_tfs[,1]),top_TFs)])
+  mMats_l[[sam]] = mMats
+  
+  fnmMats = as.data.frame (t(scale (t(fnmMat))))
+  fnmMats = fnmMats[archp$Sample %in% sam,]
+  fnmMats = as.data.frame(t((t(fnmMats[fetal_order,]))))
+  fnmMats_l[[sam]] = fnmMats
+  }
+
+# # Generate heatmap of one sample ####
+sam = 'P1'
+
+
+modMats = as.data.frame (t(scale(t(modMat))))
+modMats = modMats[archp$Sample %in% sam,]
+fetal_order = order(modMats$fetal.COL4A1)
+fscore = modMats$fetal.COL4A1[fetal_order]
+
+mMats = as.data.frame (t(scale(mMat)))
+mMats = mMats[archp$Sample %in% sam,]
+cor_tfs = cor (mMats, modMats$fetal.COL4A1, method='spearman')
+mMats = as.data.frame(scale(mMats[fetal_order,head(order (-cor_tfs[,1]),top_TFs)]))
+
+fnmMats = as.data.frame (t(scale (t(fnmMat))))
+fnmMats = fnmMats[archp$Sample %in% sam,]
+fnmMats = as.data.frame(t((t(fnmMats[fetal_order,]))))
+
+# Apply rolling mean for each column with overlapping bins
+library(zoo)
+bin_width <- 10   # Number of observations per bin
+overlap <- 1  
+
+fscore = rollapply(fscore, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
+fnmMats <- as.data.frame(lapply(fnmMats, function(x) {
+  rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
+}))
+mMats <- as.data.frame(lapply(mMats, function(x) {
+  rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
+}))
+
+
+ha = HeatmapAnnotation (
+  fetal = fscore,#,which='row'#,
+  col =list(fetal = colorRamp2(c(min(fscore),0,max(fscore)), paletteer::paletteer_d("beyonce::X41",3))))
+
+# Add distribution of fetal and adult endothelial for the other 4 samples    
+fnmMats_df = do.call (cbind, lapply (fnmMats_l, function(x) colMeans (tail (x, round(nrow(x)/100*30)))))
+ha1 = HeatmapAnnotation (' ' = anno_boxplot(fnmMats_df,axis = FALSE, 
+  width = unit(1, "cm"), outline=F, border=F,
+    gp = gpar(fill = c(paletteer_d("beyonce::X41",3)[3],
+      paletteer_d("beyonce::X41",3)[3],'darkgreen'))), 
+  which = 'row')
+
+hm1 = Heatmap (t(fnmMats),
+  cluster_columns=FALSE,
+  right = ha1,
+  top = ha,
+  cluster_rows=FALSE,
+  #row_split = archp$Sample,
+  column_names_gp = gpar(fontsize = 0),
+  row_names_gp = gpar(fontsize = 8),
+  col=palette_deviation2,
+  border=T)
+
+
+
+# Add recurrence of TFs in top 20 most correlated across the other 4 samples
+mMats_df = table (unlist(lapply (mMats_l, function(x) head(colnames(x),top_TFs))))
+mMats_df = setNames(as.vector(mMats_df[colnames(mMats)]), names(mMats_df[colnames(mMats)]))
+ha3 = HeatmapAnnotation(' '= anno_barplot(mMats_df, bar_width=1, border=F, 
+  gp = gpar(fill = 'white'),
+  width = unit(1, "cm")), which='row')
+
+hm2 = Heatmap (t(mMats),
+  right = ha3,
+  #top = ha2,
+  cluster_columns=FALSE,
+  cluster_rows=FALSE,
+  #row_split = archp$Sample,
+  column_names_gp = gpar(fontsize = 0),
+  row_names_gp = gpar(fontsize = 8, fontface='italic'),
+  col=palette_deviation_cor_fun,
+  border=T, width=15)
+
+pdf (file.path ('Plots',paste0('genescore_fetal_markers_heatmap.pdf')), height=4, width=7)
+draw (hm1 %v% hm2)
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+fnmMat2 = cbind (t(fMat), t(nMat))
+fnmMat2 = fnmMat2[, fetal_normal_endo]
+fnmMats2 = as.data.frame (t(scale (t(fnmMat2))))
+fnmMats2 = fnmMats2[archp$Sample %in% sam,]
+fnmMats2 = as.data.frame(t((t(fnmMats2[fetal_order,]))))
+
+fnmMat = cbind (t(fMat), t(nMat))
+fnmMat = fnmMat[, fetal_normal_endo]
+fnmMat = as.data.frame (t(scale (t(fnmMat))))
+fnmMats = fnmMat[archp$Sample %in% sam,]
+fnmMats = fnmMats[fetal_order,]
+
+
+fnmMats2 = as.data.frame (t(scale (t(fnmMat2))))
+fnmMats2 = fnmMats2[archp$Sample %in% sam,]
+fnmMats2 = as.data.frame(t((t(fnmMats2[fetal_order,]))))
