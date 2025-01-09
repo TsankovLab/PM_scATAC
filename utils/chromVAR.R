@@ -1,14 +1,14 @@
-archp = addBgdPeaks (archp, force= FALSE)
+archp = addBgdPeaks (archp, force= force)
   archp = addMotifAnnotations (ArchRProj = archp, 
       motifSet = "cisbp", 
       #motifSet = 'JASPAR2020',
       #name = "JASPAR2020_Motif",
-      force=TRUE)
+      force=force)
   archp = addDeviationsMatrix (
     ArchRProj = archp, 
     peakAnnotation = "Motif",
-    force = TRUE
+    force = force
   )
   
   archp = saveArchRProject (ArchRProj = archp,  
-      load = TRUE)
+      load = force)
