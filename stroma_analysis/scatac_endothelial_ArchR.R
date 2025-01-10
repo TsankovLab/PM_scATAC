@@ -148,7 +148,7 @@ archp = addDeviationsMatrix (
   peakAnnotation = "scATAC_normal2",
   force = TRUE
 )
-
+archp=saveArchRProject(archp)
 
 
 # # Differential Accessed motifs ####
@@ -357,7 +357,7 @@ archp = addDeviationsMatrix (
 # gsMat = assays (gsSE)[[1]]
 # rownames (gsMat) = rowData (gsSE)$name
 
-# Compare fetal vs normal mesothelium using deviations ####
+# Compare fetal vs normal endothelial cells using deviations ####
 if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
 mMat = scale (assays (mSE)[[1]])
 rownames (mMat) = rowData (mSE)$name
@@ -464,7 +464,6 @@ top_genes=20
 degClusters = degClusters[degClusters$avg_log2FC > 0,]
 top_deg = degClusters %>% arrange(p_val_adj) %>% group_by (cluster)  %>% slice(1:top_genes)
 
-metaGroupName = 'fetal2'
 if (!exists('gsSE')) gsSE = fetch_mat(archp, 'GeneScore')
 gsMat = assays (gsSE)[[1]]
 rownames (gsMat) = rowData (gsSE)$name
@@ -495,7 +494,7 @@ archp = addModuleScore (
 )
 
 
-# Export BigWig 
+# Export BigWig  ####
 all (rownames(archp@cellColData) == colnames(fnmMat))
 archp$fetal_group = ifelse (archp$fetal.COL4A1 > .5, 'fetal','adult')
 
@@ -544,11 +543,11 @@ mMat = mMat[,active_TFs]
 
 modMat = as.data.frame (t(scale(t(archp@cellColData[, c('fetal.Artery','fetal.COL4A1','fetal.Vein')]))))
 
-
 fetal_normal_endo = c('Latecap','Midcap','Endothelial')
-fnmMat = cbind (t(fMat), t(nMat))
-fnmMat = fnmMat[, fetal_normal_endo]
-fnmMat = as.data.frame (t(scale (t(fnmMat))))
+fnmMat = cbind (scale(t(fMat)), scale(t(nMat)))
+#fnmMat = fnmMat[, fetal_normal_endo]
+#fnmMat = as.data.frame (t(scale (t(fnmMat))))
+fnmMat = fnmMat[,!duplicated(colnames(fnmMat))]
 
 fscore_l = list()
 mMats_l = list()
@@ -572,6 +571,8 @@ for (sam in sams)
   fnmMats_l[[sam]] = fnmMats
   }
 
+
+
 # Generate heatmap of one sample ####
 sam = 'P1'
 
@@ -587,7 +588,7 @@ fnmMats = fnmMat[archp$Sample %in% sam,]
 fnmMats = as.data.frame(fnmMats[fetal_order,])
 
 # Apply rolling mean for each column with overlapping bins
-library(zoo)
+library (zoo)
 bin_width <- 10   # Number of observations per bin
 overlap <- 1
 
@@ -664,12 +665,7 @@ archp$fetal_gss2[match(fetal_barcodes, rownames(archp@cellColData))] = 'fetal'
 
 
 
-
-
-
-# ### Make heatmap ordered by module score of fetal markers ####
-sams = c('P1','P10','P11','P14','P4')
-
+## Generate scatterplot of fetal and adult TA vs GS ####
 if (!exists('fSE')) fSE = fetch_mat(archp, 'scATAC_datasets')
 fMat = assays (fSE)[[1]]
 rownames (fMat) = gsub ('rawlins_fetal_lung_','', rownames (fMat))
@@ -679,150 +675,277 @@ nMat = assays (nSE)[[1]]
 rownames (nMat) = gsub ('Tsankov_lung_','', rownames (nMat))
 
 if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
+mMat = as.data.frame (t(scale(assays (mSE)[[1]])))
+colnames (mMat) = rowData (mSE)$name
+
+if (!exists('gsSE')) gsSE = fetch_mat(archp, 'GeneScore')
+gsMat = assays (gsSE)[[1]]
+rownames (gsMat) = rowData (gsSE)$name
 
 metaGroupName = 'celltype2'
-ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
-min_exp = 0.1
+ps = log2(as.data.frame (AverageExpression (srt, features = colnames(mMat), group.by = metaGroupName)[[1]]) +1)
+min_exp = 0.5
 active_TFs = rownames(ps)[rowSums(ps) > min_exp]
 #positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0]
-mMat = mMat[active_TFs,]
+mMat = mMat[,active_TFs]
 
-modMat = archp@cellColData[, c('fetal.Artery','fetal.COL4A1','fetal.Vein')]
+# Get endothelial subset module and scale them per cell to reduce seq-depth bias
+modMat = as.data.frame (t(scale(t(archp@cellColData[, c('fetal.Artery','fetal.COL4A1','fetal.Vein')]))))
 
-
+# Combine fetal and normal deviations and scale per cell to reduce seq-depth bias
 fetal_normal_endo = c('Latecap','Midcap','Endothelial')
-fnmMat = cbind (t(fMat), t(nMat))
-fnmMat = fnmMat[, fetal_normal_endo]
+fnmMat = cbind (scale(t(fMat)), scale(t(nMat)))
+#fnmMat = fnmMat[, fetal_normal_endo]
+#fnmMat = as.data.frame (t(scale (t(fnmMat))))
+fnmMat = fnmMat[,!duplicated(colnames(fnmMat))]
 
-fscore_l = list()
-mMats_l = list()
-fnmMats_l = list()
-top_TFs=20
+# Extract the data frame of interest
+sams = c('P1','P10','P11','P14','P4') # Select samples that have at least 100 endothelial cells
 
+ext_dev = 'Endothelial'
+p_l=list()
 for (sam in sams)
   {
-  modMats = as.data.frame (t(scale(t(modMat))))
-  modMats = modMats[archp$Sample %in% sam,]
-  fetal_order = order(modMats$fetal.COL4A1)
-  fscore = modMats$fetal.COL4A1[fetal_order]
-  fscore_l[[sam]] = fscore
-  
-  mMats = as.data.frame (t(scale(mMat)))
-  mMats = mMats[archp$Sample %in% sam,]
-  cor_tfs = cor (mMats, modMats$fetal.COL4A1, method='spearman')
-  mMats = as.data.frame(mMats[fetal_order,head(order (-cor_tfs[,1]),top_TFs)])
-  mMats_l[[sam]] = mMats
-  
-  fnmMats = as.data.frame (t(scale (t(fnmMat))))
-  fnmMats = fnmMats[archp$Sample %in% sam,]
-  fnmMats = as.data.frame(t((t(fnmMats[fetal_order,]))))
-  fnmMats_l[[sam]] = fnmMats
+
+frip = archp$FRIP
+all (rownames(archp@cellColData)[archp$Sample == sam] == rownames(as.data.frame(fnmMat[archp$Sample == sam,])))
+all (rownames(archp@cellColData)[archp$Sample == sam] == rownames(as.data.frame(modMat[archp$Sample == sam,])))
+all (rownames(archp@cellColData)[archp$Sample == sam] == rownames(as.data.frame(mMat[archp$Sample == sam,])))
+
+cells = modMat$fetal.COL4A1[archp$Sample == sam] > -Inf
+df <- data.frame (
+  fetal_ta = fnmMat[archp$Sample == sam,ext_dev][cells], 
+  fetal_gs = modMat$fetal.COL4A1[archp$Sample == sam][cells], 
+  MEF2C = mMat$ETS1[archp$Sample == sam][cells],
+  FRIP = frip[archp$Sample == sam][cells])
+
+
+# Create the scatterplot with a polished aesthetic
+p_l[[sam]] <- ggplot(df, aes(x = fetal_ta, y = fetal_gs, color= FRIP)) +
+  geom_point(
+    alpha = 0.7, 
+    size = 3
+  ) + # Scatterplot points with transparency and size
+  geom_smooth(
+    method = "lm", 
+    color = "dodgerblue", 
+    fill = "lightblue", 
+    se = TRUE, 
+    linetype = "solid", 
+    size = 1
+  ) + # Regression line with confidence interval
+  stat_cor(
+    aes(label = paste(..rr.label.., ..p.label.., sep = " | ")), 
+    method = "spearman", 
+    #label.x = min(df$fetal) + 0.1 * diff(range(df$fetal)), 
+    #label.y = max(df$fetal_gs) - 0.1 * diff(range(df$fetal_gs)),
+    color = "darkred",
+    size = 5
+  ) + # Add correlation coefficient and p-value
+  theme_classic() + # Clean theme
+  labs(
+    title = "fetal gs vs. fetal ta Relationship",
+    #subtitle = "Scatterplot with Regression Line and Correlation Coefficient",
+    x = "fetal ta",
+    y = "fetal gs"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(size = 14, hjust = 0.5),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank()
+  )
+
+# Print the plot
   }
+pdf (file.path ('Plots',paste0('adult_vs_fetal_scatterplot_',ext_dev,'.pdf')), width=12)
+wrap_plots(p_l)
+dev.off()
 
-# # Generate heatmap of one sample ####
-sam = 'P1'
+
+# pdf (file.path('Plots','celltype_umap.pdf'),5,5)
+#   umap_p3 = plotEmbedding (ArchRProj = archp, 
+#     colorBy = "cellColData", name = "Sample",labelMeans =F,
+#      embedding = "UMAP_H", pal = palette_sample)
+#   # umap_p4 = plotEmbedding (ArchRProj = archp, 
+#   #   colorBy = "cellColData", name = "celltype",labelMeans =F,
+#   #    embedding = "UMAP_H", pal = palette_stroma)
+#   umap_p5 = plotEmbedding (ArchRProj = archp, 
+#     colorBy = "cellColData", name = "Clusters_H",
+#      embedding = "UMAP_H")
+  
+#   print (umap_p3)
+#   print (umap_p5)
+#   dev.off()
 
 
-modMats = as.data.frame (t(scale(t(modMat))))
-modMats = modMats[archp$Sample %in% sam,]
-fetal_order = order(modMats$fetal.COL4A1)
-fscore = modMats$fetal.COL4A1[fetal_order]
-
-mMats = as.data.frame (t(scale(mMat)))
-mMats = mMats[archp$Sample %in% sam,]
-cor_tfs = cor (mMats, modMats$fetal.COL4A1, method='spearman')
-mMats = as.data.frame(scale(mMats[fetal_order,head(order (-cor_tfs[,1]),top_TFs)]))
-
-fnmMats = as.data.frame (t(scale (t(fnmMat))))
-fnmMats = fnmMats[archp$Sample %in% sam,]
-fnmMats = as.data.frame(t((t(fnmMats[fetal_order,]))))
 
 # Apply rolling mean for each column with overlapping bins
-library(zoo)
-bin_width <- 10   # Number of observations per bin
-overlap <- 1  
+sams = c('P1','P10','P11','P14','P4') # Select samples that have at least 100 endothelial cells
+ext_dev = c('Endothelial')
+df = list()
 
-fscore = rollapply(fscore, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
-fnmMats <- as.data.frame(lapply(fnmMats, function(x) {
-  rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
-}))
-mMats <- as.data.frame(lapply(mMats, function(x) {
-  rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
-}))
+for (sam in sams)
+{
+
+library (zoo)
+bin_width <- 30   # Number of observations per bin
+overlap <- 30
+frip = archp$FRIP
+fscore_order = modMat$fetal.COL4A1[archp$Sample == sam]
+fscore_order = order (fscore_order)
+
+df[[sam]] <- data.frame (
+  fetal_ta = rollapply (fnmMat[archp$Sample == sam, ext_dev][fscore_order],width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"), 
+  fetal_gs = rollapply (modMat$fetal.COL4A1[archp$Sample == sam][fscore_order], width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"),
+  #MEF2C = rollapply (mMat$ELF2[archp$Sample == sam][fscore_order], width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"),
+  FRIP = rollapply (frip[archp$Sample == sam][fscore_order], width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"),
+  sample = sam)  
+}
+#df = tail (df,50)
+# Create the scatterplot with a polished aesthetic
+df = do.call (rbind, df)
+p1 <- ggplot(df, aes(x = fetal_ta, y = fetal_gs, color = sample)) +
+  geom_point(
+    alpha = 0.7, 
+    size = 2
+  ) + # Scatterplot points with transparency and size
+  geom_smooth(
+    aes (group = sample),
+    method = "lm", 
+    color = "dodgerblue", 
+    fill = "lightblue", 
+    se = FALSE, 
+    linetype = "solid", 
+    size = 1
+  ) + 
+  #ylim(c(-1.2,1.2)) + 
+  geom_smooth(method=lm, fullrange=FALSE, se=FALSE)+
+  # stat_cor(
+  # #  aes(label = paste("r = ", ..r.label.., ", p = ", ..p.label.., sep = "")), 
+  #   method = "pearson",  # Pearson correlation
+  #   label.x = 0, label.y = max(df$fetal_gs),  # Position of label
+  #   size = 2, color = "black"
+  # ) +
+  facet_wrap (~sample, scales = 'free', nrow=length(sams), strip.position = "left") +
+  gtheme_no_rot +
+  theme(
+    strip.placement = "inside",
+    panel.spacing = unit(0.5, "lines"), # Adjust spacing between facets
+     strip.text = element_blank(), # Customize strip text
+    strip.background = element_blank(), # Optionally remove the strip background
+    axis.text = element_blank(),       # Remove axis numbers
+    axis.ticks = element_blank() 
+  ) +
+  scale_color_manual(values = palette_sample)   # Regression line with confidence interval
+ 
+
+# Apply rolling mean for each column with overlapping bins
+ext_dev = c('Midcap')
+df = list()
+
+for (sam in sams)
+{
+
+library (zoo)
+bin_width <- 30   # Number of observations per bin
+overlap <- 30
+
+fscore_order = modMat$fetal.COL4A1[archp$Sample == sam]
+fscore_order = order (fscore_order)
+
+df[[sam]] <- data.frame (
+  fetal_ta = rollapply (fnmMat[archp$Sample == sam, ext_dev][fscore_order],width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"), 
+  fetal_gs = rollapply (modMat$fetal.COL4A1[archp$Sample == sam][fscore_order], width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"),
+  FRIP = rollapply (frip[archp$Sample == sam][fscore_order], width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"),
+  sample = sam)
+}
+#df = tail (df,50)
+# Create the scatterplot with a polished aesthetic
+df = do.call (rbind, df)
+p2 <- ggplot(df, aes(x = fetal_ta, y = fetal_gs, color = sample)) +
+  geom_point(
+    alpha = 0.7, 
+    size = 2
+  ) + # Scatterplot points with transparency and size
+  geom_smooth(
+    aes (group = sample),
+    method = "lm", 
+    color = "dodgerblue", 
+    fill = "lightblue", 
+    se = FALSE, 
+    linetype = "solid", 
+    size = 1
+  ) +  
+  #ylim(c(-1.2,1.2)) +
+  geom_smooth(method=lm, fullrange=FALSE, se=FALSE) +
+  # stat_cor(
+  #   #aes(label = paste("r = ", ..r.label.., ", p = ", ..p.label.., sep = "")), 
+  #   method = "pearson",  # Pearson correlation
+  #   size = 2, color = "black"
+  # ) +
+  facet_wrap (~sample, scales = 'free', nrow=length(sams), strip.position = "left") +
+ gtheme_no_rot +
+  theme(
+    strip.placement = "inside",
+    panel.spacing = unit(0.5, "lines"), # Adjust spacing between facets
+     strip.text = element_blank(), # Customize strip text
+    strip.background = element_blank(), # Optionally remove the strip background
+    axis.text = element_blank(),       # Remove axis numbers
+    axis.ticks = element_blank() 
+  ) +
+  scale_color_manual(values = palette_sample)  # Regression line with confidence interval
+# Print the plot
+pdf (file.path ('Plots',paste0('adult_vs_fetal_scatterplot_smoothed.pdf')), width=5, height=6)
+wrap_plots (p1, p2, ncol = 2)
+dev.off()
 
 
-ha = HeatmapAnnotation (
-  fetal = fscore,#,which='row'#,
-  col =list(fetal = colorRamp2(c(min(fscore),0,max(fscore)), paletteer::paletteer_d("beyonce::X41",3))))
 
-# Add distribution of fetal and adult endothelial for the other 4 samples    
-fnmMats_df = do.call (cbind, lapply (fnmMats_l, function(x) colMeans (tail (x, round(nrow(x)/100*30)))))
-ha1 = HeatmapAnnotation (' ' = anno_boxplot(fnmMats_df,axis = FALSE, 
-  width = unit(1, "cm"), outline=F, border=F,
-    gp = gpar(fill = c(paletteer_d("beyonce::X41",3)[3],
-      paletteer_d("beyonce::X41",3)[3],'darkgreen'))), 
-  which = 'row')
+### Find most correlated TF to fetal endothelial score ####
 
-hm1 = Heatmap (t(fnmMats),
-  cluster_columns=FALSE,
-  right = ha1,
-  top = ha,
-  cluster_rows=FALSE,
-  #row_split = archp$Sample,
-  column_names_gp = gpar(fontsize = 0),
-  row_names_gp = gpar(fontsize = 8),
-  col=palette_deviation2,
-  border=T)
+# Apply rolling mean for each column with overlapping bins
+sams = c('P1','P10','P11','P14','P4') # Select samples that have at least 100 endothelial cells
 
+cor_l=list()
+for (sam in sams)
+{
+library (zoo)
+bin_width <- 30   # Number of observations per bin
+overlap <- 30
+frip = archp$FRIP
+fscore_order = modMat$fetal.COL4A1[archp$Sample == sam]
+fscore_order = order (fscore_order)
 
-
-# Add recurrence of TFs in top 20 most correlated across the other 4 samples
-mMats_df = table (unlist(lapply (mMats_l, function(x) head(colnames(x),top_TFs))))
-mMats_df = setNames(as.vector(mMats_df[colnames(mMats)]), names(mMats_df[colnames(mMats)]))
-ha3 = HeatmapAnnotation(' '= anno_barplot(mMats_df, bar_width=1, border=F, 
-  gp = gpar(fill = 'white'),
-  width = unit(1, "cm")), which='row')
-
-hm2 = Heatmap (t(mMats),
-  right = ha3,
-  #top = ha2,
-  cluster_columns=FALSE,
-  cluster_rows=FALSE,
-  #row_split = archp$Sample,
-  column_names_gp = gpar(fontsize = 0),
-  row_names_gp = gpar(fontsize = 8, fontface='italic'),
-  col=palette_deviation_cor_fun,
-  border=T, width=15)
-
-pdf (file.path ('Plots',paste0('genescore_fetal_markers_heatmap.pdf')), height=4, width=7)
-draw (hm1 %v% hm2)
+fetal_gs = rollapply (modMat$fetal.COL4A1[archp$Sample == sam][fscore_order], width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
+smoothed_mMat = rollapply (mMat[archp$Sample == sam,][fscore_order,], width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
+cor_l[[sam]] = as.data.frame (cor (smoothed_mMat, fetal_gs))
+cor_l[[sam]]$sample = sam
+cor_l[[sam]]$gene = rownames(cor_l[[sam]])
+}
+top_genes=30
+cor_df = do.call (rbind, cor_l)
+TF_order = head(cor_df %>% group_by(gene) %>% summarise(median_value = median(V1)) %>% arrange (-median_value),top_genes)
+cor_df = cor_df[cor_df$gene %in% TF_order$gene,]
+cor_df$gene = factor (cor_df$gene, levels = rev (unique(TF_order$gene)))
+bp = ggplot (cor_df, aes (x = V1, y = gene, alpha=.3), alpha=.5) + 
+geom_point (position = position_dodge(.8), alpha= 0.5, color = 'grey22', size=1) +
+geom_boxplot (color = 'grey66',fill = 'darkblue',
+    linewidth = .1,
+    width=0.7,
+    outlier.alpha = 0.2,
+    outlier.shape = NA,
+     size=0.5, alpha=.5
+     ) + 
+gtheme_no_rot #+
+#scale_fill_manual (values = c(activity = 'darkred', genescore = 'navyblue')) + 
+#geom_vline (xintercept = 0, color='red',  linetype='dashed')
+pdf (paste0 ('Plots/fetal_endothelial_TFs_boxplots.pdf'), width = 5,height=5)
+bp
 dev.off()
 
 
 
 
-
-
-
-
-
-
-
-fnmMat2 = cbind (t(fMat), t(nMat))
-fnmMat2 = fnmMat2[, fetal_normal_endo]
-fnmMats2 = as.data.frame (t(scale (t(fnmMat2))))
-fnmMats2 = fnmMats2[archp$Sample %in% sam,]
-fnmMats2 = as.data.frame(t((t(fnmMats2[fetal_order,]))))
-
-fnmMat = cbind (t(fMat), t(nMat))
-fnmMat = fnmMat[, fetal_normal_endo]
-fnmMat = as.data.frame (t(scale (t(fnmMat))))
-fnmMats = fnmMat[archp$Sample %in% sam,]
-fnmMats = fnmMats[fetal_order,]
-
-
-fnmMats2 = as.data.frame (t(scale (t(fnmMat2))))
-fnmMats2 = fnmMats2[archp$Sample %in% sam,]
-fnmMats2 = as.data.frame(t((t(fnmMats2[fetal_order,]))))

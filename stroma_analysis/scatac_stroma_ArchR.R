@@ -23,7 +23,7 @@ source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 #source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 
-addArchRThreads (threads = 1) 
+addArchRThreads (threads = 8) 
 addArchRGenome ("Hg38")
 
 ####### ANALYSIS of stroma compartment #######

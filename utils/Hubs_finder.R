@@ -122,7 +122,7 @@ hubs_finder = function (
       # Replace peak index with peak regions per hub
       hubs_exp = mclapply (hubs, function(x) {
       main_peakSet [as.numeric(x)] 
-      }, mc.cores=1) # error when more than 1 core is set
+      }, mc.cores=cores) # error when more than 1 core is set
       names (hubs_exp) = 1:length(hubs_exp)
       hubsClustersL[[cluster]] = mclapply (hubs_exp, function(x) {
         as.data.frame(x, row.names=NULL)}, mc.cores=cores)

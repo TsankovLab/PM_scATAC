@@ -1,8 +1,8 @@
 # Load functions for hub detection ####
-source (file.path('..','PM_scATAC','utils','knnGen.R'))
-source (file.path('..','PM_scATAC','utils','addCoax.R'))
-source (file.path('..','PM_scATAC','utils','Hubs_finder.R'))
-source (file.path('..','PM_scATAC','utils','hubs_track.R'))
+source (file.path('..','..','git_repo','utils','knnGen.R'))
+source (file.path('..','..','git_repo','utils','addCoax.R'))
+source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Export bigiwg files ####
 archp$status = ifelse (archp$Sample2 == 'normal_pleura','normal','tumor')
@@ -34,10 +34,10 @@ if (!file.exists ('peak_regions.bed'))
 
 
 ### Hubs analysis #####
-metaGroupName = "celltype_status"
-cor_cutoff = 0.2
+#metaGroupName = "celltype_status"
+cor_cutoff = 0.3
 #max_dist = 12500
-max_dist = 5000
+max_dist = 12500
 min_peaks = 5
 dgs = 0
 hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks)
@@ -66,7 +66,7 @@ wrap_plots (p1, p2)
 dev.off()
 
 # Generate cluster-aware knn groups ####
-k= 30
+k= 100
 #metaGroupName = 'celltype_status'
 
 force = T
@@ -77,7 +77,7 @@ if (!file.exists(paste0 ('KNNs_',metaGroupName,'k_',k,'.rds')) | force)
     k = k,
     reducedDims = 'Harmony', 
     group = metaGroupName,
-    overlapCutoff = 0.6,
+    overlapCutoff = 0.7,
     #cellsToUse = metaGroup_df$barcode,
     #min.cells_in_group = min_cells,
     min_knn_cluster = 2
@@ -97,9 +97,11 @@ KNNs_df = do.call (rbind, KNNs_df)
 archp$knn_groups = KNNs_df$group[match (archp$cellNames, KNNs_df$cell)]
 
 # Plot KNNs on UMAP ####
+pdf()
 umap_knn = plotEmbedding (ArchRProj = archp, embedding = 'UMAP_H',
   colorBy = "cellColData", name = 'knn_groups',plotAs ='hex',
     baseSize=0, labelMeans=FALSE) + NoLegend() 
+dev.off()
 pdf (file.path(hubs_dir, 'Plots',paste0('knn_',k,'.pdf')), height=20, width=20)
 umap_knn
 dev.off()
@@ -116,7 +118,7 @@ if (run_coax)
   }
 
 ### Run hub finder ####
-force=F
+force=T
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (
