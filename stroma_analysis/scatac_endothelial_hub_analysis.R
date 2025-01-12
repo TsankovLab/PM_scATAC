@@ -15,7 +15,7 @@ if (!file.exists ('peak_regions.bed'))
 
 
 ### Hubs analysis #####
-cor_cutoff = 0.5
+cor_cutoff = 0.3
 #max_dist = 12500
 max_dist = 12500
 min_peaks = 5

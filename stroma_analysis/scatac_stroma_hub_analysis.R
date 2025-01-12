@@ -5,9 +5,7 @@ source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Export bigiwg files ####
-archp$status = ifelse (archp$Sample2 == 'normal_pleura','normal','tumor')
-archp$celltype_status = paste0(archp$status, '_', archp$celltype)
-metaGroupName = 'celltype_status'
+metaGroupName = 'celltype'
 exp_bigwig = T
 if (exp_bigwig)
   {
@@ -34,7 +32,7 @@ if (!file.exists ('peak_regions.bed'))
 
 
 ### Hubs analysis #####
-#metaGroupName = "celltype_status"
+metaGroupName = "celltype"
 cor_cutoff = 0.3
 #max_dist = 12500
 max_dist = 12500
@@ -43,33 +41,11 @@ dgs = 0
 hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks)
 dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 
-p2 <- plotGroups(
-    ArchRProj = archp, 
-    groupBy = metaGroupName, 
-    colorBy = "cellColData", 
-    name = "TSSEnrichment",
-    plotAs = "violin",
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-p1 <- plotGroups(
-    ArchRProj = archp, 
-    groupBy = metaGroupName, 
-    colorBy = "cellColData", 
-    name = "nFrags",
-    plotAs = "violin",
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-pdf (file.path ('Plots','QC-Sample-Statistics.pdf'), height=5)
-wrap_plots (p1, p2)
-dev.off()
-
 # Generate cluster-aware knn groups ####
 k= 100
 #metaGroupName = 'celltype_status'
 
-force = T
+force = F
 if (!file.exists(paste0 ('KNNs_',metaGroupName,'k_',k,'.rds')) | force)
   {
   KNNs = knnGen (
@@ -131,7 +107,7 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
     min_peaks = min_peaks,
     macs_score = 1,
     dgs = dgs,
-    cores=1
+    cores=2
     ) 
   saveRDS (hubs_obj, file.path(hubs_dir,'global_hubs_obj.rds'))
   hubs_regions = as.data.frame (hubs_obj$hubsCollapsed)
@@ -144,7 +120,7 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
 
 
 # Generate matrix of fragment counts of hubs x sample ####
-metaGroupName = 'celltype_status'
+metaGroupName = 'celltype'
 if (!file.exists(file.path (hubs_dir,paste0('hubs_',metaGroupName,'_mat.rds'))))
   {
   fragments = unlist (getFragmentsFromProject (
@@ -170,15 +146,16 @@ if (!file.exists(file.path (hubs_dir,paste0('hubs_',metaGroupName,'_mat.rds'))))
 
 #hubsSample_mat = hubsSample_mat[, !colnames (hubsSample_mat) %in% c('normal_Pericytes','LEC'),]
 ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
-ha2 = HeatmapAnnotation (status = ifelse (grepl('tumor', colnames(hubsSample_mat)),'tumor','normal'), which='row')
+#ha2 = HeatmapAnnotation (status = ifelse (grepl('tumor', colnames(hubsSample_mat)),'tumor','normal'), which='row')
 hm = Heatmap (
   scale (t(hubsSample_mat)), 
   top_annotation = ha, 
-  left_annotation = ha2,
+ # left_annotation = ha2,
   column_names_gp = gpar(fontsize = 0),
   show_column_dend = F,
   row_dend_width = unit(3,'mm'),
-  row_dend_side = 'left')
+  row_dend_side = 'left',
+  col=rev (palette_fragments))
 pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=3)
 hm
 dev.off()
@@ -213,36 +190,11 @@ hubsCell_mat = as.data.frame (hubsCell_mat)
 # Compute differential hub accessibility DHA ####
 library (presto)
 metaGroupName = 'celltype'
-metaGroupName2 = 'status'
-meta_group = c('Endothelial','SmoothMuscle','Fibroblasts','Mesothelium')
-comparison = unique(archp@cellColData[,metaGroupName2])
-wlc_res = lapply (meta_group, function(x) 
-  {
-  hubsCell_mat_comp = hubsCell_mat[,as.character(archp@cellColData[,metaGroupName]) == x]
-  comparison = as.character(archp@cellColData[,metaGroupName2])[match(colnames (hubsCell_mat_comp), rownames(archp@cellColData))]
-  res = wilcoxauc (log2(hubsCell_mat_comp+1), comparison)
-  res[res$group == 'normal',]
-  })
-names (wlc_res) = meta_group
-size_comp = lapply (seq_along(wlc_res), function(x)
-   {
-    tmp = wlc_res[[x]]
-    tmp$width = width (hubs_obj$hubsCollapsed)
-    tmp$group = ifelse (tmp$logFC < 0, 'tumor','normal')
-    tmp$celltype = names(wlc_res)[x]
-    tmp
-   })
-size_comp_df = do.call (rbind, size_comp)
-# Check hub size distribution between normal and tumor ####
-#res$width = width(hubs_obj$hubsCollapsed)[match (res$feature, hubs_obj$hubs_id)]
-vp = ggplot (size_comp_df, aes(x=group, y=logFC)) +
-    geom_boxplot() + 
-    facet_wrap (~ celltype) +
-    ggtitle ('Hub size') + gtheme
 
-pdf (file.path (hubs_dir, 'Plots','DAH_size.pdf'),4,4)
-vp
-dev.off()
+res = wilcoxauc (log2(hubsCell_mat+1), archp$celltype)
+res = res[res$logFC > 0,]
+res_df = lapply (split (res, res$group), function(x) x[order(x$padj),])
+res_df = do.call (rbind, res_df)
 
 ## Plot volcano plots ####
 res = size_comp_df
@@ -273,16 +225,6 @@ pdf (file.path (hubs_dir, 'DAH_volcano.pdf'),width = 14,height = 4)
 print (vp)
 dev.off()  
     
-
-
-# check hubs that are up across all normal stroma vs tumor ####
-wlc_res_pos = lapply (wlc_res, function(x) x[x$logFC > 0,])
-wlc_res_pos = do.call (rbind, wlc_res_pos)
-head (table (wlc_res_pos$feature)[order(-table (wlc_res_pos$feature))])
-
-wlc_res_neg = lapply (wlc_res, function(x) x[x$logFC < 0,])
-wlc_res_neg = do.call (rbind, wlc_res_neg)
-head (table (wlc_res_neg$feature)[order(-table (wlc_res_neg$feature))])
 
 
 

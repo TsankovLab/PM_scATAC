@@ -1,6 +1,6 @@
 if (!exists ('fragments')) fragments = unlist(getFragmentsFromProject (archp))
 
-force = T
+force = F
 for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
 if (!file.exists(paste0('fragments_',metagroup,'.tsv')) | force)
     { 
