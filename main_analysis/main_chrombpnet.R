@@ -28,6 +28,8 @@ addArchRGenome("hg38")
 
 archp = loadArchRProject (projdir)
 
+
+
 ### Call peaks with MACS2 by metaGroupName ####
 metaGroupName = 'celltype_lv1'
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
@@ -54,3 +56,10 @@ for (celltype in celltypes)
 	
 	system (paste(command, args))
 	}
+
+
+
+
+
+
+

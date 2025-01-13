@@ -44,9 +44,9 @@ source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 
 # Fix the fragment file of multiome sample by removing the header 
 #system ('zcat atac_fragments.tsv.gz | grep -v ^\# | bgzip > atac_fragments_fixed.tzv.gz')
-sample_names = list.files ('/sc/arion/scratch/giottb01/ENCODE_scATAC-seq_lung', pattern='bam$')
-fragment_paths = file.path ('/sc/arion/scratch/giottb01/ENCODE_scATAC-seq_lung',sample_names)
-sample_names = sub ('.bam','',sample_names)
+sample_names = list.files ('/sc/arion/scratch/giottb01/ENCODE_scATAC-seq_lung/tarfiles/compressed_fragments', pattern='tsv.gz')
+fragment_paths = file.path ('/sc/arion/scratch/giottb01/ENCODE_scATAC-seq_lung/tarfiles/compressed_fragments',sample_names)
+sample_names = sub ('.tsv.gz','',sample_names)
 
 names (fragment_paths) = sample_names
 

@@ -194,6 +194,7 @@ echo "Waiting for the finemo job to finish..."
 bwait -w "done(${finemo_job_id})"
 
 # Run the R script
+source activate meso_scatac
 echo "Running R script for finemo motif labels..."
 Rscript $repodir/utils/chromBPnet_finemo_motif_labels.R $chromBPdir $celltype
 
