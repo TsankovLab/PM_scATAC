@@ -3,9 +3,10 @@ R
 
 set.seed(1234)
 
-####### ANALYSIS of tumor compartment #######
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR'
+####### ANALYSIS of endothelial compartment #######
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/Endothelial/scatac_ArchR'
 dir.create (file.path (projdir,'Plots'), recursive =T)
+dir.create (file.path (projdir,'chromBPnet'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
@@ -31,13 +32,16 @@ archp = loadArchRProject (projdir)
 
 
 ### Call peaks with MACS2 by metaGroupName ####
-metaGroupName = 'celltype_lv1'
+archp2 = archp
+archp = archp[archp$fetal_group %in% c('high','low')]
+metaGroupName = 'fetal_group'
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 
 # Run no bias chromBPnet model for each NKT cell subtype ####
-chromBPdir = file.path (projdir,'chromBPnet')
-dir.create (chromBPdir)
+metaGroupName = 'fetal_group'
+
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/Endothelial/scatac_ArchR/chromBPnet'
 repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
@@ -47,7 +51,7 @@ celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
 for (celltype in celltypes)
 	{
 	command <- paste ("bsub -J", paste0(celltype,'_cBPnet'), 
-		"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 72:00 -R rusage[mem=32000] -R span[hosts=1] -o",
+		"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.out')), "-e" ,
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),
 		file.path(repodir,'utils','chromBPnet_master.sh'))

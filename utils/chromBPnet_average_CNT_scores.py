@@ -14,6 +14,13 @@ os.chdir (chromBPct_dir)
 
 # Define file paths
 # print ('average contribution count scores')
+# h5_counts_files = [
+#     f"no_bias_model/fold_0/models/chrombpnet_nobias.h5",
+#     f"no_bias_model/fold_1/models/chrombpnet_nobias.h5",
+#     f"no_bias_model/fold_2/models/chrombpnet_nobias.h5",
+#     f"no_bias_model/fold_3/models/chrombpnet_nobias.h5",
+#     f"no_bias_model/fold_4/models/chrombpnet_nobias.h5"
+# ]  # List of H5 file paths
 
 
 h5_counts_files = [
@@ -49,6 +56,8 @@ h5_profile_files = [
 # List of input H5 files
 #h5_files = ["file1.h5", "file2.h5", "file3.h5"]  # Replace with your file paths
 output_file = f"no_bias_model/{celltype}_averaged_contributions_counts.h5"
+
+#output_file = f"no_bias_model/{celltype}_averaged_nobias.h5"
 
 # Open all files in parallel and compute the average
 with h5py.File(h5_counts_files[0], 'r') as ref_file:  # Use the first file as a reference for structure

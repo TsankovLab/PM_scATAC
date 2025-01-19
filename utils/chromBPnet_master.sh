@@ -77,7 +77,7 @@ for fold_number in 0 1 2 3 4; do
          -P acc_Tsankov_Normal_Lung \
          -q gpu \
          -n 8 \
-         -W 96:00 \
+         -W 72:00 \
          -gpu num=2 \
          -R h100nvl \
          -R rusage[mem=32000] \
@@ -151,7 +151,7 @@ TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
     -n 8 \
-    -W 96:00 \
+    -W 72:00 \
     -R rusage[mem=64000] \
     -R span[hosts=1] \
     -o ${chromBPdir}/${celltype}_TFmodisco_counts.out \
@@ -162,7 +162,7 @@ TFmd_p_id=$(bsub -J ${celltype}_TFmd_p \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
     -n 8 \
-    -W 96:00 \
+    -W 72:00 \
     -R rusage[mem=64000] \
     -R span[hosts=1] \
     -o ${chromBPdir}/${celltype}_TFmodisco_profiles.out \
@@ -176,7 +176,7 @@ finemo_job_id=$(bsub -J ${celltype}_finemo \
     -P acc_Tsankov_Normal_Lung \
     -q gpu \
     -n 8 \
-    -W 96:00 \
+    -W 72:00 \
     -gpu num=2 \
     -R h100nvl \
     -R rusage[mem=32000] \

@@ -105,3 +105,5 @@ palette_genescore_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(ab
 palette_fragments = rev(paletteer::paletteer_c("grDevices::Oslo",n=40))
 palette_fragments = paletteer::paletteer_c("grDevices::Plasma",40)
 palette_fragments = paletteer_c("ggthemes::Classic Orange-White-Blue",40)
+
+palette_fetal = c(fetal='purple',rest = 'grey')

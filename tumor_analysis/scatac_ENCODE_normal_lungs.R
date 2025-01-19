@@ -68,22 +68,8 @@ ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
     copyArrows = TRUE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
   )
   
-  ### Subset ArchR object only for cells retained in Signac analysis ####
-  cell_annotation = read.csv ('../../per_sample_QC_signac/cell_annotation.csv')
-  colnames (cell_annotation) = c('barcode','celltype')
-  cell_annotation$barcode = sub ('\\.','#', cell_annotation$barcode)
-  
-  archp$celltype = cell_annotation$celltype[match(rownames(archp@cellColData), cell_annotation$barcode)]
-  archp$celltype[archp$celltype == 'Myeloid'] = 'MonoMac'
-  archp$celltype[archp$celltype == 'pDC'] = 'pDCs'
-  archp = archp[!is.na(archp$celltype)]
-  archp = archp[archp$celltype != 'bad_quality']
-  
-  # Import revised cell annotation after multiple iterations of Umaps (NOT SAVED)
-  ann = read.csv ('../../git_repo/files/barcode_annotation.csv')
-  archp$celltype_revised = ann$celltype[match(rownames(archp@cellColData), ann$barcode)]
-  archp = archp[!is.na(archp$celltype_revised)]
 
+  ### Subset ArchR object only for cells retained in Signac analysis ####
   ### QC plots ####
   p1 = plotFragmentSizes(ArchRProj = archp, groupBy = 'Sample', pal = palette_sample)
   p2 = plotTSSEnrichment(ArchRProj = archp, groupBy = 'Sample', pal = palette_sample)
@@ -98,7 +84,7 @@ ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
     alpha = 0.4,
     addBoxPlot = TRUE
    )
-
+pdf()
   p4 <- plotGroups(
     ArchRProj = archp, 
     groupBy = "Sample", 
@@ -109,11 +95,22 @@ ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
     alpha = 0.4,
     addBoxPlot = TRUE
    )
-
+  p2 <- plotGroups(
+    ArchRProj = archp, 
+    groupBy = "Sample", 
+    colorBy = "cellColData", 
+    name = "TSSEnrichment",
+    plotAs = "violin",
+    pal = palette_sample,
+    alpha = 0.4,
+    addBoxPlot = TRUE
+   )  
+dev.off()
   pdf (file.path ('Plots', 'QC_plots.pdf'))
   wrap_plots (p1, p2 ,p3, p4)
   dev.off()
 
+archp = archp[archp$TSSEnrichment > 6 & archp$nFrags > 2000]
 
   varfeat = 25000
   LSI_method = 2
@@ -129,6 +126,21 @@ ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
     reducedDims = "IterativeLSI",
     force = TRUE)
 
+# Harmony ####
+archp = addHarmony (
+    ArchRProj = archp,
+    reducedDims = "IterativeLSI",
+    name = "Harmony",
+    groupBy = "Sample", force=TRUE
+)
+archp = addUMAP (ArchRProj = archp, 
+    reducedDims = "Harmony", name='UMAP_H',
+    force = TRUE)
+archp = addClusters (input = archp,
+    reducedDims = "Harmony", resolution = 0.2,
+    name='Clusters_H',
+    force = TRUE)
+
 pdf ()  
 umap_p0 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Clusters",
@@ -136,21 +148,214 @@ umap_p0 = plotEmbedding (ArchRProj = archp,
    #pal = palette_celltype_simplified,
    labelMeans = FALSE)
 
-umap_p1 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "celltype_revised",
+umap_p2 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Sample",
    embedding = "UMAP",
-   pal = palette_celltype_simplified,
+  # pal = palette_sample,
    labelMeans = FALSE)
+
+umap_p1 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Clusters_H",
+   embedding = "UMAP_H",
+   #pal = palette_celltype_simplified,
+   labelMeans = FALSE)
+
+umap_p3 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Sample",
+   embedding = "UMAP_H",
+  # pal = palette_sample,
+   labelMeans = FALSE)
+dev.off()
+
+pdf (file.path('Plots','clusters_umap.pdf'), width = 25, height = 25)
+umap_p0
+umap_p2
+umap_p1
+umap_p3
+dev.off()
+
+
+
+genes = c('HP','WT1',  
+  'CD3D', 'LYZ','PECAM1','COL1A1',
+  'VWF','KLRC1','GNLY','SFTPA1',
+  'COL1A2','EPCAM','CALB2','CCR7','GATA2',
+  'ITLN1','TEAD1')
+genes_meso = c('HAS1','PHYHIP','CALB2','WT1','HP')
+
+pdf()
+p2 <- plotEmbedding(
+    ArchRProj = archp,
+    colorBy = "GeneScoreMatrix", 
+    name = genes_meso, 
+    embedding = "UMAP",
+    pal = rev(viridis::plasma(100)),
+    imputeWeights = NULL
+)
+
+pdf (file.path('Plots','marker_genes_feature_plots_3.pdf'), width = 25, height = 25)
+wrap_plots (p2)
+dev.off()
+
+#archp = archp[archp$Clusters != 'C1']
+
+#   varfeat = 25000
+#   LSI_method = 2
+#   archp = addIterativeLSI (ArchRProj = archp,
+#     useMatrix = "TileMatrix", name = "IterativeLSI",
+#     force = TRUE, LSIMethod = LSI_method,
+#     varFeatures = varfeat)
+
+#   archp = addClusters (input = archp, resolution = 3,
+#     reducedDims = "IterativeLSI", maxClusters = 100,
+#     force = TRUE)
+#   archp = addUMAP (ArchRProj = archp, 
+#     reducedDims = "IterativeLSI",
+#     force = TRUE)
+
+# pdf ()  
+# umap_p0 = plotEmbedding (ArchRProj = archp, 
+#   colorBy = "cellColData", name = "Clusters",
+#    embedding = "UMAP",
+#    #pal = palette_celltype_simplified,
+#    labelMeans = FALSE)
+
+# umap_p2 = plotEmbedding (ArchRProj = archp, 
+#   colorBy = "cellColData", name = "Sample",
+#    embedding = "UMAP",
+#   # pal = palette_sample,
+#    labelMeans = FALSE)
+# dev.off()
+
+genes = c('HP','WT1',  
+  'CD3D', 'LYZ','PECAM1','COL1A1',
+  'VWF','KLRC1','GNLY','SFTPA1',
+  'COL1A2','EPCAM','CALB2','CCR7','GATA2',
+  'ITLN1','TEAD1')
+genes_meso = c('HAS1','PHYHIP','CALB2','WT1','HP')
+
+
+# archp = addImputeWeights (archp)
+pdf()
+# p <- plotEmbedding(
+#     ArchRProj = archp,
+#     colorBy = "GeneScoreMatrix", 
+#     name = genes_meso, 
+#     embedding = "UMAP",
+#     pal = rev(viridis::plasma(100)),
+#     imputeWeights = getImputeWeights(archp)
+# )
+
+p2 <- plotEmbedding(
+    ArchRProj = archp,
+    colorBy = "GeneScoreMatrix", 
+    name = genes, 
+    embedding = "UMAP",
+    pal = rev(viridis::plasma(100)),
+    imputeWeights = NULL
+)
 
 umap_p2 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Sample",
    embedding = "UMAP",
-   pal = palette_sample,
+  # pal = palette_sample,
    labelMeans = FALSE)
 dev.off()
-pdf (file.path ('Plots','celltype_revised_umap.pdf'))
-umap_p0
-umap_p1
+
+pdf (file.path('Plots','marker_genes_feature_plots_3.pdf'), width = 25, height = 25)
+wrap_plots (p2)
 umap_p2
 dev.off()
 
+
+samples = unique(archp$Sample)
+archp_l = list()
+for (sample in samples)
+{
+archp_sub = archp[archp$Sample == sample]
+archp_sub = addIterativeLSI (ArchRProj = archp_sub,
+    useMatrix = "TileMatrix", name = "IterativeLSI",
+    force = TRUE, LSIMethod = LSI_method,
+    varFeatures = varfeat)
+archp_sub = addClusters (input = archp_sub, resolution = 3,
+    reducedDims = "IterativeLSI", maxClusters = 100,
+    force = TRUE)
+  archp_sub = addUMAP (ArchRProj = archp_sub, 
+    reducedDims = "IterativeLSI",
+    force = TRUE)  
+
+archp_sub = addImputeWeights(archp_sub)
+pdf ()
+p <- plotEmbedding(
+    ArchRProj = archp_sub,
+    colorBy = "GeneScoreMatrix", 
+    name = genes, 
+    embedding = "UMAP",
+    #pal = palette_expression,
+    imputeWeights = getImputeWeights(archp_sub)
+)
+
+umap_p2 = plotEmbedding (ArchRProj = archp_sub, 
+  colorBy = "cellColData", name = "Clusters",
+   embedding = "UMAP",
+  # pal = palette_sample,
+   labelMeans = FALSE)
+dev.off()
+
+archp_l[[sample]] = archp_sub
+pdf (file.path('Plots',paste0('marker_genes_feature_plots_3_',sample,'.pdf')), width = 25, height = 25)
+print (wrap_plots (p, ncol = 8))
+dev.off()
+pdf (file.path ('Plots',paste0('celltype_revised_umap_',sample,'.pdf')))
+umap_p2
+dev.off()
+
+}
+
+#p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
+
+pdf (file.path ('Plots','celltype_revised_umap.pdf'))
+umap_p0
+#umap_p1
+umap_p2
+dev.off()
+
+pdf (file.path('Plots','marker_genes_feature_plots_3.pdf'), width = 25, height = 25)
+print (wrap_plots (p, ncol = 8))
+dev.off()
+
+
+pdf()
+p1 <- plotEmbedding(
+    ArchRProj = archp,
+    colorBy = "cellColData", 
+    name = 'nFrags', 
+    embedding = "UMAP",
+    #pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+
+p2 <- plotEmbedding(
+    ArchRProj = archp,
+    colorBy = "cellColData", 
+    name = 'TSSEnrichment', 
+    embedding = "UMAP",
+    #pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+
+pdf (file.path('Plots','QC_umap.pdf'), width = 25, height = 25)
+print (wrap_plots (list(p1, p2)))
+dev.off()
+
+# Run genescore DAG ####
+metaGroupName = "Clusters"
+force=TRUE
+if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
+
+pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 8, height = 15)
+print (DAG_hm)
+dev.off()
+
+ 

@@ -17,13 +17,13 @@ library (tidyverse)
 set.seed(1234)
 
 # Set project dir
-projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/stroma/scrna/'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/stroma/scrna'
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
-source ('../../PM_scATAC/useful_functions.R')
-source ('../../PM_scATAC/palettes.R')
-source ('../../PM_scATAC/ggplot_aestetics.R')
-source ('../../PM_scATAC/palettes.R')
+source ('../../git_repo/useful_functions.R')
+source ('../../git_repo/palettes.R')
+source ('../../git_repo/ggplot_aestetics.R')
+source ('../../git_repo/palettes.R')
 
 sample_names = c(
     'P1', # p786

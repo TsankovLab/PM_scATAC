@@ -187,6 +187,8 @@ if (!file.exists(file.path (hubs_dir,'hubs_cells_mat.rds')))
 hubsCell_mat = as.data.frame (hubsCell_mat)
 
 
+
+
 # Compute differential hub accessibility DHA ####
 library (presto)
 metaGroupName = 'celltype'
@@ -195,6 +197,10 @@ res = wilcoxauc (log2(hubsCell_mat+1), archp$celltype)
 res = res[res$logFC > 0,]
 res_df = lapply (split (res, res$group), function(x) x[order(x$padj),])
 res_df = do.call (rbind, res_df)
+res_df$genes = hubs_obj$hubsCollapsed$gene[match(res_df$feature, hubs_obj$hubs_id)]
+res_df[unlist(sapply (TF_order$gene, function(x) (which(grepl (x, res_df$genes))))),]
+
+
 
 ## Plot volcano plots ####
 res = size_comp_df
@@ -218,8 +224,8 @@ vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
     geom_text_repel (size=2, data = res, aes(label = labels)) + 
     ggtitle ('Hubs differential accessibility') +
     #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
-    scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + theme_light() +
-    facet_wrap (.~celltype, ncol=4)
+    scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + gtheme_no_rot# +
+    #facet_wrap (.~celltype, ncol=4)
 
 pdf (file.path (hubs_dir, 'DAH_volcano.pdf'),width = 14,height = 4)
 print (vp)
