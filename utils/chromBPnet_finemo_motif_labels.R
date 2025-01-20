@@ -18,7 +18,7 @@ finemo_hits$motif_name1 = modisco_motifs$motif_match1[match(finemo_hits$motif_na
 finemo_hits$motif_name2 = modisco_motifs$motif_match2[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
 finemo_hits$combined_motifs = paste(finemo_hits$motif_name0,finemo_hits$motif_name1,finemo_hits$motif_name2, sep='_')
 
-write.table (finemo_hits[,c(1,2,3,17)], file.path(chromBPdir, 'no_bias_model', paste0(celltype,'_finemo_counts_to_genome_browser.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+write.table (finemo_hits[,c(1,2,3,17)], file.path(chromBPdir, celltype, 'no_bias_model', paste0(celltype,'_finemo_counts_to_genome_browser.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
 
 # Load finemo calls of contribution profile ####
 modisco_motifs = as.data.frame(readHTMLTable(file.path(chromBPdir,celltype, 'no_bias_model','modisco_profile',paste0(celltype,'_report'),'motifs.html')))
@@ -32,5 +32,5 @@ finemo_hits$motif_name1 = modisco_motifs$motif_match1[match(finemo_hits$motif_na
 finemo_hits$motif_name2 = modisco_motifs$motif_match2[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
 finemo_hits$combined_motifs = paste(finemo_hits$motif_name0,finemo_hits$motif_name1,finemo_hits$motif_name2, sep='_')
 
-write.table (finemo_hits[,c(1,2,3,17)], file.path(chromBPdir, 'no_bias_model', paste0(celltype,'_finemo_profile_to_genome_browser.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
-    
+write.table (finemo_hits[,c(1,2,3,17)], file.path(chromBPdir, celltype,'no_bias_model', paste0(celltype,'_finemo_profile_to_genome_browser.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+
