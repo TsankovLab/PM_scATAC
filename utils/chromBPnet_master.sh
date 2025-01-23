@@ -215,11 +215,11 @@ cd $chromBPct_dir
 avg_contribution_file=no_bias_model/${celltype}_averaged_contributions_counts.h5
 if [ -f "${avg_contribution_file}" ]; then
 echo "average contribution file found. Delete fold contribution files"
-rm -r fold_0/contribution*
-rm -r fold_1/contribution*
-rm -r fold_2/contribution*
-rm -r fold_3/contribution*
-rm -r fold_4/contribution*
+rm -r no_bias_model/fold_0/contribution*
+rm -r no_bias_model/fold_1/contribution*
+rm -r no_bias_model/fold_2/contribution*
+rm -r no_bias_model/fold_3/contribution*
+rm -r no_bias_model/fold_4/contribution*
 fi
 
 
