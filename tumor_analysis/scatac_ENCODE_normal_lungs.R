@@ -50,6 +50,7 @@ sample_names = sub ('.tsv.gz','',sample_names)
 
 names (fragment_paths) = sample_names
 
+
 ArrowFiles = createArrowFiles (inputFiles = fragment_paths,
       sampleNames = sample_names,
       minTSS = 4, #Dont set this too high because you can always increase later
@@ -110,7 +111,8 @@ dev.off()
   wrap_plots (p1, p2 ,p3, p4)
   dev.off()
 
-archp = archp[archp$TSSEnrichment > 6 & archp$nFrags > 2000]
+archp = loadArchRProject (projdir)
+archp = archp[archp$TSSEnrichment > 6 & archp$ReadsInTSS > 500]
 
   varfeat = 25000
   LSI_method = 2
@@ -181,14 +183,14 @@ genes = c('HP','WT1',
   'VWF','KLRC1','GNLY','SFTPA1',
   'COL1A2','EPCAM','CALB2','CCR7','GATA2',
   'ITLN1','TEAD1')
-genes_meso = c('HAS1','PHYHIP','CALB2','WT1','HP')
+genes_meso = c('HAS1','PHYHIP','CALB2','WT1','HP', 'GATA4')
 
 pdf()
 p2 <- plotEmbedding(
     ArchRProj = archp,
     colorBy = "GeneScoreMatrix", 
     name = genes_meso, 
-    embedding = "UMAP",
+    embedding = "UMAP_H",
     pal = rev(viridis::plasma(100)),
     imputeWeights = NULL
 )

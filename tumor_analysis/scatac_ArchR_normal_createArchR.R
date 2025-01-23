@@ -1,12 +1,12 @@
 conda activate meso_scatac
 R
 
-set.seed(1234)
-
-####### ANALYSIS of TUMOR compartment #######
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/normal_lung/scatac_ArchR'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
+
+set.seed(1234)
+
 
 # Load utils functions palettes and packages ####
 source (file.path('..','..','git_repo','utils','load_packages.R'))
@@ -19,58 +19,37 @@ source (file.path('..','..','git_repo','utils','palettes.R'))
 addArchRThreads (threads = 8) 
 addArchRGenome ("hg38")
 
-sample_names_tumor = c(
-  # Tumor  
-  'P1', # p786
-  'P4', # p811
-  'P8', # p826
-  'P3', # p846
-  'P5', #'p848'
-  'P10', # p10
-  'P11', # p11
-  'P12', # p12
-  'P13', # p13
-  'P14',# p14
-  'P23'
-  )
-
-sample_names_normal = c(
-  # Normal
+sample_names = c(
   'RPL_280_neg_1',
   'RPL_280_neg_2',
   'RPL_Epi_1',
-  'RPL_Epi_2'#,
+  'RPL_Epi_2'
   )
-  #'cf_distal')
+
   # Fix the fragment file of multiome sample by removing the header 
   #system ('zcat atac_fragments.tsv.gz | grep -v ^\# | bgzip > atac_fragments_fixed.tzv.gz')
-system ('mv /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/ArrowFiles/*.arrow /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/')
-ArrowFiles_tumor_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/'
-ArrowFiles_tumor_dir = file.path(ArrowFiles_tumor_dir, paste0(sample_names_tumor,'.arrow'))
-ArrowFiles_normal_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/normal_lung/scatac_ArchR/ArrowFiles'
-ArrowFiles_normal_dir = file.path(ArrowFiles_normal_dir,paste0(sample_names_normal,'.arrow'))
-ArrowFiles_dir = c(ArrowFiles_tumor_dir, ArrowFiles_normal_dir)
 
-# ArrowFiles = createArrowFiles (
-# inputFiles = fragment_paths,
-# sampleNames = sample_names,
-# minTSS = 4, #Dont set this too high because you can always increase later
-# minFrags = 1000,
-# maxFrags = Inf,
-# addTileMat = TRUE,
-# addGeneScoreMat = TRUE,
-# force = TRUE,
-# subThreading = T
-# )
-
-archp = ArchRProject (
-  ArrowFiles = ArrowFiles_dir, 
-  outputDirectory = projdir,
-  copyArrows = TRUE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
+fragment_paths =c('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/normal_lung')
+fragment_paths = file.path(fragment_paths, paste0(sample_names,'_fragments.tsv.gz'))
+   
+ArrowFiles = createArrowFiles (
+inputFiles = fragment_paths,
+sampleNames = sample_names,
+minTSS = 4, #Dont set this too high because you can always increase later
+minFrags = 1000,
+maxFrags = Inf,
+addTileMat = TRUE,
+addGeneScoreMat = TRUE,
+force = TRUE,
+subThreading = T
 )
 
-archp$Sample2 = archp$Sample
-archp$Sample2[grep ('RPL',archp$Sample2)] = 'normal_pleura'
+
+archp = ArchRProject (
+  ArrowFiles = ArrowFiles, 
+  outputDirectory = projdir,
+  copyArrows = FALSE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
+)
 
 # Dimensionality reduction and clustering
 varfeat = 25000
@@ -86,9 +65,26 @@ archp = addUMAP (ArchRProj = archp,
   reducedDims = "IterativeLSI",
   force = TRUE)
 
+meso_markers = c('C1QA','WT1','HP','GATA4','CD3D','COL1A1','PECAM1')
+#archp = addImputeWeights (archp)
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp,
+    colorBy = "GeneScoreMatrix", 
+    name = meso_markers, 
+    size=1,
+    embedding = "UMAP",
+    pal = palette_expression,
+    imputeWeights = NULL
+)
+dev.off()
+pdf (file.path('Plots','markers_fplots.pdf'), width = 18, height = 15)
+wrap_plots (p, ncol=3)
+dev.off()
+
 pdf()
 umap_p1 = plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
- name = "Sample2", embedding = "UMAP", pal = palette_sample)
+ name = "Sample", embedding = "UMAP", pal = palette_sample)
 umap_p2 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Clusters",
    embedding = "UMAP")
@@ -106,4 +102,4 @@ print (umap_p2)
 dev.off()
 
 # Save ArchR object ####
-archp = saveArchRProject (archp, dropCells = T)
+archp = saveArchRProject (archp[archp$Clusters == 'C12'], dropCells = T)

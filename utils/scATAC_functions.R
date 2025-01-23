@@ -1355,3 +1355,59 @@ cCNV_score = function (x)
    #x_neg = summary (unlist(lapply (x_neg, length)))[5]
   return (x_pos + abs(x_neg))
   }
+
+
+
+
+
+subsetArchRProject_light = function(
+  ArchRProject = NULL, 
+  cells = NULL,
+  projdir_new = NULL)
+{
+source_dir = getOutputDirectory(ArchRProject)
+projdir_temp = file.path(source_dir, 'tempdir')
+  copy_project_files <- function(source_dir, projdir_temp) {
+    # Ensure both source_dir and projdir_temp are provided
+    if (missing(source_dir) || missing(projdir_temp)) {
+      stop("Both 'source_dir' and 'projdir_temp' must be specified.")
+    }
+    
+    # Create the projdir_temp directory if it doesn't exist
+    if (!dir.exists(projdir_temp)) {
+      dir.create(projdir_temp, recursive = TRUE)
+      message(paste("Created target directory:", projdir_temp))
+    }
+    
+    # Construct paths for ArrowFiles and Save-ArchR-Project.rds
+    arrow_files_path <- file.path(source_dir, "ArrowFiles")
+    rds_file_path <- file.path(source_dir, "Save-ArchR-Project.rds")
+    
+    # Check if ArrowFiles directory exists
+    if (!dir.exists(arrow_files_path)) {
+      stop("ArrowFiles directory does not exist in the source directory.")
+    }
+    
+    # Check if Save-ArchR-Project.rds file exists
+    if (!file.exists(rds_file_path)) {
+      stop("Save-ArchR-Project.rds file does not exist in the source directory.")
+    }
+    
+    # Copy ArrowFiles directory
+    arrow_copy_command <- sprintf("cp -r '%s' '%s/'", arrow_files_path, projdir_temp)
+    system(arrow_copy_command)
+    message(paste("Copied ArrowFiles to:", projdir_temp))
+    
+    # Copy Save-ArchR-Project.rds file
+    rds_copy_command <- sprintf("cp '%s' '%s/'", rds_file_path, projdir_temp)
+    system(rds_copy_command)
+    message(paste("Copied Save-ArchR-Project.rds to:", projdir_temp))
+  }
+copy_project_files (source_dir, projdir_temp)
+ArchRProject = loadArchRProject (projdir_temp, force=T)
+saveArchRProject (ArchRProject[rownames(ArchRProject@cellColData) %in% cells], outputDirectory = projdir_new, dropCells=T)
+
+unlink(file.path(projdir_temp, "*"), recursive = TRUE, force = TRUE)
+  message(paste("All contents in", projdir_temp, "have been deleted."))
+}
+

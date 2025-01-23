@@ -29,37 +29,6 @@ addArchRGenome("hg38")
 archp = loadArchRProject (projdir)
 
 
-# Assign high vs low sc-S cells per sample ####
-metaGroupName = 'sarc_score'
-mods = as.data.frame (t(scale(t(archp@cellColData[,grep('cNMF',colnames(archp@cellColData))]))))
-mods$Sample = archp$Sample2
-mods = mods[order(-mods$cNMF20),]
-
-sams = unique (archp$Sample2)
-table (archp$Sample2)
-sams = c('P10','P12','P23','P4','P5')
-sarc_score = lapply (sams, function(sam) 
-	{
-	x = mods[mods$Sample == sam,'cNMF20', drop=F]
-	barcodes_high = data.frame(
-		barcode = rownames(x)[x[[1]] > quantile(x[[1]],0.8)],
-		score='high')
-	barcodes_low = data.frame(
-		barcode= rownames(x)[x[[1]] < quantile(x[[1]],0.2)],
-		score = 'low')
-	rbind (barcodes_high, barcodes_low)
-	})
-sarc_score_df = do.call (rbind, sarc_score)
-archp$sarc_score = 'mid'
-archp$sarc_score[match(sarc_score_df$barcode, rownames(archp@cellColData))] = sarc_score_df$score
-
-pdf (file.path ('Plots','sarc_score_groups.pdf'))
- umap_p1 = plotEmbedding (
- 	ArchRProj = archp, 
- 	colorBy = "cellColData",
-   name = 'sarc_score', embedding = "UMAP")
-umap_p1 
-dev.off()
 
 
 

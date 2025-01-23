@@ -34,8 +34,11 @@ biasdir=${5}
 echo $biasdir
 
 #mkdir $chromBPdir
-mkdir $chromBPdir/$celltype
-cd $chromBPdir/$celltype
+chromBPct_dir=${chromBPdir}/${celltype}
+echo $chromBPct_dir
+
+mkdir $chromBPct_dir
+cd $chromBPct_dir
 
 chmod +x ${repodir}/utils/chrBPnet_training.sh
 chmod +x ${repodir}/utils/chromBPnet_average_CNT_scores.py
@@ -95,8 +98,6 @@ for fold_number in 0 1 2 3 4; do
     fi
 done
 
-chromBPct_dir=${chromBPdir}/${celltype}
-echo $chromBPct_dir
 
 # Wait for all jobs to complete
 wait_job_id=$(bsub -J wait_jobs \
@@ -207,7 +208,21 @@ echo "R script execution completed."
 #      -R rusage[mem=64000] \
 #      -w "$job_ids" \
 #      /bin/bash -c "source activate chrombpnet && python $repodir/utils/average_CNT_scores.py $chromBPct_dir"
-     
+
+### Remove contribution scores h5 files for each fold in each cell types provided the average file is found ###
+cd $chromBPct_dir
+
+avg_contribution_file=no_bias_model/${celltype}_averaged_contributions_counts.h5
+if [ -f "${avg_contribution_file}" ]; then
+echo "average contribution file found. Delete fold contribution files"
+rm -r fold_0/contribution*
+rm -r fold_1/contribution*
+rm -r fold_2/contribution*
+rm -r fold_3/contribution*
+rm -r fold_4/contribution*
+fi
+
+
 
 ## Troubleshoot numpy (version installed should be 1.23.4)
 # python

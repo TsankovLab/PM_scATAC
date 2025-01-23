@@ -22,7 +22,7 @@ source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads (threads = 1)
+addArchRThreads (threads = 8)
 addArchRGenome ("hg38")
 
 if (!file.exists ('Save-ArchR-Project.rds')) 
@@ -760,17 +760,17 @@ dev.off()
 
   top_sarc_TF = head(m_cor_levels$TF,20)
   combined_df = combined_df[combined_df$TF %in% top_sarc_TF, ]
-  bp = ggplot (combined_df, aes (x = TF, y = score, fill = type), alpha=.5) + 
-  geom_boxplot (color = 'grey66',
+  bp = ggplot (combined_df, aes (x = TF, y = score, fill = type), alpha=.8) + 
+  geom_boxplot (color = 'grey20',
       linewidth = .1,
       width=0.7,
       outlier.alpha = 0.2,
       outlier.shape = NA,
-       size=0.5, alpha=0.5
+       size=0.5, alpha=0.7
        ) + 
   geom_point (position = position_dodge(.8), alpha= 0.5, color = 'grey22', size=1) +
   gtheme +
-  scale_fill_manual (values = c(activity = 'darkred', genescore = 'navyblue')) + 
+  scale_fill_manual (values = c(activity = '#AE123AFF', genescore = '#001260FF')) + 
   geom_hline (yintercept = 0, color='red',  linetype='dashed')
 
   pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots2.pdf'), width = 7,height=3)
@@ -1629,3 +1629,158 @@ dev.off()
 
 
 
+# Assign high vs low sc-S cells per sample ####
+metaGroupName = 'sarc_score'
+mods = as.data.frame (t(scale(t(archp@cellColData[,grep('cNMF',colnames(archp@cellColData))]))))
+#mods = as.data.frame (archp@cellColData[,grep('cNMF',colnames(archp@cellColData))])
+mods$Sample = archp$Sample2
+mods = mods[order(-mods$cNMF20),]
+
+sams = unique (archp$Sample2)
+table (archp$Sample2)
+sams = c('P10','P12','P23','P4','P5','P8','P14')
+sarc_score = lapply (sams, function(sam) 
+  {
+  x = mods[mods$Sample == sam,'cNMF20', drop=F]
+  barcodes_high = data.frame(
+    barcode = rownames(x)[x[[1]] > quantile(x[[1]],0.6)],
+    score='high')
+  barcodes_low = data.frame(
+    barcode= rownames(x)[x[[1]] < quantile(x[[1]],0.4)],
+    score = 'low')
+  rbind (barcodes_high, barcodes_low)
+  })
+sarc_score_df = do.call (rbind, sarc_score)
+archp$sarc_score = 'mid'
+archp$sarc_score[match(sarc_score_df$barcode, rownames(archp@cellColData))] = sarc_score_df$score
+
+pdf (file.path ('Plots','sarc_score_groups_scaled.pdf'))
+ umap_p1 = plotEmbedding (
+  ArchRProj = archp, 
+  colorBy = "cellColData",
+   name = 'sarc_score', embedding = "UMAP")
+umap_p1 
+dev.off()
+
+
+# Check SOX9 footprinting ####
+archp$sarc_score_sample = paste0(archp$sarc_score, archp$Sample)
+# archp2 = archp
+# archp = archp[archp$sarc_score != 'mid']
+archp <- addGroupCoverages (ArchRProj = archp, groupBy = "Clusters")
+motifPositions <- getPositions (archp)
+
+motifs <- c("SOX9", "SOX6",'RUNX2','TCF3','SNAI2','SNAI1','TWIST2','TWIST1','HIC2','HIC1')
+markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
+
+#markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"]
+#markerMotifs
+
+# ### Run peak calling ####
+# metaGroupName = "Sample"
+# force=FALSE
+# peak_reproducibility='1' # Set to 1 to better identify tumor heterogeneity
+# if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source (file.path('..','..','git_repo','utils','callPeaks.R'))
+
+#sams = c('P10','P12',
+sams = 'P23'#),'P4','P5')
+metaGroupName='Clusters'
+#for (sam in sams)
+#  {
+  #peaks_sample = readRDS (file.path ('PeakCalls',paste0(sam,'-reproduciblePeaks.gr.rds')))
+  #motifPositions_sample = lapply (motifPositions, function(x) x[queryHits(findOverlaps(x, peaks_sample))])  
+  seFoot <- getFootprints(
+    ArchRProj = archp, 
+    #positions = motifPositions_sample[markerMotifs], 
+    positions = motifPositions[markerMotifs], 
+    groupBy = metaGroupName
+  )
+  
+    plotFootprints(
+    seFoot = seFoot[,grepl('C10', colnames(seFoot)) | grepl('C7', colnames(seFoot))],
+    ArchRProj = archp, 
+    normMethod = "Subtract",
+    plotName = paste0("Footprints-Subtract-Bias_",sam),
+    addDOC = FALSE, height=4.5, width=3,
+    smoothWindow = 25)
+  #}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+markers = c('RUNX1','RUNX2','RUNX3','SOX9','VIM','SERPINE2','SNAI2')
+metaGroupName='sarc_score'
+#archp = addImputeWeights (archp)
+sams = c('P10','P12','P23','P4','P5','P8','P14')
+p2_l=list()
+for (sam in sams)
+  {
+  p2_l[[sam]] <- plotGroups(
+    ArchRProj = archp[archp$Sample == sam & archp$sarc_score != 'mid'], 
+    groupBy = metaGroupName, 
+    colorBy = "GeneScoreMatrix", 
+    name = markers,
+    plotAs = "violin",
+    alpha = 0.4,
+    getImputeWeights=NULL,
+    addBoxPlot = TRUE#,
+    #pal = palette_tnk_cells
+   )
+  }
+p2_l2 = unlist (p2_l, recursive=F)
+pdf (file.path ('Plots',paste0(sam,'_RUNXs_genescores.pdf')),14,14)
+print (wrap_plots (p2_l2, ncol=length(markers)))
+dev.off()
+
+
+
+markers = c('RUNX1','RUNX2','RUNX3','SOX9','VIM','SERPINE2','SNAI2')
+metaGroupName='Clusters'
+#archp = addImputeWeights (archp)
+sams = c('P10','P12','P23','P4','P5','P8','P14')
+p2_l=list()
+for (sam in sams)
+  {
+  p2_l[[sam]] <- plotGroups(
+    ArchRProj = archp[archp$Sample == sam & archp$sarc_score != 'mid'], 
+    groupBy = metaGroupName, 
+    colorBy = "GeneScoreMatrix", 
+    name = markers,
+    plotAs = "violin",
+    alpha = 0.4,
+    getImputeWeights=NULL,
+    addBoxPlot = TRUE#,
+    #pal = palette_tnk_cells
+   )
+  }
+p2_l2 = unlist (p2_l, recursive=F)
+pdf (file.path ('Plots',paste0(sam,'_RUNXs_genescores_clusters.pdf')),14,14)
+print (wrap_plots (p2_l2, ncol=length(markers)))
+dev.off()
+
+
+# Correlate module scores with TFs ####
+metaGroupName = "sarc_score"
+#archp$celltype2 = archp$Clusters_H
+force=FALSE
+# source (file.path('..','..','git_repo','utils','DAG.R'))
+
+
+
+
+
+
+  

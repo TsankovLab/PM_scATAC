@@ -575,7 +575,21 @@ subsetArchRProject(
   force = TRUE
 )
 
+metaGroupName = 'celltype_lv1'
+subsetArchRProject(
+  ArchRProj = archp,
+  cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% c('Malignant')],
+  outputDirectory = file.path('..','..','tumor_compartment','scatac_ArchR'),
+  dropCells = TRUE,
+  logFile = NULL,
+  threads = getArchRThreads(),
+  force = TRUE
+)
 
+subsetArchRProject_light (archp,
+  cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% c('Malignant')],
+  projdir_new = file.path('..','..','tumor_compartment','scatac_ArchR')
+  )
 
 
 # Show that enhancer linked to NR4A2 is only up in NK KLRC1 and CD8 exhausted across all cells ####
