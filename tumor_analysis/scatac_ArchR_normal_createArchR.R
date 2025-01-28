@@ -40,7 +40,7 @@ minFrags = 1000,
 maxFrags = Inf,
 addTileMat = TRUE,
 addGeneScoreMat = TRUE,
-force = TRUE,
+force = FALSE,
 subThreading = T
 )
 
@@ -101,5 +101,13 @@ print (umap_p1)
 print (umap_p2)
 dev.off()
 
+# Run genescore DAG ####
+metaGroupName = "Clusters"
+force = FALSE
+#if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
+source (file.path('..','..','git_repo','utils','DAG.R'))
+
 # Save ArchR object ####
-archp = saveArchRProject (archp[archp$Clusters == 'C12'], dropCells = T)
+write.csv (rownames(archp@cellColData)[archp$Clusters == 'C12'], 'mesothelium_annotation.csv')
+#archp = saveArchRProject (archp[archp$Clusters == 'C12'], dropCells = T)
+

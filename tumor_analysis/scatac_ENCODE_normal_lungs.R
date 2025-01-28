@@ -167,13 +167,20 @@ umap_p3 = plotEmbedding (ArchRProj = archp,
    embedding = "UMAP_H",
   # pal = palette_sample,
    labelMeans = FALSE)
+umap_p4 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Sample",
+   embedding = "UMAP",
+  # pal = palette_sample,
+   labelMeans = FALSE)
+
 dev.off()
 
-pdf (file.path('Plots','clusters_umap.pdf'), width = 25, height = 25)
+pdf (file.path('Plots','clusters_umap.pdf'), width = 7, height = 7)
 umap_p0
 umap_p2
 umap_p1
 umap_p3
+umap_p4
 dev.off()
 
 
@@ -191,7 +198,7 @@ p2 <- plotEmbedding(
     colorBy = "GeneScoreMatrix", 
     name = genes_meso, 
     embedding = "UMAP_H",
-    pal = rev(viridis::plasma(100)),
+    pal = viridis::plasma(100),
     imputeWeights = NULL
 )
 
@@ -361,3 +368,59 @@ print (DAG_hm)
 dev.off()
 
  
+
+# Make module score of mesothelial markers
+meso_markers = list(mesothelium = c('KRT6B','CDCP1','BNC1','MIR31','SLC28A3','OR1M1','WT1','WT1-AS','HAS1','UPK1B','MIR4725','ALDH8A1'))
+archp = addModuleScore (
+  ArchRProj = archp,
+  useMatrix = 'GeneScoreMatrix',
+  name = "normal",
+  features = meso_markers,
+  nBin = 25,
+  nBgd = 100,
+  seed = 1,
+  threads = getArchRThreads(),
+  logFile = createLogFile("addModuleScore")
+)
+
+pdf()
+p2 <- plotEmbedding(
+    ArchRProj = archp,
+    colorBy = "cellColData", 
+    name = 'normal.mesothelium', 
+    embedding = "UMAP_H",
+    #pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+
+pdf (file.path('Plots','meso_module_umap.pdf'), width = 7, height = 7)
+p2
+dev.off()
+
+pdf()
+p2 <- plotEmbedding(
+    ArchRProj = archp,
+    colorBy = "cellColData", 
+    name = 'normal.mesothelium', 
+    embedding = "UMAP",
+    #pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+
+archp = addClusters (input = archp, resolution = 10,
+    reducedDims = "IterativeLSI", maxClusters = 100,
+    force = TRUE)
+umap_p0 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Clusters",
+   embedding = "UMAP", 
+   #pal = palette_celltype_simplified,
+   labelMeans = TRUE) + NoLegend()
+
+pdf (file.path('Plots','meso_module_umap2.pdf'), width = 12, height = 7)
+wrap_plots (p2, umap_p0)
+dev.off()
+
+### Select mesothelial cells cluster
+write.csv (rownames(archp@cellColData)[archp$Clusters == 'C80'], 'mesothelium_barcodes.csv')

@@ -1403,6 +1403,7 @@ projdir_temp = file.path(source_dir, 'tempdir')
     system(rds_copy_command)
     message(paste("Copied Save-ArchR-Project.rds to:", projdir_temp))
   }
+message ('copy arrow files and archr object to temp directory...')  
 copy_project_files (source_dir, projdir_temp)
 ArchRProject = loadArchRProject (projdir_temp, force=T)
 saveArchRProject (ArchRProject[rownames(ArchRProject@cellColData) %in% cells], outputDirectory = projdir_new, dropCells=T)
@@ -1410,4 +1411,7 @@ saveArchRProject (ArchRProject[rownames(ArchRProject@cellColData) %in% cells], o
 unlink(file.path(projdir_temp, "*"), recursive = TRUE, force = TRUE)
   message(paste("All contents in", projdir_temp, "have been deleted."))
 }
+
+
+
 

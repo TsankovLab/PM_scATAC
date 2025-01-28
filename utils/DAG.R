@@ -31,7 +31,7 @@ if (!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force)
 
 FDR_threshold = .05
 lfc_threshold = 0.5
-top_genes = 5
+top_genes = 30
 DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
 DAG_top_list = lapply (seq_along(DAG_top_list), function(x) {
   res = DAG_top_list[[x]]
@@ -76,7 +76,7 @@ DAG_hm = Heatmap (t(scale(gsMat_mg)),
         )
          
   #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
-pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 3, height = 8)
+pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 3, height = 18)
 print (DAG_hm)
 dev.off()
 

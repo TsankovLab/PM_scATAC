@@ -137,6 +137,7 @@ no_bias_model/fold_3/contribution_scores.counts_scores.bw \
 no_bias_model/fold_4/contribution_scores.counts_scores.bw \
 > no_bias_model/temp_contribution_counts_score.wig
 wigToBigWig no_bias_model/temp_contribution_counts_score.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_counts.bw
+rm no_bias_model/temp_contribution_counts_score.wig
 
 echo "Take average of bigwig files profile"
 wiggletools mean no_bias_model/fold_0/contribution_scores.profile_scores.bw \
@@ -146,6 +147,17 @@ no_bias_model/fold_3/contribution_scores.profile_scores.bw \
 no_bias_model/fold_4/contribution_scores.profile_scores.bw \
 > no_bias_model/temp_contribution_profile_score.wig
 wigToBigWig no_bias_model/temp_contribution_profile_score.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
+rm no_bias_model/temp_contribution_profile_score.wig
+
+avg_contribution_file=no_bias_model/${celltype}_averaged_contributions_counts.h5
+if [ -f "${avg_contribution_file}" ]; then
+echo "average contribution file found. Delete fold contribution files"
+rm -r no_bias_model/fold_0/contribution*
+rm -r no_bias_model/fold_1/contribution*
+rm -r no_bias_model/fold_2/contribution*
+rm -r no_bias_model/fold_3/contribution*
+rm -r no_bias_model/fold_4/contribution*
+fi
 
 echo "Run TFmodisco on averaged h5 contribution counts and profile files"
 TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
@@ -210,17 +222,6 @@ echo "R script execution completed."
 #      /bin/bash -c "source activate chrombpnet && python $repodir/utils/average_CNT_scores.py $chromBPct_dir"
 
 ### Remove contribution scores h5 files for each fold in each cell types provided the average file is found ###
-cd $chromBPct_dir
-
-avg_contribution_file=no_bias_model/${celltype}_averaged_contributions_counts.h5
-if [ -f "${avg_contribution_file}" ]; then
-echo "average contribution file found. Delete fold contribution files"
-rm -r no_bias_model/fold_0/contribution*
-rm -r no_bias_model/fold_1/contribution*
-rm -r no_bias_model/fold_2/contribution*
-rm -r no_bias_model/fold_3/contribution*
-rm -r no_bias_model/fold_4/contribution*
-fi
 
 
 

@@ -56,12 +56,6 @@ sample_names = c(
     'P13', # p13
     'P14',#,# p14
     'P23'
-    # # Normal
-    # 'RPL_280_neg_1',
-    # 'RPL_280_neg_2',
-    # 'RPL_Epi_1',
-    # 'RPL_Epi_2'#,
-    # #'cf_distal'
     )
 
 # Load RNA
@@ -539,7 +533,8 @@ dev.off()
 
 
 ### Subset ArchR project ####
-
+run_dropcells = FALSE
+if (run_dropcells) archp = saveArchRProject (archp, dropCells = T) # Make sure to run this first before subsetting with the custom subset function
 # Subset T cells ####
 metaGroupName = 'celltype_revised'
 subsetArchRProject(
@@ -586,7 +581,8 @@ subsetArchRProject(
   force = TRUE
 )
 
-subsetArchRProject_light (archp,
+metaGroupName='celltype_lv1'
+subsetArchRProject_light (ArchRProject = archp,
   cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% c('Malignant')],
   projdir_new = file.path('..','..','tumor_compartment','scatac_ArchR')
   )
@@ -649,6 +645,12 @@ pdf(file.path ('Plots','NR4A2_dotplot.pdf'), width = 9)
 VlnPlot (srt, feature = 'NR4A2', group.by = 'celltype3', cols = c(palette_tnk_cells, palette_celltype_simplified))
 VlnPlot (srt[,!srt$celltype_simplified3 %in% c('NK','T_cells')], feature = 'NR4A2', group.by = 'celltype_simplified3', cols = c(palette_tnk_cells, palette_celltype_simplified))
 dev.off()
+
+
+# Import chrombpnet output and cross-reference with scRNA-seq TF expression
+
+
+
 
 
 

@@ -39,38 +39,61 @@ sample_names_normal = c(
   'RPL_280_neg_1',
   'RPL_280_neg_2',
   'RPL_Epi_1',
-  'RPL_Epi_2'#,
+  'RPL_Epi_2',#,
+  'ENCSR592WYM-1_fragments',
+  'ENCSR606VJQ-1_fragments',
+  'ENCSR548BXU-1_fragments'
   )
   #'cf_distal')
   # Fix the fragment file of multiome sample by removing the header 
   #system ('zcat atac_fragments.tsv.gz | grep -v ^\# | bgzip > atac_fragments_fixed.tzv.gz')
-system ('mv /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/ArrowFiles/*.arrow /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/')
-ArrowFiles_tumor_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/'
+ArrowFiles_tumor_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR'
 ArrowFiles_tumor_dir = file.path(ArrowFiles_tumor_dir, paste0(sample_names_tumor,'.arrow'))
-ArrowFiles_normal_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/normal_lung/scatac_ArchR/ArrowFiles'
-ArrowFiles_normal_dir = file.path(ArrowFiles_normal_dir,paste0(sample_names_normal,'.arrow'))
+ArrowFiles_normal_dir = c(
+  '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/normal_lung/scatac_ArchR/ArrowFiles/RPL_280_neg_1.arrow',
+  '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/normal_lung/scatac_ArchR/ArrowFiles/RPL_280_neg_2.arrow',
+  '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/normal_lung/scatac_ArchR/ArrowFiles/RPL_Epi_1.arrow',
+  '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/normal_lung/scatac_ArchR/ArrowFiles/RPL_Epi_2.arrow',
+  '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/ENCODE_normal/ArrowFiles/ENCSR592WYM-1_fragments.arrow',
+  '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/ENCODE_normal/ArrowFiles/ENCSR606VJQ-1_fragments.arrow',
+  '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/ENCODE_normal/ArrowFiles/ENCSR548BXU-1_fragments.arrow'
+  )
 ArrowFiles_dir = c(ArrowFiles_tumor_dir, ArrowFiles_normal_dir)
 
-# ArrowFiles = createArrowFiles (
-# inputFiles = fragment_paths,
-# sampleNames = sample_names,
-# minTSS = 4, #Dont set this too high because you can always increase later
-# minFrags = 1000,
-# maxFrags = Inf,
-# addTileMat = TRUE,
-# addGeneScoreMat = TRUE,
-# force = TRUE,
-# subThreading = T
-# )
-
+# if (!all (file.exists(paste0('ArrowFiles/',c(paste0(sample_names_tumor,'.arrow'),paste0(sample_names_normal,'.arrow')))))) 
+#   {
+system ('mv ArrowFiles/*.arrow ../')
 archp = ArchRProject (
-  ArrowFiles = ArrowFiles_dir, 
-  outputDirectory = projdir,
-  copyArrows = TRUE #This is recommened so that if you modify the Arrow files you have an original copy for later usage.
-)
+ArrowFiles = ArrowFiles_dir,
+outputDirectory = projdir,
+copyArrows = FALSE) 
+  # }
+  # } else {
+  # archp = ArchRProject (
+  # ArrowFiles = ArrowFiles_dir,
+  # outputDirectory = projdir,
+  # copyArrows = FALSE)  
+  # # }
+
+# Further subset malignant cells as there is a bug in ArchR that doesnt update arrow metadata when re-reading arrow files from subset object
+ann_tumor = read.csv (file.path ('..','..','git_repo','files','barcode_annotation.csv'))
+ann_tumor = ann_tumor[ann_tumor$celltype_lv1 == 'Malignant','barcode']
+ann_normal = read.csv (file.path ('..','..','normal_lung','scatac_ArchR','mesothelium_annotation.csv'))
+ann_normal = ann_normal$x
+ann_normal2 = read.csv (file.path ('..','ENCODE_normal','mesothelium_barcodes.csv'))
+ann_normal2 = ann_normal2$x
+
+ann_combined = c(ann_tumor, ann_normal, ann_normal2)
+archp = archp[rownames(archp@cellColData) %in% ann_combined]
+
+#if (!all (file.exists(paste0('ArrowFiles/',c(paste0(sample_names_tumor,'.arrow'),paste0(sample_names_normal,'.arrow'))))))
+archp = saveArchRProject (archp)
 
 archp$Sample2 = archp$Sample
-archp$Sample2[grep ('RPL',archp$Sample2)] = 'normal_pleura'
+archp$Sample2[grep ('RPL',archp$Sample2)] = 'normal1'
+archp$Sample2[grep ('ENCSR548BXU-1_fragments',archp$Sample2)] = 'normal2'
+archp$Sample2[grep ('ENCSR592WYM-1_fragments',archp$Sample2)] = 'normal3'
+archp$Sample2[grep ('ENCSR606VJQ-1_fragments',archp$Sample2)] = 'normal4'
 
 # Dimensionality reduction and clustering
 varfeat = 25000
@@ -100,10 +123,7 @@ umap_p4 = plotEmbedding (ArchRProj = archp,
    embedding = "UMAP")
 dev.off()
 
-pdf (file.path('Plots','celltype_umap.pdf'))
+pdf (file.path('Plots','celltype_umap.pdf'),10,10)
 print (umap_p1)
 print (umap_p2)
 dev.off()
-
-# Save ArchR object ####
-archp = saveArchRProject (archp, dropCells = T)

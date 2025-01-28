@@ -50,7 +50,7 @@ for (celltype in celltypes)
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.out')), "-e" ,
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),
 		file.path(repodir,'utils','chromBPnet_master.sh'))
-	args <- paste(chromBPdir, grefdir, repodir, celltype, biasdir) 
+	args <- paste (chromBPdir, grefdir, repodir, celltype, biasdir) 
 	system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_master.sh')), wait=FALSE)
 	
 	system (paste(command, args))

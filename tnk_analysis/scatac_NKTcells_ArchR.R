@@ -453,7 +453,7 @@ TF_hm = Heatmap (scale(mMat),
           #right_annotation = motif_ha
           )
 
-pdf (file.path ('Plots',paste0('TF_',metaGroupName,'heatmap.pdf')), width=12, height=5)
+pdf (file.path ('Plots',paste0('TF_',metaGroupName,'heatmap2.pdf')), width=12, height=5)
 TF_hm
 dev.off()
 
@@ -489,7 +489,7 @@ set.seed(1234)
 centers=3
 km = kmeans (mMat_cor, centers=centers)
 
-pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
+pdf (file.path ('Plots','TF_modules_heatmap2.pdf'), width = 4,height=3)
 cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
   #left_annotation = ha,
   #rect_gp = gpar(type = "none"),
@@ -517,7 +517,7 @@ cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
 #        }}))
 dev.off()
 
-pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4,height=3)
+pdf (file.path ('Plots','TF_modules_heatmap2.pdf'), width = 4,height=3)
 cor_mMat_hm
 dev.off()
 
@@ -536,7 +536,7 @@ TF_p = plotEmbedding (
     #useSeqnames='z',
     embedding = "UMAP_H")
 dev.off()
-pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 20,height=6)
+pdf (file.path ('Plots','TF_modules_umap2.pdf'), width = 20,height=6)
 wrap_plots (TF_p, ncol=5)
 dev.off()
 
@@ -625,14 +625,19 @@ if (!file.exists ('DAP_CD8_CD8_ext_pairwise.rds') | force)
     groupBy = metaGroupName
   #  useSeqnames="z"
   )
+  saveRDS (DAP_list, 'DAP_CD8_CD8_ext_pairwise.rds')
+  } else {
+  DAP_list = readRDS ('DAP_CD8_CD8_ext_pairwise.rds')
   DAP_res = do.call (cbind, (assays(DAP_list)))
   colnames (DAP_res) = names(assays(DAP_list))
   DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
   rownames(DAP_res) = as.character(DAP_res_regions)
-  saveRDS (DAP_res, 'DAP_CD8_CD8_ext_pairwise.rds')
-  } else {
-  DAP_res = readRDS ('DAP_CD8_CD8_ext_pairwise.rds')
   }
+
+pdf(file.path('Plots','Exhausted_peaks_MA_plot.pdf'), width=5,height=5)
+pma <- markerPlot(seMarker = DAP_list, name = 'CD8_exhausted', cutOff = "FDR <= 0.01 & Log2FC >= 0", plotAs = "MA")
+pma
+dev.off()
 
 # Take only significant regions ####
 DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
@@ -660,7 +665,7 @@ bp = ggplot (mod_df, aes (x = module, y = pval, fill = module)) +
 geom_bar (stat = 'identity',color='grey22') + 
 scale_fill_manual (values = c(module1 = 'darkred',module2='grey',module3='grey')) + 
 gtheme
-pdf (file.path ('Plots','TFmodule_enrichments.pdf'), width=4,height=3)
+pdf (file.path ('Plots','TFmodule_enrichments2.pdf'), width=4,height=3)
 bp
 dev.off()
 
@@ -693,7 +698,7 @@ gtheme_no_rot +
 theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
 coord_flip()
 
-pdf (file.path ('Plots','TF_in_module_enrichments.pdf'), width=4,height=7)
+pdf (file.path ('Plots','TF_in_module_enrichments2.pdf'), width=4,height=7)
 bp
 dev.off()
 
@@ -734,7 +739,7 @@ cooc_hm = Heatmap (
     cluster_columns = F,
 rect_gp = gpar (col = "white", lwd = 1))
 
-pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps.pdf'), width = 6,height=5)
+pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps2.pdf'), width = 6,height=5)
 cooc_hm 
 dev.off()
 
@@ -775,8 +780,21 @@ cooc_hm = Heatmap (
     cluster_columns = F,
 rect_gp = gpar (col = "white", lwd = 1))
 
-pdf (file.path ('Plots','selected_TF_cooccurence_in_ext_peaks_heatmaps.pdf'), width = 6,height=5)
+pdf (file.path ('Plots','selected_TF_cooccurence_in_ext_peaks_heatmaps2.pdf'), width = 6,height=5)
 cooc_hm 
+dev.off()
+
+
+# Make Venn Diagram of overlap of exhauted peaks with RUNX and NR4A2 and AP1 ####
+library (ggVennDiagram)
+peak_ov = lapply (as.list(as.data.frame(matchesMat)), function(x) paste0('p',1:nrow(matchesMat))[x])
+peak_ov = list(
+  RUNX = unique(unlist(peak_ov[c('RUNX1','RUNX2')])),
+  NR4A2 = peak_ov[['NR4A2']],
+  AP1 = unique(unlist(peak_ov[c('FOS','JUND','JUN','BATF','JUNB','BACH1','FOSL2','FOSB','SMARCC1','BACH2')])))
+vp = ggVennDiagram(peak_ov) + scale_fill_gradient(low="grey90",high = "darkred")
+pdf (file.path('Plots','ext_TF_overlap_venn.pdf'),4,4)
+vp
 dev.off()
 
 
@@ -1587,8 +1605,9 @@ fold_numbers = c(0,1,2,3,4)
 
 
 ### Check expression of RUNX3 and CTCF predicted by chromBPnet
-pdf (file.path ('Plots','TF_exp_dotplots.pdf'))
-DotPlot (srt[,srt$celltype2 != 'Proliferating'], features= c('FOS','CREB1','RUNX1','RUNX2','RUNX3','CTCF','ELK4'), group.by = 'celltype2')
+pdf (file.path ('Plots','TF_exp_dotplots.pdf'), width=5, height=3)
+DotPlot (srt[,srt$celltype2 != 'Proliferating'], 
+  features= c('RUNX1','RUNX2','RUNX3','NR4A2','NR4A1','NR4A3'), group.by = 'celltype2') + gtheme
 dev.off()
 
 deg_res = FindMarkers (srt, ident.1 = 'NK_KLRC1', ident.2 = 'NK_FGFBP2', group.by='celltype2')
@@ -1661,6 +1680,30 @@ dev.off()
 
 
 
+# Check footprint of RUNX and NR4A2 across celltypes ####
+metaGroupName='celltype2'
+archp <- addGroupCoverages (ArchRProj = archp, groupBy = metaGroupName)
+motifPositions <- getPositions (archp)
+
+motifs <- c('RUNX1','RUNX2','RUNX3','NR4A2')
+markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
+
+seFoot <- getFootprints(
+  ArchRProj = archp, 
+  #positions = motifPositions_sample[markerMotifs], 
+  positions = motifPositions[markerMotifs], 
+  groupBy = metaGroupName
+)
+  
+plotFootprints(
+seFoot = seFoot,
+ArchRProj = archp, 
+normMethod = "Subtract",
+plotName = "Footprints-Subtract-Bias_",
+addDOC = FALSE, height=7.5, width=5,
+pal = palette_tnk_cells,
+smoothWindow = 25)
+  
 
 
 
