@@ -48,9 +48,12 @@ chmod +x ${repodir}/utils/finemo_motif_calls.sh
 
 ### Create background regions file - Go in the output chromBPnet folder ####
 # Remove regions overlapping black listed regions
+if [ ! -f "${celltype}_peakset_all_no_blacklist.bed" ]; then
+echo 'create peakset with blacklist subtracted'
 bedtools slop -i ${grefdir}/blacklist.bed.gz -g ${grefdir}/hg38.chrom.sizes -b 1057 > temp.bed
 bedtools intersect -v -a ../MACS2_${celltype}/${celltype}_peaks_capped.narrowPeak -b temp.bed  > ${celltype}_peakset_all_no_blacklist.bed
 wc -l ${celltype}_peakset_all_no_blacklist.bed # # Make sure number of peaks is not more than 250K
+fi
 
 # Generate training validation and test chromosome sets
 head -n 23  ${grefdir}/hg38.chrom.sizes >  hg38.chrom.subset.sizes
