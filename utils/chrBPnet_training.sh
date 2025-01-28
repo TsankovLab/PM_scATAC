@@ -65,7 +65,7 @@ CHROM_SIZES=$grefdir/hg38.chrom.sizes
 count_scores_file=no_bias_model/${celltype}_averaged_contribution_scores_counts.h5
 profile_scores_file=no_bias_model/${celltype}_averaged_contribution_scores_profile.h5
 
-if [ ! -f "${count_scores_file}" ] && [ ! -f "${profile_scores_file}" ]; then
+if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
     chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op no_bias_model/fold_${fold_number}/contribution_scores
 else
