@@ -88,6 +88,7 @@ if (!file.exists ('Save-ArchR-Project.rds'))
   archp = archp[!is.na(archp$celltype_revised)]
 
   ### QC plots ####
+  pdf()
   p1 = plotFragmentSizes(ArchRProj = archp, groupBy = 'Sample', pal = palette_sample)
   p2 = plotTSSEnrichment(ArchRProj = archp, groupBy = 'Sample', pal = palette_sample)
 
@@ -112,7 +113,7 @@ if (!file.exists ('Save-ArchR-Project.rds'))
     alpha = 0.4,
     addBoxPlot = TRUE
    )
-
+dev.off()
   pdf (file.path ('Plots', 'QC_plots.pdf'))
   wrap_plots (p1, p2 ,p3, p4)
   dev.off()
@@ -162,20 +163,48 @@ dev.off()
 meso_markers = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
 meso_markers = meso_markers[meso_markers != 'IGHM']
 meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
+meso_markers = c('KRT19','CLDN5','COL1A1','HP','MYH11','SFTA3','LYZ','CD3E','GNLY','CD79A','VASH2','IGLL5')
 archp = addImputeWeights (archp)
+pdf()
 p <- plotEmbedding(
     ArchRProj = archp, 
     colorBy = "GeneScoreMatrix", 
     name = meso_markers, 
     embedding = "UMAP",
+    pal = palette_expression,
     imputeWeights = getImputeWeights(archp)
 )
-
-pdf (file.path('Plots','marker_genes_feature_plots.pdf'), width = 25, height = 25)
-print (wrap_plots (p, ncol = 8))
+dev.off()
+p = lapply (seq_along(p), function(x) p[[x]] + theme_void()  + theme(
+    axis.title = element_blank(),       # Remove axis titles
+    axis.text = element_blank(),        # Remove axis tick labels       # Remove plot title
+    plot.subtitle = element_blank(),    # Remove subtitle
+    plot.caption = element_blank(),     # Remove caption
+    legend.position = "none"            # Remove legend
+  ) + ggtitle (meso_markers[x])
+)
+pdf (file.path('Plots','marker_genes_feature_plots.pdf'), width = 10, height = 10)
+print (wrap_plots (p, ncol = 4))
 dev.off()
 
+# Run genescore DAG ####
+metaGroupName = "celltype_lv1"
+force = FALSE
+if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
 
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "GeneScoreMatrix", 
+    name = DAG_df$gene[DAG_df$comparison %in% c('Alveolar','pDCs','Plasma')], 
+    embedding = "UMAP",
+    pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+pdf (file.path('Plots','marker_genes_pDC_plasma_Alveolar.pdf'), width = 40, height = 40)
+print (wrap_plots (p, ncol = 8))
+dev.off()
 
 archp = saveArchRProject (archp, load = T)
 

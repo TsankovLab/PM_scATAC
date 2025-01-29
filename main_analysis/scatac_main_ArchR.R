@@ -491,18 +491,22 @@ dev.off()
 
 #### make heatmap of all positively regulated TFs across cell types to find shared programs ####
 # # Get deviation matrix ####
-mMat = assays (mSE)[[1]]
+if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
+mMat = scale(assays (mSE)[[1]])
 rownames (mMat) = rowData (mSE)$name
 
-# Subset only for positively correlated TF with genescore ####
-metaGroupName = 'celltype_revised'
-positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0.1]
-mMat = mMat[positive_TF,]
+# Filter for only expressed TFs ####
+metaGroupName = 'celltype_simplified2'
+ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
+min_exp = .1
+active_TFs = rownames(ps)[rowSums(ps) > min_exp]
+mMat = mMat[active_TFs,]
 mMat = as.data.frame (t(mMat))
 #mMat$metaGroup = as.character (archp@cellColData[,metaGroupName])
 #mMat = aggregate (.~ metaGroup, mMat, mean)
 #rownames(mMat) = mMat[,1]
 #mMat = mMat[,-1]
+metaGroupName = 'celltype_lv1'
 ha = HeatmapAnnotation (celltype = as.character (archp@cellColData[,metaGroupName]), col=list(celltype = palette_celltype_simplified))
 DAM_hm = Heatmap (t(mMat), 
           row_labels = colnames (mMat),
@@ -517,13 +521,16 @@ DAM_hm = Heatmap (t(mMat),
           column_names_rot = 45,
           #rect_gp = gpar(col = "white", lwd = .5),
           border=TRUE,
-          col = palette_deviation
+          col = palette_deviation_centered
           #right_annotation = motif_ha
           )
 
 pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_all_TF_heatmaps.pdf')), width = 12.6, height = 5)
 print(DAM_hm)
 dev.off()
+
+
+
 
 
 
@@ -629,9 +636,6 @@ ep
 dev.off()
 
 
-
-
-
 # Check expression of NR4A2 across cell types ####
 srt_tnk = readRDS (file.path('..','..','NKT_cells','scrna','srt.rds'))
 tnk_ann = srt_tnk$celltype2
@@ -647,7 +651,37 @@ VlnPlot (srt[,!srt$celltype_simplified3 %in% c('NK','T_cells')], feature = 'NR4A
 dev.off()
 
 
+# Input exhausted peaks as chromvar score ####
+T_ext = list(
+  T_ext = readRDS (file.path('..','..','NKT_cells','scatac_ArchR','T_cell_exhaustion_peaks.rds')),
+  T_ext2 = readRDS (file.path('..','..','NKT_cells','scatac_ArchR','T_cell_exhaustion_peaks.rds')))
+
 # Import chrombpnet output and cross-reference with scRNA-seq TF expression
+archp = addBgdPeaks (archp, force= TRUE)
+archp = addPeakAnnotations (ArchRProj = archp, 
+     regions = T_ext, name = "T_exhausted",force=T)
+
+archp = addDeviationsMatrix (
+  ArchRProj = archp, 
+  peakAnnotation = "T_exhausted",
+  force = TRUE
+)
+
+pdf()
+if (!any (ls() == 'tSE')) tSE = fetch_mat (archp, 'T_exhausted')
+TF_p = plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "T_exhaustedMatrix",
+    name = 'z:T_ext', 
+    #useSeqnames='z',
+    pal = rev (palette_deviation),    
+    embedding = "UMAP",
+    imputeWeights = getImputeWeights(archp)
+    )
+dev.off()
+pdf (file.path ('Plots','T_exhausted_fplots.pdf'), width = 30,height=16)
+TF_p
+dev.off()
 
 
 

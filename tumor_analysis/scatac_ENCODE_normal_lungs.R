@@ -35,6 +35,7 @@ setwd (projdir)
 # Load function (JGranja)
 source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 
+archp = loadArchRProject(projdir)
 
 # combine fragments files from different channels of the normal RPL 
 #system ('cat /ahg/regevdata/projects/ICA_Lung/10x_scatac/cellranger1.2_count_hg38/RPL_280_neg_1/RPL_280_neg_1/outs/fragments.tsv.gz \
@@ -424,3 +425,37 @@ dev.off()
 
 ### Select mesothelial cells cluster
 write.csv (rownames(archp@cellColData)[archp$Clusters == 'C80'], 'mesothelium_barcodes.csv')
+
+
+
+# Label transfer from normal lung scRNA data
+srt = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Normal_lung/normal_lung_scrna/srt.rds')
+
+############ INTEGRATION WITH scRNA ######
+archp <- addGeneIntegrationMatrix (
+    ArchRProj = archp, 
+    useMatrix = "GeneScoreMatrix",
+    matrixName = "GeneIntegrationMatrix",
+    reducedDims = "IterativeLSI",
+    seRNA = srt,
+    addToArrow = TRUE,
+    groupRNA = "celltype",
+    nameCell = "predictedCell_Un",
+    nameGroup = "predictedGroup_Un",
+    nameScore = "predictedScore_Un",
+    force = TRUE
+)
+
+palD <- paletteDiscrete (values = levels(as.factor(rnaCFd$celltype)))
+rna_p = DimPlot (rnaCFd, group.by = 'celltype')
+int_p <- plotEmbedding(
+    archp, 
+    colorBy = "cellColData", 
+    name = "predictedGroup_Un", 
+    pal = palD
+)
+pdf (paste0 (projdir,'/Plots/RNA_integration_UMAPs.pdf'), width=15)
+wrap_plots (rna_p, umap_p2, int_p, ncol=3)
+dev.off()
+
+

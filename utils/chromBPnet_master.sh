@@ -138,9 +138,9 @@ no_bias_model/fold_1/contribution_scores.counts_scores.bw \
 no_bias_model/fold_2/contribution_scores.counts_scores.bw \
 no_bias_model/fold_3/contribution_scores.counts_scores.bw \
 no_bias_model/fold_4/contribution_scores.counts_scores.bw \
-> no_bias_model/temp_contribution_counts_score.wig
-wigToBigWig no_bias_model/temp_contribution_counts_score.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_counts.bw
-rm no_bias_model/temp_contribution_counts_score.wig
+> no_bias_model/temp_contribution_counts_scores.wig
+wigToBigWig no_bias_model/temp_contribution_counts_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_counts.bw
+rm no_bias_model/temp_contribution_counts_scores.wig
 
 echo "Take average of bigwig files profile"
 wiggletools mean no_bias_model/fold_0/contribution_scores.profile_scores.bw \
@@ -148,9 +148,9 @@ no_bias_model/fold_1/contribution_scores.profile_scores.bw \
 no_bias_model/fold_2/contribution_scores.profile_scores.bw \
 no_bias_model/fold_3/contribution_scores.profile_scores.bw \
 no_bias_model/fold_4/contribution_scores.profile_scores.bw \
-> no_bias_model/temp_contribution_profile_score.wig
-wigToBigWig no_bias_model/temp_contribution_profile_score.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
-rm no_bias_model/temp_contribution_profile_score.wig
+> no_bias_model/temp_contribution_profile_scores.wig
+wigToBigWig no_bias_model/temp_contribution_profile_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
+rm no_bias_model/temp_contribution_profile_scores.wig
 
 avg_contribution_file=no_bias_model/${celltype}_averaged_contributions_counts.h5
 if [ -f "${avg_contribution_file}" ]; then

@@ -641,7 +641,7 @@ dev.off()
 
 # Take only significant regions ####
 DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
-
+saveRDS (GRanges(rownames(DAP_res_sig)), 'T_cell_exhaustion_peaks.rds')
 
 # Calculate hypergeometric test of peaks with motifs ####
 mm = getMatches (archp)

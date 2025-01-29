@@ -55,7 +55,7 @@ h5_profile_files = [
 
 # List of input H5 files
 #h5_files = ["file1.h5", "file2.h5", "file3.h5"]  # Replace with your file paths
-output_file = f"no_bias_model/{celltype}_averaged_contribution_score_counts.h5"
+output_file = f"no_bias_model/{celltype}_averaged_contribution_scores_counts.h5"
 
 #output_file = f"no_bias_model/{celltype}_averaged_nobias.h5"
 
@@ -78,7 +78,7 @@ with h5py.File(h5_counts_files[0], 'r') as ref_file:  # Use the first file as a 
 
 print(f"Averaged data saved in: {output_file}")
 
-output_file = f"no_bias_model/{celltype}_averaged_contribution_score_profile.h5"
+output_file = f"no_bias_model/{celltype}_averaged_contribution_scores_profile.h5"
 
 # Open all files in parallel and compute the average
 with h5py.File(h5_profile_files[0], 'r') as ref_file:  # Use the first file as a reference for structure

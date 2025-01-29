@@ -80,8 +80,8 @@ palette_expression = rev (as.character(paletteer::paletteer_c("grDevices::Purple
 #palette_deviation = paletteer::paletteer_c("grDevices::PuRd",20)
 palette_deviation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
 palette_deviation_ggplot_fill = paletteer::scale_fill_paletteer_c("ggthemes::Red-Black-White Diverging", direction=-1)
-palette_deviation_centered = colorRamp2(c(-4,-2,0,2,4), c(palette_deviation[1],palette_deviation[27],palette_deviation[44],palette_deviation[65],palette_deviation[100]))
-palette_deviation_centered = colorRamp2(c(-1,0,0,1,2,3,4), c('white','white','grey','#F69322FF','#C73370FF','purple','black'))
+palette_deviation_centered = colorRamp2(c(4,2,0,-2,-4), c(palette_deviation[1],palette_deviation[27],'white',palette_deviation[65],palette_deviation[100]))
+#palette_deviation_centered = colorRamp2(c(-1,0,0,1,2,3,4), c('white','white','grey','#F69322FF','#C73370FF','purple','black'))
 palette_deviation_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0, max(abs(x))), c(palette_deviation[length(palette_deviation)],'white',palette_deviation[1])))}
 palette_enrichment = rev (as.character(paletteer::paletteer_c("grDevices::Purples 3",100)))
 palette_hubs_accessibility = paletteer_c("ggthemes::Classic Orange-White-Blue",20)
