@@ -446,16 +446,20 @@ archp <- addGeneIntegrationMatrix (
     force = TRUE
 )
 
-palD <- paletteDiscrete (values = levels(as.factor(rnaCFd$celltype)))
-rna_p = DimPlot (rnaCFd, group.by = 'celltype')
+palD <- paletteDiscrete (values = levels(as.factor(srt$celltype)))
+
+rna_p = DimPlot (srt, group.by = 'celltype')
+
+pdf()
 int_p <- plotEmbedding(
     archp, 
     colorBy = "cellColData", 
     name = "predictedGroup_Un", 
     pal = palD
 )
-pdf (paste0 (projdir,'/Plots/RNA_integration_UMAPs.pdf'), width=15)
-wrap_plots (rna_p, umap_p2, int_p, ncol=3)
+dev.off()
+pdf (paste0 ('Plots/RNA_integration_UMAPs.pdf'), width=15)
+wrap_plots (rna_p, int_p, ncol=2)
 dev.off()
 
 

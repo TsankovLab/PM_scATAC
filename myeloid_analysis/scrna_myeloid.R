@@ -45,10 +45,10 @@ sample_names = c(
 sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14')
 #srt = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/srt.rds')
 #srt = srt[,srt$celltype_simplified %in% c('cDCs','MonoMac')]
-table (srt$celltype2)
 
 #saveRDS (srt, file.path ('srt.rds'))
 srt = readRDS ('srt.rds')
+table (srt$celltype2)
 
 archp = loadArchRProject (file.path('..','scatac_ArchR'))
 
@@ -105,10 +105,11 @@ if (!file.exists ('srt.rds'))
 	dev.off()
 	
 
-metaGroupName = 'seurat_clusters'
-if (file.exists ('DEG.rds'))
+metaGroupName = 'celltype2'
+if (!file.exists ('DEG.rds'))
 	{
 	DefaultAssay(srt) = 'RNA'
+	Idents(srt) = metaGroupName
 	logfcThreshold=.5
 	pvalAdjTrheshold = .05
 	degClusters = FindAllMarkers (srt, max.cells.per.ident = 1000, min.pct = .1, logfc.threshold = logfcThreshold, verbose = T)
@@ -142,7 +143,7 @@ srt2 = ScaleData (srt, features = unique(top_deg$gene))
 #if (is.na(as.integer(levels(srt@meta.data[,metaGroupName])))) Idents(srt2) = factor (srt2@meta.data[,metaGroupName], levels =unique(srt2@meta.data[,metaGroupName])[order(as.numeric(as.character(unique(srt2@meta.data[,metaGroupName]))))])
 #if (!is.na(is.integer(as.integer(srt@meta.data[,metaGroupName][1])))) Idents(srt2) = factor (srt2@meta.data[,metaGroupName], levels =unique(srt2@meta.data[,metaGroupName])[order(as.numeric(as.character(unique(srt2@meta.data[,metaGroupName]))))])
 heat_p = DoHeatmap (srt2, features = unique(top_deg$gene))
-png (file.path('Plots',paste0('top_',top_genes,'_heatmap.png')), height=15500, width=3300, res=400)
+png (file.path('Plots',paste0('top_',top_genes,'_heatmap.png')), height=10500, width=1300, res=400)
 print (heat_p)
 dev.off()
 rm (srt2)
@@ -196,6 +197,7 @@ k_list = c(5:10)
 k_selections = c(5:10)
 cores= 100
 
+# Run cNMF only in samples matching scATAC-seq samples 
 sams = unique (archp$Sample)
 sams = sams[sams %in% unique(srt$sampleID)]
 
@@ -214,6 +216,9 @@ for (sam in sams)
 
 
 ### Import and format spectra files ####
+sams = unique (archp$Sample)
+sams = sams[sams %in% unique(srt$sampleID)]
+
 k_selection = 10
 sams = sams[sams != 'P10'] # double check why P10 was not included
 cnmf_spectra_unique_l = list()
@@ -246,31 +251,35 @@ cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, fu
 # ov_mat = as.list(as.data.frame(ov_mat))
 force=FALSE
 if (!file.exists('shared_cnmf_myeloid.rds') | force)
-{
-cnmf_spectra_unique_l = unlist(cnmf_spectra_unique_l, recursive=F)
-ov_mat = ovmat (cnmf_spectra_unique_l, ov_threshold = 0.2, df=T) 
-km = kmeans (ov_mat, centers=10)
-ho = Heatmap (ov_mat,
-column_split =km$cluster , 
-row_split = km$cluster, 
-	col = viridis::inferno(100))
-pdf (file.path ('Plots','shared_cNMF_overlap.pdf'),width = 12,12)
-ho
-dev.off()
+	{
+	cnmf_spectra_unique_l = unlist(cnmf_spectra_unique_l, recursive=F)
+	ov_mat = ovmat (cnmf_spectra_unique_l, ov_threshold = 0.2, df=T) 
+	set.seed (1234)
+	km = kmeans (ov_mat, centers=10)
+	ho = Heatmap (ov_mat,
+	column_split =km$cluster , 
+	row_split = km$cluster, 
+		col = viridis::inferno(100))
+	pdf (file.path ('Plots','shared_cNMF_overlap2.pdf'),width = 12,12)
+	ho
+	dev.off()
+	
+	shared_cnmf = split (rownames(ov_mat), km$cluster)
+	overlap_cutoff = 2
+	shared_cnmf_genes = lapply (shared_cnmf, function(x) names(table (unlist(cnmf_spectra_unique_l[x]))[table (unlist(cnmf_spectra_unique_l[x])) > overlap_cutoff]))
+	shared_cnmf_genes = shared_cnmf_genes[sapply(shared_cnmf_genes, function(x) length(x) >0)]
+	names (shared_cnmf_genes) = paste0('cnmf.',names(shared_cnmf_genes))
+	# Remove cellcycle modules 
+	cellcycle_modules = c('cnmf.2','cnmf.7')
+	shared_cnmf_genes = shared_cnmf_genes[!names (shared_cnmf_genes) %in% cellcycle_modules]
+	saveRDS (shared_cnmf_genes, paste0 ('shared_cnmf_myeloid.rds'))
+	
+	} else {
+	
+	shared_cnmf_genes = readRDS ('shared_cnmf_myeloid.rds')
+	}
 
-shared_cnmf = split (rownames(ov_mat), km$cluster)
-overlap_cutoff = 2
-shared_cnmf_genes = lapply (shared_cnmf, function(x) names(table (unlist(cnmf_spectra_unique_l[x]))[table (unlist(cnmf_spectra_unique_l[x])) > overlap_cutoff]))
-shared_cnmf_genes = shared_cnmf_genes[sapply(shared_cnmf_genes, function(x) length(x) >0)]
-names (shared_cnmf_genes) = paste0('cnmf.',names(shared_cnmf_genes))
-saveRDS (shared_cnmf_genes, paste0 ('shared_cnmf_myeloid.rds'))
-
-} else {
-
-shared_cnmf_genes = readRDS ('shared_cnmf_myeloid.rds')
-}
-
-# Make PCA plot using module scores as features ####
+# Add modules to srt object and plot them on UMAPs ####
 srt = ModScoreCor (
     seurat_obj = srt, 
     geneset_list = shared_cnmf_genes, 
