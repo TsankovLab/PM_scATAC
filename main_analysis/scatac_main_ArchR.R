@@ -694,7 +694,6 @@ dev.off()
 #BiocManager::install("universalmotif")
 library ('universalmotif')
 
-
 # # Differential Accessed motifs ####
 metaGroupName = "celltype_lv1"
 force=FALSE
@@ -724,7 +723,7 @@ metaGroupName = 'celltype_simplified2'
 ps = log2(as.data.frame (AverageExpression (srt, 
 features = colnames(mMat_mg),
 group.by = metaGroupName)[[1]]) +1)
-#min_exp = .1
+min_exp = .1
 #ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
 #active_TFs = rownames(ps)[rowSums(ps) > 0]
 
@@ -746,7 +745,7 @@ list.files (file.path(chromBPdir, celltypes[3],'no_bias_model'))
 
 DAM_tf_l = list()
 sp_l = list()
-celltypes=c('SmoothMuscle','Mesothelium','Alveolar','Plasma','Fibroblasts','NK','Myeloid')
+celltypes=c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Myeloid','pDCs','T_cells','NK','B_cells','Plasma')
 ap1_complex = c('FOS','FOSL2','FOSL1','JDP2','JUN','JUND','JUNB','FOSB')
 
 for (celltype in celltypes)

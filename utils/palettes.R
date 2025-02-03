@@ -51,9 +51,10 @@ palette_bulk = setNames (as.character(paletteer::paletteer_d("rcartocolor::ArmyR
 palette_tnk_cells =setNames (as.character(paletteer::paletteer_d("tvthemes::Stark",n=6)), c('CD8','CD4','Tregs','NK_KLRC1','NK_FGFBP2','CD8_exhausted'))
 palette_tnk_cells['NK_KLRC1'] = 'black'
 #palette_tnk_cells['CD4'] = '#F9ECE8FF'
-palette_myeloid = rev(as.character(paletteer::paletteer_d("khroma::lapaz", 256)[c(1,40,80,120,150,190,210,230)]))
-palette_myeloid = setNames (as.character(paletteer::paletteer_d("khroma::lapaz", 256)[c(1,40,80,120,150,190,210,230,200)]),
-  c('C1Q','CC','cDCs','IFN','IL1B','IM','Mono','SPP1','TREM2'))
+palette_myeloid = rev (paletteer::paletteer_d("trekcolors::dominion"))
+palette_myeloid = setNames (as.character(palette_myeloid),
+  c('Monocytes','IFN','C1Q','SPP1','cDCs','TREM2','IM'))
+palette_myeloid2 = c(palette_myeloid[c('Monocytes','cDCs')], TAMs = 'gray')
 palette_protein_expression = c(low="darkblue",mid= "white",high= "darkgreen") 
 palette_feature_RNA = c('lightgrey',"#5F1415FF")
 palette_feature_protein = c("lightgrey", "darkgreen")

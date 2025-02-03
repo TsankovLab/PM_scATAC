@@ -38,7 +38,7 @@ archp = loadArchRProject (projdir)
 
   #archp = archp[!is.na(archp$celltype)]
 
-  # Dimensionality reduction and clustering
+# Dimensionality reduction and clustering
   varfeat = 25000
   LSI_method = 2
   archp = addIterativeLSI (ArchRProj = archp,
