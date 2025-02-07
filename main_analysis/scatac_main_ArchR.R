@@ -65,6 +65,9 @@ srt$celltype_simplified2[srt$celltype_simplified2 == 'pDC'] = 'pDCs'
 
 archp = loadArchRProject (projdir)
 
+# Set order of celltype for displaying purposes ####
+celltype_order = c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Endothelial','Myeloid','T_cells','NK','B_cells','Plasma','pDCs')
+
 #sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14','P10')
 #archp$Sample2 = archp$Sample
 #archp$Sample2 = factor (archp$Sample2, levels = sarc_order)
@@ -182,6 +185,147 @@ pdf (file.path('Plots','marker_genes_feature_plots_3.pdf'), width = 25, height =
 print (wrap_plots (p, ncol = 8))
 dev.off()
 
+# Generate CNV map for each sample ####
+
+# Get Granges of blacklist regions 
+blacklist = toGRanges (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/blacklisted_regions/ENCODE_blacklist/',"hg38-blacklist.v2.bed")) # taken from https://github.com/Boyle-Lab/Blacklist/tree/master/lists
+projdir_cnv = file.path('..','..','per_sample_QC_signac','CNV_analysis')
+dir.create (projdir_cnv)
+
+# Get GRanges of bins excluding black list regions
+ws = 10e5
+ws = 10e6
+ss = 10e5
+ss = 5e6
+if (!file.exists (file.path (projdir_cnv, paste0 ('windows_',ws,'_',ss,'.rds'))))
+  {
+  windows = makeWindows (genome = BSgenome.Hsapiens.UCSC.hg38, blacklist = blacklist,
+    windowSize = ws, slidingSize = ss)
+  saveRDS (windows, file.path (projdir_cnv, paste0 ('windows_',ws,'_',ss,'.rds')))
+  } else {
+  windows = readRDS (file.path (projdir_cnv, paste0 ('windows_',ws,'_',ss,'.rds')))
+  }
+
+deleted_chr = c('chr4','chr22','chr13')
+if (!exists ('fragments_l')) fragments_l = getFragmentsFromProject (archp)
+print_mat = F
+force=F
+# Loop per sample and run CNV analysis
+cnaObj_l = list()
+for (sam in sample_names)
+  {
+  # Run CNV analysis
+  #force=FALSE
+  if (!file.exists (file.path(projdir_cnv, paste0('CNV_LFC_GC_',sam,'_ws_',ws,'_ss_',ss,'.rds'))) | force)
+    {
+    cnaObj_l[[sam]] = scCNA (windows, fragments_l[[sam]], neighbors = 100, LFC = 1.5, FDR = 0.1, force = FALSE, remove = c("chrX","chrM","chrY"))
+    saveRDS(cnaObj_l[[sam]], file.path(projdir_cnv, paste0('CNV_LFC_GC_',sam,'_ws_',ws,'_ss_',ss,'.rds')))
+    } else {
+    message ('cnaObj found! loading...')
+    cnaObj_l[[sam]] = readRDS (file.path(projdir_cnv, paste0('CNV_LFC_GC_',sam,'_ws_',ws,'_ss_',ss,'.rds')))
+    }
+  }
+
+  # Get bins matching deleted chromosomes to assess ####
+  deleted_chr_mean = sapply (deleted_chr, function(x) 
+    colMeans (cnaObj@assays@data@listData[['z']][which(as.character(seqnames(cnaObj@rowRanges)) == x),]))
+  
+  # Attach CNV load and other CNV-related metrics to signac metadata per sample  
+  meta.data = deleted_chr_mean
+  rownames(meta.data) = colnames(cnaObj)
+  # meta.data = data.frame (
+  # row.names = colnames (cnaObj),
+  # #cnvload_z = rowSums (abs (t(cnaObj@assays@data@listData[['z']]))),
+  # #cnvload_lg = log2(rowSums (abs (t(cnaObj@assays@data@listData[['z']])))),
+  # cnvload_counts = rowSums(abs(t(cnaObj@assays@data@listData[['counts']]))),
+  # cCNV_score = log2(apply (t(cnaObj@assays@data@listData[['z']]),1, function (x) cCNV_score (x))+1),
+  
+
+  
+  #rownames(meta.data_df2) = sapply (rownames(meta.data_df2), function(x) unlist(strsplit (x,'\\.'))[2])
+  sgn_l[[sam]]@meta.data = sgn_l[[sam]]@meta.data[,!colnames(sgn_l[[sam]]@meta.data) %in% colnames(meta.data)]
+  sgn_l[[sam]]@meta.data = cbind (sgn_l[[sam]]@meta.data, meta.data[match(colnames(sgn_l[[sam]]), rownames(meta.data)),])
+
+  # Print CNV heatmap
+  malignant_cells = rownames(archp@cellColData)[archp$celltype_lv1 == 'Malignant']
+  for (sam in sample_names)
+    {
+    mat_type = 'z'
+    cnaObj_mat = t(cnaObj_l[[sam]]@assays@data@listData[[mat_type]])
+    colnames (cnaObj_mat) = paste0(seqnames(rowRanges(cnaObj_l[[sam]])),':', ranges(rowRanges(cnaObj_l[[sam]])))
+    rownames (cnaObj_mat) = paste0(sam,'#',colnames (cnaObj_l[[sam]]))
+    cnaObj_mat = cnaObj_mat[rownames(cnaObj_mat) %in% malignant_cells,]
+    cnaObj_mat[is.na(cnaObj_mat)] = 0
+    cnaObj_mat[is.infinite(cnaObj_mat)]= 0
+    # ha = HeatmapAnnotation (bar=row_ann,
+    #   which='row')
+    # #col_fun = colorRamp2(c(min(cnaObj_z), 2,max(cnaObj_z)), c("blue", "white", "red"))  
+    row_chr = gsub ('\\:.*','',colnames(cnaObj_mat))
+    row_chr = factor (row_chr, levels = unique (row_chr))
+    png (file.path('Plots', paste0('GL_method_',sam,'_',mat_type,'_gdn_heatmap.png')), width=1500,height=800)
+    print (Heatmap (cnaObj_mat, 
+    cluster_rows=T,#col=col_fun,
+    cluster_columns=F, 
+     #left_annotation = ha, 
+     #row_km = 2,
+    row_names_gp = gpar(fontsize = 0.01),column_names_gp = gpar(fontsize = 0.1),
+    column_split = row_chr,
+    column_gap = unit(2, "mm"),
+    cluster_column_slices = F,row_title_gp = gpar(fontsize = 1),column_title_rot=90))
+    dev.off()
+    }
+
+cnaMat_obj_l = list()
+for (sam in sample_names)
+    {
+    mat_type = 'z'
+    cnaObj_mat = t(cnaObj_l[[sam]]@assays@data@listData[[mat_type]])
+    colnames (cnaObj_mat) = paste0(seqnames(rowRanges(cnaObj_l[[sam]])),':', ranges(rowRanges(cnaObj_l[[sam]])))
+    bc = sub (paste0(sam,'#'), '', colnames(cnaObj_l[[sam]]))
+    rownames (cnaObj_mat) = paste0(sam,'#',bc)
+    cnaObj_mat = cnaObj_mat[rownames(cnaObj_mat) %in% malignant_cells,]
+    cnaObj_mat[is.na(cnaObj_mat)] = 0
+    cnaObj_mat[is.infinite(cnaObj_mat)]= 0
+    cnaMat_obj_l[[sam]] = cnaObj_mat
+    }
+cnaMat_obj_avg = lapply (cnaMat_obj_l, function(x) colMeans (x))
+cnaMat_obj_avg = do.call (cbind, cnaMat_obj_avg)
+ha = rowAnnotation (sample = colnames(cnaMat_obj_avg), col = list(sample = palette_sample))
+pdf (file.path('Plots', paste0('GL_method_',mat_type,'_CNV_heatmap.pdf')), width=6,height=3)
+    print (Heatmap (t(cnaMat_obj_avg), 
+    cluster_rows=F,#col=col_fun,
+    cluster_columns=F, 
+    left_annotation = ha, 
+    row_names_side = 'left',
+    column_title_side = 'bottom',
+    border=T,
+     #row_km = 2,
+    row_names_gp = gpar (fontsize = 8),
+    column_names_gp = gpar(fontsize = 0),
+    column_title_gp = gpar(fontsize = 7),
+    column_split = row_chr,
+    column_gap = unit(.5, "mm"),
+    cluster_column_slices = F,
+    row_title_gp = gpar(fontsize = 1),
+    column_title_rot=45))
+dev.off()
+
+
+
+
+cnv_cols = c('cnvload_z','cnvload_lg','cnvload_counts','cCNV_score')
+cnv_cols = c('chr22','chr13','chr4')
+fp = list()
+for (sam in sample_names)
+  {
+  fp[[sam]] = FeaturePlot (sgn_l[[sam]], feature = cnv_cols, combine=FALSE)
+  for (ft in 1:length(fp[[sam]])) {fp[[sam]][[ft]] = fp[[sam]][[ft]] + scale_colour_gradientn (colours = viridis::turbo(100),na.value="white")}
+  }
+pdf (file.path(projdir,'Plots','CNV_score_per_sample_umap.pdf'),width=10,height=5)
+lapply (sample_names, function(x) print (wrap_plots (fp[[x]])))
+dev.off()
+
+
 
 ### Run peak calling on celltype annotation ####
 # Add tumor sample info in celltype metagroup
@@ -230,13 +374,11 @@ if (run_chromVAR)
 
 
 ### ChromVAR based analysis ####
-run_chromVAR_analysis = FALSE
 
-if (run_chromVAR_analysis)
-  {
+
   # Find DAM ####
-  metaGroupName = "celltype_revised"
-  force = TRUE
+  metaGroupName = "celltype_lv1"
+  force = FALSE
   if (!file.exists (paste0('DAM_',metaGroupName,'.rds')) | force)
     {
     DAM_list = getMarkerFeatures (
@@ -266,7 +408,7 @@ if (run_chromVAR_analysis)
     DAM_list = lapply (DAM_list, function(x) {x$gene = gsub ('_.*','',x$gene); x})
     DAM_list = lapply (DAM_list, function(x) {x$gene = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", x$gene); x})    
     }
-  
+  DAM_list = DAM_list[celltype_order]
   # Filter by active genes as computed by correlation with gene score
   # active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > -Inf]
   # DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_genes,])
@@ -277,14 +419,14 @@ if (run_chromVAR_analysis)
     group.by = 'celltype_simplified2')[[1]]) +1)
   min_exp = 0.1
   ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
-  selected_TF = rownames(ps)[rowSums(ps) > 0]
+  active_TFs = rownames(ps)[rowSums(ps) > 0]
 
-  DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% selected_TF,])
+  DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])
 
   names (DAM_list2) = names (DAM_list)
   FDR_threshold = 1e-3
   meandiff_threshold = 0
-  top_genes = 3
+  top_genes = 5
   DAM_top_list = DAM_list2[sapply (DAM_list2, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$MeanDiff) > meandiff_threshold,]) > 0)]
   DAM_top_list = lapply (seq_along(DAM_top_list), function(x) {
     res = DAM_top_list[[x]]
@@ -302,135 +444,226 @@ if (run_chromVAR_analysis)
     })
   DAM_df = Reduce (rbind ,DAM_top_list)
   
-devMethod = 'ArchR'
- if (devMethod == 'ArchR')
-    {
-    TF_db='Motif'
-    if (!exists ('mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
-    mSE = mSE[, archp$cellNames]
-    rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
-    rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
-    }
-  DAM_df$gene = gsub ('_.*','',DAM_df$gene)
-  DAM_df$gene = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", DAM_df$gene)
-  mMat = assays (mSE)[[1]]
-  rownames (mMat) = rowData (mSE)$name
-  mMat_mg = mMat[DAM_df$gene, ]
-  mMat_mg = as.data.frame (t(mMat_mg))
-  mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
-  mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
-  rownames (mMat_mg) = mMat_mg[,1]
-  mMat_mg = mMat_mg[,-1]
-  mMat_mg = mMat_mg[names (DAM_list),]
-  #mMat_mg = mMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
-  DAM_hm = Heatmap (t(scale(mMat_mg)), 
-          row_labels = colnames (mMat_mg),
-          column_title = paste('top',top_genes),
-          clustering_distance_columns = 'euclidean',
-          clustering_distance_rows = 'euclidean',
-          cluster_rows = F,
-          #col = pals_heatmap[[5]],
-          cluster_columns=F,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
-          column_names_gp = gpar(fontsize = 8),
-          column_names_rot = 45,
-          name = 'chromVAR',
-          #rect_gp = gpar(col = "white", lwd = .5),
-          border=TRUE,
-          col = rev(palette_deviation)
+## Add column on DAM heatmap showing if TF is pioneer or not from chrombpnet ####
+## Show barplots of top TF occurrence using finemo chrombpnet outputs ####
 
-          #right_annotation = motif_ha
-          )
+### Compare TF expression from scRNA and inferred by chrombpnet per cell type ####
+# library (httr)
+# library (XML)
+# library (igraph)
+#BiocManager::install("universalmotif")
+library ('universalmotif')
+
+metaGroupName = 'celltype_lv1'
+if (!any (ls() == 'mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+#mMat_mg = mMat[DAM_df$gene, ]
+mMat_mg = as.data.frame (t(mMat))
+mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
+mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
+rownames (mMat_mg) = mMat_mg[,1]
+mMat_mg = mMat_mg[,-1]
+
+
+#Get active genes from RNA
+metaGroupName = 'celltype_simplified2'
+ps = log2(as.data.frame (AverageExpression (srt, 
+features = colnames(mMat_mg),
+group.by = metaGroupName)[[1]]) +1)
+min_exp = .1
+#ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
+#active_TFs = rownames(ps)[rowSums(ps) > 0]
+
+#active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > 0.1]
+#DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])    
+mMat_l = as.list (as.data.frame (t(mMat_mg)))
+mMat_l = lapply (mMat_l, function(x) data.frame (dev = x, row.names = colnames(mMat_mg)))
+#mMat_l = lapply (mMat_l, function(x) x[rownames(x) %in% active_TFs,,drop=F])
+
+metaGroupName = 'celltype_lv1'
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
+metaGroupName = 'celltype_lv1'
+celltypes = unique (archp@cellColData[,metaGroupName])
+
+tf_database = read_meme('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme', skip = 0, readsites = FALSE, readsites.meta = FALSE)
+tf_database = unique(unlist(lapply(tf_database, function(x) unlist(strsplit(x@name,'_'))[1])))
+
+list.files (file.path(chromBPdir, celltypes[3],'no_bias_model'))
+
+chrombpnet_counts = list()
+celltypes = unique (archp$celltype_lv1)
+for (celltype in celltypes)
+  {
+  message (paste0('reading finemo output for ', celltype))  
+  chrombpnet_counts[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
+  }
+  #chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
+  #chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
+  #chrombpnet_tf = rbind (chrombpnet_count_tf, chrombpnet_profile_tf)
+chrombpnet_counts2 = list()
+#ap1_complex = c('JUN','FOSB','FOS','BACH1','SMARCC1','FOSL2','JUND','JDP2','BATF','CEBPB','CEBPA','CEBPZ','FOSL1','NFE2','NFE2L2','NFE2L1')
+for (celltype in celltypes)
+  {
+  chrombpnet_counts_tmp = chrombpnet_counts[[celltype]]
+  chrombpnet_counts_tmp = table (  chrombpnet_counts_tmp$V4)[order(-table (  chrombpnet_counts_tmp$V4))]
+  assign_max_exp = unlist(sapply (names(chrombpnet_counts_tmp), function(x) unlist(strsplit(x, '_'))[which.max(ps[unlist(strsplit(x, '_')), celltype])]))
+  tf_dev = mMat_l[[celltype]][assign_max_exp,]
+  chrombpnet_counts_tmp2 = data.frame (occurrence =   chrombpnet_counts_tmp[names(assign_max_exp)], TF_max_exp = assign_max_exp, TF_max_dev = tf_dev)
+  #chrombpnet_counts_tmp2 = chrombpnet_counts_tmp2[!chrombpnet_counts_tmp2$TF_max_exp %in% ap1_complex,]
+  chrombpnet_counts_tmp2 = chrombpnet_counts_tmp2[!duplicated(chrombpnet_counts_tmp2$TF_max_exp),]
+  chrombpnet_counts_tmp2 = chrombpnet_counts_tmp2[chrombpnet_counts_tmp2$TF_max_exp %in% head(chrombpnet_counts_tmp2$TF_max_exp[order(-chrombpnet_counts_tmp2$TF_max_dev)],10),]
+  chrombpnet_counts_tmp2$celltype = celltype
+  chrombpnet_counts_tmp2$order = seq(nrow(chrombpnet_counts_tmp2))
+  chrombpnet_counts2[[celltype]] = chrombpnet_counts_tmp2
+  }
+
+chrombpnet_counts_df = do.call (rbind, chrombpnet_counts2)
+chrombpnet_counts_df = chrombpnet_counts_df %>% group_by (celltype) %>% mutate(Proportion = occurrence.Freq / sum(occurrence.Freq))
+chrombpnet_counts_df$TF_max_exp2 = chrombpnet_counts_df$TF_max_exp
+chrombpnet_counts_df$TF_max_exp[chrombpnet_counts_df$Proportion < 0.05] = ''
+chrombpnet_counts_df$TF_max_exp = factor (chrombpnet_counts_df$TF_max_exp, levels =unique(chrombpnet_counts_df$TF_max_exp))
+chrombpnet_counts_df$order = factor (chrombpnet_counts_df$order, levels =unique(chrombpnet_counts_df$order))
+# Create stacked bar plot with text beside each band
+bp = ggplot (chrombpnet_counts_df, aes(x = celltype, y = Proportion, fill = order)) +
+  geom_bar (stat = "identity", color = 'white') +
+  geom_text (aes(label = TF_max_exp), 
+            position = position_stack (vjust = 0.5), 
+            hjust = 0.5,  # Move text outside the bar
+            size = 3) + 
+  #coord_flip() +  # Flip to make text more readable
+  gtheme
+pdf (file.path ('Plots','chrombpnet_counts_TF_barplot.pdf'), width=7, height=4)
+bp
+dev.off()
+
+
+chrombpnet_profile = list()
+for (celltype in celltypes)
+  {
+  message (paste0('reading finemo output for ', celltype))  
+  chrombpnet_profile[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
+  }
+  #chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
+  #chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
+  #chrombpnet_tf = rbind (chrombpnet_count_tf, chrombpnet_profile_tf)
+chrombpnet_profile2 = list()
+for (celltype in celltypes)
+  {
+  chrombpnet_profile_tmp = chrombpnet_profile[[celltype]]
+    chrombpnet_profile_tmp = table (  chrombpnet_profile_tmp$V4)[order(-table (  chrombpnet_profile_tmp$V4))]
+  assign_max_exp = unlist(sapply (names(chrombpnet_profile_tmp), function(x) unlist(strsplit(x, '_'))[which.max(ps[unlist(strsplit(x, '_')), celltype])]))
+  tf_dev = mMat_l[[celltype]][assign_max_exp,]
+  chrombpnet_profile_tmp2 = data.frame (occurrence =   chrombpnet_profile_tmp[names(assign_max_exp)], TF_max_exp = assign_max_exp, TF_max_dev = tf_dev)
+  #chrombpnet_profile_tmp2 = chrombpnet_profile_tmp2[!chrombpnet_profile_tmp2$TF_max_exp %in% ap1_complex,]
+  chrombpnet_profile_tmp2 = chrombpnet_profile_tmp2[!duplicated(chrombpnet_profile_tmp2$TF_max_exp),]
+  chrombpnet_profile_tmp2 = chrombpnet_profile_tmp2[chrombpnet_profile_tmp2$TF_max_exp %in% head(chrombpnet_profile_tmp2$TF_max_exp[order(-chrombpnet_profile_tmp2$TF_max_dev)],10),]
+  chrombpnet_profile_tmp2$celltype = celltype
+  chrombpnet_profile_tmp2$order = seq(nrow(chrombpnet_profile_tmp2))
+  chrombpnet_profile2[[celltype]] = chrombpnet_profile_tmp2
+  }
+
+chrombpnet_profile_df = do.call (rbind, chrombpnet_profile2)
+chrombpnet_profile_df = chrombpnet_profile_df %>% group_by (celltype) %>% mutate(Proportion = occurrence.Freq / sum(occurrence.Freq))
+chrombpnet_profile_df$TF_max_exp2 = chrombpnet_profile_df$TF_max_exp
+chrombpnet_profile_df$TF_max_exp[chrombpnet_profile_df$Proportion < 0.05] = ''
+chrombpnet_profile_df$TF_max_exp = factor (chrombpnet_profile_df$TF_max_exp, levels =unique(chrombpnet_profile_df$TF_max_exp))
+chrombpnet_profile_df$order = factor (chrombpnet_profile_df$order, levels =unique(chrombpnet_profile_df$order))
+# Create stacked bar plot with text beside each band
+bp = ggplot (chrombpnet_profile_df, aes(x = celltype, y = Proportion, fill = order)) +
+  geom_bar (stat = "identity", color = 'white') +
+  geom_text (aes(label = TF_max_exp), 
+            position = position_stack (vjust = 0.5), 
+            hjust = 0.5,  # Move text outside the bar
+            size = 3) + 
+  #coord_flip() +  # Flip to make text more readable
+  gtheme
+pdf (file.path ('Plots','chrombpnet_profile_TF_barplot.pdf'), width=7, height=4)
+bp
+dev.off()
+
+
+
+# Assemble heatmap ####
+DAM_df$gene = gsub ('_.*','',DAM_df$gene)
+DAM_df$gene = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", DAM_df$gene)
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat_mg = mMat[DAM_df$gene, ]
+mMat_mg = as.data.frame (t(mMat_mg))
+mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
+mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
+rownames (mMat_mg) = mMat_mg[,1]
+mMat_mg = mMat_mg[,-1]
+mMat_mg = mMat_mg[names (DAM_list),]
+
+pioneer_tfs = unlist(lapply (split (DAM_df, DAM_df$comparison), function(x) x$gene[x$gene %in% unique(unlist(sapply(as.character(chrombpnet_counts2[[x$comparison[1]]]$occurrence.Var1), function(x) unlist(strsplit(x, '_')))))]))
+pioneer_profile_tfs = unlist(lapply (split (DAM_df, DAM_df$comparison), function(x) x$gene[x$gene %in% unique(unlist(sapply(as.character(chrombpnet_profile2[[x$comparison[1]]]$occurrence.Var1), function(x) unlist(strsplit(x, '_')))))]))
+ha = HeatmapAnnotation (counts = colnames(mMat_mg) %in% pioneer_tfs, profile = colnames(mMat_mg) %in% pioneer_profile_tfs,
+  col = list (counts = c(`FALSE` = 'white',`TRUE` = 'indianred4'), profile = c(`FALSE`= 'white', `TRUE`='indianred3')),
+   simple_anno_size = unit(.2, "cm"))
+#mMat_mg = mMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
+DAM_hm = Heatmap (scale(mMat_mg), 
+        top_annotation = ha,
+        row_labels = rownames (mMat_mg),
+        row_names_side = 'left',
+        column_title = paste('top',top_genes),
+        clustering_distance_columns = 'euclidean',
+        clustering_distance_rows = 'euclidean',
+        cluster_rows = F,
+        #col = pals_heatmap[[5]],
+        cluster_columns=F,#col = pals_heatmap[[1]],
+        row_names_gp = gpar(fontsize = 9),# fontface = 'italic'),
+        column_names_gp = gpar(fontsize = 7),
+        column_names_rot = 45,
+        name = 'chromVAR',
+        #rect_gp = gpar(col = "white", lwd = .5),
+        border=TRUE,
+        col = rev(palette_deviation)
+
+        #right_annotation = motif_ha
+        )
 
   #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
-pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmaps.pdf')), width = 3, height = 5)
+pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmaps.pdf')), width = 10, height = 3)
 print(DAM_hm)
 dev.off()
-}
 
 
-### Co-expression of TFs #### 
-metaGroupName = 'celltype_revised'
+
+# Make heatmap of TF by cell types ####
 if (!any (ls() == 'mSE')) mSE = fetch_mat (archp, 'Motif')
-
 all (colnames(mSE) == rownames(archp@cellColData))
-
-# # Get deviation matrix ####
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 
-# Filter by genes minimally expressed from scRNA (in at least 1 celltype) ####
-ps = log2(as.data.frame (AverageExpression (srt, 
-  features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
-  group.by = 'celltype_simplified2')[[1]]) +1)
-min_exp = 0.1
+# Filter for only expressed TFs ####
+metaGroupName = 'celltype_simplified2'
+ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
+min_exp = .1
 ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
-selected_TF = rownames(ps)[rowSums(ps) > 0]
-# positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0.1]
-mMat = mMat[selected_TF,]
+active_TFs = rownames(ps)
 
-# mMat_agg = as.data.frame (t(mMat))
-# mMat_agg$metaGroup = as.character (archp_meta[,metaGroupName])
-# mMat_agg = aggregate (.~ metaGroup, mMat_agg, mean)
-# rownames (mMat_agg) = mMat_agg[,1]
-# mMat_agg = mMat_agg[,-1]
-# mMat_agg = t(mMat_agg)
-# rownames (mMat_agg) = active_TF
-
-mMat_cor = cor (as.matrix(t(mMat)), method = 'pearson')
-#d = as.dist (1-cor(as.matrix(t(mMat))))
-
-#d = dist (mMat, method ='euclidean')
-#hc1 <- hclust(d, method = "complete" ) # Hierarchical clustering using Complete Linkage
-
-# row_filt = rowSums (mMat_cor) != 0
-# tf_name = rownames(mMat_cor)[row_filt]
-km = kmeans (mMat_cor, centers=20)
-
-pdf (file.path ('Plots','TF_modules.pdf'), width = 4,height=3)
-cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
-  #left_annotation = ha,
-  #rect_gp = gpar(type = "none"),
-  clustering_distance_rows='euclidean' ,
-  clustering_distance_columns = 'euclidean', 
-  col=palette_deviation_correlation, 
-  row_split = km$cluster,
-  column_split = km$cluster,
-  #row_km=2, 
-  #column_km=2,
-#  right_annotation = ha,
-  border=F,
-  row_names_gp = gpar(fontsize = 0),
-  column_names_gp = gpar(fontsize = 0)))#,
-  # ,
-  # cell_fun = function(j, i, x, y, w, h, fill) {
-  #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
-  #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
-#        }}))
-dev.off()
-
-pdf (file.path ('Plots','TF_modules.pdf'), width = 4,height=3)
-cor_mMat_hm
-dev.off()
-
-# Make heatmap of TF by cell types ####
+# highlight pan-TFs in heatmap
 pan_TF = c('TGIF2','TGIF1','NFKB2','SNAI2','TWIST2','HMGA2')
-ha = HeatmapAnnotation (celltype = archp$celltype_revised, col = list(celltype = palette_celltype_simplified))
+ha = HeatmapAnnotation (celltype = archp$celltype_lv1, col = list(celltype = palette_celltype_simplified))
+mMat = as.matrix (mMat)
+mMat2 = mMat[active_TFs,]
 ha2 = rowAnnotation (foo = anno_mark(at = match(pan_TF,rownames(mMat2)), 
     labels = pan_TF, labels_gp = gpar(fontsize = 6, fontface = 'italic')))
-mMat = as.matrix (mMat)
-mMat2 = mMat
+mMat2 = t(scale(t(mMat2)))
 mMat2[mMat2 > 1] = 1
 mMat2[mMat2 < -1] = -1
-pdf (file.path ('Plots','TF_modules_celltypes_heatmap.pdf'), width = 4,height=3)
-cor_mMat_hm = draw (Heatmap (t(scale(t(mMat2))),# row_km=15,
+pdf ()
+cor_mMat_hm = draw (Heatmap (#scale(t(scale(mMat2))),# row_km=15,
+  mMat2,
   top_annotation = ha,
   right_annotation = ha2,
   #left_annotation = ha,
   #rect_gp = gpar(type = "none"),
-  clustering_distance_rows='pearson' ,
+  clustering_distance_rows='pearson',
   clustering_distance_columns = 'pearson', 
-  col=palette_deviation_cor_fun, 
+  col=palette_deviation_correlation, 
   #column_split = km$cluster,
   row_km=3, 
   #column_km=2,
@@ -488,55 +721,6 @@ TF_p = lapply (paste0('mod_',unique(km$cluster)), function(x) plotEmbedding (
 pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 30,height=14)
 wrap_plots (TF_p, ncol=5)
 dev.off()
-
-#### make heatmap of all positively regulated TFs across cell types to find shared programs ####
-# # Get deviation matrix ####
-if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
-mMat = scale(assays (mSE)[[1]])
-rownames (mMat) = rowData (mSE)$name
-
-# Filter for only expressed TFs ####
-metaGroupName = 'celltype_simplified2'
-ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
-min_exp = .1
-active_TFs = rownames(ps)[rowSums(ps) > min_exp]
-mMat = mMat[active_TFs,]
-mMat = as.data.frame (t(mMat))
-#mMat$metaGroup = as.character (archp@cellColData[,metaGroupName])
-#mMat = aggregate (.~ metaGroup, mMat, mean)
-#rownames(mMat) = mMat[,1]
-#mMat = mMat[,-1]
-metaGroupName = 'celltype_lv1'
-ha = HeatmapAnnotation (celltype = as.character (archp@cellColData[,metaGroupName]), col=list(celltype = palette_celltype_simplified))
-DAM_hm = Heatmap (t(mMat), 
-          row_labels = colnames (mMat),
-          top_annotation = ha,
-          clustering_distance_columns = 'euclidean',
-          clustering_distance_rows = 'euclidean',
-          cluster_rows = T,
-          #col = pals_heatmap[[5]],
-          cluster_columns=T,#col = pals_heatmap[[1]],
-          row_names_gp = gpar (fontsize = 0),
-          column_names_gp = gpar(fontsize = 0),
-          column_names_rot = 45,
-          #rect_gp = gpar(col = "white", lwd = .5),
-          border=TRUE,
-          col = palette_deviation_centered
-          #right_annotation = motif_ha
-          )
-
-pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_all_TF_heatmaps.pdf')), width = 12.6, height = 5)
-print(DAM_hm)
-dev.off()
-
-
-
-
-
-
-
-
-
 
 
 ### Subset ArchR project ####
@@ -687,175 +871,4 @@ dev.off()
 
 
 
-### Compare TF expression from scRNA and inferred by chrombpnet per cell type ####
-# library (httr)
-# library (XML)
-# library (igraph)
-#BiocManager::install("universalmotif")
-library ('universalmotif')
-
-# # Differential Accessed motifs ####
-metaGroupName = "celltype_lv1"
-force=FALSE
-# source (file.path('..','..','git_repo','utils','DAM.R'))
-DAM_list = readRDS (paste0('DAM_',metaGroupName,'.rds'))
-DAM_list = lapply (DAM_list, function(x)
-       {
-       x$gene = gsub ('_.*','',x$gene)
-       x$gene = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", x$gene)
-       x
-       })
-
-metaGroupName = 'celltype_lv1'
-if (!any (ls() == 'mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-#mMat_mg = mMat[DAM_df$gene, ]
-mMat_mg = as.data.frame (t(mMat))
-mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
-mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
-rownames (mMat_mg) = mMat_mg[,1]
-mMat_mg = mMat_mg[,-1]
-
-
-#Get active genes from RNA
-metaGroupName = 'celltype_simplified2'
-ps = log2(as.data.frame (AverageExpression (srt, 
-features = colnames(mMat_mg),
-group.by = metaGroupName)[[1]]) +1)
-min_exp = .1
-#ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
-#active_TFs = rownames(ps)[rowSums(ps) > 0]
-
-#active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > 0.1]
-#DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])    
-mMat_l = as.list (as.data.frame (t(mMat_mg)))
-mMat_l = lapply (mMat_l, function(x) data.frame (dev = x, row.names = colnames(mMat_mg)))
-#mMat_l = lapply (mMat_l, function(x) x[rownames(x) %in% active_TFs,,drop=F])
-
-metaGroupName = 'celltype_lv1'
-chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
-metaGroupName = 'celltype_lv1'
-celltypes = unique (archp@cellColData[,metaGroupName])
-
-tf_database = read_meme('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme', skip = 0, readsites = FALSE, readsites.meta = FALSE)
-tf_database = unique(unlist(lapply(tf_database, function(x) unlist(strsplit(x@name,'_'))[1])))
-
-list.files (file.path(chromBPdir, celltypes[3],'no_bias_model'))
-
-DAM_tf_l = list()
-sp_l = list()
-celltypes=c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Myeloid','pDCs','T_cells','NK','B_cells','Plasma')
-ap1_complex = c('FOS','FOSL2','FOSL1','JDP2','JUN','JUND','JUNB','FOSB')
-
-for (celltype in celltypes)
-  {
-  message (paste0('reading finemo output for ', celltype))  
-  chrombpnet_count_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
-
-  chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
-  chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
-  chrombpnet_tf = rbind (chrombpnet_count_tf, chrombpnet_profile_tf)
-  chrombpnet_tf = chrombpnet_tf[!duplicated(chrombpnet_tf$V4),]
-  #DAM_tf = DAM_list2[[celltype]]
-  DAM_tf = mMat_l[[celltype]]
-  DAM_tf$expression = ps[rownames(DAM_tf), celltype]
-  DAM_tf = DAM_tf[order (-DAM_tf$dev),,drop=F]
-  DAM_tf = DAM_tf[!rownames(DAM_tf) %in% ap1_complex,]
-  DAM_tf = DAM_tf[DAM_tf$expression > min_exp,]
-  DAM_tf$pioneer = sapply (seq(nrow(DAM_tf)), function(x) rownames(DAM_tf)[x] %in% unlist(strsplit(chrombpnet_tf[, 'V4'],'_')))
-  DAM_tf$pioneer_TF = ifelse (DAM_tf$pioneer, rownames(DAM_tf),'')
-  DAM_tf$celltype = celltype
-  DAM_tf_l[[celltype]] = DAM_tf
-  }
-
-#DAM_tf_l = lapply (DAM_tf_l, function(x) x[order(-x$dev),,drop=F])
-DAM_tf2 = do.call (rbind, DAM_tf_l)
-DAM_tf2 = DAM_tf2[!DAM_tf2$pioneer_TF %in% ap1_complex,]
-DAM_tf3 = do.call (rbind, lapply (split(DAM_tf2, DAM_tf2$celltype), function(x){head(x[x$pioneer_TF !='',],10)}))
-DAM_tf2$alpha = ifelse (DAM_tf2$pioneer, 0.4,.2)
-sp_l = ggplot(DAM_tf2, aes(x = celltype, y = dev), linewidth=0.3) +  # x=1 makes it similar to a boxplot
-geom_jitter(shape=21, aes (fill = pioneer, alpha =alpha, size=expression),width = 0.2, color='white') +  # Jitter prevents overlap
-geom_text_repel(data = DAM_tf3, aes(label = pioneer_TF), 
-                size = 2, nudge_x = 0.2, na.rm = TRUE) +
-scale_fill_manual(values = c("TRUE" = "brown", "FALSE" = "grey")) +  # Custom colors
-gtheme_no_rot
-
-pdf (file.path ('Plots','Pioneer_TF_celltype_scatter.pdf'), height=4,width=10)
-sp_l
-dev.off()
-
-
-## Show barplots of top TF occurrence using finemo chrombpnet outputs ####
-chrombpnet_cl = list()
-for (celltype in celltypes)
-  {
-  message (paste0('reading finemo output for ', celltype))  
-  chrombpnet_count_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
-  #chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
-  #chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
-  #chrombpnet_tf = rbind (chrombpnet_count_tf, chrombpnet_profile_tf)
-  chrombpnet_tf = table (chrombpnet_count_tf$V4)[order(-table (chrombpnet_count_tf$V4))]
-  assign_max_exp = unlist(sapply (names(chrombpnet_tf), function(x) unlist(strsplit(x, '_'))[which.max(ps[unlist(strsplit(x, '_')), celltype])]))
-  tf_dev = mMat_l[[celltype]][assign_max_exp,]
-  chrombpnet_df = data.frame (occurrence = chrombpnet_tf[names(assign_max_exp)], TF_max_exp = assign_max_exp, TF_max_dev = tf_dev)
-  chrombpnet_df = chrombpnet_df[!chrombpnet_df$TF_max_exp %in% ap1_complex,]
-  chrombpnet_df = chrombpnet_df[!duplicated(chrombpnet_df$TF_max_exp),]
-  chrombpnet_df = chrombpnet_df[chrombpnet_df$TF_max_exp %in% head(chrombpnet_df$TF_max_exp[order(-chrombpnet_df$TF_max_dev)],5),]
-  chrombpnet_df$celltype = celltype
-  chrombpnet_df$order = seq(nrow(chrombpnet_df))
-  chrombpnet_cl[[celltype]] = chrombpnet_df
-  }
-
-chrombpnet_cl_df = do.call (rbind, chrombpnet_cl)
-chrombpnet_cl_df$TF_max_exp = factor (chrombpnet_cl_df$TF_max_exp, levels =unique(chrombpnet_cl_df$TF_max_exp))
-chrombpnet_cl_df$order = factor (chrombpnet_cl_df$order, levels =unique(chrombpnet_cl_df$order))
-# Create stacked bar plot with text beside each band
-bp = ggplot(chrombpnet_cl_df, aes(x = celltype, y = occurrence.Freq, fill = order)) +
-  geom_bar(stat = "identity", color = 'black') +
-  geom_text(aes(label = TF_max_exp), 
-            position = position_stack(vjust = 0.5), 
-            hjust = 0.4,  # Move text outside the bar
-            size = 4) + 
-  #coord_flip() +  # Flip to make text more readable
-  gtheme
-pdf (file.path ('Plots','chrombpnet_count_TF_barplot.pdf'))
-bp
-dev.off()
-
-chrombpnet_cl = list()
-for (celltype in celltypes)
-  {
-  message (paste0('reading finemo output for ', celltype))  
-  chrombpnet_count_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
-  #chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
-  #chrombpnet_profile_tf = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
-  #chrombpnet_tf = rbind (chrombpnet_count_tf, chrombpnet_profile_tf)
-  chrombpnet_tf = table (chrombpnet_count_tf$V4)[order(-table (chrombpnet_count_tf$V4))]
-  assign_max_exp = unlist(sapply (names(chrombpnet_tf), function(x) unlist(strsplit(x, '_'))[which.max(ps[unlist(strsplit(x, '_')), celltype])]))
-  tf_dev = mMat_l[[celltype]][assign_max_exp,]
-  chrombpnet_df = data.frame (occurrence = chrombpnet_tf[names(assign_max_exp)], TF_max_exp = assign_max_exp, TF_max_dev = tf_dev)
-  chrombpnet_df = chrombpnet_df[!chrombpnet_df$TF_max_exp %in% ap1_complex,]
-  chrombpnet_df = chrombpnet_df[!duplicated(chrombpnet_df$TF_max_exp),]
-  chrombpnet_df = chrombpnet_df[chrombpnet_df$TF_max_exp %in% head(chrombpnet_df$TF_max_exp[order(-chrombpnet_df$TF_max_dev)],5),]
-  chrombpnet_df$celltype = celltype
-  chrombpnet_df$order = seq(nrow(chrombpnet_df))
-  chrombpnet_cl[[celltype]] = chrombpnet_df
-  }
-
-chrombpnet_cl_df = do.call (rbind, chrombpnet_cl)
-chrombpnet_cl_df$TF_max_exp = factor (chrombpnet_cl_df$TF_max_exp, levels =unique(chrombpnet_cl_df$TF_max_exp))
-chrombpnet_cl_df$order = factor (chrombpnet_cl_df$order, levels =unique(chrombpnet_cl_df$order))
-# Create stacked bar plot with text beside each band
-bp = ggplot(chrombpnet_cl_df, aes(x = celltype, y = occurrence.Freq, fill = order)) +
-  geom_bar(stat = "identity", color = 'black') +
-  geom_text(aes(label = TF_max_exp), 
-            position = position_stack(vjust = 0.5), 
-            hjust = 0.4,  # Move text outside the bar
-            size = 4) + 
-  #coord_flip() +  # Flip to make text more readable
-  gtheme
-pdf (file.path ('Plots','chrombpnet_profile_TF_barplot.pdf'))
-bp
-dev.off()
 

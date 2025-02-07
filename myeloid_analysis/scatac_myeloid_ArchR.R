@@ -295,7 +295,7 @@ colnames (ps) = gsub ('-','_',colnames(ps))
 #ps = ps[, colnames(DAM_hm@matrix)]
 min_exp = .1
 ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
-active_TFs = rownames(ps)[rowSums(ps) > min_exp]
+active_TFs = rownames(ps)
 
 metaGroupName = 'celltype2'
 mMat_mg = mMat[active_DAM[active_DAM%in%active_TFs], ]

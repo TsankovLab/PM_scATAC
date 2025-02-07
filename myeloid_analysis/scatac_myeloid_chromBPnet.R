@@ -4,7 +4,7 @@ R
 set.seed(1234)
 
 ####### ANALYSIS of tumor compartment #######
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
@@ -28,12 +28,10 @@ addArchRGenome("hg38")
 
 archp = loadArchRProject (projdir)
 
-
-
 ### Call peaks with MACS2 by metaGroupName ####
-metaGroupName = 'celltype_lv1'
+archp$inflamed = ifelse (archp$mod_2 > 0,'inflamed','non_inflamed')
+metaGroupName = 'inflamed'
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
-
 
 # Run no bias chromBPnet model for each NKT cell subtype ####
 chromBPdir = file.path (projdir,'chromBPnet')
@@ -43,7 +41,7 @@ grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
 
 celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
-celltypes='B_cells'
+#celltypes='B_cells'
 for (celltype in celltypes)
 	{
 	command <- paste ("bsub -J", paste0(celltype,'_cBPnet'), 

@@ -7,7 +7,7 @@ source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Export bigiwg files ####
 #archp$celltype_status = paste0(archp$celltype2, '_', archp$status)
-metaGroupName = 'celltype_revised'
+metaGroupName = 'celltype_lv1'
 exp_bigwig = T
 if (exp_bigwig)
   {
@@ -34,7 +34,7 @@ if (!file.exists ('peak_regions.bed'))
 
 
 ### Hubs analysis #####
-metaGroupName = "celltype_revised"
+metaGroupName = "celltype_lv1"
 cor_cutoff = 0.3
 #max_dist = 12500
 max_dist = 12500
@@ -46,7 +46,7 @@ dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 
 # Generate cluster-aware knn groups ####
 k= 30
-metaGroupName = 'celltype_revised'
+metaGroupName = 'celltype_lv1'
 
 force = FALSE
 if (!file.exists(file.path (hubs_dir, paste0 ('KNNs_',metaGroupName,'k_',k,'.rds'))) | force)
@@ -83,6 +83,14 @@ pdf (file.path(hubs_dir, 'Plots',paste0('knn_',k,'.pdf')), height=5, width=5)
 umap_knn
 dev.off()
 
+
+
+### Run peak calling to define peak background ####
+metaGroupName = "celltype_lv1"
+force=FALSE
+peak_reproducibility=2
+if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source ('../../git_repo/utils/callPeaks.R')
+  
 
 # Run Co-accessibility ####
 run_coax = TRUE
@@ -122,7 +130,7 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
 
 
 # Generate matrix of fragment counts of hubs x metagroup ####
-metaGroupName = 'celltype_revised'
+metaGroupName = 'celltype_lv1'
 if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
@@ -163,7 +171,7 @@ dev.off()
 
 
 # Generate matrix of fragment counts of hubs x barcodes ####
-metaGroupName = 'celltype_revised'
+metaGroupName = 'celltype_lv1'
 if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_',metaGroupName,'_mat.rds'))))
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
@@ -190,10 +198,9 @@ hubsCell_mat = as.data.frame (hubsCell_mat)
 
 # Compute differential hub accessibility DHA ####
 library (presto)
-metaGroupName = 'celltype_revised'
+metaGroupName = 'celltype_lv1'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 res = wilcoxauc (log2(hubsCell_mat+1), as.character (archp@cellColData[,metaGroupName]))
-
 
 res_l = lapply (split (res, res$group), function(x){
   tmp = x[order (x$padj),]
@@ -207,15 +214,13 @@ c(HUB277 HUB77 HUB68 HUB32 HUB522 HUB5713 HUB26 HUB48 HUB6929 HUB1459 HUB16 HUB2
 HUB522 HUB5713 HUB277 HUB32 HUB68 HUB1459 HUB26 HUB16 HUB48 HUB77 HUB6929 HUB2371
 
 
-
-
 # Generate matrix of fragment counts of hubs x metagroup ####
-table (archp$celltype_revised)
-archp$compartment = archp$celltype_revised
-archp$compartment[archp$celltype_revised %in% c('Alveolar','Mesothelium','Malignant')] = 'epithelial'
-archp$compartment[archp$celltype_revised %in% c('Endothelial','Fibroblasts','SmoothMuscle')] = 'stroma'
-archp$compartment[archp$celltype_revised %in% c('Myeloid','pDCs')] = 'myeloid'
-archp$compartment[archp$celltype_revised %in% c('B_cells','NK','Plasma','T_cells')] = 'lymphoid'
+table (archp$celltype_lv1)
+archp$compartment = archp$celltype_lv1
+archp$compartment[archp$celltype_lv1 %in% c('Alveolar','Mesothelium','Malignant')] = 'epithelial'
+archp$compartment[archp$celltype_lv1 %in% c('Endothelial','Fibroblasts','SmoothMuscle')] = 'stroma'
+archp$compartment[archp$celltype_lv1 %in% c('Myeloid','pDCs')] = 'myeloid'
+archp$compartment[archp$celltype_lv1 %in% c('B_cells','NK','Plasma','T_cells')] = 'lymphoid'
 
 metaGroupName = 'compartment'
 if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
@@ -278,7 +283,7 @@ archp@cellColData = cbind(archp@cellColData, log2(hubsCell_mat[,c('HUB322'), dro
 #archp@cellColData = archp@cellColData[, -ncol(archp@cellColData)]
 p <- plotGroups(
   ArchRProj = archp, 
-  groupBy = "celltype_revised", 
+  groupBy = "celltype_lv1", 
   colorBy = "cellColData", 
   name = "HUB322",
   plotAs = "violin",
@@ -312,9 +317,9 @@ mMat_nz = t(as.matrix(mMat))[which(zero_val),]
 
 archp_meta = archp@cellColData
 archp_meta = archp_meta[which(zero_val),]
-hub_tf_cor = lapply (unique(archp@cellColData[,'celltype_revised']), function(x)
-  as.data.frame (t(cor (hub_nz[match(rownames(archp_meta)[as.character(archp_meta$celltype_revised) == x],
-    names(hub_nz))], mMat_nz[match(rownames(archp_meta)[as.character(archp_meta$celltype_revised) == x],
+hub_tf_cor = lapply (unique(archp@cellColData[,'celltype_lv1']), function(x)
+  as.data.frame (t(cor (hub_nz[match(rownames(archp_meta)[as.character(archp_meta$celltype_lv1) == x],
+    names(hub_nz))], mMat_nz[match(rownames(archp_meta)[as.character(archp_meta$celltype_lv1) == x],
     rownames(mMat_nz)),], method='spearman')))
   )
 hub_tf_cor = lapply (hub_tf_cor, function(x) x[order(-x[,1]),, drop=F])
@@ -323,7 +328,7 @@ head (hub_tf_cor[order (-hub_tf_cor[,1]),,drop=F],10)
 
 
 cor_df = data.frame (hub = hub_exp[which(zero_val)], tf = t(as.matrix(mMat))[which(zero_val),'ETS1'])
-cor_df$celltype = archp$celltype_revised[match(rownames(cor_df), rownames(archp@cellColData))]
+cor_df$celltype = archp$celltype_lv1[match(rownames(cor_df), rownames(archp@cellColData))]
 cor_df$sample = archp$Sample[match(rownames(cor_df), rownames(archp@cellColData))]
 
 cor (cor_df[cor_df$celltype == 'Malignant','hub'], cor_df[cor_df$celltype == 'Malignant','tf'])
@@ -343,69 +348,138 @@ dev.off()
 
 
 
-
-
-
-
-
-
-
-
-
-
-### TF Enrichment in hubs ####
-tf_match = getMatches (archp)
-colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-bg_peakSet = rowRanges (tf_match)
-mega_hubs = range (hubs_obj$hubsCollapsed[which (hubs_obj$hubs_id %in% c('HUB322'))])
-mega_hubs_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, mega_hubs))]
-#tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
-mega_hubs_TF =  hyperMotif (
-  selected_peaks = mega_hubs_peaks, 
-  motifmatch = tf_match)
-
-head (mega_hubs_TF, 20)
-
-
-
-
-
-# Compute differential hub accessibility DHA to check hub size normal vs tumor cells ####
+# Compare DHA to list of SE to validate approach ####
 library (presto)
-metaGroupName = 'celltype_revised'
+metaGroupName = 'celltype_lv1'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 res = wilcoxauc (log2(hubsCell_mat+1), as.character (archp@cellColData[,metaGroupName]))
 
 
 res_l = lapply (split (res, res$group), function(x){
-  tmp = x[order (x$padj),]
-  tmp
+  tmp = x[x$padj < 0.05,]
+  tmp[tmp$logFC > 1,]
 })
 
-# Generate boxplot 
-res2 = res[res$group == 'Malignant',]
-res2$group2 = as.character (sign (res2$logFC))
-res2$width = width (hubs_obj$hubsCollapsed)
-rp = ggplot (res2, aes(x = group2, y= width)) + geom_boxplot() + gtheme
 
-pdf (file.path (hubs_dir,'Plots','difference_width_tumor_normal_boxplot.pdf'))
-rp
+
+# Run hypergeometric test on SE database 2
+path = system.file (package="liftOver", "extdata", "hg38ToHg19.over.chain")
+ch = import.chain (path)
+SE_path = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/SEdb_ALL/'
+SE_regions = lapply (list.files(SE_path, pattern = '.bed'), function(x) {
+  y = read.table (paste0(SE_path,x), header=T, sep='\t')
+  y = y[,c(3:6)]
+  colnames (y) = c('chr','start','end','rank')
+  y = makeGRangesFromDataFrame (y)
+  })
+names(SE_regions) = list.files(SE_path, pattern = '.bed')
+SE_regions = SE_regions[grepl ('ENCODE', names(SE_regions))]
+
+hyper_SE_cluster2 = list()
+for (celltype in unique(archp$celltype_lv1))
+  {
+  bg = readRDS (file.path('PeakCalls',paste0(celltype,'-reproduciblePeaks.gr.rds')))
+  hubs_h38 = hubs_obj$hubsCollapsed[match(res_l[[celltype]]$feature, hubs_obj$hubs_id)]
+  seqlevelsStyle(hubs_h38) = "UCSC"  # necessary
+  hubs_h19 = unlist (liftOver (hubs_h38, ch))
+  q = sapply (SE_regions, function(x) 
+    {
+    q = countOverlaps (hubs_h19, x) 
+    q[q > 0] = 1
+    sum (q)
+    })
+  k = length (hubs_h19)
+  m = sapply (SE_regions, function(x) 
+    {
+    m = countOverlaps (bg, x) 
+    m[m > 0] = 1
+    sum(m)
+    })
+  n = length(bg) - m
+message (paste ('Run hyper tests for',celltype,' hubs'))
+hyper_SE = NULL
+for (i in 1:length(SE_regions))
+  {
+  hyper_SE[i] = phyper (q = q[i],m = m[i],n = n[i],k = k, lower.tail = FALSE, log.p = FALSE)
+  }
+hyper_SE_cluster2 [[celltype]] = -log10(p.adjust(hyper_SE))
+#hyper_SE_cluster2 [[celltype]][hyper_SE_cluster2 [[celltype]] < 0.05] = NA
+}
+
+hyper_SE_cluster_df = do.call (cbind, hyper_SE_cluster2)
+rownames (hyper_SE_cluster_df) = names(SE_regions)
+hyper_SE_cluster_df[is.infinite(hyper_SE_cluster_df)] = -99
+hyper_SE_cluster_df[hyper_SE_cluster_df == -99] = max (hyper_SE_cluster_df)
+hyper_SE_cluster_df[hyper_SE_cluster_df < -log10(0.05)] = NA
+rownames(hyper_SE_cluster_df) = sub ('ENCODE_','',rownames(hyper_SE_cluster_df))
+rownames(hyper_SE_cluster_df) = sub ('.bed','',rownames(hyper_SE_cluster_df))
+SE_hm2 = Heatmap (hyper_SE_cluster_df,
+        clustering_distance_columns = 'euclidean',
+        clustering_distance_rows = 'euclidean',
+        cluster_rows = T,
+        #col = pals_heatmap[[5]],
+        cluster_columns=T,#col = pals_heatmap[[1]],
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 10),
+        #rect_gp = gpar(col = "white", lwd = .5),
+        border=TRUE, 
+        col=viridis::viridis(100),
+        column_names_rot = 45)
+        #right_annotation = motif_ha
+        
+
+pdf (file.path('Plots', 'hyper_hub_SE.pdf'),width=5.5, height=5)
+SE_hm2
 dev.off()
 
 
 
 
+#### Compute P2G ####
+run_p2g_TF = TRUE
 
-# Look into mega hubs identified in P11 HOX- cluster ####
-# Map large hubs to UMAP ####
-hubsCell_mat = t(hubsCell_mat)[rownames(archp@cellColData),]
-archp@cellColData = cbind(archp@cellColData, hubsCell_mat[,c('HUB1','HUB2','HUB3','HUB4','HUB5','HUB6','HUB7','HUB8','HUB9','HUB10')])
-umap_p1 =  plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
- name = c('HUB1','HUB2','HUB3','HUB4','HUB5','HUB6','HUB7','HUB8','HUB9','HUB10'), embedding = "UMAP")
+    maxDist = 250000
+    archp = addPeak2GeneLinks(
+        ArchRProj = archp,
+        useMatrix = 'GeneScoreMatrix',
+        reducedDims = "IterativeLSI",
+        maxDist = maxDist
+    )
   
-pdf (file.path(hubs_dir,'Plots','megahubs_umap.pdf'), 15,15)
-wrap_plots (umap_p1, ncol=4)
+
+### Show example of hub ####
+
+pdf()
+#archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
+#metaGroupName = 'fetal_group'
+metaGroupName = 'celltype_lv1'
+meso_markers <- plotBrowserTrack2 (
+    ArchRProj = archp,#[!archp$Sample3 %in% c('P11_HOX')], 
+    sample_levels = celltype_order, 
+    #ylim = c(0,0.01),
+    groupBy = metaGroupName, 
+    #sample_levels = sample_sarc_order,
+    minCells = 10,
+    geneSymbol = 'WT1',
+    plotSummary = c("bulkTrack", "featureTrack", 
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
+    #pal = palette_sample,
+    #pal = palette_fetal,
+    threads=1,
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    #region = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub, hubs_obj$hubs_id)]),100000,100000),
+    upstream = 100000,
+    downstream = 100000,
+    loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    pal = palette_celltype_simplified,
+    #loops = getCoAccessibility (archp, corCutOff = 0.3,
+    #  returnLoops = TRUE),
+    useGroups= NULL
+)
 dev.off()
+plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('MPM_markers_inflamed_coveragePlots.pdf'),addDOC=F)
+  
 
 
 
@@ -418,82 +492,6 @@ dev.off()
 
 
 
-
-## Plot volcano plots ####
-res = size_comp_df
-logfcThreshold = 1
-pvalAdjTrheshold = 0.05
-res$sig = ifelse (abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold, 1,0)
-res$sig = res$sig * sign (res$logFC)
-res$sig = as.character (res$sig)
-res_filtered = res[abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold,]
-res_filtered = head (res_filtered$feature[order (-abs(res_filtered$logFC))],50)
-res$labels = ''
-res$labels[match (res_filtered, res$feature)] = res_filtered
-vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
-     geom_point(size=1, shape=19, aes (color = sig), alpha=.5) +
-     geom_vline(xintercept = logfcThreshold, linetype="dotted", 
-                 color = "grey20", size=1) +
-     geom_vline(xintercept = -logfcThreshold, linetype="dotted", 
-                 color = "grey20", size=1) +
-     geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dotted", 
-                 color = "grey20", size=1) + 
-     geom_text_repel (size=2, data = res, aes(label = labels)) + 
-     ggtitle ('Hubs differential accessibility') +
-     #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
-     scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + theme_light() +
-     facet_wrap (.~celltype, ncol=4)
-
-pdf (file.path (hubs_dir, 'Plots', 'DAH_volcano.pdf'),width = 14,height = 4)
-print (vp)
-dev.off()  
-
-
-
-# check hubs that are up across all normal vs tumor ####
-wlc_res_pos = lapply (wlc_res, function(x) x[x$logFC > 0,])
-wlc_res_pos = do.call (rbind, wlc_res_pos)
-head (table (wlc_res_pos$feature)[order(-table (wlc_res_pos$feature))])
-
-wlc_res_neg = lapply (wlc_res, function(x) x[x$logFC < 0,])
-wlc_res_neg = do.call (rbind, wlc_res_neg)
-head (table (wlc_res_neg$feature)[order(-table (wlc_res_neg$feature))])
-
-wlc_res_t = wlc_res[['T_cells']]
-head (wlc_res_t[order(wlc_res_t$logFC),],20)
-
-
-
-
-
-p2 <- plotGroups(
-    ArchRProj = archp, 
-    groupBy = metaGroupName2, 
-    colorBy = "cellColData", 
-    name = "TSSEnrichment",
-    plotAs = "violin",
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-p1 <- plotGroups(
-    ArchRProj = archp, 
-    groupBy = metaGroupName2, 
-    colorBy = "cellColData", 
-    name = "nFrags",
-    plotAs = "violin",
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-pdf (file.path ('Plots','QC-Sample-Statistics.pdf'), height=5)
-wrap_plots (p1, p2)
-dev.off()
-
-
-# Identify hubs with no annotated genes within 1MB ####
-hubs = hubs_obj$hubsCollapsed
-hubs_ext = extendGR (hubs, upstream = 1000000, downstream = 1000000)
-geneless_hubs = findOverlaps (hubs_ext, archp@geneAnnotation[[1]])
-hubs_ext[!1:length(hubs) %in% unique(queryHits(geneless_hubs))]
 
 
 

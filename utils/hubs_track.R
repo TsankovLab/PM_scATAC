@@ -421,7 +421,7 @@ plotBrowserTrack2 <- function(
     uniqueGroups <- unique(useGroups)
   }
   df$group <- factor(df$group, levels = uniqueGroups)
-  if (!is.null (sample_levels)) levels(df$group) = sample_levels[sample_levels %in% levels(df$group)]
+  if (!is.null (sample_levels))  df$group = factor(df$group, levels = sample_levels[sample_levels %in% levels(df$group)])
   title <- paste0(as.character(seqnames(region)),":", start(region)-1, "-", end(region), " ", title)
 
   allGroups <- gtools::mixedsort(unique(getCellColData(ArchRProj = ArchRProj, select = groupBy, drop = TRUE)))

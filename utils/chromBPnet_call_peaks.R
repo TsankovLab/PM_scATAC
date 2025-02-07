@@ -1,4 +1,5 @@
 if (!exists ('fragments')) fragments = unlist(getFragmentsFromProject (archp))
+dir.create ('chromBPnet')
 
 force = F
 for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))

@@ -274,19 +274,25 @@ write.csv (data.frame (barcode= rownames(archp@cellColData), celltype = archp$ce
 metaGroupName = 'celltype2'
 archp = addImputeWeights (archp)
 markers = c('GZMA','GZMB','PRF1','PDCD1','HAVCR2','CTLA4','TIGIT','KLRC1')
+activating_markers = c('GZMA','GZMB','GZMH','PRF1','ITGAE','ITGA1')
+inhibitory_markers = c('KIR3DL1','KIR2DL3')
+pdf()
 p2 <- plotGroups(
-    ArchRProj = archp, 
+    ArchRProj = archp,#[archp$celltype2 %in% c('NK_KLRC1','NK_FGFBP2')], 
     groupBy = metaGroupName, 
     colorBy = "GeneScoreMatrix", 
     name = markers,
     plotAs = "violin",
     alpha = 0.4,
+    imputeWeights = getImputeWeights(archp),
     addBoxPlot = TRUE,
     pal = palette_tnk_cells
    )
+dev.off()
 p2 = lapply (p2, function(x) x + gtheme)
-pdf (file.path ('Plots','NK_cytotoxicity_markers.pdf'))
-wrap_plots (p2)
+p2 = lapply (p2, function(x) {x$data = x$data[x$data[,1] %in% c('NK_FGFBP2','NK_KLRC1'),]; x})
+pdf (file.path ('Plots','NK_cytotoxicity_markers.pdf'), width=8,height=3)
+wrap_plots (p2, ncol=6)
 dev.off()
 
 
@@ -1607,7 +1613,7 @@ fold_numbers = c(0,1,2,3,4)
 ### Check expression of RUNX3 and CTCF predicted by chromBPnet
 pdf (file.path ('Plots','TF_exp_dotplots.pdf'), width=5, height=3)
 DotPlot (srt[,srt$celltype2 != 'Proliferating'], 
-  features= c('RUNX1','RUNX2','RUNX3','NR4A2','NR4A1','NR4A3'), group.by = 'celltype2') + gtheme
+  features= c('RUNX1','RUNX2','RUNX3','NR4A2','NR4A1','NR4A3','EGR2'), group.by = 'celltype2') + gtheme
 dev.off()
 
 deg_res = FindMarkers (srt, ident.1 = 'NK_KLRC1', ident.2 = 'NK_FGFBP2', group.by='celltype2')

@@ -101,7 +101,7 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))  
   }
 
-  ## Bind peak2genes results with hubs links ####
+## Run peak2genes results with hubs links ####
 run_p2g = T
   if (run_p2g)
     {
