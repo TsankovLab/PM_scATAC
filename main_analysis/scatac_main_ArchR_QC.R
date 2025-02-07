@@ -19,9 +19,7 @@ sample_names = c(
     'P23'
     )
 
-# Load last istance
-if (!file.exists ('Save-ArchR-Project.rds'))
-   {
+
     # Fix the fragment file of multiome sample by removing the header 
     #system ('zcat atac_fragments.tsv.gz | grep -v ^\# | bgzip > atac_fragments_fixed.tzv.gz')
     
@@ -163,7 +161,7 @@ dev.off()
 meso_markers = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
 meso_markers = meso_markers[meso_markers != 'IGHM']
 meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
-meso_markers = c('KRT19','CLDN5','COL1A1','HP','MYH11','SFTA3','LYZ','CD3E','GNLY','CD79A','VASH2','IGLL5')
+meso_markers = c('KRT19','HP','SFTA3','COL1A1','MYH11','CLDN5','LYZ','CD3E','GNLY','CD79A','IGLL5','VASH2')
 archp = addImputeWeights (archp)
 pdf()
 p <- plotEmbedding(
@@ -211,7 +209,3 @@ archp = saveArchRProject (archp, load = T)
 # Export cell annotation ####
 write.csv (data.frame (barcode = rownames(archp@cellColData), celltype = archp$celltype_revised), '../../git_repo/files/barcode_annotation.csv')
 
-
-} else {
-archp = loadArchRProject (projdir)
-}

@@ -155,9 +155,16 @@ if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.r
 hubsSample_mat = as.data.frame (hubsSample_mat)
 
 ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
+
+TF = 'WT1'
+int_genes = which (rownames(hubsSample_mat) %in% hubs_obj$hubs_id[grepl (TF, hubs_obj$hubsCollapsed$gene)])
+int_genes_label = paste0(hubs_obj$hubs_id, '_', hubs_obj$hubsCollapsed$gene)[grepl (TF, hubs_obj$hubsCollapsed$gene)]
+ha2 = HeatmapAnnotation(foo = anno_mark(at = int_genes, side = 'column',
+  labels_rot = 45,
+    labels = int_genes_label, labels_gp = gpar(fontsize = 7, fontface='italic')))
 hm = Heatmap (
   scale (t(hubsSample_mat)), 
-#  top_annotation = ha, 
+  bottom_annotation = ha2, 
   column_names_gp = gpar(fontsize = 0),
   show_column_dend = F,
   #row_dend_width = unit(5,'mm'),
@@ -165,7 +172,7 @@ hm = Heatmap (
   col = rev(palette_hubs_accessibility),
   border=T,
   name = 'Hubs')
-pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=3)
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=4)
 hm
 dev.off()
 
@@ -448,7 +455,7 @@ run_p2g_TF = TRUE
   
 
 ### Show example of hub ####
-
+TF = 'WT1'
 pdf()
 #archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
 #metaGroupName = 'fetal_group'
@@ -460,7 +467,7 @@ meso_markers <- plotBrowserTrack2 (
     groupBy = metaGroupName, 
     #sample_levels = sample_sarc_order,
     minCells = 10,
-    geneSymbol = 'WT1',
+    geneSymbol = TF,
     plotSummary = c("bulkTrack", "featureTrack", 
         "loopTrack","geneTrack", 
         "hubTrack",'hubregiontrack'),
@@ -469,7 +476,7 @@ meso_markers <- plotBrowserTrack2 (
     threads=1,
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub, hubs_obj$hubs_id)]),100000,100000),
-    upstream = 100000,
+    upstream = 150000,
     downstream = 100000,
     loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
     pal = palette_celltype_simplified,
@@ -478,8 +485,25 @@ meso_markers <- plotBrowserTrack2 (
     useGroups= NULL
 )
 dev.off()
-plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('MPM_markers_inflamed_coveragePlots.pdf'),addDOC=F)
+plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('MPM_markers_coveragePlots.pdf'),addDOC=F)
   
+
+metaGroupName = 'celltype_simplified2'
+top_dah = data.frame (
+gene = srt@assays$RNA@data[TF,],
+group = srt@meta.data[,metaGroupName])
+top_dah$group = factor (top_dah$group, levels = rev(celltype_order))
+top_dah = na.omit(top_dah)
+bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
+vlp + 
+bxpv + 
+scale_fill_manual (values = palette_celltype_simplified) +
+#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+gtheme_no_rot
+
+pdf (file.path ('Plots', paste0('scrna_',TF,'_boxplots.pdf')), height=4, width=4)
+bp
+dev.off()
 
 
 
