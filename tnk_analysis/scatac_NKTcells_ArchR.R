@@ -324,7 +324,7 @@ rownames(mMat) = rowData(mSE)$name
 
 # Filter by RNA expression ####
 metaGroupName = 'celltype2'
-active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
+active_TFs = exp_genes (srt, active_DAM, min_exp = 0.1, metaGroupName)
 mMat = mMat[active_TFs, ]
 
 #mMat_mg = mMat[active_DAM, ]
@@ -351,14 +351,14 @@ ps_tf = ps[active_DAM,]
           cluster_rows = F,
           #col = pals_heatmap[[5]],
           cluster_columns=F,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+          row_names_gp = gpar(fontsize = 8),
           column_names_gp = gpar(fontsize = 8),
           column_names_rot = 45,
           name = 'chromVAR',
           #rect_gp = gpar(col = "white", lwd = .5),
           border=TRUE,
-          col = rev(palette_deviation),
-          width = unit(2, "cm")
+          col = rev(palette_deviation)#,
+          #width = unit(2, "cm")
           #right_annotation = motif_ha
           )
 
@@ -398,7 +398,7 @@ TF_exp_selected_hm2 = Heatmap (ps_tf,
         border=T,
         width = unit(2, "cm"))
 
-pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 4,height=4)
+pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 3,height=4)
 draw (DAM_hm) # + TF_exp_selected_hm + TF_exp_selected_hm2)
 dev.off()
    
@@ -558,46 +558,6 @@ dev.off()
 
 
 
-# ridge plots of TF modules ####
-library (ggridges)
-library (ggplot2)
-library (viridis)
-#library(hrbrthemes)
-tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
-names (tf_modules) = paste0('mod_',unique(km$cluster))
-tf_modules = as.data.frame (do.call (cbind, tf_modules))
-all (rownames(tf_modules) == rownames(archp@cellColData))
-tf_modules$celltype2 = archp$celltype2
-tf_modules = gather (tf_modules, module, expression,1:centers)
-tf_modules$module = factor (tf_modules$module, levels = paste0('mod_',names (row_order (cor_mMat_hm))))
-
-# Plot
-# rp = lapply (paste0('mod_',unique(km$cluster)), function(x) 
-#   ggplot(tf_modules,  aes_string(x='Sample', y=x, fill='..x..')) +
-
-#   geom_vridgeline(stat="ydensity", trim=FALSE, alpha = 0.85, scale = 2, width=.10) +
-#   palette_deviation_ggplot_fill +
-#     theme_classic())
-# pdf (file.path ('Plots','TF_modules_ridge_plots.pdf'), width = 20,height=3)
-# wrap_plots (rp, ncol=5)
-# dev.off()
-
-dp = ggplot (tf_modules) +
-  geom_density(aes(x=expression,fill=celltype2),color='white',
-                      alpha = 0.6) +
-  # geom_vline(aes(xintercept = mean, group = tf_modules, linetype = Sample),
-  #            data = combined_sla_means) +
-  facet_wrap (~module, nrow = 5, scales = 'free',strip.position = "left") +
-  scale_fill_manual (values = palette_tnk_cells) +
-  gtheme_no_rot
-
-pdf (file.path ('Plots','TF_modules_ridge_plots2.pdf'), width = 7,height=5)
-dp
-dev.off()
-# colnames(TF_hm@ht_list$chromVAR@matrix)[unlist(column_order(TF_hm)[c('2','3','4','5')])]
-# which (colnames(mMat) == 'NR4A2')
-# sapply (column_order(TF_hm), function(x) 497 %in% x)
-
 
 # Differential Peaks in CD8 exhausted vs CD8 ####
 # Find DAP ####
@@ -644,9 +604,9 @@ colnames(mmMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames(mmMat))
 hyper_res = lapply (unique(km$cluster), function(mod) {
   module_peaks = rowRanges(mm)[which (rowSums (mmMat[,names(km$cluster[km$cluster == mod])]) > 0)]
   q = length (queryHits (findOverlaps (module_peaks, GRanges (rownames(DAP_res_sig)))))
-  n = length(getPeakSet(archp)) - length(GRanges (rownames(DAP_res_sig)))
-  m = length(GRanges (rownames(DAP_res_sig)))
-  k = length(module_peaks)
+  n = length (getPeakSet(archp)) - length(GRanges (rownames(DAP_res_sig)))
+  m = length (GRanges (rownames(DAP_res_sig)))
+  k = length (module_peaks)
   #hyper_res[[mod]] = 
   print (phyper (q, m, n, k, lower.tail = FALSE, log.p = FALSE))
   })
@@ -676,7 +636,7 @@ hyper_res_TF_df = data.frame (hyper = unlist(hyper_res_TF), TF= names(km$cluster
 hyper_res_TF_df = hyper_res_TF_df[order(hyper_res_TF_df$hyper), ]
 
 # Barplot of enriched TFs in ext module enrichment in CD8 ext peaks ####
-hyper_res_TF_df$pval= -log10(hyper_res_TF_df$hyper+1e-9)
+hyper_res_TF_df$pval= -log10(hyper_res_TF_df$hyper)#+1e-9)
 hyper_res_TF_df$TF = factor (hyper_res_TF_df$TF, levels = rev(hyper_res_TF_df$TF))
 top_TF = 13
 hyper_res_TF_df$label = ifelse (hyper_res_TF_df$TF %in% head(hyper_res_TF_df$TF, top_TF), as.character(head(hyper_res_TF_df$TF, top_TF)), '')
@@ -684,18 +644,18 @@ hyper_res_TF_df$label = ifelse (hyper_res_TF_df$TF %in% head(hyper_res_TF_df$TF,
 bp = ggplot (head(hyper_res_TF_df,50), aes (x = TF, y = pval, fill = pval)) + 
 geom_bar (stat = 'identity') + 
 scale_fill_gradient(low = "white", high = "darkred") +
-geom_text(aes(label = label, y = pval + .1), hjust = -0.05,na.rm = TRUE, angle=0,size=3, fontface = "italic") +
-ylim (c(0,11.5)) +
+geom_text(aes(label = label, y = pval + .1), hjust = -0.05,na.rm = TRUE, angle=0,size=3) +
+#ylim (c(0,11.5)) +
 gtheme_no_rot + 
 theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
 coord_flip()
 
-pdf (file.path ('Plots','TF_in_module_enrichments2.pdf'), width=4,height=7)
+pdf (file.path ('Plots','TF_in_module_enrichments3.pdf'), width=3,height=7)
 bp
 dev.off()
 
 
-# Compute co-occurrence of ext TFs ####
+# Compute co-occurrence of exthausted TFs ####
 TFs = names(km$cluster)[km$cluster == 1]
 motifMat = getPositions (archp)
 matches = getMatches (archp)
@@ -735,7 +695,7 @@ pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps2.pdf'), width = 6,heig
 cooc_hm 
 dev.off()
 
-# Compute co-occurrence of ext TFs in ext peaks ####
+# Compute co-occurrence of exthausted TFs in exthausted peaks ####
 TFs = as.character(head(hyper_res_TF_df$TF, top_TF))
 motifMat = getPositions (archp)
 matches = getMatches (archp)
@@ -824,80 +784,80 @@ dev.off()
 tf_ext = names (km$cluster[km$cluster == 1])
 
 # # Take highest mean of NK KLRC1 + CD8 exhausted TFs ####
-# metaGroupName = 'celltype2'
+metaGroupName = 'celltype2'
 
-# if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
-# mMat = assays (mSE)[[1]]
-# rownames (mMat) = rowData (mSE)$name
-# mMat = mMat[selected_TF,]
-# mMat = as.data.frame (mMat)
+if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = scale(mMat[tf_ext,])
+mMat = as.data.frame (mMat)
 
-# mMat_mg = as.data.frame (t(mMat))
-# mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
-# mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
-# rownames (mMat_mg) = mMat_mg[,1]
-# mMat_mg = mMat_mg[,-1]
-# mMat_mg = t (mMat_mg)
+mMat_mg = as.data.frame (t(mMat))
+mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
+mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
+rownames (mMat_mg) = mMat_mg[,1]
+mMat_mg = mMat_mg[,-1]
+mMat_mg = t (mMat_mg)
 
-# ext_vs_ctx_mean = rowMeans (mMat_mg[,c('CD8_exhausted','NK_KLRC1')])
-# ext_vs_ctx_mean = ext_vs_ctx_mean[order (-ext_vs_ctx_mean)]
-# selected_ext_TF = names(ext_vs_ctx_mean[names(ext_vs_ctx_mean) %in% tf_ext])
+ext_vs_ctx_mean = rowMeans (mMat_mg[,c('CD8_exhausted','NK_KLRC1')])
+ext_vs_ctx_mean = ext_vs_ctx_mean[order (-ext_vs_ctx_mean)]
 
-
-# #mMat_mg = mMat_mg[names (DAM_list),]
-
-# ps = log2(as.data.frame (AverageExpression (srt, features = selected_ext_TF, group.by = metaGroupName)[[1]]) +1)
-# colnames (ps) = gsub ('-','_',colnames(ps))
-# #ps = ps[, colnames(DAM_hm@matrix)]
-# ps_tf = ps[selected_ext_TF,c('CD8_exhausted','NK_KLRC1')]
-# ps_tf_mean = rowMeans(ps_tf)
-# top_exp_tf = head(names(ps_tf_mean)[order(-ps_tf_mean)],10)
-# mMat_mg = mMat_mg[selected_ext_TF,c('CD8_exhausted','NK_KLRC1')]
+ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat_mg), group.by = metaGroupName)[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+#ps = ps[, colnames(DAM_hm@matrix)]
+ps_tf = ps[tf_ext,c('CD8_exhausted','NK_KLRC1')]
+ps_tf_mean = rowMeans(ps_tf)
+top_exp_tf = head(names(ps_tf_mean)[order(-ps_tf_mean)],10)
+mMat_mg = mMat_mg[tf_ext,c('CD8_exhausted','NK_KLRC1')]
 
 
 
-# # Import table of cor tfs to KLRC1 and PDCD1 in nk and cd8
-# nk_cd8_ext_cor = read.csv (file.path('..','scrna','nk_cd8_ext_cor.csv'), row.names=1)
+# Import table of cor tfs to KLRC1 and PDCD1 in nk and cd8
+#nk_cd8_ext_cor = read.csv (file.path('..','scrna','nk_cd8_ext_cor.csv'), row.names=1)
 
-# cd8_bar = HeatmapAnnotation (mark = anno_mark(at = match(top_exp_tf,names(ps_tf_mean)), 
-#   labels_gp=gpar(fontsize = 6, fontface = 'italic'), 
-#     labels = top_exp_tf,side='left'),  
-# '  ' = anno_barplot (-ps_tf[,c('CD8_exhausted')],border=F,gp = gpar(color = "white")),
-#   ' ' = nk_cd8_ext_cor[rownames(ps_tf), 'cd8'],
-#   which='row', col=list(' ' = palette_expression_cor_fun),
-#    simple_anno_size = unit(.2, "cm"))
-# nk_bar = HeatmapAnnotation (
-#   ' ' = nk_cd8_ext_cor[rownames(ps_tf), 'nk'],
-#   '  ' = anno_barplot(ps_tf[,c('NK_KLRC1')],border=F,gp = gpar(color = "white")), which='row',
-#    col=list(' ' = palette_expression_cor_fun),
-#     simple_anno_size = unit(.2, "cm"))
+cd8_bar = HeatmapAnnotation (mark = anno_mark(at = match(top_exp_tf,names(ext_vs_ctx_mean)), 
+  labels_gp=gpar(fontsize = 6), 
+  labels_rot = 45,
+  labels = top_exp_tf,side='top'),  
+  ' ' = anno_barplot (ps_tf[names(ext_vs_ctx_mean),c('CD8_exhausted')],border=F,gp = gpar(color = "white")),
+#  ' ' = nk_cd8_ext_cor[rownames(ps_tf), 'cd8'],
+  #which='row', 
+  col=list(' ' = palette_expression_cor_fun),
+  simple_anno_size = unit(.2, "cm"))
+nk_bar = HeatmapAnnotation (
+  #'' = nk_cd8_ext_cor[rownames(ps_tf), 'nk'],
+  ' ' = anno_barplot(-ps_tf[names(ext_vs_ctx_mean),c('NK_KLRC1')],
+    border=F,gp = gpar(color = "white")), 
+  #which='row',
+   col=list(' ' = palette_expression_cor_fun),
+    simple_anno_size = unit(.2, "cm"))
 
-# TF_hm = Heatmap (mMat_mg, 
-#           #row_labels = colnames (mMat_mg),
-#           #column_title = paste('top',top_genes),
-#           clustering_distance_columns = 'euclidean',
-#           clustering_distance_rows = 'euclidean',
-#           cluster_rows = F,
-#           left_annotation = cd8_bar,
-#           right_annotation = nk_bar,
-#           row_names_side = 'left',
-#           #column_km = 20,
-#           #col = pals_heatmap[[5]],
-#           cluster_columns=F,#col = pals_heatmap[[1]],
-#           row_names_gp = gpar(fontsize = 0, fontface = 'italic'),
-#           column_names_gp = gpar(fontsize = 8),
-#           column_names_rot = 45,
-#           name = 'chromVAR',
-#           #rect_gp = gpar(col = "white", lwd = .5),
-#           border=TRUE,
-#           col = palette_deviation_fun (mMat_mg[selected_ext_TF,])#,
-#           #width = unit(1, "cm")
-#           #right_annotation = motif_ha
-#           )
+TF_hm = Heatmap (t(mMat_mg[names(ext_vs_ctx_mean),]), 
+          #row_labels = colnames (mMat_mg),
+          #column_title = paste('top',top_genes),
+          #clustering_distance_columns = 'euclidean',
+          #clustering_distance_rows = 'euclidean',
+          cluster_rows = F,
+          top_annotation = cd8_bar,
+          bottom_annotation = nk_bar,
+          row_names_side = 'left',
+          #column_km = 20,
+          #col = pals_heatmap[[5]],
+          cluster_columns=F,#col = pals_heatmap[[1]],
+          row_names_gp = gpar(fontsize = 8),
+          column_names_gp = gpar(fontsize = 0),
+          column_names_rot = 45,
+          name = 'TF activity',
+          #rect_gp = gpar(col = "white", lwd = .5),
+          border=TRUE,
+          col = palette_deviation_fun (mMat_mg)#,
+          #width = unit(1, "cm")
+          #right_annotation = motif_ha
+          )
 
-# pdf (file.path ('Plots','chromvar_rna_expression_NK_CD8_EXT_heatmaps.pdf'), width = 3,height=5)
-# draw (TF_hm)# + TF_exp_selected_hm2)
-# dev.off()
+pdf (file.path ('Plots','chromvar_rna_expression_NK_CD8_EXT_heatmaps2.pdf'), width = 5,height=2.5)
+draw (TF_hm)# + TF_exp_selected_hm2)
+dev.off()
    
 
 
@@ -1005,9 +965,9 @@ ext_TF_df$TF_mean = rowMeans (ext_TF_df[,c('CD8_exhausted', 'NK_KLRC1')])
 ext_TF_df$label = ''
 ext_TF_df$label[match (head(rownames(ext_TF_df)[order(-ext_TF_df$TF_mean)],10),rownames(ext_TF_df))] = head(rownames(ext_TF_df)[order(-ext_TF_df$TF_mean)],10)
 #ext_TF_df$logFC_exp = res_combined$logFC_exp[match (rownames(ext_TF_df),res_combined$feature)]
-custom_palette <- c("white", "red", "white")
+custom_palette <- c("white",'navyblue', "white")
 vp = ggplot (ext_TF_df, aes(x=CD8_exhausted, y= NK_KLRC1)) +
-    geom_point(shape=21, aes (fill = exp_diff, size = exp_mean), alpha=.5) +
+    geom_point(shape=21, aes (fill = exp_diff, size = exp_mean)) +
     geom_text_repel (size=2, aes(label = label),segment.size=.2) + 
   scale_fill_gradientn(
     colors = custom_palette,   # Custom colors
@@ -1021,7 +981,7 @@ vp = ggplot (ext_TF_df, aes(x=CD8_exhausted, y= NK_KLRC1)) +
     # scale_fill_manual (values = c(ns='grey77',Naive='green',Ext='red')) + 
     gtheme_no_rot
 
-pdf (file.path ('Plots', 'top_dysfunctional_scatter2.pdf'),height=3,width=5)
+pdf (file.path ('Plots', 'top_dysfunctional_scatter3.pdf'),height=3,width=4.5)
 vp
 dev.off()
 
@@ -1314,7 +1274,7 @@ dev.off()
 
 
 
-### Find all peaks around ext TFs and correlate accessibility and RNA expression across celltype pseudobulks ####
+### Find all peaks around exhausted TFs and correlate accessibility and RNA expression across celltype pseudobulks ####
 metaGroupName = 'celltype2'
 TF = read.csv ('exhausted_TF_rna.csv')
 TF = c('NR4A2','RUNX2') # include only those that show balanced expression between NK KLRC1 and CD8 ext
@@ -1331,7 +1291,7 @@ gene_regions_extended = GRangesList (lapply (seq_along(gene_regions), function(x
 gene_regions_peaks = lapply (seq_along(gene_regions), function(x) queryHits (findOverlaps(getPeakSet(archp), gene_regions_extended[x])))
 gene_regions_peaks = lapply (gene_regions_peaks, function(x) getPeakSet(archp)[x])
 
-force = TRUE
+force = FALSE
 if (!file.exists ('pMats.rds') | force)
   {
   pMats = lapply (gene_regions_peaks, function(x) getGroupSE(
@@ -1370,7 +1330,7 @@ peak_gene_cor = lapply (gene_regions$symbol, function(x) cor (t(pMats2[[x]]), t(
 peak_gene_cor = lapply (peak_gene_cor, function(x) x[order(-x[,1]),,drop=F])
 names (peak_gene_cor) = gene_regions$symbol
 
-top_e = 3
+top_e = 5
 peak_gene_cor = lapply (names(peak_gene_cor), function(x) {
   peak_gene_cor[[x]] = as.data.frame (peak_gene_cor[[x]])
   gr = GRanges (rownames(peak_gene_cor[[x]]))
@@ -1397,7 +1357,7 @@ vp = lapply (names(peak_gene_cor), function(x)
     geom_label_repel (size=3, color='grey22', aes(label = name), segment.size=.2) + gtheme_no_rot
     })
 
-pdf (file.path ('Plots','enhancers_distance_ext_TF2.pdf'),width=7,height=3)
+pdf (file.path ('Plots','enhancers_distance_ext_TF3.pdf'),width=7,height=3)
 vp
 dev.off()
 
@@ -1457,6 +1417,7 @@ meso_markers <- plotBrowserTrack2 (
     plotSummary = c("bulkTrack", "featureTrack", 
         "loopTrack","geneTrack", 
         "hubTrack",'hubregiontrack'),
+    hubs_regions = hubs_obj$hubsCollapsed,
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
     upstream = 50000,
@@ -1536,6 +1497,7 @@ meso_markers <- plotBrowserTrack2 (
         plotSummary = c("bulkTrack", "featureTrack", 
         "loopTrack","geneTrack", 
         "hubTrack",'hubregiontrack'),
+        hubs_regions = hubs_obj$hubsCollapsed,
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
     upstream = 100000,

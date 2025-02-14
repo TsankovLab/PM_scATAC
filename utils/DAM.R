@@ -99,7 +99,7 @@
           row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
           column_names_gp = gpar(fontsize = 8),
           column_names_rot = 45,
-          name = 'chromVAR',
+          name = 'TF activity',
           #rect_gp = gpar(col = "white", lwd = .5),
           border=TRUE,
           col = palette_deviation_fun(scale(mMat_mg))

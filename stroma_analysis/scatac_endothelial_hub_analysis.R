@@ -171,6 +171,7 @@ meso_markers <- plotBrowserTrack2 (
     #group_order = sample_levels, 
     ylim = c(0,0.30),
     groupBy = metaGroupName, 
+    hubs_regions = hubs_obj$hubsCollapsed,
     #sample_levels = sample_sarc_order,
     minCells = 10,
     geneSymbol = TF,

@@ -94,7 +94,7 @@ if (run_coax)
   }
 
 ### Run hub finder ####
-force=T
+force=F
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (
@@ -198,41 +198,42 @@ res = res[res$logFC > 0,]
 res_df = lapply (split (res, res$group), function(x) x[order(x$padj),])
 res_df = do.call (rbind, res_df)
 res_df$genes = hubs_obj$hubsCollapsed$gene[match(res_df$feature, hubs_obj$hubs_id)]
-res_df[unlist(sapply (TF_order$gene, function(x) (which(grepl (x, res_df$genes))))),]
+head (res_df[res_df$group == 'LEC',])
 
 
 
-## Plot volcano plots ####
-res = size_comp_df
-logfcThreshold = 1
-pvalAdjTrheshold = 0.05
-res$sig = ifelse (abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold, 1,0)
-res$sig = res$sig * sign (res$logFC)
-res$sig = as.character (res$sig)
-res_filtered = res[abs(res$logFC) > logfcThreshold & res$padj < pvalAdjTrheshold,]
-res_filtered = head (res_filtered$feature[order (-abs(res_filtered$logFC))],50)
-res$labels = ''
-res$labels[match (res_filtered, res$feature)] = res_filtered
-vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
-    geom_point(size=1, shape=19, aes (color = sig), alpha=.5) +
-    geom_vline(xintercept = logfcThreshold, linetype="dotted", 
-                color = "grey20", size=1) +
-    geom_vline(xintercept = -logfcThreshold, linetype="dotted", 
-                color = "grey20", size=1) +
-    geom_hline(yintercept = -log10(pvalAdjTrheshold), linetype="dotted", 
-                color = "grey20", size=1) + 
-    geom_text_repel (size=2, data = res, aes(label = labels)) + 
-    ggtitle ('Hubs differential accessibility') +
-    #geom_label_repel (size=2,max.overlaps=10000, data = deg2_cl, aes(label = show_genes), color='red') + 
-    scale_color_manual (values = c("0"='grey77',"-1"='#666666FF',"1"='#F8A02EFF')) + gtheme_no_rot# +
-    #facet_wrap (.~celltype, ncol=4)
+TF = 'ETS1'
+TF = 'MIR4777'
+metaGroupName = 'celltype'
 
-pdf (file.path (hubs_dir, 'DAH_volcano.pdf'),width = 14,height = 4)
-print (vp)
-dev.off()  
-    
-
-
-
-
-
+pdf()
+#archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
+#metaGroupName = 'fetal_group'
+meso_markers <- plotBrowserTrack2 (
+    ArchRProj = archp,#[!archp$Sample3 %in% c('P11_HOX')], 
+    #group_order = sample_levels, 
+#    ylim = c(0,0.30),
+    groupBy = metaGroupName, 
+    hubs_regions = hubs_obj$hubsCollapsed,
+    #sample_levels = sample_sarc_order,
+    minCells = 10,
+    geneSymbol = TF,
+    plotSummary = c("bulkTrack", "featureTrack", 
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
+    #pal = palette_sample,
+    pal = palette_stroma,
+    threads=1,
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+    upstream = 100000,
+    downstream = 100000,
+    loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+    #loops = getCoAccessibility (archp, corCutOff = 0.3,
+    #  returnLoops = TRUE),
+    useGroups= NULL
+)
+dev.off()
+plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('MPM_markers_',TF,'_coveragePlots.pdf'),addDOC=F)
+  

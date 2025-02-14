@@ -35,7 +35,8 @@ archp = loadArchRProject (projdir)
 
 # Load RNA
 srt = readRDS ('../scrna/srt.rds')
-
+#srt$celltype[srt$celltype == 'SmoothMuscle'] = 'Smooth Muscle'
+#saveRDS (srt, '../scrna/srt.rds')
 #sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
 
 # Load last istance
@@ -117,7 +118,7 @@ dev.off()
   archp$celltype = 0
   archp$celltype[archp$Clusters_H %in% c('C2','C3','C4')] = 'Endothelial'
   archp$celltype[archp$Clusters_H %in% c('C7','C8','C9','C10')] = 'Fibroblasts'
-  archp$celltype[archp$Clusters_H %in% c('C6')] = 'Smooth Muscle'
+  archp$celltype[archp$Clusters_H %in% c('C6')] = 'SmoothMuscle'
   archp$celltype[archp$Clusters_H %in% c('C1')] = 'LEC'
   archp$celltype[archp$Clusters_H_2 %in% c('C10')] = 'Mesothelium'
   archp$celltype[archp$Clusters_H %in% c('C5')] = 'Unknown'
@@ -127,8 +128,9 @@ dev.off()
   umap_p3 = plotEmbedding (ArchRProj = archp, 
     colorBy = "cellColData", name = "Sample",labelMeans =F,
      embedding = "UMAP_H", pal = palette_sample)
-  umap_p5 = plotEmbedding (ArchRProj = archp, 
+  umap_p5 = plotEmbedding (ArchRProj = archp, labelMeans =F,
     colorBy = "cellColData", name = "celltype",
+    pal = palette_stroma,
      embedding = "UMAP_H")
   dev.off()
 
@@ -177,7 +179,7 @@ if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path
 
 # Differential Accessed motifs ####
 metaGroupName = "celltype"
-force=TRUE
+force=FALSE
 source (file.path('..','..','git_repo','utils','DAM.R'))
 
 mMat = assays (mSE)[[1]]
@@ -199,7 +201,7 @@ ps = ps[, colnames(DAM_hm@matrix)]
 ps_tf = ps[active_DAM,]
 
   
- DAM_hm = Heatmap (t(scale(mMat_mg)), 
+DAM_hm = Heatmap (t(scale(mMat_mg)), 
           row_labels = colnames (mMat_mg),
           column_title = paste('top',top_genes),
           clustering_distance_columns = 'euclidean',
@@ -213,8 +215,8 @@ ps_tf = ps[active_DAM,]
           name = 'chromVAR',
           #rect_gp = gpar(col = "white", lwd = .5),
           border=TRUE,
-          col = rev(palette_deviation),
-          width = unit(2, "cm")
+          col = rev(palette_deviation)#,
+          #width = unit(2, "cm")
           #right_annotation = motif_ha
           )
 
@@ -254,8 +256,8 @@ TF_exp_selected_hm2 = Heatmap (ps_tf,
         border=T,
         width = unit(2, "cm"))
 
-pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 8,height=4)
-draw (DAM_hm + TF_exp_selected_hm + TF_exp_selected_hm2)
+pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 3,height=4)
+draw (DAM_hm )#+ TF_exp_selected_hm + TF_exp_selected_hm2)
 dev.off()
    
 
@@ -389,6 +391,24 @@ subsetArchRProject(
   threads = getArchRThreads(),
   force = TRUE
 )
+
+# Subset Fibroblasts cells ####
+metaGroupName = 'celltype'
+subsetArchRProject(
+  ArchRProj = archp,
+  cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% 'Endothelial'],
+  outputDirectory = file.path('..','..','Endothelial','scatac_ArchR'),
+  dropCells = TRUE,
+  logFile = NULL,
+  threads = getArchRThreads(),
+  force = TRUE
+)
+
+metaGroupName='celltype'
+subsetArchRProject_light (ArchRProject = archp,
+  cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% c('Fibroblasts')],
+  projdir_new = file.path('..','..','Fibroblasts','scatac_ArchR')
+  )
 
 
 

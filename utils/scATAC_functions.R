@@ -1367,6 +1367,7 @@ subsetArchRProject_light = function(
 {
 source_dir = getOutputDirectory(ArchRProject)
 projdir_temp = file.path(source_dir, 'tempdir')
+dir.create (file.path(projdir_new,'Plots'), recursive=T)
   copy_project_files <- function(source_dir, projdir_temp) {
     # Ensure both source_dir and projdir_temp are provided
     if (missing(source_dir) || missing(projdir_temp)) {

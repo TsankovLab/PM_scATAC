@@ -66,8 +66,11 @@ palette_clonotype = setNames (c(as.character (paletteer::paletteer_d("beyonce::X
 
 pallette_pbmc_celltype = setNames (rev(as.character(paletteer::paletteer_d("khroma::smoothrainbow")[c(1,3,5,7,9,11,13,15)])), c('CD4','CD8','ILC','MAIT','NK','NK Proliferating','NK_CD56bright','Treg'))
 
-palette_stroma = as.character(paletteer::paletteer_d("colRoz::shark_bay", 6))
-palette_stroma[c('Endothelial','LEC','Fibroblasts','SmoothMuscle')] = as.character(c('grey','lightblue4','olivedrab3','slateblue2'))
+#palette_stroma = c(as.character(paletteer::paletteer_d("colRoz::shark_bay", 6)))
+names(palette_celltype_simplified)[names(palette_celltype_simplified) == 'SmoothMuscle'] = 'Smooth Muscle'
+palette_stroma = palette_celltype_simplified
+palette_stroma = palette_stroma[c('Endothelial','Fibroblasts','Smooth Muscle','Mesothelium')]
+palette_stroma = c(palette_stroma, LEC = 'darkgreen')
 palette_endothelial = setNames(as.character(paletteer::paletteer_d("colRoz::shark_bay", 3)), c('Artery','PLVAP+EC','Vein'))
 pallette_fetal_vs_adult = setNames (c('#DB3EB1FF', 'grey','purple'), c('fetal_lung','adult_lung','PM'))
 palette_scenic = rev(colorRampPalette(brewer.pal(10,'RdYlBu'))(50))
@@ -96,7 +99,7 @@ palette_expression_cor_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,m
 #palette_expression_cor = c('#24693DFF','#F6F9FCFF','#4F7FAAFF')
 
 palette_deviation_correlation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
-#palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#49525EFF','#FFFCFCFF','#AE123AFF'))
+palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#49525EFF','#FFFCFCFF','#AE123AFF'))
 palette_deviation2 = paletteer::paletteer_c("pals::ocean.curl",100)
 palette_deviation_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c(palette_deviation[length(palette_deviation)],'white',palette_deviation[1])))}
 

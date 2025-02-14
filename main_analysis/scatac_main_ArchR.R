@@ -418,10 +418,10 @@ if (run_chromVAR)
     features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
     group.by = 'celltype_simplified2')[[1]]) +1)
   min_exp = 0.1
-  ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
-  active_TFs = rownames(ps)[rowSums(ps) > 0]
+  DAM_list2 = lapply (names(DAM_list), function(x) DAM_list[[x]][DAM_list[[x]]$gene %in% rownames(ps)[ps[,x] > min_exp],])
+  #active_TFs = rownames(ps)[rowSums(ps) > 0]
 
-  DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])
+  #DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])
 
   names (DAM_list2) = names (DAM_list)
   FDR_threshold = 1e-3
@@ -489,7 +489,7 @@ celltypes = unique (archp@cellColData[,metaGroupName])
 tf_database = read_meme('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme', skip = 0, readsites = FALSE, readsites.meta = FALSE)
 tf_database = unique(unlist(lapply(tf_database, function(x) unlist(strsplit(x@name,'_'))[1])))
 
-list.files (file.path(chromBPdir, celltypes[3],'no_bias_model'))
+#list.files (file.path(chromBPdir, celltypes[3],'no_bias_model'))
 
 chrombpnet_counts = list()
 celltypes = unique (archp$celltype_lv1)
@@ -600,7 +600,10 @@ mMat_mg = mMat_mg[names (DAM_list),]
 pioneer_tfs = unlist(lapply (split (DAM_df, DAM_df$comparison), function(x) x$gene[x$gene %in% unique(unlist(sapply(as.character(chrombpnet_counts2[[x$comparison[1]]]$occurrence.Var1), function(x) unlist(strsplit(x, '_')))))]))
 pioneer_profile_tfs = unlist(lapply (split (DAM_df, DAM_df$comparison), function(x) x$gene[x$gene %in% unique(unlist(sapply(as.character(chrombpnet_profile2[[x$comparison[1]]]$occurrence.Var1), function(x) unlist(strsplit(x, '_')))))]))
 ha = HeatmapAnnotation (counts = colnames(mMat_mg) %in% pioneer_tfs, profile = colnames(mMat_mg) %in% pioneer_profile_tfs,
-  col = list (counts = c(`FALSE` = 'white',`TRUE` = 'indianred4'), profile = c(`FALSE`= 'white', `TRUE`='indianred3')),
+  col = list (
+    counts = c(`FALSE` = 'white',`TRUE` = 'lavenderblush'), 
+    profile = c(`FALSE`= 'white', `TRUE`='lavenderblush2')),
+    gp = gpar(col = "black"),
    simple_anno_size = unit(.2, "cm"))
 #mMat_mg = mMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
 DAM_hm = Heatmap (scale(mMat_mg), 
@@ -616,7 +619,7 @@ DAM_hm = Heatmap (scale(mMat_mg),
         row_names_gp = gpar(fontsize = 9),# fontface = 'italic'),
         column_names_gp = gpar(fontsize = 7),
         column_names_rot = 45,
-        name = 'chromVAR',
+        name = 'TF activity',
         #rect_gp = gpar(col = "white", lwd = .5),
         border=TRUE,
         col = rev(palette_deviation)
@@ -781,21 +784,21 @@ subsetArchRProject_light (ArchRProject = archp,
 
 # Show that enhancer linked to NR4A2 is only up in NK KLRC1 and CD8 exhausted across all cells ####
 nkt_ann = read.csv (file.path('..','..','NKT_cells','scatac_ArchR','barcode_annotation_nkt.csv'))
-mye_ann = read.csv (file.path('..','..','myeloid_cells','scatac_ArchR','barcode_annotation_main.csv'))
+mye_ann = read.csv (file.path('..','..','myeloid_cells','scatac_ArchR','barcode_annotation.csv'))
 archp$celltype2 = archp$celltype_revised
 archp$celltype2[match(nkt_ann$barcode, rownames(archp@cellColData))] = nkt_ann$celltype
 archp$celltype2[match(mye_ann$barcode, rownames(archp@cellColData))] = mye_ann$celltype
 metaGroupName = 'celltype2'  
-  pMats = getGroupSE(
-    ArchRProj = archp,
-    useMatrix = 'PeakMatrix',
-    groupBy = metaGroupName,
-    divideN = TRUE,
-    scaleTo = NULL,
-    threads = getArchRThreads(),
-    verbose = TRUE,
-    logFile = createLogFile("getGroupSE")
-  )
+pMats = getGroupSE(
+  ArchRProj = archp,
+  useMatrix = 'PeakMatrix',
+  groupBy = metaGroupName,
+  divideN = TRUE,
+  scaleTo = NULL,
+  threads = getArchRThreads(),
+  verbose = TRUE,
+  logFile = createLogFile("getGroupSE")
+)
 enhancer_region = GRanges ('chr2:156480366-156480866')
 promoter_region = getPeakSet(archp)
 promoter_region =  promoter_region[which(promoter_region$peakType == 'Promoter' & promoter_region$nearestGene == 'NR4A2')]

@@ -285,7 +285,7 @@ cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf
 region = readRDS ('../tumor_compartment/scatac_ArchR/P11_chr18_region.rds')
 
 # Make gene modules overlapping megahubs regions in P11 ####
-all_genes = genes(TxDb.Hsapiens.UCSC.hg38.knownGene)
+all_genes = genes (TxDb.Hsapiens.UCSC.hg38.knownGene)
 genes_in_region = all_genes$gene_id[subjectHits(findOverlaps (region, all_genes))]
 genes_in_region = list(chr18_q23 = as.data.frame(org.Hs.egSYMBOL)[match (genes_in_region, as.data.frame(org.Hs.egSYMBOL)[,1]),'symbol'])
 #genes_in_region = split (genes_in_region[[1]], genes_in_region)
