@@ -87,9 +87,9 @@ if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path
 # TNK markers ####
 tnk_markers = c('CD3D','CD8A','PDCD1','HAVCR2','CD4', 'FOXP3','GNLY',
   'FGFBP2','KLRC1','XCL1','ICOS')
-tnk_markers = c('CD4','CD8A','FOXP3',
-  'PDCD1','HAVCR2','GNLY',
-  'FGFBP2','KLRC1','XCL1')#,'ICOS')
+tnk_markers = c('CD4','CD8A',
+  'PDCD1','FOXP3','GNLY', 'HAVCR2',
+  'FGFBP2','KLRC1','CTLA4')#,'ICOS')
 archp = addImputeWeights (archp)
 pdf()
 p <- plotEmbedding(
@@ -580,20 +580,60 @@ if (!file.exists ('DAP_CD8_CD8_ext_pairwise.rds') | force)
   saveRDS (DAP_list, 'DAP_CD8_CD8_ext_pairwise.rds')
   } else {
   DAP_list = readRDS ('DAP_CD8_CD8_ext_pairwise.rds')
-  DAP_res = do.call (cbind, (assays(DAP_list)))
-  colnames (DAP_res) = names(assays(DAP_list))
-  DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
-  rownames(DAP_res) = as.character(DAP_res_regions)
   }
+DAP_res = do.call (cbind, (assays(DAP_list)))
+colnames (DAP_res) = names(assays(DAP_list))
+DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
+rownames(DAP_res) = as.character(DAP_res_regions)
 
 pdf(file.path('Plots','Exhausted_peaks_MA_plot.pdf'), width=5,height=5)
-pma <- markerPlot(seMarker = DAP_list, name = 'CD8_exhausted', cutOff = "FDR <= 0.01 & Log2FC >= 0", plotAs = "MA")
+pma <- markerPlot(seMarker = DAP_list, name = 'CD8_exhausted', cutOff = "FDR <= 0.01", plotAs = "MA")
 pma
 dev.off()
 
 # Take only significant regions ####
 DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
 saveRDS (GRanges(rownames(DAP_res_sig)), 'T_cell_exhaustion_peaks.rds')
+
+
+# Run GSEA enrichment analysis #### 
+#!!! To run this analysis load only ArcHR and clusterprofiler packages !!!!
+library (fgsea)    
+options(warn = 0)
+ps = getPeakSet (archp)
+gmt.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/GSE9650_NAIVE_VS_EXHAUSTED_CD8_TCELL_DN.v2024.1.Hs.gmt'
+gmt.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/GSE9650_EXHAUSTED_VS_MEMORY_CD8_TCELL_UP.v2024.1.Hs.gmt'
+gmt.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/GSE24026_PD1_LIGATION_VS_CTRL_IN_ACT_TCELL_LINE_UP.v2024.1.Hs.gmt'
+csv.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/Tcell_exhastuion_genes_PMID37091230.csv'
+pathways = read.gmt (gmt.file)
+pathways = read.csv (csv.file)
+pathways = list(Tcell_exhastuion_genes_PMID37091230 = pathways[,1])
+#pathways = gmtPathways (gmt.file)
+DAP_list = readRDS ('DAP_CD8_CD8_ext_pairwise.rds')
+DAP_res = do.call (cbind, (assays(DAP_list)))
+colnames (DAP_res) = names(assays(DAP_list))
+DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
+rownames(DAP_res) = as.character(DAP_res_regions)
+
+peak_genes = unname(ps[queryHits (findOverlaps(ps, GRanges (rownames(DAP_res))))]$nearestGene)
+names (peak_genes) = as.character(ps)[queryHits(findOverlaps (ps,GRanges (rownames(DAP_res))))]
+peak_genes = peak_genes[rownames(DAP_res)]
+peak_genes = setNames (-log10(DAP_res$Pval) * sign (DAP_res$Log2FC), peak_genes)
+#names (peak_genes) = 
+peak_genes = peak_genes[!duplicated(names(peak_genes))]
+peak_genes = peak_genes[!is.na(names(peak_genes))]
+fgseaRes = fgseaMultilevel (pathways, 
+          peak_genes,#, 
+          minSize=15, 
+          maxSize=1500,
+          nPermSimple=100000,
+          BPPARAM = NULL
+          )
+pdf (file.path ('Plots','DAP_exhaustion_enrichment_plot.pdf'), width=5, height=3)
+plotEnrichment(pathways[["Tcell_exhastuion_genes_PMID37091230"]],
+               peak_genes) + labs(title="Tcell_exhastuion_genes_PMID37091230")
+dev.off()
+
 
 # Calculate hypergeometric test of peaks with motifs ####
 mm = getMatches (archp)
@@ -1754,3 +1794,37 @@ smoothWindow = 25)
 # print (hm)
 # print (hm2)
 # dev.off()
+
+
+
+#### Import Hi-ChiP data from GSE168881 ####
+library (HiContacts)
+library (HiCExperiment)
+hic_files = file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/HiC_Texhaustion_GSE168881',list.files('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/HiC_Texhaustion_GSE168881'))
+for (hfile in 1:length(hic_files))
+{
+hic_file <- HicFile(path = hic_files[hfile])
+hic = import(hic_file, focus = "2:157160718-157446103", resolution = 5000)
+
+
+pdf (file.path('Plots',paste0('HiC_data_NR4A2_locus_',hfile,'_heatmap.pdf')))
+print(plotMatrix(hic, maxDistance = 300000,use.scores = 'balanced',
+    cmap = afmhotrColors()))
+dev.off()
+}
+
+
+
+
+for (hfile in 1:length(hic_files))
+{
+hic_file <- HicFile(path = hic_files[hfile])
+hic = import(hic_file, focus = "2:242400000-243000000", resolution = 5000)
+
+
+pdf (file.path('Plots',paste0('HiC_data_PDCD1_locus_',hfile,'_heatmap.pdf')))
+print(plotMatrix(hic, maxDistance = 300000,use.scores = 'balanced',
+    cmap = afmhotrColors()))
+dev.off()
+}
+

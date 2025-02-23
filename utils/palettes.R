@@ -111,3 +111,12 @@ palette_fragments = paletteer::paletteer_c("grDevices::Plasma",40)
 palette_fragments = paletteer_c("ggthemes::Classic Orange-White-Blue",40)
 
 palette_fetal = c(fetal='purple',rest = 'grey')
+palette_cooccurrence_cor = paletteer::paletteer_c("grDevices::Broc",100)
+palette_cooccurrence_cor_fun = colorRamp2(c(-1,0,1), c(paletteer::paletteer_c("grDevices::Broc",100)[3],'white',paletteer::paletteer_c("grDevices::Broc",100)[97]))
+
+
+
+
+
+
+

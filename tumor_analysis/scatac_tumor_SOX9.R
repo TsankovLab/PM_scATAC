@@ -45,6 +45,7 @@ sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
 
 
 archp_NN = archp[!archp$Sample3 %in% c('normal1','normal2','normal3')]
+
 pdf ()
 umap_p1 = plotEmbedding (ArchRProj = archp_NN, labelMeans = F, 
   colorBy = "cellColData", name = "Sample2", 
@@ -231,84 +232,6 @@ if (run_p2g_TF)
   )
 
 
-### Plot mesothelium cell type markers on genome tracks ####
-archp$Sample4 = paste0 ('C', as.numeric (sample_sarc_order),'_', archp$Sample3)
-archp$Sample4[archp$Sample4 == 'C7_normal_pleura'] = 'C13_normal_pleura'
-metaGroupName = 'Sample4'
-celltype_markers = c('WT1')#,'KRT19','CALB2','ITLN1','AXL')
-#celltype_markers = c('WT1','CALB2','GATA4','MSLN','KRT5','KRT18','ITLN1','HP','SOX9')
-
-metaGroupName = "Sample2"
-cor_cutoff = 0.2
-#max_dist = 12500
-max_dist = 12500
-min_peaks = 5
-dgs = 0
-hubs_dir = paste0 ('hubs_obj_cor_',cor_cutoff,'_md_',max_dist,'_dgs_',dgs,'_min_peaks_',min_peaks)
-hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))  
-
-pdf()
-meso_markers <- plotBrowserTrack2 (
-    ArchRProj = archp[archp$Sample3 != 'P11_HOX'],#[!archp$Sample3 %in% c('P11_HOX')], 
-    group_order = sample_levels, 
-    groupBy = metaGroupName, 
-    sample_levels = sample_sarc_order,
-    minCells = 10,
-    geneSymbol = celltype_markers,
-    pal = palette_sample,
-    threads=1,
-    hubs_regions = hubs_obj$hubsCollapsed,
-    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
-    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-    upstream = 220000,
-    downstream = 220000,
-    loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
-    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
-    #loops = getCoAccessibility (archp, corCutOff = 0.3,
-    #  returnLoops = TRUE),
-    useGroups= NULL
-)
-dev.off()
-plotPDF (meso_markers, ArchRProj = archp, width=14, name ='MPM_markers_coveragePlots.pdf',addDOC=F)
-  
-#   # # Convert df in Granges add gene Name and correlation ####
-#   # gene = 'WT1'
-#   p2g$geneName = mcols(metadata(p2g)$geneSet)$name[p2g$idxRNA]
-#   p2g = p2g[!is.na (p2g$FDR),] # remove NaN correlations (not sure why there are some)
-#   p2g = p2g[p2g$Correlation > p2g_corr, ]
-#   p2gGR = metadata (p2g)$peakSet[p2g$idxATAC]
-#   p2gGR$geneName = p2g$geneName
-#   p2gGR$correlation = p2g$Correlation
-  
-
-
-#   cnmf_list = lapply (cnmf_list, function(x) head (x,200))
-#   p2g_cnmf = lapply (cnmf_list, function(x) p2gGR[p2gGR$geneName %in% x])
-  
-#   tf_match = getMatches (archp)
-#   colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-#   bg_peakSet = rowRanges (tf_match)
-#   #tf_match = tf_match[unique(queryHits (findOverlaps (bg_peakSet, p2gGR)))]
-#   nmf_TF = lapply (p2g_cnmf, function(x) hyperMotif (
-#     selected_peaks = x, 
-#     motifmatch = tf_match))
-  
-#   nmf_TF = lapply (nmf_TF, function(x) x[rownames(nmf_TF[[1]]), ])
-#   nmf_TF_df = do.call (cbind, nmf_TF)
-#   nmf_TF_df = nmf_TF_df[, grep ('padj', colnames(nmf_TF_df))]
-#   nmf_TF_df[nmf_TF_df > 0.05] = 1
-#   nmf_TF_df = -log10(nmf_TF_df)
-#   nmf_TF_df = nmf_TF_df[rowSums (nmf_TF_df) != 0, ]
-#   nmf_TF_df[sapply(nmf_TF_df, is.infinite)] <- 300
-#   saveRDS (nmf_TF_df, 'nmf_TF_p2g_enrichments.rds')
-#   TF_ht = Heatmap (nmf_TF_df, row_names_gp = gpar (fontsize=3), column_names_gp = gpar (fontsize=5))
-  
-#   pdf (paste0('Plots/TF_nmf_',k,'_nfeat_',nfeat,'_heatmap.pdf'),width = 3,height=25)
-#   print (TF_ht)
-#   dev.off()
-#   } else {
-#   nmf_TF_df = readRDS ('nmf_TF_p2g_enrichments.rds')
-#   }
 
 # Make data.frame of deviation difference and expression difference between normal and tumors ####
 force = F
@@ -400,7 +323,7 @@ dev_res_df = do.call (cbind , dev_res_df)
 # dev_res_df = dev_res_df[, !grepl ('feature',colnames(dev_res_df))]
 #rownames (dev_res_df) = rowData (mSE)$name
 colnames (dev_res_df) = names(dev_comparisons)
-rownames(dev_res_df) = pos_features
+rownames (dev_res_df) = pos_features
 
 # # Repeat using genescore
 # gsMat = assays (gsSE)[[1]]
@@ -652,7 +575,7 @@ selected_TF = readRDS ('selected_TF.rds')
 if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 archp_meta = as.data.frame (archp@cellColData)
 sams = as.character(unique(archp_meta$Sample3))
-sams = sams[!sams %in% c('normal_pleura','P3','P13','P11_HOX')] # remove normal,low cell numbers and outlier samples
+sams = sams[!sams %in% c('normal1','P3','P13','P11_HOX')] # remove normal,low cell numbers and outlier samples
 
 #archp_meta = archp_meta[archp_meta$Sample3 %in% sams,]
 mMat = assays (mSE)[[1]]
@@ -695,7 +618,7 @@ cor_TF_df = draw (Heatmap (median_matrix,
   #       }}))
 dev.off()
 
-pdf (file.path ('Plots','selected_TF_dev_corr_heatmaps2.pdf'), width = 8,height=7)
+pdf (file.path ('Plots','selected_TF_dev_corr_heatmaps3.pdf'), width = 8,height=7)
 cor_TF_df 
 dev.off()
 
@@ -720,7 +643,7 @@ hm = draw (Heatmap (
     border=T))
 dev.off()
 
-pdf (file.path ('Plots','selected_TF_dev_corr_pathways_heatmaps2.pdf'), width = 3.5,height=8)
+pdf (file.path ('Plots','selected_TF_dev_corr_pathways_heatmaps2.pdf'), width = 5.5,height=8)
 hm
 dev.off()
 
@@ -866,21 +789,32 @@ m_cor_levels = m_cor_df %>% group_by (TF) %>% summarise (median_value = median(s
   top_sarc_TF = head(m_cor_levels$TF,20)
   combined_df$TF = factor (combined_df$TF, levels = top_sarc_TF)
   combined_df = combined_df[combined_df$TF %in% top_sarc_TF, ]
-  
-  bp = ggplot (combined_df, aes (x = TF, y = score, fill = type), alpha=.8) + 
-  geom_boxplot (color = 'grey20',
-      linewidth = .1,
-      width=0.7,
-      outlier.alpha = 0.2,
-      outlier.shape = NA,
-       size=0.5, alpha=0.7
-       ) + 
-  geom_point (position = position_dodge(.8), alpha= 0.5, color = 'grey22', size=1) +
-  gtheme +
-  scale_fill_manual (values = c(activity = '#AE123AFF', genescore = '#001260FF')) + 
-  geom_hline (yintercept = 0, color='red',  linetype='dashed')
+palette_expression_disc = paletteer::paletteer_c("grDevices::Purple-Blue", length(top_sarc_TF))
 
-  pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots4.pdf'), width = 7,height=3)
+bp = ggplot(combined_df, aes(x = TF, y = score, fill = TF, color = type)) + 
+  geom_boxplot(
+    aes(group = interaction(TF, type)),  # Split by both TF and type
+    position = position_dodge(0.8),
+    #color = 'grey20',
+    linewidth = 0.4,
+    width = 0.7,
+    outlier.alpha = 0.2,
+    outlier.shape = NA,
+    size = 0.5,
+    alpha = 0.6
+  ) +
+  geom_point(
+    aes(group = interaction(TF, type), color = type),  # Align points with boxplots
+    position = position_dodge(0.8),  # Ensure same dodge width
+    alpha = 0.5,
+    size = 1
+  ) +
+  gtheme +
+  scale_fill_manual(values = palette_expression_disc) +
+  scale_color_manual(values = c(activity = '#AE123AFF', genescore = '#001260FF')) +
+  geom_hline(yintercept = 0, color = 'red', linetype = 'dashed')
+
+  pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots4.pdf'), width = 8,height=3)
   bp
   dev.off()
 
@@ -929,18 +863,35 @@ combined_df_rna$TF = factor (combined_df_rna$TF, levels = m_cor_levels$TF)
 
 top_sarc_TF = head(m_cor_levels$TF,20)
 combined_df_rna = combined_df_rna[combined_df_rna$TF %in% top_sarc_TF, ]
-bp = ggplot (combined_df_rna, aes (x = TF, y = score, fill = type), alpha=.5) + 
-geom_boxplot (color = 'grey20',
-      linewidth = .1,
-      width=0.7,
-      outlier.alpha = 0.2,
-      outlier.shape = NA,
-       size=0.5, alpha=0.7
-       ) + 
-geom_point (position = position_dodge(.8), alpha= 0.5, color = 'grey33', size=1) +
-gtheme +
-scale_fill_manual (values = c(activity = 'darkred', expression = 'darkseagreen3')) + 
-geom_hline (yintercept = 0, color='red',  linetype='dashed')
+palette_expression_disc = paletteer::paletteer_c("grDevices::Purple-Blue", length(top_sarc_TF))
+
+bp = ggplot(combined_df, aes(x = TF, y = score, fill = TF, color = type)) + 
+  geom_boxplot(
+    aes(group = interaction(TF, type)),  # Split by both TF and type
+    position = position_dodge(0.8),
+    #color = 'grey20',
+    linewidth = 0.4,
+    width = 0.7,
+    outlier.alpha = 0.2,
+    outlier.shape = NA,
+    size = 0.5,
+    alpha = 0.6
+  ) +
+  geom_point(
+    aes(group = interaction(TF, type), color = type),  # Align points with boxplots
+    position = position_dodge(0.8),  # Ensure same dodge width
+    alpha = 0.5,
+    size = 1
+  ) +
+  gtheme +
+  scale_fill_manual(values = palette_expression_disc) +
+  scale_color_manual (values = c(activity = '#AE123AFF', genescore = 'darkgreen')) +
+  geom_hline(yintercept = 0, color = 'red', linetype = 'dashed')
+
+  pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots4.pdf'), width = 8,height=3)
+  bp
+  dev.off()
+
 
 pdf (file.path ('Plots','sarcomatoid_score_activity_expression_boxplots2.pdf'), width = 7,height=3)
 bp
@@ -1025,17 +976,19 @@ hubsCell_mat = readRDS (file.path (hubs_dir,paste0('hubs_cells_mat.rds')))
 
 # Select samples ####
 sams = as.character(unique(archp$Sample3))
-sams = sams[!sams %in% c('normal_pleura','P3','P13','P11_HOX')] # remove normal,low cell numbers and outlier samples
+sams = sams[!sams %in% c('normal2','normal3','normal4','P3','P13','P11_HOX')] # remove normal,low cell numbers and outlier samples
 
 # Identify hubs higher in malignant ####
-  library (presto)
-  pval_threshold = 0.01
-  occurrence_threshold = 4
+library (presto)
+pval_threshold = 0.01
+occurrence_threshold = 4
 
-  test_comparisons = as.list(
-    paste0(sams, ' normal_pleura'))
-  names(test_comparisons) = sams
+test_comparisons = as.list(
+  paste0(sams, ' normal1'))
+names(test_comparisons) = sams
+test_comparisons = test_comparisons[-10]
 test_comparisons = lapply (test_comparisons, function(x) unlist(strsplit(x, ' ')))
+#archp = archp[rownames(archp@cellColData) %in% colnames(hubsCell_mat)]
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 test_res = lapply (test_comparisons, function(sam_pair) 
   wilcoxauc (log2(hubsCell_mat+1), y= archp$Sample3, groups_use = sam_pair))
@@ -1043,12 +996,12 @@ test_res = lapply (test_res, function(x) x[x$logFC > 0,])
 test_res = do.call (rbind, test_res)
 test_res$gene = hubs_obj$hubsCollapsed$gene[match(test_res$feature, hubs_obj$hubs_id)]
 test_res = test_res[test_res$padj < pval_threshold,]
-test_res = test_res[test_res$group != 'normal_pleura',]
-test_res = test_res[test_res$avgExpr > 1,]
-test_res = test_res[test_res$logFC > 1,]
+test_res = test_res[test_res$group != 'normal1',]
+test_res = test_res[test_res$avgExpr > .5,]
+test_res = test_res[test_res$logFC > .5,]
 malig_hubs = names(table (test_res$feature)[table (test_res$feature) > occurrence_threshold])
 
-hubsCell_mat_sub = scale (hubsCell_mat[malig_hubs,])
+hubsCell_mat_sub = scale (log2(hubsCell_mat[malig_hubs,]+1))
 
 bin_width <- 50   # Number of observations per bin
 overlap <- 50    
@@ -1091,9 +1044,6 @@ for (sam in sams)
   hub_cor_l[[sam]] = tmp
   }
 
-
-
-
 # load cnmf modules to exclude labelling any genes in the sarcomatoid module ####
 nfeat=5000
 k=25
@@ -1109,21 +1059,27 @@ hubs_cor_df$score[is.na(hubs_cor_df$score)] = 0
 hub_cor_levels = hubs_cor_df %>% group_by(hub_id) %>% summarise(median_value = median(score)) %>% arrange (-median_value)
 hub_cor_levels$hub_id = factor (hub_cor_levels$hub_id, levels = hub_cor_levels$hub_id)
 hub_cor_levels$gene = paste0(hubs_obj$hubs_id,'-',hubs_obj$hubsCollapsed$gene)[match(hub_cor_levels$hub_id, hubs_obj$hubs_id)]
+
+selected_TF = readRDS ('selected_TF.rds')
 hub_cor_levels$in_module = as.character(rowSums (sapply (sarc_module_genes, function(x) grepl (x, hub_cor_levels$gene))))
-hub_cor_levels$labels = ''
-sox9_hubs = na.omit(top_hubs_df)[na.omit(top_hubs_df)$TF == 'SOX9' & na.omit(top_hubs_df)$hit == 1,'hub']
-hub_cor_levels$SOX9 = hub_cor_levels$hub_id %in% sox9_hubs
-top_labels=20
-hub_cor_levels$labels[1:top_labels] = head(hub_cor_levels$gene,top_labels)
-bp = ggplot (hub_cor_levels[hub_cor_levels$median_value > 0,], aes (x= hub_id, y = median_value, label = labels, fill = in_module), color='white') + 
+hub_cor_levels$sarc_TF = ''
+hub_cor_levels$sarc_TF[unlist(sapply (selected_TF, function(x) grep(x, hub_cor_levels$gene)))] = hub_cor_levels$gene[unlist(sapply (selected_TF, function(x) grep(x, hub_cor_levels$gene)))]
+hub_cor_levels$hit = ifelse (hub_cor_levels$sarc_TF != '','hit','nohit')
+
+bp = ggplot (hub_cor_levels[hub_cor_levels$median_value > 0,], 
+  aes (x= hub_id, y = median_value, label = sarc_TF, fill = hit), color='white') + 
 geom_bar (stat = 'identity') +
-scale_fill_manual (values = c(`1` = 'darkred',`0` = 'grey66')) + 
+scale_fill_manual (values = c(`hit` = 'darkred',`nohit` = 'grey66')) + 
 #scale_color_manual (values = c(`TRUE` = 'darkred',`FALSE` = 'grey66')) + 
-geom_text_repel (size=2, max.overlaps=10, nudge_x = 2) +
+geom_text_repel (size=1.8, 
+  max.overlaps=10000, 
+  nudge_y = .1, 
+  nudge_x = .2, 
+  segment.curvature = 0.1,
+  segment.size=.2) +
 #geom_text(aes(label = labels, y = median_value + .001), hjust = -0.05,na.rm = TRUE, angle=90,size=1) +
 gtheme_no_rot +
   theme(
-    nudge_x= 0.2,
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
     axis.title = element_blank(),
@@ -1134,6 +1090,83 @@ gtheme_no_rot +
 pdf (file.path ('Plots','hubs_cor_ranked.pdf'), width=4, height=3)
 bp
 dev.off()
+
+
+
+
+
+# Check top correlated hubs on browser track ####
+top_hubs = as.character(head(hub_cor_levels$hub_id, 50))
+metaGroupName='Sample3'
+matching_samples=c('normal_pleura','P1','P3','P4','P5','P8','P11','P11_HOX','P12','P14','P23')
+TF = 'RUNX2'
+TF = 'SOX6'
+sample_sarc_order_levels = levels(sample_sarc_order)
+#sample_sarc_order_levels = sample_sarc_order_levels[c(7,1:6,8:13)]
+sample_sarc_order_levels = sample_sarc_order_levels[! sample_sarc_order_levels %in% 'normal1']
+
+pdf()
+meso_markers <- plotBrowserTrack2 (
+    ArchRProj = archp_NN, 
+    sizes = c(6, 1, 1, 1,1,1),
+    groupBy = metaGroupName, 
+    #region = ext_range(hubs_obj$hubsCollapsed[match(top_hubs, hubs_obj$hubs_id)],50000,50000),
+    #region = ext_range(hubs_obj$hubsCollapsed[grep('SOX9', hubs_obj$hubsCollapsed$gene)],50000,50000),
+    sample_levels = sample_sarc_order_levels,
+    #geneSymbol = TF,
+    genelabelsize=2,
+    geneSymbol = TF,
+    normMethod = "ReadsInTSS",
+    scCellsMax=100,
+    hubs_regions = hubs_obj$hubsCollapsed,
+    plotSummary = c("bulkTrack", "featureTrack", 
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+    upstream = 200000,
+    pal = palette_sample,
+    minCells = 25,
+    #ylim=c(0,0.4),
+    downstream = 50000,
+    #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+#    loops = getCoAccessibility (archp, corCutOff = 0.25),
+    #  returnLoops = TRUE),
+    useGroups= NULL,
+    loops = getPeak2GeneLinks (archp, corCutOff = 0.2,returnLoops = TRUE),
+    #hubs = hubs_obj$peakLinks2
+)
+dev.off()
+
+plotPDF (meso_markers, ArchRProj = archp, 
+  width=5,height=3, 
+  name =paste0(TF,'_sarc_cor_hubs_sarc_TFs_coveragePlots.pdf'),
+  addDOC = F) 
+
+metaGroupName = 'sampleID3'
+srt_NN = srt[,srt@meta.data[,metaGroupName] != 'normal_pleura']
+hub_id = 'HUB7701'
+hub_gr = hubs_obj$hubsCollapsed[match (hub_id, hubs_obj$hubs_id)]
+genes_in_region = unique(getPeakSet (archp)[subjectHits (findOverlaps (hub_gr, getPeakSet (archp)))]$nearestGene)
+genes_in_region = c(genes_in_region)
+top_dah = data.frame (
+gene = colMeans (srt_NN@assays$RNA@data[rownames(srt_NN) %in% genes_in_region,,drop=F]),
+group = srt_NN@meta.data[,metaGroupName])
+top_dah$group = factor (top_dah$group, levels = rev(sample_sarc_order_levels[!sample_sarc_order_levels %in% c('P3','P13')]))
+top_dah = na.omit(top_dah)
+bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
+vlp + 
+bxpv + 
+scale_fill_manual (values = palette_sample) +
+#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+gtheme_no_rot
+
+pdf (file.path ('Plots', paste0('scrna_region_boxplots.pdf')), height=4, width=4)
+bp
+dev.off()
+
+
 
 
 # TF motifs in hubs correlating with sarcomatoid score ####
@@ -1185,79 +1218,6 @@ gtheme +
 geom_hline (yintercept = 0, color='red',  linetype='dashed')
 
 pdf (paste0 ('Plots/sarcomatoid_score_hubs_cor_boxplots.pdf'), width = 7,height=3)
-bp
-dev.off()
-
-
-
-
-
-
-# Check top correlated hubs on browser track ####
-top_hubs = as.character(head(hub_cor_levels$hub_id, 50))
-metaGroupName='Sample3'
-matching_samples=c('normal_pleura','P1','P3','P4','P5','P8','P11','P11_HOX','P12','P14','P23')
-TF = 'SOX9'
-sample_sarc_order_levels = levels(sample_sarc_order)
-sample_sarc_order_levels = sample_sarc_order_levels[c(7,1:6,8:13)]
-
-
-pdf()
-meso_markers <- plotBrowserTrack2 (
-    ArchRProj = archp, 
-    sizes = c(6, 1, 1, 1,1,1),
-    groupBy = metaGroupName, 
-    region = ext_range(hubs_obj$hubsCollapsed[match(top_hubs, hubs_obj$hubs_id)],50000,50000),
-    sample_levels = sample_sarc_order_levels,
-    #geneSymbol = TF,
-    genelabelsize=2,
-    #geneSymbol = TF,
-    normMethod = "ReadsInTSS",
-    scCellsMax=100,
-    hubs_regions = hubs_obj$hubsCollapsed,
-    plotSummary = c("bulkTrack", "featureTrack", 
-        "loopTrack","geneTrack", 
-        "hubTrack",'hubregiontrack'),
-    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
-    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-    upstream = 150000,
-    pal = palette_sample,
-    minCells = 25,
-    #ylim=c(0,0.4),
-    downstream = 150000,
-    #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
-    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
-#    loops = getCoAccessibility (archp, corCutOff = 0.25),
-    #  returnLoops = TRUE),
-    useGroups= NULL,
-    loops = getPeak2GeneLinks (archp, corCutOff = 0.2,returnLoops = TRUE),
-    #hubs = hubs_obj$peakLinks2
-)
-dev.off()
-
-plotPDF (meso_markers, ArchRProj = archp, 
-  width=5,height=3, 
-  name =paste0(TF,'_sarc_cor_hubs_coveragePlots.pdf'),
-  addDOC = F)
-
-metaGroupName = 'sampleID3'
-hub_id = 'HUB6922'
-hub_gr = hubs_obj$hubsCollapsed[match (hub_id, hubs_obj$hubs_id)]
-genes_in_region = unique(getPeakSet (archp)[subjectHits (findOverlaps (hub_gr, getPeakSet (archp)))]$nearestGene)
-genes_in_region = c(genes_in_region,'RIMKLB')
-top_dah = data.frame (
-gene = colMeans (srt@assays$RNA@data[rownames(srt) %in% genes_in_region,]),
-group = srt@meta.data[,metaGroupName])
-top_dah$group = factor (top_dah$group, levels =rev(c('normal_pleura','P1','P4','P5','P8','P11','P11_HOX','P12','P14')))
-top_dah = na.omit(top_dah)
-bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
-vlp + 
-bxpv + 
-scale_fill_manual (values = palette_sample) +
-#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
-gtheme_no_rot
-
-pdf (file.path ('Plots', paste0('scrna_region_boxplots.pdf')), height=4, width=4)
 bp
 dev.off()
 

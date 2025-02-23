@@ -228,7 +228,7 @@ hubs_finder = function (
       if (length(hubs) == 0) 
         {
         message('No hubs passing min_peaks filter!')
-        next  
+        break        
         }
       # Replace peak index with peak regions per hub
       message ('Replace peak indexes with peak regions per hub')

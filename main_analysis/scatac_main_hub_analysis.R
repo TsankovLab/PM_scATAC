@@ -356,8 +356,10 @@ dev.off()
 
 
 # Compare DHA to list of SE to validate approach ####
+hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))  
 library (presto)
 metaGroupName = 'celltype_lv1'
+hubsCell_mat = readRDS (file.path (hubs_dir,paste0('hubs_cells_',metaGroupName,'_mat.rds')))  
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 res = wilcoxauc (log2(hubsCell_mat+1), as.character (archp@cellColData[,metaGroupName]))
 
@@ -382,6 +384,24 @@ SE_regions = lapply (list.files(SE_path, pattern = '.bed'), function(x) {
 names(SE_regions) = list.files(SE_path, pattern = '.bed')
 SE_regions = SE_regions[grepl ('ENCODE', names(SE_regions))]
 
+# Read in also SE celltypes from Wooseung
+SE_path2 = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/SE_db2_from_Wooseung'
+SE_regions2 = lapply (list.files(SE_path2, pattern = '.bed'), function(x) {
+  y = read.table (file.path(SE_path2,x), header=T, sep='\t')
+  y = y[,c(1:3,6)]
+  colnames (y) = c('chr','start','end','rank')
+  y = makeGRangesFromDataFrame (y)
+  })
+names(SE_regions2) = list.files(SE_path2, pattern = '.bed')
+# SE_regions2 = lapply (SE_regions2, function(x) 
+#   {
+#   seqlevelsStyle(x) = "UCSC"  # necessary
+#   x = unlist (liftOver (SE_regions2, ch))
+#   })
+
+SE_regions = c (SE_regions, SE_regions2)
+names (SE_regions) = sub ('.bed','',names(SE_regions))
+
 hyper_SE_cluster2 = list()
 for (celltype in unique(archp$celltype_lv1))
   {
@@ -389,6 +409,8 @@ for (celltype in unique(archp$celltype_lv1))
   hubs_h38 = hubs_obj$hubsCollapsed[match(res_l[[celltype]]$feature, hubs_obj$hubs_id)]
   seqlevelsStyle(hubs_h38) = "UCSC"  # necessary
   hubs_h19 = unlist (liftOver (hubs_h38, ch))
+
+
   q = sapply (SE_regions, function(x) 
     {
     q = countOverlaps (hubs_h19, x) 
@@ -417,7 +439,8 @@ hyper_SE_cluster_df = do.call (cbind, hyper_SE_cluster2)
 rownames (hyper_SE_cluster_df) = names(SE_regions)
 hyper_SE_cluster_df[is.infinite(hyper_SE_cluster_df)] = -99
 hyper_SE_cluster_df[hyper_SE_cluster_df == -99] = max (hyper_SE_cluster_df)
-hyper_SE_cluster_df[hyper_SE_cluster_df < -log10(0.05)] = NA
+hyper_SE_cluster_df[hyper_SE_cluster_df < -log10(0.05)] = 0
+#hyper_SE_cluster_df[hyper_SE_cluster_df > 100] = 100
 rownames(hyper_SE_cluster_df) = sub ('ENCODE_','',rownames(hyper_SE_cluster_df))
 rownames(hyper_SE_cluster_df) = sub ('.bed','',rownames(hyper_SE_cluster_df))
 SE_hm2 = Heatmap (hyper_SE_cluster_df,
@@ -434,9 +457,42 @@ SE_hm2 = Heatmap (hyper_SE_cluster_df,
         column_names_rot = 45)
         #right_annotation = motif_ha
         
+ct1 = c('Malignant','Mesothelium','Alveolar',
+  'Fibroblasts','SmoothMuscle','Endothelial',
+  'Myeloid','T_cells',#'NK',
+  'B_cells','Plasma','pDCs')
+ct2 = c('Mammary_gland_primary_cell_mammary-epithelial-cell',
+  #'Skin_in_vitro_differentiated_cells_bipolar-neuron',
+  'Skin_primary_cell_keratinocyte',
+  'AT1','AT2',
+  'Lung_primary_cell_fibroblast-of-lung',
+  'Smoothmuscle',
+  'Endothelial',
+  'Blood_primary_cell_CD14-positive-monocyte',
+  'Tcell',
+  #'NK',
+  'Blood_primary_cell_Bcell')        
+rownames(hyper_SE_cluster_df)
+SE_hm3 = Heatmap (as.data.frame(hyper_SE_cluster_df)[ct2,ct1],
+        clustering_distance_columns = 'euclidean',
+        clustering_distance_rows = 'euclidean',
+        cluster_rows = F,
+        #col = pals_heatmap[[5]],
+        cluster_columns=F,#col = pals_heatmap[[1]],
+        row_names_gp = gpar(fontsize = 8),
+        column_names_gp = gpar(fontsize = 10),
+        #rect_gp = gpar(col = "white", lwd = .5),
+        border=TRUE, 
+        col=viridis::viridis(100),
+        column_names_rot = 45)
+        #right_annotation = motif_ha
+        
 
-pdf (file.path('Plots', 'hyper_hub_SE.pdf'),width=5.5, height=5)
-SE_hm2
+# pdf (file.path('Plots', 'hyper_hub_SE2.pdf'),width=5.5, height=5)
+# SE_hm2
+# dev.off()
+pdf (file.path('Plots', 'hyper_hub_SE3.pdf'),width=5.5, height=3)
+SE_hm3
 dev.off()
 
 

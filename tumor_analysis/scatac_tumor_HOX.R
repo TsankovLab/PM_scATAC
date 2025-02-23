@@ -46,13 +46,13 @@ sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
 #archp$Sample2 = factor (archp$Sample2, levels = sarc_order$sampleID)
 
 # Subset ArchR project to remove normal sample ####
-archp_NN = archp[archp$Sample2 != 'normal_pleura']
+archp_NN = archp[archp$Sample2 != 'normal1']
 
 # Plot UMAP of samples and clusters ####
 metaGroupNames = c('Sample2','Clusters')
 pdf()
 p <- plotEmbedding(
-    ArchRProj = archp, 
+    ArchRProj = archp_NN, 
     colorBy = "cellColData", 
     name = metaGroupNames[1], 
     embedding = "UMAP",
@@ -68,7 +68,7 @@ dev.off()
 
 pdf()
 p <- plotEmbedding(
-    ArchRProj = archp, 
+    ArchRProj = archp_NN, 
     colorBy = "cellColData", 
     name = metaGroupNames[2], 
     embedding = "UMAP"#,
@@ -154,25 +154,25 @@ dev.off()
 # wrap_plots (TF_p, ncol=5)
 # dev.off()
 
-# # Check individual TFs
+# Check individual TFs
 
-# tf_markers = c('NFKB1','NFKB2','SNAI2','SOX9','SOX6','TWIST1','ZEB1','HOXB13')
-# markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
-# markerMotifs = grep ("z:", markerMotifs, value = TRUE)
-# #archp = addImputeWeights (archp)
-# pdf()
-# TF_p = plotEmbedding(
-#     ArchRProj = archp, 
-#     colorBy = "MotifMatrix", 
-#     name = sort(markerMotifs), 
-#     embedding = "UMAP",
-#     pal = rev (palette_deviation),
-#     imputeWeights = getImputeWeights(archp)
-# )
-# dev.off()
-# pdf (file.path ('Plots','top_TF_markers.pdf'), width = 30, height=18)
-# wrap_plots (TF_p, ncol=4)
-# dev.off()
+tf_markers = c('HOXA13','HOXB13','HOXC13','HOXC10')
+markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
+markerMotifs = grep ("z:", markerMotifs, value = TRUE)
+#archp = addImputeWeights (archp)
+pdf()
+TF_p = plotEmbedding(
+    ArchRProj = archp_NN, 
+    colorBy = "MotifMatrix", 
+    name = sort(markerMotifs), 
+    embedding = "UMAP",
+    pal = rev (palette_deviation),
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+pdf (file.path ('Plots','HOX_genes_umap.pdf'), width = 30, height=18)
+wrap_plots (TF_p, ncol=4)
+dev.off()
 
 # # ridge plots of TF modules ####
 # tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat_NN[names(km$cluster[km$cluster == x]),]))
@@ -197,7 +197,7 @@ dev.off()
 # dev.off()
 
 # Alternatively run DAM per cluster / sample ####
-archp$Clusters_sample = paste0(archp_NN$Clusters, '_',archp_NN$Sample2)
+archp_NN$Clusters_sample = paste0(archp_NN$Clusters, '_',archp_NN$Sample2)
 Clusters_sample = paste0(archp_NN$Clusters, '_',archp_NN$Sample2)
 remove_low_clusters = !Clusters_sample %in% names(table (Clusters_sample)[table (Clusters_sample) < 10])
 Clusters_sample = Clusters_sample[remove_low_clusters]
@@ -209,8 +209,8 @@ force=TRUE
 source (file.path('..','..','git_repo','utils','DAM.R'))
 archp = archp2
 
-ha = rowAnnotation (foo = anno_mark(at = match(head(DAM_df$gene[DAM_df$comparison=='C1_P11'],top_genes),colnames(mMat_mg)), 
-    labels = head(DAM_df$gene[DAM_df$comparison=='C1_P11'],top_genes), labels_gp = gpar(fontsize = 6, fontface = 'italic')))
+ha = rowAnnotation (foo = anno_mark(at = match(head(DAM_df$gene[DAM_df$comparison=='C12_P11'],top_genes),colnames(mMat_mg)), 
+    labels = head(DAM_df$gene[DAM_df$comparison=='C12_P11'],top_genes), labels_gp = gpar(fontsize = 8, fontface = 'italic')))
 ha2 = HeatmapAnnotation (sample = sapply (rownames(mMat_mg), function(x) unlist(strsplit(x,'_'))[2]), col= list(sample = palette_sample))
 DAM_hm = Heatmap (t(scale(mMat_mg)), 
           top_annotation = ha2,
@@ -226,7 +226,7 @@ DAM_hm = Heatmap (t(scale(mMat_mg)),
           row_names_gp = gpar(fontsize = 0, fontface = 'italic'),
           column_names_gp = gpar(fontsize = 8),
           column_names_rot = 45,
-          name = 'TFactivity',
+          name = 'TF activity',
           #rect_gp = gpar(col = "white", lwd = .5),
           border=TRUE,
           col = palette_deviation_fun(scale(mMat_mg))
@@ -298,8 +298,6 @@ vp = ggplot (p11_dev_rna, aes(x=logFC, y= -log10(padj))) +
 pdf (file.path ('Plots', 'P11_TF_volcano.pdf'),height=3.5,width=6.5)
 vp
 dev.off()
-
-
 
 
 ### Check HOXB13 expression in bulk and correlate with survival ####

@@ -73,7 +73,7 @@ if (!file.exists ('peak_regions.bed'))
 
 
 ### Hubs analysis #####
-metaGroupName = "Sample2"
+metaGroupName = "Sample3"
 cor_cutoff = 0.3
 #max_dist = 12500
 max_dist = 12500
@@ -85,7 +85,7 @@ dir.create(file.path (hubs_dir, 'Plots'), recursive=T)
 # Generate cluster-aware knn groups ####
 k= 100
 metaGroupName = 'Sample3'
-archp_NN = archp[archp$Sample3 != 'normal_pleura']
+archp_NN = archp[archp$Sample3 != 'normal1']
 
 force = F
 if (!file.exists(paste0 ('KNNs_',metaGroupName,'k_',k,'.rds')) | force)
@@ -130,13 +130,13 @@ run_coax = TRUE
 if (run_coax)
   {
   archp_NN = addCoAx (
-    archp_NN, 
+    archp_NN,
     KNNs,
     maxDist = max_dist)
   }
 
 ### Run hub finder ####
-force=F
+force=T
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (
@@ -149,7 +149,7 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
     min_peaks = min_peaks,
     macs_score = 1,
     dgs = dgs,
-    cores=1
+    cores=300
     ) 
   saveRDS (hubs_obj, file.path(hubs_dir,'global_hubs_obj.rds'))
   hubs_regions = as.data.frame (hubs_obj$hubsCollapsed)
@@ -163,7 +163,8 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
 
 # Generate matrix of fragment counts of hubs x metagroup ####
 metaGroupName = 'Sample3'
-if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
+force=F
+if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))) | force)
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
     ArchRProj = archp_NN))   

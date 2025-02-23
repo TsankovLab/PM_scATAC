@@ -687,9 +687,10 @@ dev.off()
 
 
 # Find shared TF across celltypes ####
-tf_name2 = unlist(sapply (c('TGIF2','TGIF1','TWIST2','NFKB2','HMGA2'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
+tf_name2 = unlist(sapply (c('TGIF1','TWIST2','NFKB2','HMGA2'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
 tf_name2 = paste0('z:',tf_name2)
 archp = addImputeWeights (archp)
+pdf()
 TF_p = plotEmbedding (
     ArchRProj = archp,
     colorBy = "MotifMatrix",
@@ -699,7 +700,7 @@ TF_p = plotEmbedding (
     embedding = "UMAP",
     imputeWeights = getImputeWeights(archp)
     )
-
+dev.off()
 pdf (file.path ('Plots','pan_TF_fplots.pdf'), width = 30,height=16)
 wrap_plots (TF_p, ncol=5)
 dev.off()
