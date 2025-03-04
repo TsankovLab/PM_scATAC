@@ -114,6 +114,64 @@
 # bp
 # dev.off()
 
+# Add epithelioid gene signature 
+epit = list(epit = 'PDZK1IP1
+EFNA5
+RAET1E
+TGM1
+CDON
+ARHGAP44
+EPHB6
+MEIS2
+NRG4
+PARD6B
+PLLP
+RERG
+ANXA9
+SOX6
+PROCR
+C1S
+BCO2
+MSLN
+SLC9A3R1
+KLHL31
+AGFG2
+GALNT9
+ITLN1
+GAL3ST2
+CFB
+SGPP2
+CFI
+KLK11
+NFIA
+SELENBP1
+CARNS1
+FLRT3
+COBL
+GHR
+TJP3
+PRR15
+TPD52L1
+CLDN15
+C1RL')
+epit = strsplit(epit[[1]],'\\\n')
+
+  archp = addModuleScore (
+      ArchRProj = archp,
+      useMatrix = 'GeneScoreMatrix',
+      name = '',
+      features = epit,
+      nBin = 25,
+      nBgd = 100,
+      seed = 1,
+      threads = getArchRThreads(),
+      logFile = createLogFile("addModuleScore")
+    )
+
+# Define sarc - epithelioid module ####
+archp$cNMF_sarc_epit = archp$cNMF20 - archp$cNMF6
+archp$cNMF_sarc_epit = as.numeric(archp$cNMF_sarc_epit)
+
 ### Import H3K27Ac data from primary cells from ENCODE ####
 encode_h3k27ac_path = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/ENCODE/H3K27Ac'
 encode_h3k27ac_files = file.path(encode_h3k27ac_path, list.files(encode_h3k27ac_path,pattern = '.bed'))
@@ -152,7 +210,8 @@ saveArchRProject (archp)
 # Compute correlation of sarcomatoid cNMF external celltypes ####
 sams = unique(archp$Sample3)
 sams = sams[!sams %in% c('normal1','P3','P13','P11_HOX')] # Remove normal and low number samples and outliers
-cnmf_mat = as.matrix(archp@cellColData[,grep ('cNMF', colnames(archp@cellColData))])
+cnmf_mat = archp@cellColData[,grep ('cNMF', colnames(archp@cellColData))]
+cnmf_mat$cNMF_sarc_epit = as.numeric (cnmf_mat$cNMF_sarc_epit)
 cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
 names (cnmf_mat) = sams
 
@@ -290,11 +349,12 @@ archp = addDeviationsMatrix (
 # Compute correlation of sarcomatoid cNMF external celltypes ####
 sams = unique(archp$Sample3)
 sams = sams[!sams %in% c('normal1','P3','P13','P11_HOX')] # Remove normal and low number samples and outliers
-cnmf_mat = as.matrix(archp@cellColData[,grep ('cNMF', colnames(archp@cellColData))])
+cnmf_mat = archp@cellColData[,grep ('cNMF', colnames(archp@cellColData))]
+cnmf_mat$cNMF_sarc_epit = as.numeric (cnmf_mat$cNMF_sarc_epit)
 cnmf_mat = lapply (sams, function(x) scale(t(cnmf_mat[archp$Sample3 == x, ])))
 names (cnmf_mat) = sams
 
-# # Get ENCODE matrix ####
+# # Get Normal Lung matrix ####
 if (!exists('nlSE')) nlSE = fetch_mat (archp, 'Normal_Lung')
 all (colnames(nlSE) == rownames(archp))
 normal_Mat = assays (nlSE)[[1]]
@@ -368,6 +428,7 @@ dev.off()
 
 # Also plot boxplots ordered by correlation to sarcomatoid score ####
 sarc_module = 'cNMF20'
+sarc_module = 'cNMF_sarc_epit'
 top_ext_ct = median_matrix[sarc_module,]
 top_ext_ct = top_ext_ct[order (-top_ext_ct)]
 #top_ext_ct2 = sapply (names(top_ext_ct), function(x) unlist(strsplit (x, '\\|'))[1])
@@ -403,7 +464,7 @@ bp = ggplot (sarc_tf_df, aes (x = score, y = normal_celltype)) +
   coord_flip()
   
 
-pdf (paste0 ('Plots/sarcomatoid_score_normal_lung_boxplots2.pdf'), width = 6,height=3)
+pdf (paste0 ('Plots/sarcomatoid_score_normal_lung_boxplots4.pdf'), width = 6,height=3)
 bp
 dev.off()
 

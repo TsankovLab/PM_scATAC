@@ -231,6 +231,7 @@ for (sam in sams)
 
 cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, function(y) head(y,50)))
 
+    
 # cnmf_overlap = do.call (cbind, lapply (names(cnmf_spectra_unique_l), function(x)
 # 				rowSums (sapply (names(cnmf_spectra_unique_l), function(y)
 # 					unlist(lapply (cnmf_spectra_unique_l[[x]], function(z)

@@ -1,0 +1,200 @@
+  # - conda-forge::python=3.8.10=h49503c6_1_cpython
+  # - conda-forge::scipy=1.7.0=py38h7b17777_1
+  # - conda-forge::numpy=1.21.1=py38h9894fe3_0
+  # - bioconda::iced=0.5.10=py38h803c66d_0
+  # - bioconda::bx-python=0.8.11=py38h024e602_1
+  # - bioconda::pysam=0.16.0.1=py38hf7546f9_3
+  # - bioconda::cooler=0.8.11=pyh3252c3a_0
+
+  # - conda-forge::r-base=4.0.3=h349a78a_8
+  # - conda-forge::r-ggplot2=3.3.5=r40hc72bb7e_0
+  # - conda-forge::r-rcolorbrewer=1.1_2=r40h785f33e_1003
+  # - conda-forge::r-gridbase=0.4_7=r40hc72bb7e_1003
+  
+  # - conda-forge::tbb=2020.2=hc9558a2_0
+  # - bioconda::bowtie2=2.4.4=py38h72fc82f_0
+  # - bioconda::samtools=1.12=h9aed4be_1
+  # - bioconda::multiqc=1.11=pyhdfd78af_0
+
+conda create -n hic python=3.8.10 scipy numpy 
+conda install -c conda-forge gxx
+pip install -U iced
+conda install -c conda-forge -c bioconda bx-python
+conda install bioconda::pysam=0.16.0.1 
+conda install anaconda::pandas
+conda install conda-forge::r-base
+conda install conda-forge::r-ggplot2
+
+conda install bioconda::bowtie2
+conda install bioconda::samtools
+conda install multiqc=1.11
+#conda install pysam
+
+
+projdir
+cd HiCPro/HiC-Pro
+conda activate meso_scatac
+# in R
+
+   ###
+   ## How to generate chromosome size files ?
+   ###
+R   
+require (BSgenome.Hsapiens.UCSC.hg38)
+human_chr <- seqlevels(BSgenome.Hsapiens.UCSC.hg38)[1:22]
+chrom.size <- seqlengths(BSgenome.Hsapiens.UCSC.hg38)[human_chr]
+write.table(chrom.size, file="chrom_hg38.sizes", quote=FALSE, col.names=FALSE, sep="\t")
+
+# Generate restriction fragments file
+bin/utils/digest_genome.py -r mboi -o hg38_mboI.bed ../../../genome_assemblies/hg38.fa
+
+
+conda activate hic
+# hicpro is actually already installed on minerva (but it doesnt work). Need to clone HiC-Pro repo then make configure then cp manually to ~/local/bin/HiC-Pro_3.1.0 and then edit config file to change paths to ~/local/bin/HiC-Pro_3.1.0 and then do make install
+#ml hicpro
+
+projdir
+cd HiCPro/HiC-Pro
+#~/local/bin/HiC-Pro_3.1.0/bin/HiC-Pro -i /sc/arion/scratch/leew17/HiC/rawdata -o /sc/arion/scratch/giottb01/HiCPro -c /sc/arion/projects/Tsankov_Normal_Lung/Bruno/HiCPro_files/config_file.txt
+
+
+
+
+
+# TRy send it as a job
+chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/HiC_Pro.sh
+bsub -J HiC_step1 -P acc_Tsankov_Normal_Lung -q premium -n 8 -W 144:00 -R rusage[mem=16000] -R span[hosts=1] -o HiC.out -e HiC.err /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/HiC_Pro.sh
+
+
+### RE-run with higher resolution contact maps
+~/local/bin/HiC-Pro_3.1.0/bin/HiC-Pro -i /sc/arion/scratch/giottb01/HiCPro2/hic_results/data -o /sc/arion/scratch/giottb01/HiCPro_matrices -c /sc/arion/projects/Tsankov_Normal_Lung/Bruno/HiCPro_files/config_file.txt -s build_contact_maps -s ice_norm
+
+
+
+
+# chmod +x /sc/arion/scratch/giottb01/HiCPro/HiCPro_step1_HiC_HChang.sh
+# cd /sc/arion/scratch/giottb01/HiCPro/
+# bsub -J HiC_step1 -P acc_Tsankov_Normal_Lung -q premium -n 8 -W 12:00 -R rusage[mem=16000] -R span[hosts=1] -o HiC.out -e HiC.err HiCPro_step1_HiC_HChang.sh
+# pip install --upgrade pip setuptools wheel cython
+
+# conda install bx-python=0.8.11 
+
+
+# conda install bioconda::samtools
+# conda install bioconda::bowtie2
+
+
+# #conda install iced=0.5.10 
+# conda install cooler=0.8.11 
+# conda install r-base=4.0.3 
+# conda install r-ggplot2=3.3.5 
+# conda install r-rcolorbrewer=1.1_2 
+# conda install r-gridbase=0.4_7 
+# conda install tbb=2020.2 
+# conda install bowtie2=2.4.4 
+# conda install samtools=1.12 
+# 
+
+
+conda activate meso_scatac
+R
+
+library (HiCExperiment)
+library (HiTC)
+
+samples = c('SRR13961069','SRR13961070','SRR13961071','SRR13961072','SRR13961073','SRR13961074')
+
+hic = list()
+for (sam in samples)
+{
+matrix_files = paste0('/sc/arion/scratch/giottb01/HiCPro_matrices/hic_results/matrix/',sam,'/raw/10000/',sam,'_10000.matrix')
+bed_files = paste0('/sc/arion/scratch/giottb01/HiCPro_matrices/hic_results/matrix/',sam,'/raw/10000/',sam,'_10000_abs.bed')
+bed = read.table (bed_files)
+
+hic[[sam]]<-importC(matrix_files,
+             bed_files)
+}
+
+E14exp = list()
+E14norm.binned = list()
+for (sam in samples)
+{
+# Focus on chr2:156312347−156492348
+
+#chr2 156292347−156642348
+E14subset = extractRegion(hic[[sam]]$chr2chr2, c(1,2),
+chr="chr2", from=156292347, to=156642348)
+## Binning of 5C interaction map
+E14subset.binned <- binningC(E14subset, binsize=10000, method="median", step=3)
+pdf()
+E14exp[[sam]] <- getExpectedCounts(E14subset.binned, method="loess", stdev=TRUE, plot=TRUE)
+dev.off()
+E14norm.binned[[sam]] <- normPerExpected(E14subset.binned, method="loess", stdev=TRUE)
+}
+
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR'
+
+pdf (file.path (projdir,'Plots','HiC_map.pdf'),height=3,width=4)
+lapply (E14norm.binned, function(x) mapC(x))
+#mapC(E14norm.binned[[samples[1]]] - E14norm.binned[[samples[6]]],
+#tracks=list(RefSeqGene=gene, CTCF=ctcf),
+maxrange=10)
+dev.off()
+
+samples2 = c('SRR13961069','SRR13961074')
+for (sam in samples2)
+{
+# Focus on chr2:156312347−156492348
+
+#chr2 156292347−156642348
+E14subset = extractRegion(hic[['SRR13961069']]$chr2chr2, c(1,2),
+chr="chr2", from=156292347, to=156642348)
+
+E14subset2 = extractRegion(hic[['SRR13961074']]$chr2chr2, c(1,2),
+chr="chr2", from=156292347, to=156642348)
+
+## Binning of 5C interaction map
+E14subset.binned <- binningC (E14subset, binsize=10000, method="median", step=3)
+E14subset2.binned <- binningC (E14subset2, binsize=10000, method="median", step=3)
+
+E14norm.binned <- normPerExpected (E14subset.binned, method="loess", stdev=TRUE)
+E14norm2.binned <- normPerExpected (E14subset2.binned, method="loess", stdev=TRUE)
+
+E14norm3.binned = E14norm.binned
+E14norm.binned@intdata[is.na(E14norm.binned@intdata)] = 0
+E14norm2.binned@intdata[is.na(E14norm2.binned@intdata)] = 0
+E14norm3.binned@intdata = E14norm2.binned@intdata - E14norm.binned@intdata
+
+pdf (file.path (projdir,'Plots','HiC_map_diff.pdf'),height=3,width=4)
+mapC (E14norm3.binned, maxrange=10)
+#mapC(E14norm.binned[[samples[1]]] - E14norm.binned[[samples[6]]],
+#tracks=list(RefSeqGene=gene, CTCF=ctcf),
+
+dev.off()
+
+
+
+
+
+
+
+
+# hicpro_file <- HicproFile(matrix_files, bed = bed_files)
+# hic = import(hicpro_file, focus = "chr2:156312347−156492348", resolution = 5000)
+
+# #hic = import(hic_file, focus = "2:157160718-157446103", resolution = 5000)
+
+
+# pdf (file.path('Plots',paste0('HiC_data_NR4A2_locus_',hfile,'_heatmap.pdf')))
+# print(plotMatrix(hic, maxDistance = 300000,use.scores = 'balanced',
+#     cmap = afmhotrColors()))
+# dev.off()
+# ## Horizontal matrix
+# library (HiContacts)
+# plotMatrix(
+#     refocus(hic, 'II'),
+#     use.scores = 'balanced', limits = c(-4, -1), 
+#     maxDistance = 200000
+# )
+
+
