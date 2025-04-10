@@ -90,7 +90,7 @@ palette_deviation_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0, max(a
 palette_enrichment = rev (as.character(paletteer::paletteer_c("grDevices::Purples 3",100)))
 palette_hubs_accessibility = paletteer_c("ggthemes::Classic Orange-White-Blue",20)
 palette_pseudotime = colorRamp2(c(-4,0,4), c('white','white','black'))
-palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('white','white','black'))
+palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#2A5783FF','white','#24693DFF'))
 
 palette_expression_correlation = paletteer::paletteer_c("ggthemes::Green-Blue-White Diverging",100)
 #palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#grey','#FCFDFEFF','#2A6F3FFF'))

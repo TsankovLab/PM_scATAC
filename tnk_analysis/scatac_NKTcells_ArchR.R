@@ -23,7 +23,7 @@ source (file.path('..','..','git_repo','utils','hubs_track.R'))
 #source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads(threads = 1) 
+addArchRThreads(threads = 8) 
 addArchRGenome("hg38")
 
 archp = loadArchRProject (projdir)

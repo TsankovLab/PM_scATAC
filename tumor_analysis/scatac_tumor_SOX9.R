@@ -719,8 +719,8 @@ dev.off()
   # Average mats along sarc module score ####
   library(zoo)
 
-  bin_width <- 30   # Number of observations per bin
-  overlap <- 30    
+  bin_width <- 40   # Number of observations per bin
+  overlap <- 40    
   mMat_ordered = lapply (sams, function(sam) mMat[[sam]][order(cnmf_mat[[sam]][,sarc_module]),])
   names(mMat_ordered) = sams
   mMat_ordered_avg = lapply (sams, function (sam) as.data.frame (lapply (as.data.frame (mMat_ordered[[sam]]), function(x) {
@@ -758,7 +758,7 @@ dev.off()
     })
   m_cor_df = do.call (rbind, m_cor)
   m_cor_df$type = 'activity'
-m_cor_levels = m_cor_df %>% group_by (TF) %>% summarise (median_value = median(score)) %>% arrange(-median_value)
+  m_cor_levels = m_cor_df %>% group_by (TF) %>% summarise (median_value = median(score)) %>% arrange(-median_value)
 
   gs_cor = lapply (sams, function(sam) 
     {
@@ -786,9 +786,9 @@ m_cor_levels = m_cor_df %>% group_by (TF) %>% summarise (median_value = median(s
 
   #lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
 
-  top_sarc_TF = head(m_cor_levels$TF,20)
-  combined_df$TF = factor (combined_df$TF, levels = top_sarc_TF)
-  combined_df = combined_df[combined_df$TF %in% top_sarc_TF, ]
+top_sarc_TF = head(m_cor_levels$TF,20)
+combined_df$TF = factor (combined_df$TF, levels = top_sarc_TF)
+combined_df = combined_df[combined_df$TF %in% top_sarc_TF, ]
 palette_expression_disc = paletteer::paletteer_c("grDevices::Purple-Blue", length(top_sarc_TF))
 
 bp = ggplot(combined_df, aes(x = TF, y = score, fill = TF, color = type)) + 
@@ -814,7 +814,7 @@ bp = ggplot(combined_df, aes(x = TF, y = score, fill = TF, color = type)) +
   scale_color_manual(values = c(activity = '#AE123AFF', genescore = '#001260FF')) +
   geom_hline(yintercept = 0, color = 'red', linetype = 'dashed')
 
-  pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots4.pdf'), width = 8,height=3)
+  pdf (paste0 ('Plots/sarcomatoid_score_TF_activity_boxplots.pdf'), width = 8,height=3)
   bp
   dev.off()
 
@@ -827,7 +827,7 @@ nfeat=5000
 k=25
 cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
 
-sams = c('P1','P4','P5','P8','P11','P12')
+sams_rna = c('P1','P4','P5','P8','P11','P12')
 
 if (!all (names(cnmf_spectra_unique) %in% colnames(metacells@meta.data)))
 {
@@ -842,7 +842,7 @@ metacells_assay = metacells@assays$RNA@layers$data
 rownames (metacells_assay) = rownames (srt)
 metacells_assay = metacells_assay[selected_TF,]
 
-rna_cor = lapply (sams, function(sam)
+rna_cor = lapply (sams_rna, function(sam)
   {
   tmp = cor(as.matrix(t(metacells_assay[,metacells$sampleID == sam])), as.matrix(metacells@meta.data[,sarc_module])[metacells$sampleID == sam,,drop=F], method='spearman')
   tmp = as.data.frame (tmp)
@@ -865,7 +865,7 @@ top_sarc_TF = head(m_cor_levels$TF,20)
 combined_df_rna = combined_df_rna[combined_df_rna$TF %in% top_sarc_TF, ]
 palette_expression_disc = paletteer::paletteer_c("grDevices::Purple-Blue", length(top_sarc_TF))
 
-bp = ggplot(combined_df, aes(x = TF, y = score, fill = TF, color = type)) + 
+bp = ggplot(combined_df_rna, aes(x = TF, y = score, fill = TF, color = type)) + 
   geom_boxplot(
     aes(group = interaction(TF, type)),  # Split by both TF and type
     position = position_dodge(0.8),
@@ -885,17 +885,12 @@ bp = ggplot(combined_df, aes(x = TF, y = score, fill = TF, color = type)) +
   ) +
   gtheme +
   scale_fill_manual(values = palette_expression_disc) +
-  scale_color_manual (values = c(activity = '#AE123AFF', genescore = 'darkgreen')) +
+  scale_color_manual (values = c(activity = '#AE123AFF', expression = 'darkgreen')) +
   geom_hline(yintercept = 0, color = 'red', linetype = 'dashed')
 
-  pdf (paste0 ('Plots/sarcomatoid_score_TF_boxplots4.pdf'), width = 8,height=3)
+  pdf (paste0 ('Plots/sarcomatoid_score_TF_expression_boxplots.pdf'), width = 8,height=3)
   bp
   dev.off()
-
-
-pdf (file.path ('Plots','sarcomatoid_score_activity_expression_boxplots2.pdf'), width = 7,height=3)
-bp
-dev.off()
 
 
 # Compute co-occurrence of sarcomatoid TFs ####

@@ -9,6 +9,7 @@
 
 # Read in peak files from scATAC studies ####
 projects = c('yang_kidney','Tsankov_lung','rawlins_fetal_lung','JShendure','greenleaf_colon','greenleaf_brain','bingren_pan')
+projects = c('Tsankov_lung','rawlins_fetal_lung')
 projects_peaks = lapply (seq_along(projects), function(x) {
   bed_files = list.files (file.path('..','all_tissues_ArchR',projects[x],'PeakCalls'), pattern = '.rds')
   grlist = lapply (seq_along(bed_files), 
@@ -21,95 +22,25 @@ projects_peaks = unlist (projects_peaks, recursive=F)
 #### chromVAR analysis ####
 archp = addBgdPeaks (archp, force= TRUE)
 archp = addPeakAnnotations (ArchRProj = archp, 
-     regions = projects_peaks, name = "scATAC_datasets")
+     regions = projects_peaks, name = "scATAC_fetal_adult")
 
 archp = addDeviationsMatrix (
   ArchRProj = archp, 
-  peakAnnotation = "scATAC_datasets",
+  peakAnnotation = "scATAC_fetal_adult",
   force = TRUE
 )
 
-if (!any (ls() == 'encSE')) encSE = ArchR::getMatrixFromProject (archp, useMatrix = 'ENCODE_H3K4me3Matrix')
-  encSE = encSE[, archp$cellNames]
-  encMat = as.matrix (assays (encSE)[[1]])
-if (!any (ls() == 'scaSE')) scaSE = ArchR::getMatrixFromProject (archp, useMatrix = 'scATAC_datasetsMatrix')
-  scaSE = scaSE[, archp$cellNames]
-  scaMat = as.matrix (assays (scaSE)[[1]])
-  scaMat = scaMat[!grepl('Tsankov', rownames (scaMat)),]
+if (!any (ls() == 'afSE')) afSE = fetch_mat (archp, 'scATAC_fetal_adult')
+afSE = afSE[, archp$cellNames]
+afMat = as.matrix (scale (assays (afSE)[[1]]))
 
-dev_sample = lapply (unique(archp$Sample2), function(x) {
-	tmp = scaMat[,archp$cellNames [archp$Sample2 == x]]
-	tmp_max = apply (tmp, 2, function(y) which.max(y))
-	data.frame (
-		celltype = rownames (tmp)[tmp_max],
-		barcode = colnames (tmp)
-		)
-})
-
-# prop_sample = lapply (dev_sample, function(x) as.data.frame (proportions (table (x$celltype))))
-# prop_sample = lapply (dev_sample, function(x) as.data.frame (proportions (table (x$celltype))))
-# prop_sample = lapply (prop_sample, function(x) {x = head(x[order(-x$Freq),],5); x$Var1 = factor(x$Var1, levels = x$Var1); x})
-# #prop_sample = lapply (prop_sample, function(x) {x$Freq = proportions (x$Freq); x})
-
-# # ----- This section prepare a dataframe for labels ---- #
-# # Get the name and the y position of each label
-# # calculate the ANGLE of the labels
-# # # prop_sample = lapply (prop_sample, function(x)
-# # 	{
-# # 	number_of_bar <- nrow(x)
-# # 	x$id = 1:number_of_bar
-# # 	angle <- 90 - 360 * (x$id-0.5) / number_of_bar     # I substract 0.5 because the letter must have the angle of the center of the bars. Not extreme right(1) or extreme left (0)
-# # 	x$hjust<-ifelse( angle < -90, 1, 0)
-# # 	x$angle<-ifelse(angle < -90, angle+180, angle)
-# # 	x
-# # 	})
- 
-# # # calculate the alignment of labels: right or left
-# # # If I am on the left part of the plot, my labels have currently an angle < -90
- 
-# # # flip angle BY to make them readable
-# # # ----- ------------------------------------------- ---- #
- 
-# # p <- lapply (seq_along(prop_sample), function(x) ggplot(prop_sample[[x]], aes(x=as.factor(Var1), y=Freq)) +       # Note that id is a factor. If x is numeric, there is some space between the first bar
-  
-# #   # This add the bars with a blue color
-# #   geom_bar(stat="identity", fill=alpha("blue", 0.3)) +
-  
-# #   # Limits of the plot = very important. The negative value controls the size of the inner circle, the positive one is useful to add size over each bar
-# #   ylim(-1,1) +
-  
-# #   # Custom the theme: no axis title and no cartesian grid
-# #   theme_minimal() +
-# #   theme(
-# #     axis.text = element_blank(),
-# #     axis.title = element_blank(),
-# #     panel.grid = element_blank(),
-# #     plot.margin = unit(rep(4,4), "cm")     # This remove unnecessary margin around plot
-# #   ) +
-  
-# #   # This makes the coordinate polar instead of cartesian.
-# #   coord_polar (start = 0) + 
-# #   geom_text (data=prop_sample[[x]], aes(x=id, y=Freq+0.01, label=Var1, hjust=hjust), color="black", fontface="bold",alpha=0.6, size=2.5, angle= prop_sample[[x]]$angle, inherit.aes = FALSE ) +
-# #   ggtitle (unique(archp$Sample2)[x]))
-
-
-# # pdf (file.path ('Plots', 'scatacDatasets_deviations_sample_barplot.pdf'),10,10)
-# # p
-# # dev.off()
-
-# # Generate normal barplots ####
-# bp = lapply (seq_along(prop_sample), function(x) ggplot (prop_sample[[x]], aes (x = Var1, y = Freq)) + geom_bar(stat = 'identity') +gtheme + ggtitle(unique(archp$Sample2)[x]))
-
-# pdf (file.path ('Plots', 'scatacDatasets_deviations_sample_barplot2.pdf'),width = 3,5)
-# bp
-# dev.off()
 
 # Generate heatmap ####
-scaMat = as.data.frame (t(scaMat))
-scaMat$Sample = archp$Sample2
-scaMat = aggregate (.~Sample, data = scaMat, FUN = 'mean')
-rownames (scaMat) = scaMat[,1]
-scaMat = scaMat[,-1]
+afMat = as.data.frame (t(afMat))
+afMat$Sample = archp$Sample3
+afMat = aggregate (.~Sample, data = afMat, FUN = 'mean')
+rownames (afMat) = afMat[,1]
+afMat = afMat[,-1]
 # row_names = unique (as.character(unlist (lapply (prop_sample, function(x) x$Var1))))
 # prop_sample = lapply (prop_sample, function(x) {rownames(x) = x$Var1; x})
 # prop_sample_df = do.call (cbind, lapply (prop_sample, function(x) x[row_names,]))
@@ -120,14 +51,63 @@ scaMat = scaMat[,-1]
 # prop_sample_df[is.na(prop_sample_df)] = 0
 ht = Heatmap (
   # prop_sample_df, 
-  scale (scaMat),
-  col = palette_deviation, 
+  afMat,
+  col = palette_deviation_fun (afMat), 
   row_names_gp= gpar (fontsize=6), 
   column_names_gp= gpar (fontsize=6), 
   column_names_rot = 45)
-pdf (file.path ('Plots', 'scatacDatasets_deviations_sample_heatmap.pdf'),width = 44.8,height=4)
+pdf (file.path ('Plots', 'scatacDatasets_deviations_sample2_heatmap.pdf'),width = 10.8,height=4)
 ht
 dev.off()
+
+
+
+
+# Correlate scatac celltype dev with motif dev only HOXB13 vs fetal meso ####
+if(!exists ('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = as.matrix (scale(assays (mSE)[[1]]))
+rownames(mMat) = rowData (mSE)$name
+if(!exists ('afSE')) afSE = fetch_mat (archp, 'scATAC_fetal_adult')
+afMat = scale(assays (afSE)[[1]])
+
+all (colnames (afMat) == colnames (mMat))
+all (colnames(afMat) == rownames(archp@cellColData))
+#scatac_celltype = 'bingren_pan_Astrocyte.2'
+scatac_celltype = c('rawlins_fetal_lung_Earlymeso',
+    'rawlins_fetal_lung_Mid_latemeso',
+    'Tsankov_lung_Mesothelium'
+    )
+#scatac_celltype = 'rawlins_fetal_lung_Mid_latemeso'
+metaGroupName = 'Sample3'
+scatac_tf_cor = lapply (unique (as.character(archp@cellColData[,metaGroupName])), 
+  function(x) 
+  cor (t(afMat)[as.character(archp@cellColData[,metaGroupName]) == x,], 
+    t(mMat)[as.character(archp@cellColData[,metaGroupName]) == x,grep ('HOXB13',rownames(mMat)), drop=F]))
+names (scatac_tf_cor) = unique (as.character(archp@cellColData[,metaGroupName]))
+scatac_tf_cor = do.call (cbind, scatac_tf_cor)
+colnames (scatac_tf_cor) = unique (as.character(archp@cellColData[,metaGroupName]))
+
+# Plot only fetal mesothelium ####
+ht = Heatmap (
+  # prop_sample_df, 
+  t(scale(scatac_tf_cor)),
+  cluster_rows=T,
+  cluster_columns=T,
+  col = rev(palette_deviation), 
+  row_names_gp= gpar (fontsize=7), 
+  column_names_gp= gpar (fontsize=7),
+  name = 'cor',
+  border=T#, 
+  #column_names_rot = 45
+  )
+pdf (file.path ('Plots', 'fetal_HOXB13_chromvar_cor_heatmap2.pdf'),width = 12,height=5.2)
+ht
+dev.off()
+
+
+
+
+
 
 
 scatac_celltype = 'bingren_pan_Astrocyte.2'
@@ -170,47 +150,6 @@ pdf (file.path ('Plots','scatac_celltypes_modules_ridge_plots.pdf'), width = 20,
 wrap_plots (rp, ncol=5)
 dev.off()
 
-
-# Correlate scatac celltype dev with motif dev only HOXB13 vs fetal meso ####
-if(!exists ('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = as.matrix (assays (mSE)[[1]])
-rownames(mMat) = rowData (mSE)$name
-if(!exists ('scaSE')) scaSE = fetch_mat (archp, 'scATAC_datasets')
-scaMat = as.matrix (assays (scaSE)[[1]])
-
-all (colnames (scaMat) == colnames (mMat))
-all (colnames(scaMat) == rownames(archp@cellColData))
-#scatac_celltype = 'bingren_pan_Astrocyte.2'
-scatac_celltype = c('rawlins_fetal_lung_Earlymeso',
-    'rawlins_fetal_lung_Mid_latemeso',
-    'Tsankov_lung_Mesothelium'
-    )
-#scatac_celltype = 'rawlins_fetal_lung_Mid_latemeso'
-metaGroupName = 'SampleP11'
-scatac_tf_cor = lapply (unique (as.character(archp@cellColData[,metaGroupName])), 
-  function(x) 
-  cor (t(scaMat)[as.character(archp@cellColData[,metaGroupName]) == x,scatac_celltype], 
-    t(mMat)[as.character(archp@cellColData[,metaGroupName]) == x,grep ('HOXB13',rownames(mMat)), drop=F]))
-names (scatac_tf_cor) = unique (as.character(archp@cellColData[,metaGroupName]))
-scatac_tf_cor = do.call (cbind, scatac_tf_cor)
-colnames (scatac_tf_cor) = unique (as.character(archp@cellColData[,metaGroupName]))
-
-# Plot only fetal mesothelium ####
-ht = Heatmap (
-  # prop_sample_df, 
-  t(scatac_tf_cor),
-  cluster_rows=F,
-  cluster_columns=F,
-  col = rev(palette_deviation), 
-  row_names_gp= gpar (fontsize=7), 
-  column_names_gp= gpar (fontsize=7),
-  name = 'cor',
-  border=T#, 
-  #column_names_rot = 45
-  )
-pdf (file.path ('Plots', 'fetal_HOXB13_chromvar_cor_heatmap.pdf'),width = 2,height=3.2)
-ht
-dev.off()
 
 # Show as scatterplot for P11 HOX+ ####
 library (ggpubr)

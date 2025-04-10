@@ -123,7 +123,7 @@ if (!file.exists ('bueno_rpkm_cleaned.rds'))
 #### Import MESOMICS ####
 if (!file.exists ('mesomics_data.rds'))
   {
-  msm_mat = read.table ('/ahg/regevdata/projects/ICA_Lung/Wooseung/Mesothelioma/Data/Expression/TPM_COnverted_GeneCount.tsv')
+  msm_mat = read.table ('/sc/arion/projects/Tsankov_Normal_Lung/ICA_Lung/Wooseung/Mesothelioma/Data/Expression/TPM_COnverted_GeneCount.tsv')
   #msm = log2(msm+1)
   #msm = read.table ('/ahg/regevdata/projects/ICA_Lung/Wooseung/Mesothelioma/Data/Expression/VStexpr.tsv', header=T)
   msm_meta = read.table ('/ahg/regevdata/projects/ICA_Lung/Wooseung/Mesothelioma/Data/Mesothelioma_SampleInfo.txt', header=T)
