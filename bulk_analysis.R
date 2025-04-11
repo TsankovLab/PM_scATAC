@@ -486,12 +486,23 @@ rownames (tcga_mat) = unname (sapply (rownames(tcga_mat), function(x) unlist (st
 
 
 ### Correlate gene with rest of genes across samples #####
-study = 'tcga'
-your.gene1 = 'HOXB13'
-your.gene2 = rownames(meso_bulk_l[[study]])
-cor_mat = as.data.frame (t(cor (t(meso_bulk_l[[study]][your.gene1,, drop=F]), t(meso_bulk_l[[study]][your.gene2,]), method = 'spearman')))
-head (cor_mat[order(-cor_mat[[1]]),, drop=F],100)
+studies = c('tcga','bueno','mesomics')
 
+cor_mat_l = list()
+for (study in studies)
+  {
+  your.gene1 = 'HOXB13'
+  your.gene2 = rownames(meso_bulk_l[[study]])
+  cor_mat = as.data.frame (t(cor (t(meso_bulk_l[[study]][your.gene1,, drop=F]), t(meso_bulk_l[[study]][your.gene2,]), method = 'spearman')))
+  cor_mat_l[[study]] = cor_mat[order (cor_mat[[1]]),,drop=F]
+  }
+shared_genes = rownames(cor_mat_l[[1]])[rownames(cor_mat_l[[1]]) %in%  rownames(cor_mat_l[[2]])]
+shared_genes = shared_genes[shared_genes %in%  rownames(cor_mat_l[[3]])]
+cor_mat_df = do.call (cbind, lapply (cor_mat_l, function(x) x[shared_genes,]))
+rownames (cor_mat_df) = shared_genes
+cor_mat_mean = rowMeans (cor_mat_df)
+cor_mat_mean = cor_mat_mean[order (cor_mat_mean)]
+head (cor_mat_mean,50)
 
 
 ###########################

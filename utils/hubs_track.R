@@ -435,7 +435,7 @@ plotBrowserTrack2 <- function(
     geom_area(stat = "identity") + 
     facet_wrap(facets = ~group, strip.position = 'right', ncol = 1) +
     ylab(sprintf("Coverage\n(Norm. ATAC Signal Range (%s-%s) by %s)", round(min(ylim),2), round(max(ylim),2), normMethod)) +
-    scale_color_manual(values = pal) +
+    scale_color_manual(values = 'black') +
     scale_fill_manual(values = pal) +
     scale_x_continuous(limits = c(start(region), end(region)), expand = c(0,0)) +
     scale_y_continuous(limits = ylim, expand = c(0,0)) +

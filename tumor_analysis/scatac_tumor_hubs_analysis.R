@@ -136,7 +136,7 @@ if (run_coax)
   }
 
 ### Run hub finder ####
-force=T
+force=F
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
   hubs_obj = hubs_finder (

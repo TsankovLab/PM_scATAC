@@ -1096,21 +1096,23 @@ metaGroupName='Sample3'
 matching_samples=c('normal_pleura','P1','P3','P4','P5','P8','P11','P11_HOX','P12','P14','P23')
 TF = 'RUNX2'
 TF = 'SOX6'
+TF = 'SOX9'
 sample_sarc_order_levels = levels(sample_sarc_order)
 #sample_sarc_order_levels = sample_sarc_order_levels[c(7,1:6,8:13)]
 sample_sarc_order_levels = sample_sarc_order_levels[! sample_sarc_order_levels %in% 'normal1']
-
+palette_sample_scs = as.character(paletteer::paletteer_c("grDevices::Purple-Blue",length (unique(archp_NN@cellColData[,metaGroupName]))))
+names (palette_sample_scs) = sample_sarc_order_levels
 pdf()
 meso_markers <- plotBrowserTrack2 (
     ArchRProj = archp_NN, 
     sizes = c(6, 1, 1, 1,1,1),
     groupBy = metaGroupName, 
     #region = ext_range(hubs_obj$hubsCollapsed[match(top_hubs, hubs_obj$hubs_id)],50000,50000),
-    #region = ext_range(hubs_obj$hubsCollapsed[grep('SOX9', hubs_obj$hubsCollapsed$gene)],50000,50000),
+    region = ext_range(hubs_obj$hubsCollapsed[grep('SOX9', hubs_obj$hubsCollapsed$gene)],10000,100000),
     sample_levels = sample_sarc_order_levels,
     #geneSymbol = TF,
     genelabelsize=2,
-    geneSymbol = TF,
+    #geneSymbol = TF,
     normMethod = "ReadsInTSS",
     scCellsMax=100,
     hubs_regions = hubs_obj$hubsCollapsed,
@@ -1119,11 +1121,11 @@ meso_markers <- plotBrowserTrack2 (
         "hubTrack",'hubregiontrack'),
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-    upstream = 200000,
-    pal = palette_sample,
+    #upstream = 1000,
+    pal = palette_sample_scs,
     minCells = 25,
     #ylim=c(0,0.4),
-    downstream = 50000,
+    #downstream = 100000,
     #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
     #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
 #    loops = getCoAccessibility (archp, corCutOff = 0.25),
@@ -1846,4 +1848,35 @@ force=FALSE
 
 
 
-  
+  ### Generate feature plots of uncommited state from Bueno ####
+force = FALSE
+uncommitted = list (uncommitted = c('MEST','HHIP','DNMT3A','TET1'))
+archp@cellColData = archp@cellColData[,!grepl ('uncommitted',colnames(archp@cellColData), ignore.case=T)]
+archp = addModuleScore (
+    ArchRProj = archp,
+    useMatrix = 'GeneScoreMatrix',
+    name = '',
+    features = uncommitted,
+    nBin = 25,
+    nBgd = 100,
+    seed = 1,
+    threads = getArchRThreads(),
+    logFile = createLogFile("addModuleScore")
+  )
+colnames (archp@cellColData) = gsub ('^\\.','',colnames(archp@cellColData))
+
+archp = addImputeWeights (archp)
+#celltype_markers = c('WT1','CALB2','RUNX2','TCF3','SOX9','SOX6','MESP1','HMGA1','TWIST1','SNAI2')
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "cellColData", 
+    name = 'uncommitted', 
+    embedding = "UMAP",
+    pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+pdf (file.path('Plots','uncommitted_feature_plots.pdf'), width = 10, height = 10)
+p
+dev.off()
