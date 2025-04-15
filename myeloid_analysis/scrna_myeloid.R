@@ -295,7 +295,32 @@ wrap_plots (fp (srt, names (shared_cnmf_genes)))
 wrap_plots (fp (srt, c('TREM2','SPP1','C3','VCAN','NFKB1')))
 dev.off()
 
+### Annotate based on cnmfs ####
+shared_cnmf_genes2 = shared_cnmf_genes
+new_cnmf_names = c(
+	cnmf.1 = 'TREM2', 
+	cnmf.3 = 'Monocytes',
+	cnmf.4 ='SPP1',
+	cnmf.5 = 'IL1B',
+	cnmf.6 = 'cDCs',
+	cnmf.8 = 'IFN',
+	cnmf.9 = 'IM',
+	cnmf.10 = 'C1Q'
+	)
+names (shared_cnmf_genes2) = new_cnmf_names[names (shared_cnmf_genes2)]
 
+srt = ModScoreCor (
+    seurat_obj = srt, 
+    geneset_list = shared_cnmf_genes2, 
+    cor_threshold = NULL, 
+    pos_threshold = NULL, # threshold for fetal_pval2
+    listName = 'shared_cnmf2', outdir = NULL)
+
+pdf (file.path ('Plots','cnmf_named_umap.pdf'))
+DimPlot (srt, group.by = 'shared_cnmf2_r_max', reduction='umap')
+dev.off()
+
+sv()
 
 # # Try with PCA ####
 # cnmfs = data.frame (srt@meta.data[,names (shared_cnmf_genes)])
@@ -326,7 +351,7 @@ dev.off()
 
 
 library (hdWGCNA)
-force = TRUE
+force = F
 # table (srt$sampleID)
 # srt$sampleID
 #srt_tam = srt[,srt$celltype2 == 'TAMs']

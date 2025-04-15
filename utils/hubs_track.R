@@ -431,11 +431,11 @@ plotBrowserTrack2 <- function(
   }
   
   #Plot Track
-  p <- ggplot(df, aes_string("x","y", color = "group", fill = "group")) + 
-    geom_area(stat = "identity") + 
+  p <- ggplot(df, aes_string("x","y", fill = "group")) + 
+    geom_area(stat = "identity", color = "black", size = 0.2) + 
     facet_wrap(facets = ~group, strip.position = 'right', ncol = 1) +
     ylab(sprintf("Coverage\n(Norm. ATAC Signal Range (%s-%s) by %s)", round(min(ylim),2), round(max(ylim),2), normMethod)) +
-    scale_color_manual(values = 'black') +
+    #scale_color_manual(values = pal) +
     scale_fill_manual(values = pal) +
     scale_x_continuous(limits = c(start(region), end(region)), expand = c(0,0)) +
     scale_y_continuous(limits = ylim, expand = c(0,0)) +

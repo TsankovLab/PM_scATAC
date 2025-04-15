@@ -1108,7 +1108,7 @@ meso_markers <- plotBrowserTrack2 (
     sizes = c(6, 1, 1, 1,1,1),
     groupBy = metaGroupName, 
     #region = ext_range(hubs_obj$hubsCollapsed[match(top_hubs, hubs_obj$hubs_id)],50000,50000),
-    region = ext_range(hubs_obj$hubsCollapsed[grep('SOX9', hubs_obj$hubsCollapsed$gene)],10000,100000),
+    region = ext_range (hubs_obj$hubsCollapsed[grep('SOX9', hubs_obj$hubsCollapsed$gene)],10000,50000),
     sample_levels = sample_sarc_order_levels,
     #geneSymbol = TF,
     genelabelsize=2,

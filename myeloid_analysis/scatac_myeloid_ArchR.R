@@ -456,10 +456,6 @@ dev.off()
   
 
 
-
-
-
-
 ### Co-expression of TFs across cells #### 
 
 ### Run TF correlation to identify TF modules across TNK cells #### 
@@ -920,6 +916,122 @@ sp
 dev.off()
 
 
+
+
+
+
+# Differential Peaks in cells positive for km2 vs rest ####
+# Find DAP ####
+#force = FALSE
+archp$inflamed = ifelse (archp$mod_2 > 0, 'inflamed','non_inflamed')
+metaGroupName = 'inflamed'
+force=F
+if (!file.exists ('DAP_inflamed_pairwise.rds') | force)
+  {
+  DAP_list = getMarkerFeatures (
+    ArchRProj = archp, 
+    testMethod = "wilcoxon",
+          useGroups = "inflamed",
+          bgdGroups = "non_inflamed",
+    k=100,
+    binarize = FALSE,
+    useMatrix = "PeakMatrix",
+    groupBy = metaGroupName
+  #  useSeqnames="z"
+  )
+  saveRDS (DAP_list, 'DAP_inflamed_pairwise.rds')
+  } else {
+  DAP_list = readRDS ('DAP_inflamed_pairwise.rds')
+  }
+DAP_res = do.call (cbind, (assays(DAP_list)))
+colnames (DAP_res) = names(assays(DAP_list))
+DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
+rownames(DAP_res) = as.character(DAP_res_regions)
+
+pdf(file.path('Plots','inflamed_MA_plot.pdf'), width=5,height=5)
+pma <- markerPlot(seMarker = DAP_list, name = 'inflamed', cutOff = "FDR <= 0.01", plotAs = "MA")
+pma
+dev.off()
+
+# Take only significant regions ####
+DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
+saveRDS (GRanges(rownames(DAP_res_sig)), 'inflamed_peaks.rds')
+
+
+# Run GSEA enrichment analysis #### 
+#!!! To run this analysis load only ArcHR and clusterprofiler packages !!!!
+library (fgsea)    
+options(warn = 0)
+ps = getPeakSet (archp)
+
+gmt_annotations = c(
+'h.all.v7.4.symbol.gmt',#,
+'c5.bp.v7.1.symbol.gmt',
+'c3.tft.v7.1.symbol.gmt'
+)
+
+gmt.file = paste0 ('../../git_repo/files/h.all.v7.4.symbols.gmt')
+gmt.file = paste0 ('../../git_repo/files/c5.bp.v7.1.symbol.gmt')
+# gmt.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/GSE9650_NAIVE_VS_EXHAUSTED_CD8_TCELL_DN.v2024.1.Hs.gmt'
+# gmt.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/GSE9650_EXHAUSTED_VS_MEMORY_CD8_TCELL_UP.v2024.1.Hs.gmt'
+# gmt.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/GSE24026_PD1_LIGATION_VS_CTRL_IN_ACT_TCELL_LINE_UP.v2024.1.Hs.gmt'
+# csv.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/Tcell_exhastuion_genes_PMID37091230.csv'
+pathways = clusterProfiler::read.gmt (gmt.file)
+pathways = pathways[grep('inflammatory', pathways$term,ignore.case=T),]
+#pathways = read.csv (csv.file)
+pathways = split(pathways$gene, pathways$term)
+#pathways = gmtPathways (gmt.file)
+DAP_list = readRDS ('DAP_inflamed_pairwise.rds')
+DAP_res = do.call (cbind, (assays(DAP_list)))
+colnames (DAP_res) = names(assays(DAP_list))
+DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
+rownames(DAP_res) = as.character(DAP_res_regions)
+
+peak_genes = unname(ps[queryHits (findOverlaps(ps, GRanges (rownames(DAP_res))))]$nearestGene)
+names (peak_genes) = as.character(ps)[queryHits(findOverlaps (ps,GRanges (rownames(DAP_res))))]
+peak_genes = peak_genes[rownames(DAP_res)]
+#peak_genes = setNames (-log10(DAP_res$Pval) * sign (DAP_res$Log2FC), peak_genes)
+peak_genes = setNames (DAP_res$Log2FC, peak_genes)
+#peak_genes = peak_genes[!duplicated(names(peak_genes))]
+#names (peak_genes) = 
+peak_genes = peak_genes[!duplicated(names(peak_genes))]
+peak_genes = peak_genes[!is.na(names(peak_genes))]
+library (BiocParallel)
+BiocParallel::register(BiocParallel::SerialParam())
+
+### fgsea throws a BiocParallel error when I load all packages including clusterProfiler...try avoiding loading packages except ArchR and fgsea
+#peak_genes2 = setNames(order(peak_genes), names(peak_genes))
+fgseaRes = fgseaMultilevel (pathways, 
+          peak_genes,#, 
+          minSize=15, 
+        #  scoreType='pos',
+          maxSize=1500,
+          nproc=1,
+          nPermSimple=100000,
+          BPPARAM = NULL
+          )
+pdf (file.path ('Plots','GO_Inflammatory_enrichment_plot.pdf'), width=5, height=3)
+plotEnrichment(pathways[["GO_INFLAMMATORY_RESPONSE"]],
+               peak_genes) + labs(title="GO_INFLAMMATORY_RESPONSE")
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Run peak2genes results with hubs links ####
 run_p2g = T
   if (run_p2g)
@@ -1179,130 +1291,12 @@ TF_p = plotEmbedding (
     imputeWeights = NULL
     )
 dev.off()
+
 pdf(file.path('Plots','avg_AP1_deviation_fplot.pdf'),15,15)
 wrap_plots(TF_p)
 wrap_plots(umap_p1)
 wrap_plots (umap_p0,umap_p2)#,umap_p3)
 dev.off()
-
-
-
-
-
-# ############ INTEGRATION WITH scRNA ######
-# archp <- addGeneIntegrationMatrix (
-#     ArchRProj = archp, 
-#     useMatrix = "GeneScoreMatrix",
-#     matrixName = "GeneIntegrationMatrix",
-#     reducedDims = "IterativeLSI",
-#     seRNA = srt,
-#     addToArrow = TRUE,
-#     groupRNA = "celltype2",
-#     nameCell = "predictedCell_Un",
-#     nameGroup = "predictedGroup_Un",
-#     nameScore = "predictedScore_Un",
-#     force = TRUE
-# )
-
-# #rna_p = DimPlot (archp, group.by = 'celltype')
-# pdf()
-# int_p <- plotEmbedding(
-#     archp, 
-#     colorBy = "cellColData", 
-#     name = "predictedGroup_Un", 
-#     embedding = 'UMAP_H'
-# #    pal = palD
-# )
-# int_p2 <- plotEmbedding(
-#     archp, 
-#     colorBy = "cellColData", 
-#     name = "predictedGroup_Un", 
-#     highlightCells = rownames(archp@cellColData)[archp$predictedGroup_Un == 'Mono_CD14'],
-#     embedding = 'UMAP_H'
-# #    pal = palD
-# )
-# dev.off()
-# pdf (paste0 (projdir,'/Plots/RNA_integration_UMAPs.pdf'), width=15)
-# int_p
-# int_p2
-# dev.off()
-
-
-
-# ## Add RNA integration annotation for monocytes 
-# archp_MAC = archp[!archp$predictedGroup_Un %in% c('DC2','Mono_CD14','Mono_CD16')]
-
-# # Check if monocytes are better defined with label transfer
-# TF = c('S100A9','EREG','CCL2')
-# metaGroupName='predictedGroup_Un'
-# pdf()
-# #archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
-# #metaGroupName = 'fetal_group'
-# meso_markers <- plotBrowserTrack2 (
-#     ArchRProj = archp,#[!archp$Sample3 %in% c('P11_HOX')], 
-#     #group_order = sample_levels, 
-#     #ylim = c(0,0.30),
-#     groupBy = metaGroupName, 
-#     #sample_levels = sample_sarc_order,
-#     minCells = 10,
-#     geneSymbol = TF,
-#     plotSummary = c("bulkTrack", "featureTrack", 
-#         "loopTrack","geneTrack", 
-#         "hubTrack",'hubregiontrack'),
-#     #pal = palette_sample,
-#     #pal = palette_fetal,
-#     threads=1,
-#     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
-#     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-#     upstream = 100000,
-#     downstream = 100000,
-#     loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
-#     #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
-#     #loops = getCoAccessibility (archp, corCutOff = 0.3,
-#     #  returnLoops = TRUE),
-#     useGroups= NULL
-# )
-# dev.off()
-# plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('Monocytes_markers_coveragePlots.pdf'),addDOC=F)
-
-
-# # Generate heatmap of cnmf modules across cells and use kmeans to cluster ####
-# shared_cnmf = readRDS (file.path('..','scrna','shared_cnmf_myeloid.rds'))
-# shared_cnmf = lapply (shared_cnmf, function(x) x[x %in% getFeatures (archp)])
-
-# remove_modules = c('cnmf.3','cnmf.6') # remove monocyres and cDC modules
-# shared_cnmf_MAC = shared_cnmf[!names(shared_cnmf) %in% remove_modules]
-# cnmf_scatac = as.data.frame (t(scale(t(archp_MAC@cellColData[,names(shared_cnmf_MAC)]))))
-
-# set.seed (123)
-# cnmf_remove = c('cnmf.7') # remove redundant cell cycle module 
-# km = kmeans (scale(cnmf_scatac[,!colnames(cnmf_scatac) %in% cnmf_remove]), centers=6)  
-
-# ha = HeatmapAnnotation (sample = archp_MAC$Sample, col=list(sample = palette_sample))
-# hm = Heatmap (t(scale(cnmf_scatac[,!colnames(cnmf_scatac) %in% cnmf_remove])), 
-#   col = palette_genescore_fun(scale(cnmf_scatac)), 
-#   top_annotation = ha,
-#   show_column_dend = F,
-#   column_split = km$cluster,
-# #  column_km=9,
-#   row_names_gp = gpar (fontsize = 8),
-#   column_names_gp = gpar (fontsize = 0),
-#   border=T)
-
-# pdf (file.path ('Plots','cnmf_scatac_barcodes_heatmap_scaled_only_MAC2.pdf'), height=2.5)
-# hm
-# dev.off()
-
-# archp$cnmf_celltypes2 = archp$predictedGroup_Un
-# archp$cnmf_celltypes2[match(names(km$cluster), rownames(archp@cellColData))] = paste0('cnmf_',km$cluster)
-# archp$cnmf_celltypes2[archp$cnmf_celltypes2 =='cnmf_1'] = 'IM'
-# archp$cnmf_celltypes2[archp$cnmf_celltypes2 =='cnmf_2'] = 'IL1B'
-# archp$cnmf_celltypes2[archp$cnmf_celltypes2 =='cnmf_3'] = 'TREM2'
-# archp$cnmf_celltypes2[archp$cnmf_celltypes2 =='cnmf_4'] = 'SPP1'
-# archp$cnmf_celltypes2[archp$cnmf_celltypes2 =='cnmf_5'] = 'IFN'
-# archp$cnmf_celltypes2[archp$cnmf_celltypes2 =='cnmf_6'] = 'C1QA'
-
-
 
 
 
@@ -1328,10 +1322,63 @@ if (exp_bigwig)
 
 
 
+### Compare expression of genes in inflammation peaks vs rest ####
+tf_match = getMatches (archp)
+bg_peaks = getPeakSet (archp)
+colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
+#ap1_complex = c('JUN','FOSB','FOS','BACH1','SMARCC1','FOSL2','JUND','JDP2','BATF')
+km1 = names (km$cluster[km$cluster == 1])
+km2 = names (km$cluster[km$cluster == 2])
+tf_match2 = tf_match[,km2] 
+tf_match2 = tf_match2[rowSums(assay(tf_match2)) > 0,]
+tf_match1 = tf_match[,km1]
+tf_match1 = tf_match1[rowSums(assay(tf_match1)) > 0,]
 
+peakSet1 = rowRanges(tf_match1)[queryHits(findOverlaps(tf_match1, bg_peaks))] 
+peakSet2 = rowRanges(tf_match2)[queryHits(findOverlaps(tf_match2, bg_peaks))] 
+identical (peakSet1, peakSet2)
+#hub_regions = hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]
+hub_regions_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, hub_regions))]
 
+metaGroupName = 'celltype2'
+pMats = getGroupSE(
+  ArchRProj = archp,
+  useMatrix = 'PeakMatrix',
+  groupBy = metaGroupName,
+  divideN = TRUE,
+  scaleTo = NULL,
+  threads = getArchRThreads(),
+  verbose = TRUE,
+  logFile = createLogFile("getGroupSE")
+)
 
+is_sequential <- function(x) {
+  length(x) > 1 && all(diff(x) == 1)
+}
+peakset = getPeakSet(archp)
+pmat_peakset = makeGRangesFromDataFrame(rowData(pMats))
+pmat_peakset$nearestGene = peakset$nearestGene
+#is_sequential(queryHits (findOverlaps (pmat_peakset, peakset)))
 
+metaGroupName = 'shared_cnmf2_r_max'
+
+for (tf in km2)
+  {
+  tf_peaks = rowRanges(tf_match[,tf][rowSums(assay(tf_match[,tf]))>0,])
+  tf_peaks_fragments = pMats[queryHits (findOverlaps (pmat_peakset, tf_peaks)),]
+  pmat_peakset_sub = pmat_peakset[queryHits (findOverlaps (pmat_peakset, tf_peaks)),]
+  #tf_peaks = tf_peaks[queryHits (findOverlaps (tf_peaks, makeGRangesFromDataFrame(rowData(pMats))))]
+  tf_peaks_fragments = as.data.frame(assay(tf_peaks_fragments))
+  
+  ps = log2(as.data.frame (AverageExpression (srt, 
+  features = unique(pmat_peakset_sub$nearestGene), 
+  group.by = metaGroupName)[[1]]) +1)
+
+  sapply (rownames(ps), function(x) cor(ps[x,], 
+    na.omit(tf_peaks_fragments[unname(pmat_peakset_sub$nearestGene) == x,]))
+
+  }
+min_exp = .1
 
 
 

@@ -23,7 +23,7 @@ source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 #source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 
-addArchRThreads (threads = 4) 
+addArchRThreads (threads = 8) 
 addArchRGenome ("Hg38")
 
 ####### ANALYSIS of stroma compartment #######
@@ -134,7 +134,7 @@ dev.off()
      embedding = "UMAP_H")
   dev.off()
 
-  pdf (file.path('Plots','celltype_umap.pdf'),5,5)
+  pdf (file.path('Plots','celltype_umap2.pdf'),5,5)
   print (umap_p3)
   print (umap_p5)
   dev.off()
@@ -148,6 +148,7 @@ dev.off()
 
 ### Call peaks on celltypes ####
 metaGroupName = 'Clusters_H'
+metaGroupName = 'celltype'
 force = FALSE
 peak_reproducibility='2'
 pdf() # This is necessary cause cairo throws error and stops the script

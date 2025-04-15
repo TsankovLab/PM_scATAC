@@ -145,20 +145,186 @@ if (!file.exists(file.path (hubs_dir,paste0('hubs_',metaGroupName,'_mat.rds'))))
   hubsSample_mat = as.data.frame (hubsSample_mat)
 
 #hubsSample_mat = hubsSample_mat[, !colnames (hubsSample_mat) %in% c('normal_Pericytes','LEC'),]
-ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
+#ha = HeatmapAnnotation (size = anno_barplot(width (hubs_obj$hubsCollapsed), gp = gpar(color = "red"), height =  unit(8, "mm")))
 #ha2 = HeatmapAnnotation (status = ifelse (grepl('tumor', colnames(hubsSample_mat)),'tumor','normal'), which='row')
 hm = Heatmap (
-  scale (t(hubsSample_mat)), 
-  top_annotation = ha, 
+  t(scale (t(hubsSample_mat))), 
+ # top_annotation = ha, 
  # left_annotation = ha2,
-  column_names_gp = gpar(fontsize = 0),
+  column_names_gp = gpar(fontsize = 6),
+  row_names_gp = gpar(fontsize = 0),
+  column_names_rot = 45,
   show_column_dend = F,
   row_dend_width = unit(3,'mm'),
   row_dend_side = 'left',
   col=rev (palette_fragments))
-pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=3)
+
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=4, width=3)
 hm
 dev.off()
+
+# Find hubs high in mesothelium and fibroblasts ####
+hubsSample_mat_scaled = t(scale (t(hubsSample_mat)))
+fib_meso_avg = rowMeans (hubsSample_mat_scaled[, c('Fibroblasts','Mesothelium')])
+fib_meso_avg = fib_meso_avg[order(-fib_meso_avg)]
+
+
+# Check top correlated hubs on browser track ####
+top_hubs = as.character(head(hub_cor_levels$hub_id, 50))
+metaGroupName='celltype'
+
+TF = 'RUNX2'
+
+pdf()
+meso_markers = plotBrowserTrack2 (
+    ArchRProj = archp, 
+    sizes = c(6, 1, 1, 1,1,1),
+    groupBy = metaGroupName, 
+    #region = ext_range(hubs_obj$hubsCollapsed[match(top_hubs, hubs_obj$hubs_id)],50000,50000),
+    region = ext_range (hubs_obj$hubsCollapsed[hubs_obj$hubs_id %in% head(names (fib_meso_avg))],10000,50000),
+    sample_levels = NULL,
+    #geneSymbol = TF,
+    genelabelsize=2,
+    #geneSymbol = TF,
+    normMethod = "ReadsInTSS",
+    scCellsMax=100,
+    hubs_regions = hubs_obj$hubsCollapsed,
+    plotSummary = c("bulkTrack", "featureTrack", 
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+    #upstream = 1000,
+    pal = palette_stroma,
+    minCells = 25,
+    #ylim=c(0,0.4),
+    #downstream = 100000,
+    #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+#    loops = getCoAccessibility (archp, corCutOff = 0.25),
+    #  returnLoops = TRUE),
+    useGroups= NULL,
+    loops = getPeak2GeneLinks (archp, corCutOff = 0.2,returnLoops = TRUE),
+    #hubs = hubs_obj$peakLinks2
+)
+dev.off()
+
+plotPDF (meso_markers, ArchRProj = archp, 
+  width=5,height=3, 
+  name =paste0('cor_hubs_sarc_TFs_coveragePlots.pdf'),
+  addDOC = F) 
+
+metaGroupName = 'sampleID3'
+srt_NN = srt[,srt@meta.data[,metaGroupName] != 'normal_pleura']
+hub_id = 'HUB7701'
+hub_gr = hubs_obj$hubsCollapsed[match (hub_id, hubs_obj$hubs_id)]
+genes_in_region = unique(getPeakSet (archp)[subjectHits (findOverlaps (hub_gr, getPeakSet (archp)))]$nearestGene)
+genes_in_region = c(genes_in_region)
+top_dah = data.frame (
+gene = colMeans (srt_NN@assays$RNA@data[rownames(srt_NN) %in% genes_in_region,,drop=F]),
+group = srt_NN@meta.data[,metaGroupName])
+top_dah$group = factor (top_dah$group, levels = rev(sample_sarc_order_levels[!sample_sarc_order_levels %in% c('P3','P13')]))
+top_dah = na.omit(top_dah)
+bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
+vlp + 
+bxpv + 
+scale_fill_manual (values = palette_sample) +
+#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+gtheme_no_rot
+
+pdf (file.path ('Plots', paste0('scrna_region_boxplots.pdf')), height=4, width=4)
+bp
+dev.off()
+
+
+# Plot hubs fibroblasts vs mesothelium in scatterplot ####
+
+# Import peaks mesothelium and fibroblasts ####
+fib_peaks = readRDS ('PeakCalls/Fibroblasts-reproduciblePeaks.gr.rds')
+fib_peaks = getPeakSet (archp)[queryHits(findOverlaps(getPeakSet(archp),fib_peaks))]
+meso_peaks = readRDS ('PeakCalls/Mesothelium-reproduciblePeaks.gr.rds')
+meso_peaks = getPeakSet (archp)[queryHits(findOverlaps(getPeakSet(archp),meso_peaks))]
+
+
+  if(!exists('fragments')) fragments = unlist (getFragmentsFromProject (
+    ArchRProj = archp))
+  
+  fib_mat = matrix (ncol = 1, nrow = length(fib_peaks))
+  colnames (fib_mat) = 'Fibroblasts'
+  rownames (fib_mat) = as.character(fib_peaks)
+    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[archp$celltype == 'Fibroblasts']]  
+    fragments_in_sample_in_peaks = countOverlaps (fib_peaks, fragments_in_sample)
+    fib_mat[,1] = fragments_in_sample_in_peaks
+  frags_in_sample = sum (archp$nFrags[as.character(archp$celltype) == 'Fibroblasts'])
+  fib_mat = t(t(fib_mat) * (10^6 / frags_in_sample)) # scale
+
+  meso_mat = matrix (ncol = 1, nrow = length(meso_peaks))
+  colnames (meso_mat) = 'Mesothelium'
+  rownames (meso_mat) = as.character(meso_peaks)
+    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[archp$celltype == 'Mesothelium']]  
+    fragments_in_sample_in_peaks = countOverlaps (meso_peaks, fragments_in_sample)
+    meso_mat[,1] = fragments_in_sample_in_peaks
+  frags_in_sample = sum (archp$nFrags[as.character(archp$celltype) == 'Mesothelium'])
+  meso_mat = t(t(meso_mat) * (10^6 / frags_in_sample)) # scale
+
+# Combine peak mats
+meso_fib_mat = cbind (as.data.frame(meso_mat),as.data.frame (fib_mat)[rownames(as.data.frame(meso_mat)),])
+colnames (meso_fib_mat) = c('Mesothelium','Fibroblasts')
+
+library (ggpointdensity)
+library (smplot2)
+mf_p = ggplot (log2(hubsSample_mat[,c('Fibroblasts','Mesothelium')]+1),
+  aes (x = Fibroblasts, y = Mesothelium)) + 
+geom_point (color = 'grey22',alpha=0.4) +  
+geom_pointdensity (alpha=1, size=.1) +
+scale_color_viridis (option='F') +
+# geom_smooth(
+#   method = "lm", 
+#   color = "white", 
+#   fill = "white", 
+#   se = T, 
+#   linetype = "dashed", 
+#   size = .4
+# ) + # Regression line with confidence interval
+labs(
+  title = "cHubs",
+  #subtitle = "Scatterplot with Regression Line and Correlation Coefficient",
+  x = "Fibroblasts",
+  y = "Mesothelium") +
+  sm_statCorr(linetype = 'dashed',color = "white")+ 
+  gtheme_no_rot
+  # ) +
+png (file.path ('Plots','Fibroblasts_mesothelium_hubs_scatter.png'),1000,1000,res=300)
+mf_p
+dev.off()
+
+mf_p = ggplot (log2(meso_fib_mat[,c('Fibroblasts','Mesothelium')]+1),
+  aes (x = Fibroblasts, y = Mesothelium)) + 
+geom_point (color = 'grey22',alpha=0.4) +  
+geom_pointdensity (alpha=1, size=.1) +
+scale_color_viridis (option='F') +
+# geom_smooth(
+#   method = "lm", 
+#   color = "white", 
+#   fill = "white", 
+#   se = T, 
+#   linetype = "dashed", 
+#   size = .4
+# ) + # Regression line with confidence interval
+labs(
+  title = "Peaks",
+  #subtitle = "Scatterplot with Regression Line and Correlation Coefficient",
+  x = "Fibroblasts",
+  y = "Mesothelium") +
+  sm_statCorr(linetype = 'dashed',color = "white") + 
+  gtheme_no_rot
+  # ) +
+png (file.path ('Plots','Fibroblasts_mesothelium_peaks_scatter.png'),1000,1000,res=300)
+mf_p
+dev.off()
+
+
+
 
 
 
