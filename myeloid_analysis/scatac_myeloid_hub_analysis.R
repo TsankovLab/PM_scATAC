@@ -196,7 +196,7 @@ hubsCell_mat = as.data.frame (hubsCell_mat)
 
 # Compute differential hub accessibility DHA ####
 library (presto)
-metaGroupName = 'cnmf_celltypes'
+metaGroupName = 'celltype2'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 res = wilcoxauc (log2(hubsCell_mat+1), as.character (archp@cellColData[,metaGroupName]))
 
@@ -319,10 +319,10 @@ pdf (file.path ('Plots','Treg_maturation_trajectory.pdf'))
 p
 dev.off()
 
-trajMM  <- getTrajectory(ArchRProj = archp, name = "Treg_maturation", useMatrix = "MotifMatrix", log2Norm = FALSE)
-trajGS  <- getTrajectory(ArchRProj = archp, name = "Treg_maturation", useMatrix = "GeneScoreMatrix", log2Norm = FALSE)
-p1 <- plotTrajectoryHeatmap(trajMM, pal = palette_deviation)
-p2 <- plotTrajectoryHeatmap(trajGS, pal = palette_expression)
+trajMM  <- getTrajectory (ArchRProj = archp, name = "Treg_maturation", useMatrix = "MotifMatrix", log2Norm = FALSE)
+trajGS  <- getTrajectory (ArchRProj = archp, name = "Treg_maturation", useMatrix = "GeneScoreMatrix", log2Norm = FALSE)
+p1 <- plotTrajectoryHeatmap (trajMM, pal = palette_deviation)
+p2 <- plotTrajectoryHeatmap (trajGS, pal = palette_expression)
 
 pdf (file.path ('Plots','Treg_TF_trajectory.pdf'))
 p1
@@ -382,7 +382,7 @@ top_cor_hubs_labels = head (paste0(hubs_obj$hubs_id,':',hubs_obj$hubsCollapsed$g
 
 
 ha = HeatmapAnnotation (psuedotime = pseudotime_binned_avg[order (pseudotime_binned_avg)])
-ha2 = rowAnnotation(foo = anno_mark(at = seq_along(top_cor_hubs_labels), 
+ha2 = rowAnnotation (foo = anno_mark(at = seq_along(top_cor_hubs_labels), 
     labels = top_cor_hubs_labels, labels_gp = gpar(fontsize = 6)))
 hm = Heatmap (
   t(scale (t(hubsSample_mat_top))), 

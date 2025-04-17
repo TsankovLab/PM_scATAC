@@ -741,66 +741,6 @@ sp
 dev.off()
 
 
-# Compare inflamed vs non-inflamed Momacs ####
-library (presto)
-archp$inflamed = ifelse (archp$mod_2 > 0, 'inflamed','non_inflamed')
-metaGroupName = 'inflamed'
-all (colnames(hubsCell_mat) == rownames(archp@cellColData))
-metagroup = as.character (archp@cellColData[,metaGroupName])
-res = wilcoxauc (log2(hubsCell_mat+1), metagroup)
-res = res[res$logFC > 0,]
-
-res_l = lapply (split (res, res$group), function(x){
-  tmp = x[order (x$padj),]
-  tmp
-})
-
-res_df = do.call (rbind, res_l)
-res_df$gene = hubs_obj$hubsCollapsed$gene[match(res_df$feature, hubs_obj$hubs_id)]
-
-top_hubs = 20
-res_df_top = res_df %>% group_by (group) %>%
-  slice_head(n = top_hubs)
-
-hub = res_df_top$feature
-hub = hubs_obj$hubs_id[grep ('NFKB1', hubs_obj$hubsCollapsed$gene)]
-#sample_levels = c('Monocytes','cDCs','SPP1','TREM2','C1Q','IFN','IM')
-
-sample_levels = c('Monocytes','cDCs','SPP1','TREM2','C1Q','IFN','IM')
-
-pdf()
-#archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
-#metaGroupName = 'fetal_group'
-meso_markers <- plotBrowserTrack2 (
-    ArchRProj = archp,#[!archp$Sample3 %in% c('P11_HOX')], 
-    sample_levels = sample_levels, 
-    hubs_regions = hubs_obj$hubsCollapsed,
-    #ylim = c(0,0.30),
-    groupBy = metaGroupName, 
-    #sample_levels = sample_sarc_order,
-    minCells = 10,
-    #geneSymbol = TF,
-    plotSummary = c("bulkTrack", "featureTrack", 
-        "loopTrack","geneTrack", 
-        "hubTrack",'hubregiontrack'),
-    #pal = palette_sample,
-    #pal = palette_fetal,
-    threads=1,
-    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
-    region = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub, hubs_obj$hubs_id)]),100000,100000),
-    #upstream = 100000,
-    #downstream = 100000,
-    loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
-    pal = palette_myeloid,
-    #loops = getCoAccessibility (archp, corCutOff = 0.3,
-    #  returnLoops = TRUE),
-    useGroups= NULL
-)
-dev.off()
-plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('MPM_markers_inflamed_coveragePlots.pdf'),addDOC=F)
-  
-
-
 # Compare cNMF modules with inflammatory program in scATAC-seq and scRNA-seq ####
 shared_cnmf = readRDS (file.path('..','scrna','shared_cnmf_myeloid.rds'))
 shared_cnmf = lapply (shared_cnmf, function(x) x[x %in% getFeatures (archp)])
@@ -914,9 +854,6 @@ sp = sp + stat_cor (
 pdf (file.path ('Plots','cnmf_AP1_scatterplots2.pdf'),width=9, height=1.4)
 sp
 dev.off()
-
-
-
 
 
 
@@ -1177,57 +1114,45 @@ dev.off()
 #TF = 'SNAI1'
 TF = sapply (unique(res_df_top$gene), function(x) unlist(strsplit(x, '-'))[1])
 metaGroupName = 'celltype2'
+# Compare inflamed vs non-inflamed Momacs ####
+library (presto)
+archp$inflamed = ifelse (archp$mod_2 > 0, 'inflamed','non_inflamed')
+metaGroupName = 'inflamed'
+all (colnames(hubsCell_mat) == rownames(archp@cellColData))
+metagroup = as.character (archp@cellColData[,metaGroupName])
+res = wilcoxauc (log2(hubsCell_mat+1), metagroup)
+res = res[res$logFC > 0,]
 
-pdf()
-#archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
-#metaGroupName = 'fetal_group'
-meso_markers <- plotBrowserTrack2 (
-    ArchRProj = archp,#[!archp$Sample3 %in% c('P11_HOX')], 
-    #group_order = sample_levels, 
-    #ylim = c(0,0.30),
-    groupBy = metaGroupName, 
-    hubs_regions = hubs_obj$hubsCollapsed,
-    #sample_levels = sample_sarc_order,
-    minCells = 10,
-    geneSymbol = TF,
-    plotSummary = c("bulkTrack", "featureTrack", 
-        "loopTrack","geneTrack", 
-        "hubTrack",'hubregiontrack'),
-    #pal = palette_sample,
-    #pal = palette_fetal,
-    threads=1,
-    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
-    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-    upstream = 100000,
-    downstream = 100000,
-    loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
-    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
-    #loops = getCoAccessibility (archp, corCutOff = 0.3,
-    #  returnLoops = TRUE),
-    useGroups= NULL
-)
-dev.off()
-plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('MPM_markers_',TF,'_coveragePlots.pdf'),addDOC=F)
-  
+res_l = lapply (split (res, res$group), function(x){
+  tmp = x[order (x$padj),]
+  tmp
+})
 
+res_df = do.call (rbind, res_l)
+res_df$gene = hubs_obj$hubsCollapsed$gene[match(res_df$feature, hubs_obj$hubs_id)]
 
-# Plot largest chubs ####  
-TF = head (hubs_obj$hubsCollapsed,10)
+top_hubs = 10
+res_df_top = res_df %>% group_by (group) %>%
+  slice_head(n = top_hubs)
+
+hub = res_df_top$feature
+#hub = hubs_obj$hubs_id[grep ('NFKB1', hubs_obj$hubsCollapsed$gene)]
+#sample_levels = c('Monocytes','cDCs','SPP1','TREM2','C1Q','IFN','IM')
+
+sample_levels = c('Monocytes','cDCs','SPP1','TREM2','C1Q','IFN','IM')
 metaGroupName = 'celltype2'
-TF = 'NFKB1'
 pdf()
 #archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
 #metaGroupName = 'fetal_group'
 meso_markers <- plotBrowserTrack2 (
     ArchRProj = archp,#[!archp$Sample3 %in% c('P11_HOX')], 
-    #group_order = sample_levels, 
+    sample_levels = sample_levels, 
+    hubs_regions = hubs_obj$hubsCollapsed,
     #ylim = c(0,0.30),
     groupBy = metaGroupName, 
-    hubs_regions = hubs_obj$hubsCollapsed,
     #sample_levels = sample_sarc_order,
     minCells = 10,
     #geneSymbol = TF,
-    region = ext_range(TF, 100000,100000),
     plotSummary = c("bulkTrack", "featureTrack", 
         "loopTrack","geneTrack", 
         "hubTrack",'hubregiontrack'),
@@ -1235,21 +1160,44 @@ meso_markers <- plotBrowserTrack2 (
     #pal = palette_fetal,
     threads=1,
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
-    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
-    upstream = 100000,
-    downstream = 100000,
+    region = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub, hubs_obj$hubs_id)]),10000,10000),
+    #upstream = 100000,
+    #downstream = 100000,
     loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
-    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+    pal = palette_myeloid,
     #loops = getCoAccessibility (archp, corCutOff = 0.3,
     #  returnLoops = TRUE),
     useGroups= NULL
 )
 dev.off()
-plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('MPM_markers_largest_cHubs_coveragePlots.pdf'),addDOC=F)
+plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=8, name =paste0('MPM_markers_inflamed_coveragePlots.pdf'),addDOC=F)
+
+
+metaGroupName = 'shared_cnmf2_r_max'
+hub_gr = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub, hubs_obj$hubs_id)]),100000,100000)
+genes_in_region = unique(getPeakSet (archp)[subjectHits (findOverlaps (hub_gr, getPeakSet (archp)))]$nearestGene)
+genes_in_region = c(genes_in_region)
+genes_in_region = 'CD44'
+top_dah = data.frame (
+  gene = colMeans (srt@assays$RNA@data[rownames(srt) %in% genes_in_region,,drop=F]),
+  group = srt@meta.data[,metaGroupName])
+top_dah$group = factor (top_dah$group, levels = rev(sample_levels))
+top_dah = na.omit(top_dah)
+bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
+vlp + 
+bxpv + 
+scale_fill_manual (values = palette_myeloid) +
+#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+gtheme_no_rot
+
+pdf (file.path ('Plots', paste0('scrna_region_boxplots.pdf')), height=4, width=4)
+bp
+dev.off()
 
 
 
-# Check footprint of RUNX and NR4A2 across celltypes ####
+
+# Check footprint across celltypes ####
 metaGroupName='celltype2'
 archp <- addGroupCoverages (ArchRProj = archp, groupBy = metaGroupName)
 motifPositions <- getPositions (archp)

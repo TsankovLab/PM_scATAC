@@ -163,6 +163,19 @@ pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), 
 hm
 dev.off()
 
+
+
+#### Compute P2G ####
+run_p2g_TF = TRUE
+
+    maxDist = 250000
+    archp = addPeak2GeneLinks(
+        ArchRProj = archp,
+        useMatrix = 'GeneScoreMatrix',
+        reducedDims = "IterativeLSI",
+        maxDist = maxDist
+    )
+  
 # Find hubs high in mesothelium and fibroblasts ####
 hubsSample_mat_scaled = t(scale (t(hubsSample_mat)))
 fib_meso_avg = rowMeans (hubsSample_mat_scaled[, c('Fibroblasts','Mesothelium')])
@@ -181,7 +194,7 @@ meso_markers = plotBrowserTrack2 (
     sizes = c(6, 1, 1, 1,1,1),
     groupBy = metaGroupName, 
     #region = ext_range(hubs_obj$hubsCollapsed[match(top_hubs, hubs_obj$hubs_id)],50000,50000),
-    region = ext_range (hubs_obj$hubsCollapsed[hubs_obj$hubs_id %in% head(names (fib_meso_avg))],10000,50000),
+    region = ext_range (hubs_obj$hubsCollapsed[hubs_obj$hubs_id %in% head(names (fib_meso_avg))],100000,100000),
     sample_levels = NULL,
     #geneSymbol = TF,
     genelabelsize=2,
