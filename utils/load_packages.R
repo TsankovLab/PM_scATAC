@@ -29,6 +29,7 @@ packages = c(
  'clusterProfiler',
  'scales',
  'ggridges',
- 'viridis'
+ 'viridis',
+ 'dendextend'
 )
 lapply(packages, require, character.only = TRUE)

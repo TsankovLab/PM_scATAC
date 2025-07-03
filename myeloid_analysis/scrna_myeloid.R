@@ -29,6 +29,8 @@ source (file.path('..','..','git_repo','utils','useful_functions.R'))
 source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
 source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 source (file.path('..','..','git_repo','utils','palettes.R'))
+scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline'
+
 
 sample_names = c(
     'P1', # p786
@@ -211,7 +213,7 @@ for (sam in sams)
 	repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 	
 	### RUN consensus NMF ####
-	source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R')) 		
+	source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R'))
 	}
 
 
@@ -220,7 +222,7 @@ sams = unique (archp$Sample)
 sams = sams[sams %in% unique(srt$sampleID)]
 
 k_selection = 10
-sams = sams[sams != 'P10'] # double check why P10 was not included
+#sams = sams[sams != 'P10'] # double check why P10 was not included
 cnmf_spectra_unique_l = list()
 for (sam in sams)
 	{
@@ -229,7 +231,7 @@ for (sam in sams)
 	cnmf_spectra_unique_l[[sam]] = cnmf_spectra_unique
 	}
 
-cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, function(y) head(y,50)))
+cnmf_spectra_unique_l = lapply (cnmf_spectra_unique_l, function(x) lapply (x, function(y) head(y, 100)))
 
     
 # cnmf_overlap = do.call (cbind, lapply (names(cnmf_spectra_unique_l), function(x)
@@ -254,37 +256,60 @@ force=FALSE
 if (!file.exists('shared_cnmf_myeloid.rds') | force)
 	{
 	cnmf_spectra_unique_l = unlist(cnmf_spectra_unique_l, recursive=F)
+	set.seed (123)
 	ov_mat = ovmat (cnmf_spectra_unique_l, ov_threshold = 0.2, df=T) 
-	set.seed (1234)
 	km = kmeans (ov_mat, centers=10)
 	ho = Heatmap (ov_mat,
-	column_split =km$cluster , 
+	column_split = km$cluster , 
 	row_split = km$cluster, 
-		col = viridis::inferno(100))
-	pdf (file.path ('Plots','shared_cNMF_overlap2.pdf'),width = 12,12)
+	row_names_gp = gpar(fontsize = 2),
+	column_names_gp = gpar(fontsize = 2),
+		col = RColorBrewer::brewer.pal(9,'Blues'))
+	pdf (file.path ('Plots','shared_cNMF_overlap3.pdf'),width = 5, height=4)
 	ho
 	dev.off()
 	
 	shared_cnmf = split (rownames(ov_mat), km$cluster)
+	remove_metamodule = 1 # remove metamodule include non-overlapping modules
+	shared_cnmf = shared_cnmf[names (shared_cnmf) != as.character(remove_metamodule)]
 	overlap_cutoff = 2
-	shared_cnmf_genes = lapply (shared_cnmf, function(x) names(table (unlist(cnmf_spectra_unique_l[x]))[table (unlist(cnmf_spectra_unique_l[x])) > overlap_cutoff]))
-	shared_cnmf_genes = shared_cnmf_genes[sapply(shared_cnmf_genes, function(x) length(x) >0)]
+	shared_cnmf_genes = lapply (shared_cnmf, function(x) 
+		{
+		ranked_genes = table (unlist(cnmf_spectra_unique_l[x]))
+		ranked_genes = ranked_genes[order(-ranked_genes)]
+		names (ranked_genes[ranked_genes > overlap_cutoff])
+		})
+	shared_cnmf_genes = shared_cnmf_genes[sapply(shared_cnmf_genes, function(x) length(x) > 0)]
 	names (shared_cnmf_genes) = paste0('cnmf.',names(shared_cnmf_genes))
 	# Remove cellcycle modules 
-	cellcycle_modules = c('cnmf.2','cnmf.7')
-	shared_cnmf_genes = shared_cnmf_genes[!names (shared_cnmf_genes) %in% cellcycle_modules]
-	saveRDS (shared_cnmf_genes, paste0 ('shared_cnmf_myeloid.rds'))
-	
-	} else {
-	
+	#cellcycle_modules = c('cnmf.2','cnmf.7')
+	#shared_cnmf_genes = shared_cnmf_genes[!names (shared_cnmf_genes) %in% cellcycle_modules]
+new_cnmf_names = c(
+	cnmf.1 = 'SPP1', 
+	cnmf.3 = 'LILRA',
+	cnmf.4 ='IM',
+	cnmf.5 = 'TREM2',
+	cnmf.6 = 'Mono',
+	cnmf.7 = 'IFN_CXCLs',
+	cnmf.8 = 'cDCs2',
+	cnmf.9 = 'CC_S',
+	cnmf.10 = 'cDCs'
+	)
+names (shared_cnmf_genes) = new_cnmf_names[names (shared_cnmf_genes)]
+	saveRDS (shared_cnmf_genes, paste0 ('shared_cnmf_myeloid.rds'))	
+	} else {	
 	shared_cnmf_genes = readRDS ('shared_cnmf_myeloid.rds')
 	}
 
+shared_cnmf_genes = lapply (shared_cnmf_genes, function(x) head (x,50))
+
 # Add modules to srt object and plot them on UMAPs ####
+remove_modules = c('cDCs2','CC_S','LILRA') # remove monocyres cDC and CC modules. Consider re-inculding CC 
+shared_cnmf_genes = shared_cnmf_genes[!names(shared_cnmf_genes) %in% remove_modules]
 srt = ModScoreCor (
-    seurat_obj = srt, 
-    geneset_list = shared_cnmf_genes, 
-    cor_threshold = NULL, 
+    seurat_obj = srt,
+    geneset_list = shared_cnmf_genes,
+    cor_threshold = NULL,
     pos_threshold = NULL, # threshold for fetal_pval2
     listName = 'shared_cnmf', outdir = NULL)
 
@@ -296,18 +321,29 @@ wrap_plots (fp (srt, c('TREM2','SPP1','C3','VCAN','NFKB1')))
 dev.off()
 
 ### Annotate based on cnmfs ####
+set.seed (123)
+cnmf_scrna = srt@meta.data[, names(shared_cnmf_genes)]
+
+km_cnmf = kmeans (scale(cnmf_scrna), centers=6) # double scale modules and cluster using k-means
+#ha = HeatmapAnnotation (sample = srt$sampleID[, col=list(sample = palette_sample[sams]))
+hm = Heatmap (t(scale(cnmf_scrna)), 
+  col = palette_genescore_fun(cnmf_scrna), 
+#  top_annotation = ha,
+  clustering_distance_columns = 'pearson',
+  clustering_distance_rows = 'pearson',
+  show_column_dend = F,
+  column_split = km_cnmf$cluster,
+  #column_km=3,
+  row_names_gp = gpar (fontsize = 8),
+  column_names_gp = gpar (fontsize = 0),
+  border=T)
+
+pdf (file.path ('Plots','cnmf_scrna_scaled_heatmap.pdf'), height=1.5)
+hm
+dev.off()
+
+### Annotate based on cnmfs ####
 shared_cnmf_genes2 = shared_cnmf_genes
-new_cnmf_names = c(
-	cnmf.1 = 'TREM2', 
-	cnmf.3 = 'Monocytes',
-	cnmf.4 ='SPP1',
-	cnmf.5 = 'IL1B',
-	cnmf.6 = 'cDCs',
-	cnmf.8 = 'IFN',
-	cnmf.9 = 'IM',
-	cnmf.10 = 'C1Q'
-	)
-names (shared_cnmf_genes2) = new_cnmf_names[names (shared_cnmf_genes2)]
 
 srt = ModScoreCor (
     seurat_obj = srt, 
@@ -322,32 +358,14 @@ dev.off()
 
 sv()
 
-# # Try with PCA ####
-# cnmfs = data.frame (srt@meta.data[,names (shared_cnmf_genes)])
-# library (uwot)
+### Plot meta cnmf coexpression ####
+#mono_mac_cnmfs = c('TREM2','Monocytes','SPP1','IL1B','IFN','IM','C1Q')
+ccomp_df = srt@meta.data[,names (shared_cnmf_genes)]
+ccomp_df_cor = cor (ccomp_df, method = 'spearman')
 
-
-# pca_result <- prcomp(cnmfs, center = TRUE, scale = TRUE)
-# umap_result = as.data.frame(pca_result$x)
-# umap_result <- umap (umap_result, n_neighbors = 15, min_dist = 0.1, n_components = 2)
-# umap_result = as.data.frame (umap_result)
-# colnames(umap_result) <- c("UMAP1", "UMAP2")
-# umap_result$gene = srt@assays$RNA@data['C3',]
-# umap_result$sample = srt$sampleID
-
-# up = ggplot(umap_result, aes(x = UMAP1, y = UMAP2, color = gene, label = rownames(umap_result))) +#, colors=class))+#, color = sarc)) +
-# geom_point(alpha=0.5, size=.1) + gtheme# +
-# # geom_point(data = umap_result[umap_result$class != 'ND',], aes(color=class),alpha=0.5) +
-# # geom_smooth(data = umap_result[umap_result$class != 'ND',],
-# #   method = "lm", se = TRUE, aes (color = class2)) + 
-# # geom_point(data = umap_result[umap_result$tf != '',],size=4) +
-#  geom_text_repel()#+ 
-# # labs(title = paste("UMAP - ",sam)) + 
-# # scale_color_manual (values = c(ND = 'grey', emtTF = 'red', inflTF = 'blue', lineageTF= 'green',nonlineageTF = 'purple'))
-# # )
-# pdf (file.path('Plots','Mac_modules_umap.pdf'), width = 6, height = 5)
-# wrap_plots (up)
-# dev.off()
+pdf (file.path ('Plots','scRNA_meta_cnmf_coexpression_heatmap2.pdf'),4,width=5)
+Heatmap (ccomp_df_cor, col = palette_expression_cor_fun (ccomp_df_cor), border=T)
+dev.off()
 
 
 library (hdWGCNA)
@@ -467,3 +485,22 @@ dev.off()
 pdf (file.path('Plots','modules_umap.pdf'), width=10, height=10)
 wrap_plots (fp (srt, gene = names(shared_cnmf_genes)))
 dev.off()
+
+
+#### Run SCENIC ####
+force = FALSE
+org = 'human'
+motif_window = 'tss500bp'#'10kbp'
+scenic_name = 'monomac_programs'
+genes.keep = VariableFeatures (FindVariableFeatures (srt, nfeat=5000))
+source (file.path(scrna_pipeline_dir, 'SCENIC.R'))
+
+# Run SCENIC plots ####
+srt$myeloid = 'myeloid'
+motif_window = 'tss500bp'#'10kbp'
+genes.keep = VariableFeatures (FindVariableFeatures (srt, nfeat=5000))
+metaGroupNames = c('sampleID','shared_cnmf2_r_max','myeloid')
+reductionName = 'umap'
+source (file.path(scrna_pipeline_dir, 'SCENIC_plots.R'))
+
+

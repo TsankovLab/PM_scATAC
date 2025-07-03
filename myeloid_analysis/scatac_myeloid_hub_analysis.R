@@ -36,7 +36,7 @@ if (!file.exists ('myeloid_peak_regions.bed'))
 
 ### Hubs analysis #####
 metaGroupName = "Clusters_H"
-cor_cutoff = 0.3
+cor_cutoff = 0.2
 #max_dist = 12500
 max_dist = 12500
 min_peaks = 5
@@ -196,20 +196,188 @@ hubsCell_mat = as.data.frame (hubsCell_mat)
 
 # Compute differential hub accessibility DHA ####
 library (presto)
-metaGroupName = 'celltype2'
+archp$monomac_vs_resident = ifelse (archp$cnmf_celltypes %in% 'IM', 'resident','monomac')
+metaGroupName = 'monomac_vs_resident'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
-res = wilcoxauc (log2(hubsCell_mat+1), as.character (archp@cellColData[,metaGroupName]))
+compare_groups = c('monomac','resident')
+res = wilcoxauc (log2(hubsCell_mat[,as.character (archp@cellColData[,metaGroupName]) %in% compare_groups]+1), 
+  as.character (archp@cellColData[,metaGroupName][as.character (archp@cellColData[,metaGroupName]) %in% compare_groups]))
 
 res_l = lapply (split (res, res$group), function(x){
   tmp = x[x$logFC > 0,]
   tmp = tmp[order (tmp$pval),]
   tmp
 })
-
-head (res_l[['TREM2']],20)
+res = res_l[[1]]
+res$gene = hubs_obj$hubsCollapsed$gene[match (res$feature, hubs_obj$hubs_id)]
+head (res,50)
 
 ## Hubs to show in IGV ####
 HUB84 HUB499 HUB1324 HUB575 HUB178 HUB733 HUB429 HUB369 HUB242 HUB602
+
+
+
+
+
+
+metaGroupName = 'cnmf_celltypes'
+TF = 'EREG'
+pdf()
+meso_markers <- plotBrowserTrack2 (
+    ArchRProj = archp, 
+    sizes = c(6, 1, 1, 1,1,1),
+    groupBy = metaGroupName, 
+    geneSymbol = TF,
+    normMethod = "ReadsInTSS",
+    scCellsMax=3000,
+    plotSummary = c("bulkTrack", "featureTrack", 
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
+    hubs_regions = hubs_obj$hubsCollapsed,
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+    upstream = 50000,
+    pal = palette_myeloid,
+    #ylim=c(0,0.1),
+    downstream = 50000,
+    #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+#    loops = getCoAccessibility (archp, corCutOff = 0.25),
+    #  returnLoops = TRUE),
+    useGroups= NULL,
+    loops = getPeak2GeneLinks (archp, corCutOff = 0.2,returnLoops = TRUE),
+    #hubs = hubs_obj$peakLinks2
+)
+dev.off()
+plotPDF (meso_markers, ArchRProj = archp, 
+  width=5,height=3, 
+  name =paste0(paste(TF, collapse='_'),'_coveragePlots.pdf'),
+  addDOC = F)
+
+metaGroupName = 'celltype2'
+top_dah = data.frame (
+gene = srt@assays$RNA@data[TF,],
+group = srt@meta.data[,metaGroupName])
+top_dah$group = factor (top_dah$group, levels = 
+  rev (c('CD4','CD8','NK_FGFBP2','Tregs','CD8_exhausted',
+  'NK_KLRC1','TFH')))
+top_dah = na.omit(top_dah)
+bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
+vlp + 
+bxpv + 
+scale_fill_manual (values = palette_tnk_cells) +
+#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+gtheme_no_rot
+
+pdf (file.path ('Plots', paste0('scrna_',TF,'_boxplots.pdf')), height=4, width=4)
+bp
+dev.off()
+
+
+
+
+
+### Find all peaks around exhausted TFs and correlate accessibility and RNA expression across celltype pseudobulks ####
+TF = c('EREG',' IL1B')
+metaGroupName = 'cnmf_celltypes'
+# Get all peaks correlated with exhausted TF
+library (org.Hs.eg.db)
+gene_regions = genes (TxDb.Hsapiens.UCSC.hg38.knownGene)
+eg_sym = toTable (org.Hs.egSYMBOL)
+gene_regions$symbol = eg_sym$symbol[match(gene_regions$gene_id, eg_sym$gene_id)]
+gene_regions = gene_regions[gene_regions$symbol %in% TF ]
+
+extend_region = 250000
+gene_regions_extended = GRangesList (lapply (seq_along(gene_regions), function(x) extendGR (gr = gene_regions[x], upstream = extend_region, downstream = extend_region)))
+
+gene_regions_peaks = lapply (seq_along(gene_regions), function(x) queryHits (findOverlaps(getPeakSet(archp), gene_regions_extended[x])))
+gene_regions_peaks = lapply (gene_regions_peaks, function(x) getPeakSet(archp)[x])
+
+force = FALSE
+if (!file.exists ('pMats.rds') | force)
+  {
+  pMats = lapply (gene_regions_peaks, function(x) getGroupSE(
+    ArchRProj = archp,
+    useMatrix = 'PeakMatrix',
+    groupBy = metaGroupName,
+    divideN = TRUE,
+    scaleTo = NULL,
+    threads = getArchRThreads(),
+    verbose = TRUE,
+    logFile = createLogFile("getGroupSE")
+  ))
+  pMats2 = lapply (seq_along(gene_regions_peaks), function(x) pMats[[x]][queryHits(findOverlaps(GRanges(rowData(pMats[[x]])), gene_regions_peaks[[x]]))])
+  pMats2 = lapply (pMats2, function(x) {tmp = assay(x); rownames(tmp) = as.character(GRanges (rowData(x))); tmp})
+  names (pMats2) = gene_regions$symbol
+  saveRDS (pMats2, 'pMats2.rds')
+  } else {
+  pMats2 = readRDS ('pMats2.rds')  
+  }
+
+
+ps = log2(as.data.frame (AverageExpression (srt, features = gene_regions$symbol, group.by = 'shared_cnmf2_r_max')[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+colnames (ps)[colnames (ps) == 'Monocytes'] = 'Mono'
+
+# Compute distance between TSS and correlated peaks ####
+library (rtracklayer)
+library (AnnotationDbi)
+gene_ids = toTable (org.Hs.egSYMBOL)$gene_id[match (TF,toTable (org.Hs.egSYMBOL)$symbol)]
+mygenes.transcripts = subset (genes(TxDb.Hsapiens.UCSC.hg38.knownGene, columns=c("tx_id", "tx_name","gene_id")), gene_id %in% gene_ids)
+mygenes.tss = resize (mygenes.transcripts, width=1, fix='start')
+
+mygenes.tss$symbol = toTable (org.Hs.egSYMBOL)$symbol[match (mygenes.tss$gene_id ,toTable (org.Hs.egSYMBOL)$gene_id)]
+
+pMats2[[1]] = pMats2[[1]][,!colnames(pMats2[[1]]) %in% 'CC']
+peak_gene_cor = lapply (gene_regions$symbol, function(x) cor (t(pMats2[[x]]), t(ps[x, colnames(pMats2[[x]])])))
+peak_gene_cor = lapply (peak_gene_cor, function(x) x[order(-x[,1]),,drop=F])
+names (peak_gene_cor) = gene_regions$symbol
+
+top_e = 5
+peak_gene_cor = lapply (names(peak_gene_cor), function(x) {
+  peak_gene_cor[[x]] = as.data.frame (peak_gene_cor[[x]])
+  gr = GRanges (rownames(peak_gene_cor[[x]]))
+  dis = distanceToNearest (gr,mygenes.tss[mygenes.tss$symbol == x])@elementMetadata$distance
+  pr = follow (gr,mygenes.tss[mygenes.tss$symbol == x])
+  pr[is.na(pr)] = 0
+  dis = ifelse (pr == 1, dis * -1, dis) 
+  peak_gene_cor[[x]]$distance = dis
+  peak_gene_cor[[x]]$name = ''
+  peak_gene_cor[[x]]$name[1:top_e] = head (paste0('E',peak_gene_cor[[x]]$distance),top_e)
+  peak_gene_cor[[x]]$max = apply(pMats2[[x]],1, max)[match(rownames(peak_gene_cor[[x]]),rownames(pMats2[[x]]))]
+  colnames(peak_gene_cor[[x]]) = c('cor','distance','name','max')
+  peak_gene_cor[[x]]
+  })
+
+names (peak_gene_cor) = gene_regions$symbol
+vp = lapply (names(peak_gene_cor), function(x)
+    {
+    ggplot (peak_gene_cor[[x]], aes(x=distance, y= cor)) +
+    geom_bar (stat = 'identity') +
+    geom_point (aes (size = max), shape=21, color='white',alpha=.5, fill = 'red') +
+    xlim(c(-extend_region,extend_region)) + 
+    ggtitle (x) + 
+    geom_label_repel (size=3, color='grey22', aes(label = name), segment.size=.2) + gtheme_no_rot
+    })
+
+pdf (file.path ('Plots','enhancers_distance_ext_TF3.pdf'),width=7,height=3)
+vp
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

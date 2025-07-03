@@ -100,7 +100,7 @@ if (!file.exists ('srt.rds'))
 	fp (srt, 'HOXB13')
 	dev.off()
 	} else {
-	srt = readRDS ('srt.rds')	
+	srt = readRDS ('srt.rds')  
 	}
 
 
@@ -654,5 +654,79 @@ fp (srt, c('SOX9','HOXB13'))
 dev.off()
 
 
+### Run SCENT ####
+source (file.path('..','..','git_repo','utils','SCENT.R'))
+
+sams = c('P1','P4','P8','P3','P5','P11_HOX','P11','P12','P13','P14')
+entr = unlist(lapply (sams, function(x) 
+	cor (srt[,srt$sampleID3==x]$cNMF20, srt[,srt$sampleID3==x]$entropy_score, method = 'spearman')))
+names (entr) = sams
+
+cc = unlist(lapply(sams, function(x) 
+	cor (srt[,srt$sampleID3==x]$entropy_score, srt[,srt$sampleID3==x]$G2M.Score, method = 'spearman')))
+
+cor.test (entr, cc)
+
+ccomp_df = srt@meta.data[srt$sampleID3 %in% sams, ]
+ccomp_df2 = srt@meta.data[srt$sampleID3 %in% sams, ]
+ccomp_df = aggregate (ccomp_df[,c('cNMF20')], by=as.list(ccomp_df[,'sampleID3', drop=F]), 'mean')
+ccomp_df2 = aggregate (ccomp_df2[,c('entropy_score')], by=as.list(ccomp_df2[,'sampleID3', drop=F]), 'mean')
+rownames(ccomp_df) = ccomp_df[,1]
+ccomp_df = ccomp_df[,-1, drop=F]
+#srt$sampleID = factor (srt$sampleID, levels = rownames(arrange (ccomp_df[,'x', drop=FALSE], -ccomp_df[,'x', drop=FALSE])))
+ccomp_df$entropy_cor = entr[rownames(ccomp_df)]
+ccomp_df$entropy_mean = ccomp_df2[match(rownames(ccomp_df), ccomp_df2$sampleID3),'x']
+
+library (ggpointdensity)
+library (ggpubr)
+cp = ggplot (ccomp_df, aes (x = x, y = entropy_cor, color=rownames(ccomp_df))) + geom_point() + gtheme_no_rot +
+ geom_smooth(
+    method = "lm", 
+    color = "grey22", 
+    fill = "grey22", 
+    se = FALSE, 
+    linetype = "dashed", 
+    size = .4
+  ) + 
+ scale_color_manual (values = palette_sample) + stat_cor (
+    aes(label = paste(..rr.label.., ..p.label.., sep = " | ")), 
+    method = "pearson", 
+    #label.x = min(df$fetal) + 0.1 * diff(range(df$fetal)), 
+    #label.y = max(df$fetal_gs) - 0.1 * diff(range(df$fetal_gs)),
+    color = "grey11",
+    size = 3
+  ) +
+  xlab ('scS-score') + ylab ('Entropy correlation')
+pdf (file.path ('Plots','entropy_scS_score.pdf'), width =4.7,height=3)
+cp
+dev.off()
 
 
+cor.test (ccomp_df[[1]], ccomp_df[[2]])
+
+
+### Try correlating all cnmfs vs entropy
+sams = c('P1','P4','P8','P3','P5','P11_HOX','P11','P12','P13','P14')
+entr =lapply (sams, function(x) 
+	cor (srt@meta.data[srt$sampleID3==x, names(cnmf_spectra_unique)], srt[,srt$sampleID3==x]$entropy_score, method = 'spearman'))
+entr = do.call (cbind, entr)
+colnames (entr) = sams
+
+entr = as.data.frame (entr)
+entr$cNMF = rownames(entr)
+entr = gather (entr, sample, score, 1:(ncol(entr) - 1))
+
+
+entr$cNMF = factor (bp$data$cNMF, levels = med)
+bp = ggplot (entr, aes (x = entr$cNMF, y = score)) + geom_boxplot () + gtheme
+med = unlist(lapply (split(bp$data$score, bp$data$cNMF), function(x) median(x)))
+med = names (med)[order(-med)]
+pdf (file.path ('Plots','cnmf_entropy_cor_boxplot.pdf'))
+bp
+dev.off()
+
+
+
+
+
+# 

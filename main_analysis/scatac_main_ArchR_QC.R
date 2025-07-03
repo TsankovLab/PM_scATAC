@@ -135,13 +135,13 @@ pdf ()
 umap_p0 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Clusters",
    embedding = "UMAP",
-   #pal = palette_celltype_simplified,
+   #pal = palette_celltype_lv1,
    labelMeans = FALSE)
 
 umap_p1 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "celltype_revised",
    embedding = "UMAP",
-   pal = palette_celltype_simplified,
+   pal = palette_celltype_lv1,
    labelMeans = FALSE)
 
 umap_p2 = plotEmbedding (ArchRProj = archp, 
@@ -158,10 +158,70 @@ dev.off()
 
 
 # Plot gene score of cell type markers ####
+metaGroupName = 'celltype_revised'
+  DAG_list = readRDS (paste0('DAG_',metaGroupName,'.rds'))
+  
+  FDR_threshold = 1e-2
+  lfc_threshold = 0
+  top_genes = 20
+  DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
+  DAG_top_list = lapply (seq_along(DAG_top_list), function(x) {
+    res = DAG_top_list[[x]]
+    res = na.omit (res)
+    res = res[res$FDR < FDR_threshold,]
+    res = res[order (res$FDR), ]
+    res = res[abs(res$Log2FC) > lfc_threshold,]
+    res$comparison = names(DAG_top_list)[x]
+    if (nrow(res) < top_genes) 
+      {
+      res
+      } else {
+      head (res,top_genes)
+      }
+    })
+  DAG_df = Reduce (rbind ,DAG_top_list)
+  
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "GeneScoreMatrix", 
+    name = head(DAG_df$gene[DAG_df$comparison == 'Mesothelium'],20), 
+    embedding = "UMAP",
+    pal = palette_expression,
+    #imputeWeights = getImputeWeights(archp)
+    imputeWeights = NULL
+)
+dev.off()
+
+p = lapply (seq_along(p), function(x) p[[x]] + theme_void()  + theme(
+    axis.title = element_blank(),       # Remove axis titles
+    axis.text = element_blank(),        # Remove axis tick labels       # Remove plot title
+    plot.subtitle = element_blank(),    # Remove subtitle
+    plot.caption = element_blank(),     # Remove caption
+    legend.position = "none"            # Remove legend
+  ) + ggtitle (head(DAG_df$gene[DAG_df$comparison == 'Mesothelium'],20)[x])
+)
+pdf (file.path('Plots','marker_genes_feature_plots2.pdf'), width = 10, height = 10)
+print (wrap_plots (p, ncol = 4))
+dev.off()
+
 meso_markers = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
 meso_markers = meso_markers[meso_markers != 'IGHM']
 meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
-meso_markers = c('KRT19','HP','SFTA3','COL1A1','MYH11','CLDN5','LYZ','CD3E','GNLY','CD79A','IGLL5','VASH2')
+meso_markers = c(
+  'KRT19','AMOTL2','EGFR',
+  'HP','BDKRB1','ZBTB7C',
+  'SFTA3','SFTPB','LINC00261',
+  'COL1A1','FBN1','COL6A2',
+  'MYH11','COL4A2','COL4A1',
+  'CLDN5','VWF','CDH5',
+  'LYZ','IL1B','CD83',
+  'CD3E','BCL11B','RUNX3',
+  'GNLY', 'KLRD1','ITGAE',
+  'CD79A','PAX5','BLK',
+  'IGLL5','ELL2','ELL2',
+  'VASH2','MAD1L1','ZFAT')
+#meso_markers = rev (meso_markers)
 archp = addImputeWeights (archp)
 pdf()
 p <- plotEmbedding(
@@ -170,9 +230,11 @@ p <- plotEmbedding(
     name = meso_markers, 
     embedding = "UMAP",
     pal = palette_expression,
-    imputeWeights = getImputeWeights(archp)
+    #imputeWeights = getImputeWeights(archp)
+    imputeWeights = NULL
 )
 dev.off()
+
 p = lapply (seq_along(p), function(x) p[[x]] + theme_void()  + theme(
     axis.title = element_blank(),       # Remove axis titles
     axis.text = element_blank(),        # Remove axis tick labels       # Remove plot title
@@ -184,6 +246,49 @@ p = lapply (seq_along(p), function(x) p[[x]] + theme_void()  + theme(
 pdf (file.path('Plots','marker_genes_feature_plots.pdf'), width = 10, height = 10)
 print (wrap_plots (p, ncol = 4))
 dev.off()
+
+
+  if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
+  gsSE = gsSE[, archp$cellNames]
+  gsMat = assays (gsSE)[[1]]
+  celltype_order = c('Malignant','Mesothelium','Alveolar','Fibroblast',
+    'SmoothMuscle','Endothelial','Myeloid','T_cells','NK','B_cells','Plasma','pDCs')
+  rownames (gsMat) = rowData (gsSE)$name
+  gsMat_mg = gsMat[meso_markers, ]
+  gsMat_mg = as.data.frame (t(gsMat_mg))
+  gsMat_mg$metaGroup = as.character(archp@cellColData[,metaGroupName])
+  gsMat_mg = aggregate (.~ metaGroup, gsMat_mg, mean)
+  rownames (gsMat_mg) = gsMat_mg[,1]
+  gsMat_mg = gsMat_mg[,-1]
+  gsMat_mg = gsMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
+  gsMat_mg = gsMat_mg[celltype_order,]
+  DAG_hm = Heatmap (t(t(scale(gsMat_mg))), 
+          column_labels = colnames (gsMat_mg),
+          column_title = paste('top',top_genes),
+          clustering_distance_columns = 'euclidean',
+          clustering_distance_rows = 'euclidean',
+          cluster_rows = F,
+          row_names_side = 'left',
+          #col = palette_genescore_fun(gsMat_mg),
+          col = palette_expression,
+          #col = pals_heatmap[[5]],
+          cluster_columns=F,#col = pals_heatmap[[1]],
+          row_names_gp = gpar(fontsize = 8),
+          column_names_rot = 45,
+          column_names_gp = gpar(fontsize = 6),
+          rect_gp = gpar(col = "white", lwd = .1),
+          border=TRUE
+          #right_annotation = motif_ha
+          )
+
+  #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+pdf (file.path('Plots',paste0('DAG_clusters_',metaGroupName,'_heatmaps.pdf')), width = 6, height = 3)
+print(DAG_hm)
+dev.off()
+
+
+
+
 
 # Run genescore DAG ####
 metaGroupName = "celltype_lv1"

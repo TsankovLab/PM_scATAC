@@ -40,7 +40,7 @@ srt = readRDS (file.path('..','scrna','srt.rds'))
 srt$sampleID3[srt$sampleID3 %in% c('HU37','HU62')] = 'normal_pleura'
 sarc_order = read.csv (file.path('..','scrna','cnmf20_sarcomatoid_sample_order.csv'), row.names=1)
 sarc_order = sarc_order[! sarc_order$sampleID %in% c('HU37','HU62'),]
-sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
+sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order) 
 #archp$Sample2 = factor (archp$Sample2, levels = sarc_order$sampleID)
 
 
@@ -566,10 +566,6 @@ selected_TF = readRDS ('selected_TF.rds')
 # #     wilcoxauc (mMat, y = archp$Sample2, groups_use = x))
 
 
-
-
-
-
 # Make coexpression network for each sample using top TFs deviations ####
 selected_TF = readRDS ('selected_TF.rds')
 if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
@@ -589,27 +585,33 @@ for (sam in sams)
   cor_TF_l[[sam]] = cor (mMat[archp_meta$Sample3 == sam,], method = 'spearman')
   }
 
-corTF_array <- simplify2array(cor_TF_l)
+corTF_array <- simplify2array (cor_TF_l)
 #any(lapply(corTF_array, function(x) any(is.na(x))))
 # Take element-wise median
-median_matrix <- apply(corTF_array, c(1, 2), median)
+median_matrix <- apply (corTF_array, c(1, 2), median)
 
 # set.seed(123)
 # centers=3
 # km = kmeans (median_matrix, centers=centers)
 # km_df = as.data.frame (km$cluster)
 # km_df = km_df[order (km_df[,1]),,drop=F]
+set.seed (123)
+# km = kmeans (median_matrix, centers=2)
+# km$cluster[km$cluster == 1]
+hr = hclust(as.dist(1-median_matrix))#, method = "average")
+clusters = dendextend::cutree(hr, k = 2)
 
 pdf()
+set.seed (1234)
 cor_TF_df = draw (Heatmap (median_matrix,
   #left= ha1,
-  #row_split = km$cluster,
-  #column_split = km$cluster,
+  row_split = clusters,
+  column_split = clusters,
   row_names_gp = gpar(fontsize = 6),
   clustering_distance_rows='pearson',
   clustering_distance_columns='pearson',
   column_names_gp = gpar(fontsize = 6),
-  col = palette_deviation_cor_fun,border=T))
+  col = palette_deviation_cor_fun, border=T))
 
   # rect_gp = gpar(type = "none"),
   # cell_fun = function(j, i, x, y, w, h, fill) {
@@ -625,27 +627,72 @@ dev.off()
 # Add pathways of TF correlated genes from scRNA ####
 if (!file.exists('enrichment_pathways_TFs.rds')) source (file.path('..','..','git_repo','tumor_analysis','enrichment_cnmfs.R'))
 TF_cor_sum = readRDS (file.path('enrichment_pathways_TFs.rds'))
-TFrow_order = row_order (cor_TF_df)
+TFrow_order = unname(unlist(row_order (cor_TF_df)))
+TFrow_order_split = rep (names(row_order (cor_TF_df)), lapply (row_order (cor_TF_df),length))
+#TFrow_order_split = TFrow_order_split[TFrow_order]
 rownames (TF_cor_sum) = gsub ('HALLMARK_','',rownames(TF_cor_sum))
 rownames (TF_cor_sum) = gsub ('_', ' ',rownames (TF_cor_sum))
 TF_cor_sum = TF_cor_sum[apply (TF_cor_sum, 1, function(x) any(x > 1)),]
 pdf()
 hm = draw (Heatmap (
-    t(TF_cor_sum[,TFrow_order]),
+    TF_cor_sum[,TFrow_order],
+    column_split = ifelse(TFrow_order_split =='1',2,1),
     column_names_rot =45, 
     row_names_gp = gpar(fontsize = 7),
-    column_names_gp = gpar(fontsize = 7),
+    column_names_gp = gpar(fontsize = 5),
     col =palette_enrichment, 
-    cluster_rows=F,
+    cluster_rows=T,
+    cluster_columns = F,
 #     cell_fun = function(j, i, x, y, width, height, fill) {
 #         grid.text(sprintf("%.0f", t(TF_cor_sum)[i, j]), x, y, gp = gpar(fontsize = 10, col='white'))
 # },
     border=T))
 dev.off()
 
-pdf (file.path ('Plots','selected_TF_dev_corr_pathways_heatmaps2.pdf'), width = 5.5,height=8)
+pdf (file.path ('Plots','selected_TF_dev_corr_pathways_heatmaps2.pdf'), width = 9.5,height=2.6)
 hm
 dev.off()
+
+
+#### Generate heatmap of significant Cox proportion hazards from bulk-RNA ####
+coxht = readRDS (file.path('..','..','bulkRNA_meso','oncoTF_sig_cox_bulkRNA.rds'))
+
+ht = Heatmap (coxht[[1]], 
+    clustering_distance_columns = 'euclidean',
+    clustering_distance_rows = 'euclidean',
+    #column_title = paste('* = < ',pvalAdjTrheshold,'top',topGenes,'genes'),
+    col = plotcol,
+    #heatmap_legend_param = list(
+    #     at = c(col_limit, 0, -col_limit),#,
+    #    direction = "horizontal",#,
+    #    #legend_height = unit(5, "cm"),
+    #    just = c('top')
+    #    #title_position = "leftcenter-rot"
+   #    ),
+    bottom_annotation = labels_annotation,
+    column_names_gp = gpar(fontsize = 0),
+    row_names_gp = gpar(fontsize = 5),
+    cell_fun = function (j, i, x, y, width, height, fill) 
+            {
+           if (t(pval_mat)[i, j] < pvalAdjTrheshold3)
+              {
+               grid.text("***", x, y, just='center', vjust=.8,
+                gp = gpar(fontsize = 5, col='black'))
+              } else {
+              if(t(pval_mat)[i, j] < pvalAdjTrheshold2)
+                  {
+                  grid.text("**", x, y, just='center', vjust=.8,
+                  gp = gpar(fontsize = 5, col='black'))   
+                  } else {
+                  if(t(pval_mat)[i, j] < pvalAdjTrheshold)
+                    {
+                    grid.text("*", x, y, just='center', vjust=.8,
+                    gp = gpar(fontsize = 5, col='black'))         
+                    }}}
+      }, ...)
+
+
+
 
 # ### Show sarcomatoid score per sample regenerating UMAPs ####
 sarc_module = 'cNMF20'

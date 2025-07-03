@@ -168,7 +168,7 @@ nfeat = 5000
 force=F
 k_list = c(5:30)
 k_selections = c(5:30)
-k_selection = 10
+k_selection = 20
 cores= 100
 
 cnmf_name = 'scrna_p11_HOX'
@@ -180,13 +180,13 @@ srt = srt[,srt$seurat_clusters == 1]
 source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
 
 ### Import and format spectra files ####
-k_selection = 10
+k_selection = 20
 cnmf_name = 'scrna_p11_HOX'
 source (file.path ('..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
 
-top_nmf_genes = 200
+top_nmf_genes = 50
 cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head (x, top_nmf_genes))
-write.csv (cnmf_spectra_unique, file.path (cnmf_out,'cnmf_list.csv'))
+write.csv (patchvecs(cnmf_spectra_unique), file.path (cnmf_out,'cnmf_list.csv'))
 
 # Add module score of cNMF modules ####
 force = T
@@ -246,7 +246,7 @@ metaGroupNames = c('celltype_simplified')
   theme_classic() +
   theme_void())
   
-pdf (file.path(cnmf_out,'Plots',paste0('cNMF_module_scores_umap_',k_selection,'_HOX.pdf')),width=10,7)
+pdf (file.path(cnmf_out,'Plots',paste0('cNMF_module_scores_umap_',k_selection,'_HOX.pdf')),width=20,17)
 print (wrap_plots (umap_p1))
 dev.off()
 
@@ -297,7 +297,7 @@ metacells = readRDS (file.path('..','scrna','metacells.rds'))
 region = readRDS (file.path ('..','scatac_ArchR','P11_chr18_region.rds'))
 
 # Make gene modules overlapping megahubs regions in P11 ####
-all_genes = genes(TxDb.Hsapiens.UCSC.hg38.knownGene)
+all_genes = genes (TxDb.Hsapiens.UCSC.hg38.knownGene)
 genes_in_region = all_genes$gene_id[subjectHits(findOverlaps (region, all_genes))]
 genes_in_region = list(chr18_q23 = as.data.frame(org.Hs.egSYMBOL)[match (genes_in_region, as.data.frame(org.Hs.egSYMBOL)[,1]),'symbol'])
 
@@ -362,7 +362,7 @@ plot (x = metacells_assay_P11s['ZKSCAN5',], y = ccomp_df_P11s)
 dev.off()
 
 # Run DEG between high megahubs cells and low within P11 #### 
-srt_p11 = srt[,srt$sampleID == 'P11']
+srt_p11 = srt[,srt$celltype2 == 'Malignant']
 pdf (file.path ('Plots','chr18_q23_in_P11_cells_hist.pdf'))
 hist (srt_p11$chr18_q23)
 dev.off()
@@ -370,17 +370,17 @@ dev.off()
 srt_p11$megahubs = ifelse (srt_p11$chr18_q23 > 0.3, 'high','low')
 
 deg_res = FindMarkers (srt_p11, ident.1 = 'high', ident.2 = 'low', group.by='megahubs')
-head (deg_res,10)
+tail (deg_res, 30)
 
 
-logfcThreshold = 2
+logfcThreshold = 1
 pvalAdjTrheshold = 0.05
 deg_res$sig = ifelse (abs(deg_res$avg_log2FC) > logfcThreshold & deg_res$p_val_adj < pvalAdjTrheshold, 1,0)
 deg_res$sig = deg_res$sig * sign (deg_res$avg_log2FC)
 deg_res$alpha = ifelse (deg_res$sig != '0', .5,.2)
 deg_res$sig[deg_res$sig == 1] = 'High'
 deg_res$sig[deg_res$sig == -1] = 'Low'
-
+deg_res = deg_res[order(-deg_res$avg_log2FC),]
 # res_filtered = deg_res[abs(deg_res$avg_log2FC) > logfcThreshold & deg_res$p_val_adj < pvalAdjTrheshold,]
 # res_filtered = head (rownames(res_filtered)[order (-abs(res_filtered$avg_log2FC))],20)
 deg_res$labels = ''
@@ -626,7 +626,7 @@ cnv_tf_cor = p11cnv_mat[,names(min_cor)[1]]
 names(cnv_tf_cor) = paste0('P11#',names(cnv_tf_cor))
 archp$p11_hox_cnv = cnv_tf_cor[match(rownames(archp@cellColData), names(cnv_tf_cor))]
 archp$p11_hox_cnv[is.na(archp$p11_hox_cnv)] = 0
-p <- plotEmbedding(
+p <- plotEmbedding (
     ArchRProj = archp, 
     colorBy = "cellColData", 
     name = 'p11_hox_cnv', 
@@ -641,9 +641,60 @@ dev.off()
 
 
 
+### Check correlation of HOXB13 and MBP cnmf within same P11 malignant clusters #####
+pdf (file.path ('Plots','dimplot.pdf'))
+DimPlot (srt, group.by = 'seurat_clusters', reduction = reductionName, label=T)
+dev.off()
+
+malig_cnmf = c('cNMF6','cNMF1')
+srt_p11_mlg1 = srt_p11[, srt_p11$seurat_clusters == 3]
+cnmf_cor = cor.test (srt_p11_mlg1@meta.data[,c('cNMF6')],srt_p11_mlg1@meta.data[,c('cNMF1')], method='pearson')
+
+
+srt_p11_mlg2 = srt_p11[, srt_p11$seurat_clusters == 1]
+cnmf_cor = cor.test (srt_p11_mlg2@meta.data[,c('cNMF6')],srt_p11_mlg2@meta.data[,c('cNMF1')], method='pearson')
+
+pdf (file.path ('Plots','HOXB13_MBP_cnmfs_correlation_scatter.pdf'))
+plot (srt_p11_mlg1@meta.data[,c('cNMF6')], srt_p11_mlg1@meta.data[,c('cNMF1')])
+plot (srt_p11_mlg2@meta.data[,c('cNMF6')], srt_p11_mlg2@meta.data[,c('cNMF1')])
+dev.off()
+
+# Import chrombpnet finemo results ####
+# Load P11 megahubs regions ####
+region = readRDS (file.path ('..','scatac_ArchR','P11_chr18_region.rds'))
+
+finemo_C1 = read.table ('C1_finemo_to_genome_browser.tsv')
+colnames(finemo_C1) = c('chr','start','end','TF1','TF2','TF3')
+finemo_C1 = makeGRangesFromDataFrame (finemo_C1, keep.extra.columns = T)
+
+C1_region = table (finemo_C1$TF1[queryHits(findOverlaps (finemo_C1, region))])
+C1_region = C1_region[order(-C1_region)]
+
+finemo_C2 = read.table ('C2_finemo_to_genome_browser.tsv')
+colnames(finemo_C2) = c('chr','start','end','TF1','TF2','TF3')
+finemo_C2 = makeGRangesFromDataFrame (finemo_C2, keep.extra.columns = T)
+
+C2_region = table (finemo_C2$TF1[queryHits(findOverlaps (finemo_C2, region))])
+C2_region = C2_region[order(-C2_region)]
 
 
 
+#### muscat DS on genotype ####
+# force = F
+# srt = srt[,!srt$sampleID %in% c('HU37','HU62')]
+# do.fgsea = TRUE
+# logfcThreshold = 0
+# pvalAdjTrheshold = 0.05
+# ds_method = "DESeq2" #c("edgeR", "DESeq2", "limma-trend", "limma-voom")
+# do.fgsea=TRUE
+# metaGroupName1 = 'seurat_clusters'
+# metaGroupName2 = 'P11_vs_rest'
+# metaGroupName3 = 'treatment'
 
+# srt@meta.data[,metaGroupName2][srt@meta.data[,metaGroupName2] == 0] = 'ND'
+# muscatIdents = c('post','pre')
+# pbDS_min_cells = 10
+# topGenes = 20 
+# source (file.path(scrna_pipeline_dir,'DS_muscat.R'))
 
 

@@ -133,7 +133,7 @@ ModuleNetworkPlot <- function(
 
 # Save seurat object
 sv = function() {
-	saveRDS (srt, paste0(projdir,'srt.rds'))}
+	saveRDS (srt, file.path(projdir,'srt.rds'))}
 
 # Compute cell states in GBM using the gene sets and method from Neftel et al paper
 Nefstates = function (seurat_obj = srt, mouse=T)

@@ -46,10 +46,10 @@ addArchRGenome ("Hg38")
 sample_names = c(
     # Tumor  
     'P1', # p786
-    'P4', # p811
-    'P8', # p826
     'P3', # p846
+    'P4', # p811
     'P5', #'p848'
+    'P8', # p826
     'P10', # p10
     'P11', # p11
     'P12', # p12
@@ -79,6 +79,7 @@ if (run_GS_analysis)
   {
   # Find DAG ####
   metaGroupName = "Clusters"
+  metaGroupName = 'celltype_revised'
   force = FALSE
   if (!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force)
     {
@@ -108,8 +109,8 @@ if (run_GS_analysis)
     DAG_list = readRDS (paste0('DAG_',metaGroupName,'.rds'))
     }
   
-  FDR_threshold = 1e-8
-  lfc_threshold = 1
+  FDR_threshold = 1e-2
+  lfc_threshold = 0
   top_genes = 20
   DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
   DAG_top_list = lapply (seq_along(DAG_top_list), function(x) {
@@ -167,6 +168,7 @@ meso_markers = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets
 meso_markers = c(meso_markers, 'IGLL5')
 meso_markers = meso_markers[meso_markers != 'IGHM']
 #meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
+meso_markers = c()
 archp = addImputeWeights (archp)
 
 pdf()
@@ -226,13 +228,13 @@ for (sam in sample_names)
     }
   }
 
-  # Get bins matching deleted chromosomes to assess ####
-  deleted_chr_mean = sapply (deleted_chr, function(x) 
-    colMeans (cnaObj@assays@data@listData[['z']][which(as.character(seqnames(cnaObj@rowRanges)) == x),]))
+  # # Get bins matching deleted chromosomes to assess ####
+  # deleted_chr_mean = sapply (deleted_chr, function(x) 
+  #   colMeans (cnaObj_l[[1]]@assays@data@listData[['z']][which(as.character(seqnames(cnaObj_l[[1]]@rowRanges)) == x),]))
   
-  # Attach CNV load and other CNV-related metrics to signac metadata per sample  
-  meta.data = deleted_chr_mean
-  rownames(meta.data) = colnames(cnaObj)
+  # # Attach CNV load and other CNV-related metrics to signac metadata per sample  
+  # meta.data = deleted_chr_mean
+  # rownames(meta.data) = colnames(cnaObj)
   # meta.data = data.frame (
   # row.names = colnames (cnaObj),
   # #cnvload_z = rowSums (abs (t(cnaObj@assays@data@listData[['z']]))),
@@ -290,6 +292,7 @@ for (sam in sample_names)
     }
 cnaMat_obj_avg = lapply (cnaMat_obj_l, function(x) colMeans (x))
 cnaMat_obj_avg = do.call (cbind, cnaMat_obj_avg)
+cnaMat_obj_avg = cnaMat_obj_avg[,sample_names]
 ha = rowAnnotation (sample = colnames(cnaMat_obj_avg), col = list(sample = palette_sample))
 pdf (file.path('Plots', paste0('GL_method_',mat_type,'_CNV_heatmap.pdf')), width=6,height=3)
     print (Heatmap (t(cnaMat_obj_avg), 
@@ -339,6 +342,32 @@ peak_reproducibility=2
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source ('../../git_repo/utils/callPeaks.R')
   
 
+# Make barplots of number of peaks per cell type ####
+ct_peaks = lapply (file.path('PeakCalls',paste0(names(palette_celltype_lv1)[names(palette_celltype_lv1) %in% unique(archp$celltype_lv1)],'-reproduciblePeaks.gr.rds')), function(x) readRDS (x))
+
+ct_peaks = do.call (cbind,  lapply(ct_peaks, function(x) table (x$peakType)))
+colnames (ct_peaks) = names(palette_celltype_lv1)[names(palette_celltype_lv1) %in% unique(archp$celltype_lv1)]
+
+ct_peaks = as.data.frame (ct_peaks)
+ct_peaks$peaktype = rownames(ct_peaks)
+ct_peaks = gather (ct_peaks, celltype, peaks, 1:(ncol(ct_peaks)-1))
+
+df = ct_peaks %>% 
+group_by (celltype) %>% 
+summarize (sum = sum(peaks)) %>% 
+arrange(sum)
+
+ct_peaks$celltype = factor (ct_peaks$celltype, levels = rev(df$celltype[order(df$sum)]))
+
+bp = ggplot (ct_peaks, aes(x = celltype, y = peaks, fill = peaktype)) + 
+geom_bar (stat= 'identity') + 
+paletteer::scale_fill_paletteer_d("nbapalettes::knicks_city") +
+gtheme
+
+pdf (file.path ('Plots','peakcalls.pdf'))
+bp
+dev.off()
+
 archp = saveArchRProject (archp, load=TRUE)
   
   metaGroupNames = c('TSSEnrichment','nFrags','ReadsInTSS','FRIP')  
@@ -348,7 +377,7 @@ archp = saveArchRProject (archp, load=TRUE)
   pdf (paste0(projdir,'/Plots/qc_umap_after_filtering.pdf'), 15,15)
   wrap_plots (umap_p12, ncol=5)
   dev.off()
-  }
+
 
 ### chromVAR analysis ####
 run_chromVAR = TRUE
@@ -641,34 +670,39 @@ mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 
 # Filter for only expressed TFs ####
-metaGroupName = 'celltype_simplified2'
+metaGroupName = 'celltype_lv1'
 ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
 min_exp = .1
 ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
 active_TFs = rownames(ps)
 
 # highlight pan-TFs in heatmap
+
 pan_TF = c('TGIF2','TGIF1','NFKB2','SNAI2','TWIST2','HMGA2')
-ha = HeatmapAnnotation (celltype = archp$celltype_lv1, col = list(celltype = palette_celltype_simplified))
+ha = HeatmapAnnotation (celltype = archp$celltype_lv1, 
+  col = list(celltype = palette_celltype_lv1))
 mMat = as.matrix (mMat)
 mMat2 = mMat[active_TFs,]
 ha2 = rowAnnotation (foo = anno_mark(at = match(pan_TF,rownames(mMat2)), 
     labels = pan_TF, labels_gp = gpar(fontsize = 6, fontface = 'italic')))
+
 mMat2 = t(scale(t(mMat2)))
 mMat2[mMat2 > 1] = 1
 mMat2[mMat2 < -1] = -1
+km = kmeans (mMat2, centers=3)
 pdf ()
 cor_mMat_hm = draw (Heatmap (#scale(t(scale(mMat2))),# row_km=15,
   mMat2,
   top_annotation = ha,
   right_annotation = ha2,
+  row_split = km$cluster,
   #left_annotation = ha,
   #rect_gp = gpar(type = "none"),
   clustering_distance_rows='pearson',
   clustering_distance_columns = 'pearson', 
   col=palette_deviation_correlation, 
   #column_split = km$cluster,
-  row_km=3, 
+  #row_km=3, 
   #column_km=2,
 #  right_annotation = ha,
   border=T,
@@ -681,10 +715,58 @@ cor_mMat_hm = draw (Heatmap (#scale(t(scale(mMat2))),# row_km=15,
 #        }}))
 dev.off()
 
-pdf (file.path ('Plots','TF_modules_celltypes_heatmap.pdf'), width = 8,height=4)
+pdf (file.path ('Plots','TF_modules_celltypes_heatmap2.pdf'), width = 8,height=4)
 cor_mMat_hm
 dev.off()
 
+### Run TF correlation to identify TF modules across all cells #### 
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = as.matrix(mMat)#[selected_TF,])
+mMat = mMat[names(km$cluster)[km$cluster ==3],]
+
+mMat_cor = cor (as.matrix(t(scale(mMat))), method = 'spearman')
+
+set.seed(1234)
+centers=4
+km = kmeans (mMat_cor, centers=centers)
+
+pdf (file.path ('Plots','TME_TF_modules_heatmap.pdf'), width = 4,height=3)
+cor_mMat_hm = draw (Heatmap (mMat_cor,
+  clustering_distance_rows='euclidean' ,
+  clustering_distance_columns = 'euclidean', 
+  col=palette_deviation_cor_fun, 
+  row_split = km$cluster,
+  column_split = km$cluster,
+  border=T,
+  row_names_gp = gpar(fontsize = 0), 
+  column_names_gp = gpar(fontsize = 0)
+  ))
+dev.off()
+
+pdf (file.path ('Plots','TF_modules_heatmap2.pdf'), width = 4,height=3)
+cor_mMat_hm
+dev.off()
+
+tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+names (tf_modules) = paste0('mod_',unique(km$cluster))
+tf_modules = do.call (cbind, tf_modules)
+archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
+archp@cellColData = cbind (archp@cellColData, tf_modules) 
+
+pdf()
+TF_p = plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "cellColData",
+    name = paste0('mod_',unique(km$cluster)), 
+    pal = rev(palette_deviation_correlation),
+    #useSeqnames='z',
+    embedding = "UMAP")
+dev.off()
+pdf (file.path ('Plots','TF_modules_umap2.pdf'), width = 20,height=6)
+wrap_plots (TF_p, ncol=5)
+dev.off()
 
 # Find shared TF across celltypes ####
 tf_name2 = unlist(sapply (c('TGIF1','TWIST2','NFKB2','HMGA2'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
@@ -819,7 +901,7 @@ pdf (file.path ('Plots','eNR4F2_accessibility_barplot.pdf'), height=3, width=6)
 ep = ggplot (pmat_df, aes (x = celltype, y = region, fill = type)) + 
 geom_bar(stat = 'identity',position ='stack', color='grey22') + gtheme +
 scale_fill_manual (values = c(enhancer = '#C1D32FFF', promoter = 'grey'))
-#+ scale_fill_manual (values = c(palette_tnk_cells, palette_myeloid, palette_celltype_simplified))
+#+ scale_fill_manual (values = c(palette_tnk_cells, palette_myeloid, palette_celltype_lv1))
 ep
 dev.off()
 
@@ -834,8 +916,8 @@ srt$celltype3[match (names(tnk_ann), colnames(srt))] = tnk_ann
 srt$celltype_simplified3 = srt$celltype_simplified
 srt$celltype_simplified3[match (names(tnk_ann), colnames(srt))] = tnk_ann
 pdf(file.path ('Plots','NR4A2_dotplot.pdf'), width = 9)
-VlnPlot (srt, feature = 'NR4A2', group.by = 'celltype3', cols = c(palette_tnk_cells, palette_celltype_simplified))
-VlnPlot (srt[,!srt$celltype_simplified3 %in% c('NK','T_cells')], feature = 'NR4A2', group.by = 'celltype_simplified3', cols = c(palette_tnk_cells, palette_celltype_simplified))
+VlnPlot (srt, feature = 'NR4A2', group.by = 'celltype3', cols = c(palette_tnk_cells, palette_celltype_lv1))
+VlnPlot (srt[,!srt$celltype_simplified3 %in% c('NK','T_cells')], feature = 'NR4A2', group.by = 'celltype_simplified3', cols = c(palette_tnk_cells, palette_celltype_lv1))
 dev.off()
 
 
@@ -873,6 +955,20 @@ dev.off()
 
 
 
+### Show cell type proportions per sample ####
+archp_meta = as.data.frame (archp@cellColData)
+archp_meta$celltype_lv1 = factor (archp_meta$celltype_lv1, levels = names(palette_celltype_lv1))
+archp_meta$Sample2 = archp_meta$Sample
+archp_meta$Sample2 = factor (archp_meta$Sample2, levels= rev(c('P1','P3','P4','P5','P8','P10','P11','P12','P13','P14','P23')))
+bp = cellComp(
+  seurat_obj = archp_meta,
+  metaGroups = c('Sample2','celltype_lv1'),
+  plot_as = 'bar',
+  pal = palette_celltype_lv1
+  ) + gtheme + coord_flip()
 
+pdf (file.path('Plots',paste0('celltype_barplots.pdf')), height=6, width=5)
+bp
+dev.off()
 
 

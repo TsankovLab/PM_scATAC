@@ -23,7 +23,7 @@ source (file.path('..','..','git_repo','utils','hubs_track.R'))
 #source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads(threads = 8) 
+addArchRThreads(threads = 1) 
 addArchRGenome("hg38")
 
 archp = loadArchRProject (projdir)
@@ -1876,4 +1876,101 @@ mapC (E14norm3.binned, maxrange=10)
 #tracks=list(RefSeqGene=gene, CTCF=ctcf),
 
 dev.off()
+
+
+
+
+
+
+
+
+
+
+### Show sample distribution of average chromatin accessibility of exhausted peaks 
+
+# Differential Peaks in CD8 exhausted vs CD8 ####
+# Find DAP ####
+#force = FALSE
+metaGroupName = 'celltype2'
+force=F
+if (!file.exists ('DAP_CD8_CD8_ext_pairwise.rds') | force)
+  {
+  DAP_list = getMarkerFeatures (
+    ArchRProj = archp, 
+    testMethod = "wilcoxon",
+          useGroups = "CD8_exhausted",
+          bgdGroups = "CD8",
+    k=100,
+    binarize = FALSE,
+    useMatrix = "PeakMatrix",
+    groupBy = metaGroupName
+  #  useSeqnames="z"
+  )
+  saveRDS (DAP_list, 'DAP_CD8_CD8_ext_pairwise.rds')
+  } else {
+  DAP_list = readRDS ('DAP_CD8_CD8_ext_pairwise.rds')
+  }
+DAP_res = do.call (cbind, (assays(DAP_list)))
+colnames (DAP_res) = names(assays(DAP_list))
+DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
+rownames(DAP_res) = as.character(DAP_res_regions)
+
+# Take only significant regions ####
+DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
+
+metaGroupName = 'celltype2'
+pb_l = list()
+for (ct in unique(archp@cellColData[,metaGroupName]))
+  {
+  pb_l[[ct]] = getGroupSE(
+  ArchRProj = archp[as.character(archp@cellColData[,metaGroupName]) == ct],
+  useMatrix = 'PeakMatrx',
+  groupBy = "Sample",
+  divideN = TRUE,
+  scaleTo = NULL,
+  threads = getArchRThreads(),
+  verbose = TRUE,
+  logFile = createLogFile("getGroupSE")
+  )
+  }
+
+mat = 'Peak'
+
+pmat = ArchR::getMatrixFromProject (archp, useMatrix = paste0(mat,'Matrix'))
+pmat = pmat[queryHits (findOverlaps (pmat, GRanges(rownames(DAP_res_sig))))]
+pmat = pmat[,rownames(archp)]
+pmat = as.data.frame (t(assays (pmat)[[1]]))
+pmat$metaGroup = paste0(as.character(archp@cellColData[,'Sample']),'__',as.character(archp@cellColData[,metaGroupName]))
+pmat = aggregate (.~ metaGroup, pmat, mean)
+rownames (pmat) = pmat[,1]
+pmat = pmat[,-1]
+pmat = rowMeans (pmat)
+pmat = as.data.frame (pmat)
+pmat$sample = sapply (rownames (pmat), function(x) unlist(strsplit(x,'__'))[1])
+pmat$celltype = sapply (rownames (pmat), function(x) unlist(strsplit(x,'__'))[2])
+
+pmat$celltype = factor (pmat$celltype, levels = c('CD8_exhausted','NK_KLRC1','Tregs','NK_FGFBP2','CD8','CD4'))
+bp = ggplot (pmat, aes (x = celltype, y = pmat, fill = celltype)) + 
+      #geom_violin (trim=TRUE, aes (fill = treatment), alpha=.6) +
+      #geom_violin (aes_string(fill = metaGroupNames[3])) +
+      geom_point (aes (x = celltype, y = pmat), position='identity', alpha=.7, color="blue", size=1.2) +
+      geom_boxplot(width=0.5, aes (fill = celltype, color = pmat), alpha=.6) +
+      scale_fill_manual (values= palette_tnk_cells) + 
+      scale_color_manual (values= palette_tnk_cells) + 
+      geom_line (data = pmat, aes(x = celltype, y = pmat, group = sample), color='blue',linewidth=.2, alpha=.7) +
+      gtheme + 
+      NoLegend() + 
+      #facet_wrap (~module, scales = 'free_y',strip.position = "left") +
+      #theme(strip.background = element_rect(fill = "white", color = "black")) 
+
+pdf (file.path ('Plots','Exhausted_peaks_avg_per_sample_celltype_boxplot.pdf'),height=3, width =3)
+bp
+dev.off()
+
+
+
+
+pmat = aggregate (pmat)
+
+
 

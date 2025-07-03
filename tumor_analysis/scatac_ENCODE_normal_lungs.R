@@ -148,7 +148,7 @@ pdf ()
 umap_p0 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Clusters",
    embedding = "UMAP",
-   #pal = palette_celltype_simplified,
+   #pal = palette_celltype_lv1,
    labelMeans = FALSE)
 
 umap_p2 = plotEmbedding (ArchRProj = archp, 
@@ -160,7 +160,7 @@ umap_p2 = plotEmbedding (ArchRProj = archp,
 umap_p1 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Clusters_H",
    embedding = "UMAP_H",
-   #pal = palette_celltype_simplified,
+   #pal = palette_celltype_lv1,
    labelMeans = FALSE)
 
 umap_p3 = plotEmbedding (ArchRProj = archp, 
@@ -227,7 +227,7 @@ dev.off()
 # umap_p0 = plotEmbedding (ArchRProj = archp, 
 #   colorBy = "cellColData", name = "Clusters",
 #    embedding = "UMAP",
-#    #pal = palette_celltype_simplified,
+#    #pal = palette_celltype_lv1,
 #    labelMeans = FALSE)
 
 # umap_p2 = plotEmbedding (ArchRProj = archp, 
@@ -416,7 +416,7 @@ archp = addClusters (input = archp, resolution = 10,
 umap_p0 = plotEmbedding (ArchRProj = archp, 
   colorBy = "cellColData", name = "Clusters",
    embedding = "UMAP", 
-   #pal = palette_celltype_simplified,
+   #pal = palette_celltype_lv1,
    labelMeans = TRUE) + NoLegend()
 
 pdf (file.path('Plots','meso_module_umap2.pdf'), width = 12, height = 7)

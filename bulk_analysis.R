@@ -297,12 +297,15 @@ your.gene2 = head(cnmf_spectra_unique[['cNMF20']],20)
 your.gene1 = head(cnmf_spectra_unique[['cNMF13']],20)
 your.gene2 = genes_in_region[[1]]
 your.gene2 = 'MBP'
+your.gene2 = 'TXNL4A'
 your.gene2 = genes_in_region[[48]]
 your.gene2 = 'LYZ'
 your.gene2 = 'BAP1'
 your.gene2 = c('PMP2')
 your.gene1 = 'SOX9'
-your.gene2 = 'SOX9'
+your.gene2 = 'HSBP1L1'
+your.gene2 = 'ATP9B'
+your.gene2 = 'NFATC1'
 #study = c('bueno_immune_corrected','tcga_immune_corrected','mesomics_immune_corrected')
 corr_res = list()
 studies = c('bueno','tcga','mesomics')
@@ -493,16 +496,75 @@ for (study in studies)
   {
   your.gene1 = 'HOXB13'
   your.gene2 = rownames(meso_bulk_l[[study]])
-  cor_mat = as.data.frame (t(cor (t(meso_bulk_l[[study]][your.gene1,, drop=F]), t(meso_bulk_l[[study]][your.gene2,]), method = 'spearman')))
-  cor_mat_l[[study]] = cor_mat[order (cor_mat[[1]]),,drop=F]
+  no_exp = meso_bulk_l[[study]][your.gene1,] > 0
+  cor_mat = as.data.frame (t(cor (t(meso_bulk_l[[study]][your.gene1,no_exp, drop=F]), t(meso_bulk_l[[study]][your.gene2,no_exp]), method = 'spearman')))
+  cor_mat_l[[study]] = cor_mat[order (-cor_mat[[1]]),,drop=F]
   }
 shared_genes = rownames(cor_mat_l[[1]])[rownames(cor_mat_l[[1]]) %in%  rownames(cor_mat_l[[2]])]
 shared_genes = shared_genes[shared_genes %in%  rownames(cor_mat_l[[3]])]
 cor_mat_df = do.call (cbind, lapply (cor_mat_l, function(x) x[shared_genes,]))
 rownames (cor_mat_df) = shared_genes
 cor_mat_mean = rowMeans (cor_mat_df)
-cor_mat_mean = cor_mat_mean[order (cor_mat_mean)]
-head (cor_mat_mean,50)
+cor_mat_mean = cor_mat_mean[order (-cor_mat_mean)]
+cor_mat_mean = na.omit(cor_mat_mean) 
+write.csv (as.data.frame(tail (cor_mat_mean,100)),'HOXB13_sig_mean_cor_studies.csv')
+write.csv (as.data.frame(head (cor_mat_mean,100)),'HOXB13_sig_mean_cor_studies_head.csv')
+
+
+# Compare with P11 HOXB13 correlated genes ####
+p11 = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/correlated_genes_p11s_HOXB13.csv')
+p11_flt = p11[p11[,1] %in% names(cor_mat_mean),]
+cor_mat_mean_flt = cor_mat_mean[names (cor_mat_mean) %in% p11_flt[,1]]
+cor.test(1:length(cor_mat_mean_flt), match (names(cor_mat_mean_flt), p11[,1]), method='spearman')
+head(match (names(cor_mat_mean_flt), p11[,1]), 200)[which (head(match (names(cor_mat_mean_flt), p11[,1]), 200) < 50)]
+p11[21,]
+
+library (fgsea)
+enricher_universe = names(cor_mat_mean_flt)
+#do.fgsea = TRUE
+gmt_annotations = c(
+'h.all.v7.4.symbols.gmt',#,
+'c5.bp.v7.1.symbol.gmt',
+'c3.tft.v7.1.symbol.gmt'
+)
+gmt_annotation = gmt_annotations[2]
+if (!file.exists (paste0('EnrichR_HOXB13_cor_genes_gmt_annotation_',gmt_annotation,'.rds')) | force)
+  {
+    gmt.file = file.path ('..','git_repo','files',gmt_annotation)
+    pathways = clusterProfiler::read.gmt (gmt.file)
+    EnrichRResCluster = list()
+      sig_genes = cor_mat_mean_flt
+      #if (!any (sig_genes %in% pathways$gene)) next
+      egmt = clusterProfiler::enricher (tail(names(sig_genes),100), TERM2GENE=pathways, universe = enricher_universe)
+      egmt@result$ID = stringr::str_trunc (egmt@result$ID, 100)
+      EnrichRResCluster = egmt@result
+      }
+    EnrichRResAll = EnrichRResCluster
+    saveRDS (EnrichRResAll, paste0('EnrichR_HOXB13_cor_genes_gmt_annotation_',gmt_annotation,'.rds'))
+    } else {
+  EnrichRResAll = readRDS (paste0('EnrichR_HOXB13_cor_genes_gmt_annotation_',gmt_annotation,'.rds'))
+  }
+  pvalAdjTrheshold = 0.05
+  top_pathways = 10
+  EnrichRes_dp = dotGSEA (enrichmentsTest_list = EnrichRResAll, type = 'enrich', padj_threshold = pvalAdjTrheshold, top_pathways= top_pathways)
+  pdf (paste0(cnmf_out, '/Plots/EnrichR_',i,'_k_',k_selection,'_top_nmf_genes_',top_nmf_genes,'_ann_',gmt_annotation,'_dotplots.pdf'), width = 12 + length(length (cnmf_spectra_unique))/10, height = 15)
+  print (EnrichRes_dp)
+  dev.off()
+
+
+# check PRC2 and BAF complexes expression ####
+prc2 = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/PRC2.csv', skip=1, header=T)
+
+cor_mat_mean_flt[prc2$Approved.symbol]
+
+
+
+
+
+
+
+
+
 
 
 ###########################
@@ -532,7 +594,7 @@ module_l = lapply (cnmf_spectra_unique, function(x) head(x,20))
 # Make metadata for survival analysis ####
 # Define module of genes to check ####
 module_l = list(TCF3 = 'TCF3', PITX1 = 'PITX1', TEAD1 = 'TEAD1')
-selected_TFs = read.csv ('../tumor_compartment/scatac_ArchR/Active_TFs.csv')$x
+selected_TFs = readRDS ('../tumor_compartment/scatac_ArchR/selected_TF.rds')
 module_l = split (selected_TFs, selected_TFs)
 
 #### Check chromatin regulators and genetic drivers genes ####
@@ -562,7 +624,7 @@ meso_bulk_meta_l2 = lapply (seq_along(meso_bulk_l), function(x)
 names (meso_bulk_meta_l2) = c('bueno','tcga','mesomics')
 #survival_name = 'activeTFs'
 #survival_name = 'megahub'
-survival_name = 'HOXs'
+survival_name = 'oncoTFs'
 
 
 
@@ -671,6 +733,14 @@ for (study in names (cfit_study))
     dev.off()
   }
   
+# make heatmap of cox regression models ####
+ht = do.call (cbind, cfit_study)
+ht2 = ht[,grep ('HR', colnames(ht))]
+ht3 = ht[,grep ('P_value_C', colnames(ht))]
+ht3 = ifelse (ht3 > .05,0,1)
+htl = list (hr = ht2, p = ht3)
+saveRDS (htl, 'oncoTF_sig_cox_bulkRNA.rds')
+
 
 # Correlate HOXB13 expression with TME proportions ####
 bp_bueno = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_study/reproduction2/bulkRNA/bayesprism_bueno_theta.rds')

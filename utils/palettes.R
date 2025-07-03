@@ -1,23 +1,23 @@
 library (paletteer)
 library (circlize)
 
-palette_celltype_simplified = c(
-  B_cells = 'magenta2',
-  T_cells = 'firebrick1',
-  MonoMac = 'cornflowerblue',
-  Myeloid = 'cornflowerblue',
-  DCs = 'deepskyblue',
-  NK = 'gold1',
-  Fibroblasts = 'azure4',
-  Endothelial = 'brown',
-  SmoothMuscle = 'blueviolet',
-  Plasma = 'lightsalmon1',
-  Alveolar = 'black',
-  #Malignant = 'palegreen4',
+palette_celltype_lv1 = c(
   Malignant = 'plum4',
-  Mast = 'royalblue4',
   Mesothelium = 'olivedrab1',
+  Alveolar = 'black',
   Glia = 'lawngreen',
+  Fibroblasts = 'azure4',
+  `Smooth Muscle` = 'blueviolet',
+  Endothelial = 'brown',
+  Myeloid = 'cornflowerblue',
+  MonoMac = 'cornflowerblue',
+  DCs = 'deepskyblue',
+  Mast = 'royalblue4',
+  T_cells = 'firebrick1',
+  NK = 'gold1',
+  #Malignant = 'palegreen4',
+  B_cells = 'magenta2',
+  Plasma = 'lightsalmon1',
   pDCs = 'tomato')
 
 
@@ -67,8 +67,8 @@ palette_clonotype = setNames (c(as.character (paletteer::paletteer_d("beyonce::X
 pallette_pbmc_celltype = setNames (rev(as.character(paletteer::paletteer_d("khroma::smoothrainbow")[c(1,3,5,7,9,11,13,15)])), c('CD4','CD8','ILC','MAIT','NK','NK Proliferating','NK_CD56bright','Treg'))
 
 #palette_stroma = c(as.character(paletteer::paletteer_d("colRoz::shark_bay", 6)))
-names(palette_celltype_simplified)[names(palette_celltype_simplified) == 'SmoothMuscle'] = 'Smooth Muscle'
-palette_stroma = palette_celltype_simplified
+names(palette_celltype_lv1)[names(palette_celltype_lv1) == 'SmoothMuscle'] = 'Smooth Muscle'
+palette_stroma = palette_celltype_lv1
 palette_stroma = palette_stroma[c('Endothelial','Fibroblasts','Smooth Muscle','Mesothelium')]
 palette_stroma = c(palette_stroma, LEC = 'darkgreen')
 palette_endothelial = setNames(as.character(paletteer::paletteer_d("colRoz::shark_bay", 3)), c('Artery','PLVAP+EC','Vein'))
@@ -95,7 +95,7 @@ palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#2A5783FF','white','#24693
 palette_expression_correlation = paletteer::paletteer_c("ggthemes::Green-Blue-White Diverging",100)
 #palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#grey','#FCFDFEFF','#2A6F3FFF'))
 palette_cooccurrence = colorRamp2(c(0,1), c('white','cornsilk4'))
-palette_expression_cor_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c('grey25','#FCFDFEFF','#2A6F3FFF')))}
+palette_expression_cor_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c('#2A5783FF','#FCFDFEFF','#2A6F3FFF')))}
 #palette_expression_cor = c('#24693DFF','#F6F9FCFF','#4F7FAAFF')
 
 palette_deviation_correlation = paletteer::paletteer_c("ggthemes::Red-Black-White Diverging",100)
@@ -103,8 +103,8 @@ palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#49525EFF','#FFFCFCFF','#AE
 palette_deviation2 = paletteer::paletteer_c("pals::ocean.curl",100)
 palette_deviation_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c(palette_deviation[length(palette_deviation)],'white',palette_deviation[1])))}
 
-palette_genescore = as.character(paletteer::paletteer_d("khroma::vik"))
-palette_genescore_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c(palette_genescore[1],'white',palette_genescore[length(palette_genescore)])))}
+palette_genescore = as.character(paletteer::paletteer_c("grDevices::Purple-Blue",100))
+palette_genescore_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c('grey55','white', palette_genescore[1])))}
 #palette_deviation_cor_fun = colorRamp2(c(-1,0,1), c('#2B5C8AFF','white','#9E3D22FF'))
 palette_fragments = rev(paletteer::paletteer_c("grDevices::Oslo",n=40))
 palette_fragments = paletteer::paletteer_c("grDevices::Plasma",40)

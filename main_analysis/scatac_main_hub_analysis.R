@@ -283,7 +283,7 @@ dev.off()
 srt = readRDS ('../scrna/srt.rds')
 #sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
 
-vp = VlnPlot (srt, feature = c('ERG','VIM'), group.by = 'celltype_simplified', col=palette_celltype_simplified) + NoLegend()
+vp = VlnPlot (srt, feature = c('ERG','VIM'), group.by = 'celltype_simplified', col=palette_celltype_lv1) + NoLegend()
 
 hubsCell_mat = t(hubsCell_mat)[rownames(archp@cellColData),]
 archp@cellColData = cbind(archp@cellColData, log2(hubsCell_mat[,c('HUB322'), drop=F]+1))
@@ -294,7 +294,7 @@ p <- plotGroups(
   colorBy = "cellColData", 
   name = "HUB322",
   plotAs = "violin",
-  pal = palette_celltype_simplified,
+  pal = palette_celltype_lv1,
   alpha = 0.4,
   addBoxPlot = TRUE
  )
@@ -536,7 +536,7 @@ meso_markers <- plotBrowserTrack2 (
     upstream = 150000,
     downstream = 100000,
     loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
-    pal = palette_celltype_simplified,
+    pal = palette_celltype_lv1,
     #loops = getCoAccessibility (archp, corCutOff = 0.3,
     #  returnLoops = TRUE),
     useGroups= NULL
@@ -554,7 +554,7 @@ top_dah = na.omit(top_dah)
 bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
 vlp + 
 bxpv + 
-scale_fill_manual (values = palette_celltype_simplified) +
+scale_fill_manual (values = palette_celltype_lv1) +
 #geom_point (position='identity', alpha=.3, color="grey44", size=1) +
 gtheme_no_rot
 
