@@ -7,7 +7,7 @@ source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 
 # Export bigiwg files ####
-metaGroupName = 'celltype2'
+metaGroupName = 'cnmf_celltypes'
 exp_bigwig = T
 if (exp_bigwig)
   {
@@ -123,7 +123,8 @@ if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
 
 # Generate matrix of fragment counts of hubs x metagroup ####
 metaGroupName = 'cnmf_celltypes'
-if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
+force = F
+if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))) | force)
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
     ArchRProj = archp))   
@@ -203,28 +204,105 @@ compare_groups = c('monomac','resident')
 res = wilcoxauc (log2(hubsCell_mat[,as.character (archp@cellColData[,metaGroupName]) %in% compare_groups]+1), 
   as.character (archp@cellColData[,metaGroupName][as.character (archp@cellColData[,metaGroupName]) %in% compare_groups]))
 
-res_l = lapply (split (res, res$group), function(x){
-  tmp = x[x$logFC > 0,]
-  tmp = tmp[order (tmp$pval),]
-  tmp
-})
-res = res_l[[1]]
+# res_l = lapply (split (res, res$group), function(x){
+#   tmp = x[x$logFC > 0,]
+#   tmp = tmp[order (tmp$pval),]
+#   tmp
+# })
+# res = res_l[[1]]
+# res$gene = hubs_obj$hubsCollapsed$gene[match (res$feature, hubs_obj$hubs_id)]
+# head (res,50)
+
+res = res[res$group == 'monomac',]
 res$gene = hubs_obj$hubsCollapsed$gene[match (res$feature, hubs_obj$hubs_id)]
-head (res,50)
+
+DAH_df = data.frame (Log2FC = res$logFC, 
+                    #Mean = res$Mean[,1],
+                    FDR = res$padj,
+                    #Pval = res$Pval[,1],
+                    #MeanDiff = res$MeanDiff[,1],
+                    #AUC = res$AUC[,1],
+                    #MeanBGD = res$MeanBGD[,1],
+                    feature = res$feature)
+
+logFCthreshold = 0.5
+pValThreshold = 1e-5
+DAH_df$color = 'ns'
+DAH_df$label = ''
+DAH_df$label[abs (DAH_df$Log2FC) > logFCthreshold & DAH_df$FDR < pValThreshold] = rownames(DAH_df)[abs (DAH_df$Log2FC) > logFCthreshold & DAH_df$FDR < pValThreshold]
+
+# Make volcano plots of DAM per each comparison
+jitter = position_jitter (width = 0.01, height = 0.01)
+vol_p = ggplot(DAH_df, aes(x = Log2FC, y = -log10(FDR), label = feature)) +
+  geom_point(aes(color = Log2FC), size = 0.2, alpha = 0.5, position = jitter) +
+  geom_text_repel(
+    min.segment.length = 0.2,
+    box.padding = 0.2,
+    size = 2,
+    max.overlaps = 10
+  ) +
+  ggtitle("DAH moMac vs IM") +
+  xlab("LFC") + 
+  ylab("-log10 adjusted p-value") +
+  scale_color_gradientn(colors = rev(palette_hubs_accessibility)) +
+  geom_hline(yintercept = -log10(pValThreshold), linetype = "dashed", color = "black", size = 0.2) +
+  geom_vline(xintercept = -logFCthreshold, linetype = "dashed", color = "black", size = 0.2) +
+  geom_vline(xintercept =  logFCthreshold, linetype = "dashed", color = "black", size = 0.2) +
+  gtheme_no_rot
+
+pdf (file.path('Plots','DAH_volcano.pdf'),width=4,height=3)
+print (vol_p)
+dev.off()
+#palette_hubs_accessibility
+
 
 ## Hubs to show in IGV ####
 HUB84 HUB499 HUB1324 HUB575 HUB178 HUB733 HUB429 HUB369 HUB242 HUB602
 
+
+# Find top DAH ####
+res = wilcoxauc (hubsCell_mat, archp$cnmf_celltypes)
+
+res_l = lapply (split (res, res$group), function(x){
+  tmp = x[x$logFC > 0,]
+  tmp = tmp[order (tmp$pval),]
+  head (tmp,5)
+})
+res_df = do.call (rbind, res_l)
+
+DAH_df = hubsSample_mat[res_df$feature, unique(res_df$group)]
+rownames (DAH_df) = paste0(rownames(DAH_df), ':',hubs_obj$hubsCollapsed$gene[match(res_df$feature, hubs_obj$hubs_id)])
+
+hm = Heatmap (
+  t(scale (t(DAH_df))), 
+#  top_annotation = ha, 
+  column_names_gp = gpar(fontsize = 8),
+  row_names_gp = gpar(fontsize = 8),
+  column_names_rot=45,
+  #column_km = 2,
+  #row_dend_width = unit(5,'mm'),
+  row_dend_side = 'left',
+  clustering_distance_columns = 'pearson',
+  clustering_distance_rows = 'pearson',
+  col = rev(palette_hubs_accessibility),
+  cluster_columns = F,
+  cluster_rows = F,
+  border=T,
+  name = 'Hubs')
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_DAH_heatmap.pdf')), height=6.2, width=4)
+hm
+dev.off()
 
 
 
 
 
 metaGroupName = 'cnmf_celltypes'
-TF = 'EREG'
+TF = 'IL1A'
 pdf()
 meso_markers <- plotBrowserTrack2 (
-    ArchRProj = archp, 
+    ArchRProj = archp,
+    sample_levels = c('Mono','TREM2','SPP1','cDCs','IFN_CXCLs','IM'), 
     sizes = c(6, 1, 1, 1,1,1),
     groupBy = metaGroupName, 
     geneSymbol = TF,
@@ -239,7 +317,7 @@ meso_markers <- plotBrowserTrack2 (
     upstream = 50000,
     pal = palette_myeloid,
     #ylim=c(0,0.1),
-    downstream = 50000,
+    downstream = 100000,
     #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
     #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
 #    loops = getCoAccessibility (archp, corCutOff = 0.25),

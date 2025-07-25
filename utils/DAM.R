@@ -57,13 +57,14 @@
   names (DAM_list2) = names (DAM_list)
   FDR_threshold = 1e-2
   meandiff_threshold = 0
-  top_genes = 5
+  top_genes = 10
   DAM_top_list = DAM_list2[sapply (DAM_list2, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$MeanDiff) > meandiff_threshold,]) > 0)]
   DAM_top_list = lapply (seq_along(DAM_top_list), function(x) {
     res = DAM_top_list[[x]]
     #res = na.omit (res)
     res = res[res$FDR < FDR_threshold,]
     res = res[order (res$FDR), ]
+    #res = res[order (-res$MeanDiff), ]
     res = res[res$MeanDiff > meandiff_threshold,]
     res$comparison = names(DAM_top_list)[x]
     if (nrow(res) < top_genes) 

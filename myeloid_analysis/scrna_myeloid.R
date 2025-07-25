@@ -202,10 +202,13 @@ cores= 100
 # Run cNMF only in samples matching scATAC-seq samples 
 sams = unique (archp$Sample)
 sams = sams[sams %in% unique(srt$sampleID)]
-
-srt2 = srt
+srt2 = srt[, srt$sampleID %in% sams]
+#srt2 = srt2[, srt2$sampleID %in% names (table (srt2$sampleID)[table (srt2$sampleID) > 100])]
+#srt2 = srt
+sams = unique (srt2$sampleID)
 for (sam in sams)
 	{
+	print(sam)	
 	srt = srt2[,srt2$sampleID == sam]	
 	cnmf_name = paste0('myeloid_',sam)
 	cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
@@ -216,10 +219,10 @@ for (sam in sams)
 	source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R'))
 	}
 
-
+#srt = srt2
 ### Import and format spectra files ####
-sams = unique (archp$Sample)
-sams = sams[sams %in% unique(srt$sampleID)]
+# sams = unique (archp$Sample)
+# sams = sams[sams %in% unique(srt$sampleID)]
 
 k_selection = 10
 #sams = sams[sams != 'P10'] # double check why P10 was not included
@@ -265,13 +268,13 @@ if (!file.exists('shared_cnmf_myeloid.rds') | force)
 	row_names_gp = gpar(fontsize = 2),
 	column_names_gp = gpar(fontsize = 2),
 		col = RColorBrewer::brewer.pal(9,'Blues'))
-	pdf (file.path ('Plots','shared_cNMF_overlap3.pdf'),width = 5, height=4)
+	pdf (file.path ('Plots','shared_cNMF_overlap4.pdf'),width = 5, height=4)
 	ho
 	dev.off()
 	
 	shared_cnmf = split (rownames(ov_mat), km$cluster)
-	remove_metamodule = 1 # remove metamodule include non-overlapping modules
-	shared_cnmf = shared_cnmf[names (shared_cnmf) != as.character(remove_metamodule)]
+	#remove_metamodule = 1 # remove metamodule include non-overlapping modules
+	#shared_cnmf = shared_cnmf[names (shared_cnmf) != as.character(remove_metamodule)]
 	overlap_cutoff = 2
 	shared_cnmf_genes = lapply (shared_cnmf, function(x) 
 		{
@@ -285,6 +288,7 @@ if (!file.exists('shared_cnmf_myeloid.rds') | force)
 	#cellcycle_modules = c('cnmf.2','cnmf.7')
 	#shared_cnmf_genes = shared_cnmf_genes[!names (shared_cnmf_genes) %in% cellcycle_modules]
 new_cnmf_names = c(
+	cnmf.2 = 'CC_G2M', 
 	cnmf.1 = 'SPP1', 
 	cnmf.3 = 'LILRA',
 	cnmf.4 ='IM',
@@ -304,8 +308,6 @@ names (shared_cnmf_genes) = new_cnmf_names[names (shared_cnmf_genes)]
 shared_cnmf_genes = lapply (shared_cnmf_genes, function(x) head (x,50))
 
 # Add modules to srt object and plot them on UMAPs ####
-remove_modules = c('cDCs2','CC_S','LILRA') # remove monocyres cDC and CC modules. Consider re-inculding CC 
-shared_cnmf_genes = shared_cnmf_genes[!names(shared_cnmf_genes) %in% remove_modules]
 srt = ModScoreCor (
     seurat_obj = srt,
     geneset_list = shared_cnmf_genes,
@@ -313,6 +315,8 @@ srt = ModScoreCor (
     pos_threshold = NULL, # threshold for fetal_pval2
     listName = 'shared_cnmf', outdir = NULL)
 
+remove_modules = c('cDCs2','CC_S','CC_G2M','LILRA') # remove monocyres cDC and CC modules. Consider re-inculding CC 
+shared_cnmf_genes = shared_cnmf_genes[!names(shared_cnmf_genes) %in% remove_modules]
 # Plot cnmfs 
 reductionName = 'umap'
 pdf (file.path ('Plots','cnmf_featplots.pdf'),10,10)
@@ -502,5 +506,54 @@ genes.keep = VariableFeatures (FindVariableFeatures (srt, nfeat=5000))
 metaGroupNames = c('sampleID','shared_cnmf2_r_max','myeloid')
 reductionName = 'umap'
 source (file.path(scrna_pipeline_dir, 'SCENIC_plots.R'))
+
+auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+km = readRDS (file.path ('..','scatac_ArchR','TF_activity_modules.rds'))
+regulon_TFs_in_modules = list(
+  km1 = colnames(auc_mtx)[colnames(auc_mtx) %in% names(km$cluster[km$cluster == 1])],
+  km2 = colnames(auc_mtx)[colnames(auc_mtx) %in% names(km$cluster[km$cluster == 2])]
+  )
+auc_mtx = auc_mtx[, colnames(auc_mtx) %in% regulon_TFs_in_modules$km2]
+
+srt$mod_2 = unname(rowMeans (auc_mtx))
+
+# # Try with ridge plots ####
+library (ggridges)
+library (ggplot2)
+library (viridis)
+library (tidyr)
+#library(hrbrthemes)
+
+# Plot
+ccomp = as.data.frame (srt@meta.data)
+#ccomp = ccomp[ccomp$cnmf_celltypes %in% c('cDCs'),]
+ccomp$cnmf_celltypes = factor (ccomp$shared_cnmf_r_max, levels = rev(c('Mono','TREM2','SPP1','IFN_CXCLs','cDCs','IM')))
+ccomp$module = srt$mod_2
+ccomp = ccomp[!is.na(ccomp$cnmf_celltypes),]
+rp <- ggplot(ccomp, aes(x = module, y = cnmf_celltypes, fill = ..x..)) +
+  geom_density_ridges_gradient(
+  scale = 3,
+  rel_min_height = 0.01,
+  linewidth = 0.4,
+  color='white',
+  alpha = 0.3
+) +
+
+  scale_fill_gradientn (colors = palette_expression) +  # Optional: nice color gradient
+  theme_ridges() +                      # Optional: clean ridge plot theme
+  theme(legend.position = "right")     # Adjust legend position
+#   theme_classic() + facet_wrap (~sample, ncol=5)
+pdf (file.path ('Plots','cnmf_inflammation_module_ridge_plots.pdf'), width = 5,height=3)
+rp
+dev.off()
+
+
+
+
+
 
 

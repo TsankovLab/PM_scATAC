@@ -40,7 +40,7 @@ source (file.path('..','..','git_repo','utils','palettes.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 set.seed (1234)
-addArchRThreads (threads = 8) 
+addArchRThreads (threads = 1) 
 addArchRGenome ("Hg38")
 
 sample_names = c(
@@ -919,6 +919,80 @@ pdf(file.path ('Plots','NR4A2_dotplot.pdf'), width = 9)
 VlnPlot (srt, feature = 'NR4A2', group.by = 'celltype3', cols = c(palette_tnk_cells, palette_celltype_lv1))
 VlnPlot (srt[,!srt$celltype_simplified3 %in% c('NK','T_cells')], feature = 'NR4A2', group.by = 'celltype_simplified3', cols = c(palette_tnk_cells, palette_celltype_lv1))
 dev.off()
+
+
+
+
+# Show regions linked to IL1B across all cells ####
+nkt_ann = read.csv (file.path('..','..','NKT_cells','scatac_ArchR','barcode_annotation_nkt.csv'))
+mye_ann = read.csv (file.path('..','..','myeloid_cells','scatac_ArchR','barcode_annotation_cnmf_celltypes.csv'))
+archp$celltype2 = archp$celltype_revised
+archp$celltype2[match(nkt_ann$barcode, rownames(archp@cellColData))] = nkt_ann$celltype
+archp$celltype2[match(mye_ann$barcode, rownames(archp@cellColData))] = mye_ann$celltype
+metaGroupName = 'celltype2'  
+pMats = getGroupSE(
+  ArchRProj = archp,
+  useMatrix = 'PeakMatrix',
+  groupBy = metaGroupName,
+  divideN = TRUE,
+  scaleTo = NULL,
+  threads = getArchRThreads(),
+  verbose = TRUE,
+  logFile = createLogFile("getGroupSE")
+)
+hub_region = GRanges ('chr2:112774866-112842997')
+hub_region = GRanges (c(
+  'chr2:112828807-112833348',
+  'chr2:112835783-112838053',
+  'chr2:112838685-112840955'))
+hub_region_names = c('momac_specific','unspecific_(promoter)','momac_IM')
+pset = getPeakSet (archp)
+hub_region_peaks = lapply (seq_along(hub_region), function(x) pset[queryHits (findOverlaps(pset,hub_region[x]))])
+
+pmat_enhancer = do.call(cbind, lapply (hub_region_peaks, function(x) as.data.frame (colMeans(assay (pMats[queryHits(findOverlaps (GRanges(rowData(pMats)), x)),])))))
+colnames (pmat_enhancer) = hub_region_names
+#pmat_enhancer_df$celltype = factor (pmat_enhancer_df$celltype, pmat_enhancer_df$celltype[order(-pmat_enhancer_df$region)])
+#pmat_enhancer_df$type = 'enhancer'
+#pmat_promoter = unlist(colSums (as.data.frame (assay (pMats[queryHits(findOverlaps (GRanges(rowData(pMats)), promoter_region)),]))))
+#pmat_promoter_df = data.frame (region = pmat_promoter, celltype =names(pmat_promoter))
+# panno = rowData (pMats[queryHits(findOverlaps (GRanges(rowData(pMats)), hub_region_peaks)),])
+# panno = makeGRangesFromDataFrame (panno)
+# panno = pset[queryHits (findOverlaps(pset, panno))]
+
+# panno = HeatmapAnnotation (ptype = panno$peakType, which='row')
+pmat_enhancer_scaled = scale(pmat_enhancer)
+#pmat_enhancer_scaled[pmat_enhancer_scaled < -1] = -1
+#pmat_enhancer_scaled[pmat_enhancer_scaled > 1] = 1
+pmat_enhancer_scaled = pmat_enhancer_scaled[,c('momac_specific','momac_IM','unspecific_(promoter)')]
+pdf (file.path ('Plots','hub_peaks_heatmap.pdf'), height=3)
+Heatmap (t(scale(pmat_enhancer_scaled)), cluster_rows=F, cluster_columns=T, col = palette_fragments_fun, column_names_rot=45)
+dev.off()
+
+
+
+pmat_promoter_df$type = 'promoter'
+pmat_df = rbind (pmat_enhancer_df, pmat_promoter_df)
+pmat_df$type = factor (pmat_df$type, levels =c ('promoter','enhancer'))
+
+pdf (file.path ('Plots','eNR4F2_accessibility_barplot.pdf'), height=3, width=6)
+ep = ggplot (pmat_df, aes (x = celltype, y = region, fill = type)) + 
+geom_bar(stat = 'identity',position ='stack', color='grey22') + gtheme +
+scale_fill_manual (values = c(enhancer = '#C1D32FFF', promoter = 'grey'))
+#+ scale_fill_manual (values = c(palette_tnk_cells, palette_myeloid, palette_celltype_lv1))
+ep
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Input exhausted peaks as chromvar score ####

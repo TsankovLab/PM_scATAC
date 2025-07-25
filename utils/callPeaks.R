@@ -24,9 +24,10 @@ archp = addPeakMatrix (archp)
 archp = saveArchRProject (archp, load=TRUE)
   
 metaGroupNames = c('TSSEnrichment','nFrags','ReadsInTSS','FRIP')  
+pdf()
   umap_p12 = lapply (metaGroupNames, function(x) plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
    name = x, embedding = "UMAP"))
-    
-pdf (paste0(projdir,'/Plots/qc_umap_after_filtering.pdf'), 15,15)
-wrap_plots (umap_p12, ncol=5)
+dev.off()
+pdf (file.path('Plots','qc_umap_after_filtering.pdf'), 15,15)
+print (wrap_plots (umap_p12, ncol=5))
 dev.off()

@@ -109,7 +109,9 @@ palette_genescore_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(ab
 palette_fragments = rev(paletteer::paletteer_c("grDevices::Oslo",n=40))
 palette_fragments = paletteer::paletteer_c("grDevices::Plasma",40)
 palette_fragments = paletteer_c("ggthemes::Classic Orange-White-Blue",40)
+palette_fragments_fun = colorRamp2(c(-1,2), c('white',palette_fragments[40]))
 
+#palette_fragments_cor = 
 palette_fetal = c(fetal='purple',rest = 'grey')
 palette_cooccurrence_cor = paletteer::paletteer_c("grDevices::Broc",100)
 palette_cooccurrence_cor_fun = colorRamp2(c(-1,0,1), c(paletteer::paletteer_c("grDevices::Broc",100)[3],'white',paletteer::paletteer_c("grDevices::Broc",100)[97]))
