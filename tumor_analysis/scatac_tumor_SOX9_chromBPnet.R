@@ -33,10 +33,12 @@ archp = loadArchRProject (projdir)
 
 
 ### Call peaks with MACS2 by metaGroupName ####
-archp$sarc_score_sample = paste0(archp$sarc_score,'_', archp$Sample2)
+archp$sarc_score_sample = paste0(archp$sarc_score_cluster,'_', archp$Sample)
 archp2 = archp
+sams = c('P23','P1')
 archp = archp[archp$Sample2 %in% sams]
-archp = archp[! grepl ('mid',archp$sarc_score_sample)]
+archp = archp[archp$sarc_score_cluster != '']
+#archp = archp[! grepl ('mid',archp$sarc_score_sample)]
 metaGroupName = 'sarc_score_sample'
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 

@@ -22,7 +22,7 @@ source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
 source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
-addArchRThreads (threads = 8)
+addArchRThreads (threads = 1)
 addArchRGenome ("hg38")
 
 if (!file.exists ('Save-ArchR-Project.rds')) 
@@ -1774,6 +1774,11 @@ pdf (file.path ('Plots','sarc_score_groups_scaled.pdf'))
 umap_p1 
 dev.off()
 
+# Assign sarcomatoid score using UMAP clustering for P1 and P23
+archp$sarc_score_cluster = ''
+archp$sarc_score_cluster[archp$Clusters %in% c('C5')] = 'SOX9_high'
+archp$sarc_score_cluster[archp$Clusters %in% c('C3')] = 'SOX9_low'
+archp$sarc_score_cluster[archp$Sample == 'P1'] = 'SOX9_high'
 
 # Check SOX9 footprinting ####
 archp$sarc_score_sample = paste0(archp$sarc_score, archp$Sample)
@@ -1782,7 +1787,7 @@ archp$sarc_score_sample = paste0(archp$sarc_score, archp$Sample)
 archp <- addGroupCoverages (ArchRProj = archp, groupBy = "Clusters")
 motifPositions <- getPositions (archp)
 
-motifs <- c("SOX9", "SOX6",'RUNX2','TCF3','SNAI2','SNAI1','TWIST2','TWIST1','HIC2','HIC1')
+motifs <- c("SOX9", "SOX6",'RUNX2','RUNX1','SNAI2')
 markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
 
 #markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"]

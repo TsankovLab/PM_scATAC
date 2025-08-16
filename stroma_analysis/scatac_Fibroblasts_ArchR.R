@@ -80,12 +80,22 @@ embedding = "UMAP_H")
 print (umap_p3)
 print (umap_p5)
 dev.off()
+
+metaGroupNames = c('TSSEnrichment','nFrags','ReadsInTSS','FRIP')  
+pdf()
+  umap_p12 = lapply (metaGroupNames, function(x) plotEmbedding (ArchRProj = archp, colorBy = "cellColData",
+   name = x, embedding = "UMAP"))
+dev.off()  
+pdf (file.path('Plots','qc_umap_after_filtering.pdf'), 15,15)
+print (wrap_plots (umap_p12, ncol=5))
+dev.off()
   
   archp = saveArchRProject (archp, load = T, dropCells=T)
   
   } else {
   archp = loadArchRProject (projdir)
   }
+
 
 # Find DAG in cnmf_clusters ####
 metaGroupName = "Clusters_H"
@@ -247,7 +257,7 @@ dev.off()
 
 ### Run TF correlation to identify TF modules across TNK cells #### 
 if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
+mMat = scale(assays (mSE)[[1]])
 rownames (mMat) = rowData (mSE)$name
 mMat = as.matrix(mMat)#[selected_TF,])
 
@@ -258,7 +268,7 @@ ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat),
 min_exp = .5
 mMat = mMat[rownames(ps)[ps[,1] > min_exp], ]
 
-mMat_cor = cor (as.matrix(t(scale(mMat))), method = 'spearman')
+mMat_cor = cor (t(mMat), method = 'spearman')
 
 set.seed(1234)
 centers=3
@@ -315,8 +325,20 @@ TF_p = plotEmbedding (
     embedding = "UMAP_H")
 dev.off()
 
-pdf (file.path ('Plots','TF_modules_umap2.pdf'), width = 6,height=5)
-wrap_plots (TF_p, ncol=2)
+pdf (file.path ('Plots','TF_modules_umap2.pdf'), width = 11,height=5)
+wrap_plots (TF_p, ncol=3)
+dev.off()
+
+ccomp = as.data.frame (archp@cellColData)
+bp = ggplot (ccomp, aes (x = Sample, y = mod_1, fill = Sample)) + 
+vlp + 
+bxpv + 
+scale_fill_manual (values = palette_sample) +
+#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+gtheme_no_rot
+
+pdf (file.path ('Plots', paste0('TF_module_boxplots.pdf')), height=4, width=4)
+bp
 dev.off()
 
 
