@@ -43,7 +43,7 @@ metaGroupName = 'sarc_score_sample'
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 
-# Run no bias chromBPnet model for each NKT cell subtype ####
+# Run no bias chromBPnet model for each cell subtype ####
 metaGroupName = 'sarc_score_sample'
 
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'

@@ -13,7 +13,8 @@
 #BSUB -L /bin/bash
 
 ml anaconda3/2022.10
-ml cuda/11.7.0
+#ml cuda/11.7.0
+ml cuda/12.4.0
 ml cudnn/8.9.5-11
 ml proxies
 ml java/11.0.2
