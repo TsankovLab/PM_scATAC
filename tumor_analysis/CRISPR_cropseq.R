@@ -287,7 +287,7 @@ gp1 = gp1 + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
 # gp2 = ggplot (ccomp, aes (x = merged_call, y = G2M.Score)) + geom_boxplot()
 # gp3 = ggplot (ccomp, aes (x = merged_call, y = S.Score)) + geom_boxplot()
 
-gene = c('SOX9','TEAD2','TEAD4','MEF2A','TWIST1','MEF2D','PITX1','BPTF','TCF3','RUNX1','TEAD1')
+gene = c('SOX9','SNAI2','RUNX2','RUNX1')
 
 pdf (file.path ('Plots','target_genes_dotplot.pdf'), height=4, width=6)
 gp1

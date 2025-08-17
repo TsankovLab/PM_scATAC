@@ -19,9 +19,15 @@
 # ml java/11.0.2
 # ml tensorrt/8.5.3.1
 
+# NOTES 
+# Install numpy lower than 1.24 to avoid np error
+# e.g. pip install numpy==1.23.5
+# use CUDA > 12.4 to support GPU H100. Check also tensorflow and cudnn versions 
+
 #ml anaconda3 #/2020.11
 ml anaconda3/2022.10
 source activate chrombpnet
+
 
 chromBPdir=${1}
 echo $chromBPdir
@@ -86,7 +92,7 @@ for fold_number in 0 1 2 3 4; do
          -n 8 \
          -W 72:00 \
          -gpu num=2 \
-         -R h100nvl \
+         -R a100 \
          -R rusage[mem=32000] \
          -R span[hosts=1] \
          -o ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.out \
@@ -195,7 +201,7 @@ finemo_job_id=$(bsub -J ${celltype}_finemo \
     -n 8 \
     -W 72:00 \
     -gpu num=2 \
-    -R h100nvl \
+    -R a100 \
     -R rusage[mem=32000] \
     -R span[hosts=1] \
     -o ${chromBPdir}/finemo_${celltype}.out \
