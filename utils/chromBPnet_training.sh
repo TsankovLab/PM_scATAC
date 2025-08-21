@@ -50,24 +50,6 @@ chrombpnet pipeline \
     -fl $grefdir/folds/fold_$fold_number.json \
     -b $biasdir/fold_${fold_number}/models/bias.h5 \
     -o no_bias_model/fold_$fold_number
-else
-    echo "chrombpnet_nobias.h5 file found!"
-
-
-# Compute contribution scores
-REGIONS=${celltype}_peakset_all_no_blacklist.bed
-GENOME=$grefdir/genome_references/hg38.genome.fa
-CHROM_SIZES=$grefdir/hg38.chrom.sizes
-count_scores_file=no_bias_model/${celltype}_averaged_contribution_scores_counts.h5
-profile_scores_file=no_bias_model/${celltype}_averaged_contribution_scores_profile.h5
-
-if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
-    echo "Contribution scores file not found. Computing contribution scores..."
-    chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op no_bias_model/fold_${fold_number}/contribution_scores
-else
-    echo "Contribution count scores file already exists: ${count_scores_file}"
-    echo "Contribution profile scores file already exists: ${profile_scores_file}"
-fi
 
 #chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op $OUTPUT_PREFIX 
 

@@ -93,7 +93,7 @@ for fold_number in 0 1 2 3 4; do
     
     if [ ! -f "${MODEL_H5}" ]; then
         echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
-    rm -r no_bias_model/fold_$fold_number/
+    #rm -r no_bias_model/fold_$fold_number/
     job_id=$(bsub -J ${celltype}_CBPtrain \
          -P acc_Tsankov_Normal_Lung \
          -q gpu \
