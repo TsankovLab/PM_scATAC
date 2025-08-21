@@ -68,66 +68,57 @@ scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipelin
 source (file.path(scrna_pipeline_dir,'master_scrna.R'))
 
 
-### INFERCNV ####
-# Get mesothelium ref from broad normal lung data
-projdir_ref = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Normal_lung/normal_lung_scrna/'
-ref = readRDS (paste0(projdir_ref, 'mesothelium_srt.rds'))
-#saveRDS (ref, file.path (projdir_ref, 'mesothelium_srt.rds'))
-#subsample_ct = 1000
-#ref_bc = lapply (unique(ref$celltype), function(x) sample(colnames(ref)[ref$celltype == x], subsample_ct, replace=T))
-#names (ref_bc) = unique(ref$celltype)
-#cts = c('Mesothelium','Fibroblast')
-#ref = ref[,colnames (ref) %in% unlist(ref_bc[cts])]
-ref = ref[,ref$celltype == 'Mesothelium']
-ref$sampleID2 = 'normal_lung'
-ref_name = 'broad_meso'
-# srt$sampleID = paste0(srt$sampleID2, '_broad_ref')
-srt$celltype = srt$sampleID
-#srt$celltype2[srt$celltype2 == 'Fibroblasts'] = 'Malignant'
-metaGroupName1 = 'celltype'
-metaGroupName1Element = unique (srt$celltype)
-metaGroupName2 = 'sampleID'
-per_sample = FALSE
-# cancer_clusters = unique (srt$celltype_sample[grep ('malignant', srt$celltype_sample)])
-#subsample=min (table(srt$sampleID2))
-subsample=Inf
-force=F
-source (file.path(scrna_pipeline_dir, 'inferCNV_run.R'))
+if (!file.exists ('../../_cellranger_raw_Filter_400_800_25/no_harmony/infercnv/all_samples_subsampled_Inf_ref_broad_meso/infercnv.results.obj.Rds'))
+  {
+  ### INFERCNV ####
+  # Get mesothelium ref from broad normal lung data
+  projdir_ref = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Normal_lung/normal_lung_scrna/'
+  ref = readRDS (paste0(projdir_ref, 'mesothelium_srt.rds'))
+  #saveRDS (ref, file.path (projdir_ref, 'mesothelium_srt.rds'))
+  #subsample_ct = 1000
+  #ref_bc = lapply (unique(ref$celltype), function(x) sample(colnames(ref)[ref$celltype == x], subsample_ct, replace=T))
+  #names (ref_bc) = unique(ref$celltype)
+  #cts = c('Mesothelium','Fibroblast')
+  #ref = ref[,colnames (ref) %in% unlist(ref_bc[cts])]
+  ref = ref[,ref$celltype == 'Mesothelium']
+  ref$sampleID2 = 'normal_lung'
+  ref_name = 'broad_meso'
+  # srt$sampleID = paste0(srt$sampleID2, '_broad_ref')
+  srt$celltype = srt$sampleID
+  #srt$celltype2[srt$celltype2 == 'Fibroblasts'] = 'Malignant'
+  metaGroupName1 = 'celltype'
+  metaGroupName1Element = unique (srt$celltype)
+  metaGroupName2 = 'sampleID'
+  per_sample = FALSE
+  # cancer_clusters = unique (srt$celltype_sample[grep ('malignant', srt$celltype_sample)])
+  #subsample=min (table(srt$sampleID2))
+  subsample=Inf
+  force=F
+  source (file.path(scrna_pipeline_dir, 'inferCNV_run.R'))
+  } else {
+  library (infercnv) 
+  icnv = readRDS ('../../_cellranger_raw_Filter_400_800_25/no_harmony/infercnv/all_samples_subsampled_Inf_ref_broad_meso/infercnv.results.obj.Rds') # output folder
+  }
 
-library (infercnv) 
-icnv = readRDS ('../../_cellranger_raw_Filter_400_800_25/no_harmony/infercnv/all_samples_subsampled_Inf_ref_broad_meso/infercnv.results.obj.Rds') # output folder
+# Filter cells based on correlation to average CNV profile ####
 lexpr.data = log2(icnv@expr.data) 
 lexpr.data = lexpr.data[,-icnv@reference_grouped_cell_indices[[1]]]
-
 avg_cnv = rowMeans (lexpr.data)
-
 cnv_cor = cor (lexpr.data, avg_cnv)
+cnv_cor_filt = rownames(cnv_cor)[cnv_cor[,1] > 0.5]
+srt = srt[, colnames (srt) %in% cnv_cor_filt]
+
 pdf (file.path ('Plots','cnv_cor_distribution.pdf'))
 hist (cnv_cor)
 dev.off()
 
-cnv_cor_filt = rownames(cnv_cor)[cnv_cor[,1] > 0.5]
 
-srt = srt[, colnames (srt) %in% cnv_cor_filt]
-
+#### Map guides detected to cells ####
 crispr_calls = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/cropseq/raw/Sample1Cropseq/cellranger_output/ALTS06_sample1_0_v1/per_sample_outs/ALTS06_sample1_0/count/crispr_analysis/protospacer_calls_per_cell.csv')
 #crispr_ref = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/cropseq/raw/Sample1Cropseq/cellranger_output/ALTS06_sample1_0_v1/per_sample_outs/ALTS06_sample1_0/count/crispr_analysis/feature_reference.csv')
 srt$crispr_calls = crispr_calls$feature_call[match (colnames(srt), crispr_calls$cell_barcode)]
 
-# Remove cells with no guides ####
-srt = srt[,!is.na(srt$crispr_calls)]
-
-res2 = as.data.frame (table (srt$crispr_calls))
-res2 = res2[order(-res2$Freq),]
-res2$Var1 = factor (res2$Var1, levels = unique (res2$Var1))
-bp = ggplot (res2, aes (x = Var1, y = Freq)) + geom_bar (stat = 'identity') + gtheme
-
-pdf (file.path ('Plots','gRNA_abundances_not_filtered_barplot.pdf'), width=93, height=20)
-bp
-dev.off()
-
-
-# Map only cells with one gRNA called or in combination with NTC
+# Identify cells with one gRNA called or in combination with NTC ####
 x <- srt$crispr_calls
 
 keep <- sapply(strsplit(x, "\\|"), function(parts) {
@@ -152,8 +143,34 @@ keep <- sapply(strsplit(x, "\\|"), function(parts) {
   
   return(FALSE)
 })
+srt$unique_guide = keep
+ccomp = as.data.frame (table (srt$unique_guide))
+bp = ggplot (ccomp, aes (x = Var1, y = Freq, fill = Var1)) + geom_bar (stat = 'identity') + 
+scale_fill_manual (values = c(`TRUE` = 'brown',`FALSE` = 'grey')) + gtheme
+bp$data$Var1 = factor (bp$data$Var1, levels = c('TRUE','FALSE'))
+pdf (file.path ('Plots','fraction_unique_guides_barplot.pdf'), width=3, height=3)
+bp
+dev.off()
 
+
+### Filter non-unique guides ####
 srt <- srt[,keep]
+
+
+
+
+# # Remove cells with no guides ####
+# srt = srt[,!is.na(srt$crispr_calls)]
+
+res2 = as.data.frame (table (srt$crispr_calls))
+res2 = res2[order(-res2$Freq),]
+res2$Var1 = factor (res2$Var1, levels = unique (res2$Var1))
+bp = ggplot (res2, aes (x = Var1, y = Freq)) + geom_bar (stat = 'identity') + gtheme
+
+pdf (file.path ('Plots','gRNA_abundances_not_filtered_barplot.pdf'), width=93, height=20)
+bp
+dev.off()
+
 
 res2 = as.data.frame (table (srt$crispr_calls))
 res2 = res2[order(-res2$Freq),]
@@ -287,7 +304,7 @@ gp1 = gp1 + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
 # gp2 = ggplot (ccomp, aes (x = merged_call, y = G2M.Score)) + geom_boxplot()
 # gp3 = ggplot (ccomp, aes (x = merged_call, y = S.Score)) + geom_boxplot()
 
-gene = c('SOX9','SNAI2','RUNX2','RUNX1')
+gene = c('SOX9','SNAI2','RUNX2','RUNX1','SOX6','TWIST1')
 
 pdf (file.path ('Plots','target_genes_dotplot.pdf'), height=4, width=6)
 gp1
@@ -311,12 +328,86 @@ gdot_p2 = geneDot (
 gdot_p2$data = gdot_p2$data %>%
   filter(x_axis == "NTC" | gene == x_axis)
 gdot_p2$data$x_axis = ifelse(gdot_p2$data$x_axis == 'NTC','control', 'guide')
+
+dp = DotPlot (srt, group.by = 'merged_call', features = c('SOX9'), scale =F)
+dp_data1 = dp$data[dp$data$id %in% c('NTC', 'SOX9'),]
+dp_data2 = gdot_p2$data[gdot_p2$data$y_axis %in% c('NTC', 'SOX9'),]
 pdf (file.path('Plots','guides_expression_dotplot.pdf'), height=3.5, width=3)
 #gdot_p2
 gdot_p2
 dev.off()
 
-# Feature plot
+# Show lower Cm17 and higher Cm2 in SOX9 KD compared to control ####
+module_genes = head(cnmf_spectra_unique_comb_full[['Cm17']],50)
+module_genes = rownames(srt)[grep('TGFB', rownames(srt))]
+module_genes = 'SNAI2'
+module_genes_exp = t(srt@assays$RNA@layers$data[rownames(srt) %in% module_genes,])
+rownames(module_genes_exp) = colnames(srt)
+colnames(module_genes_exp) = rownames(srt)[rownames(srt) %in% module_genes]
+ccomp = srt@meta.data[, c('merged_call')]
+ccomp = cbind (ccomp, module_genes_exp)
+head (ccomp)
+ccomp = 
+ccomp = ccomp[ccomp$SNAI2 > 0,]
+ccomp = ccomp[ccomp$merged_call %in% c('NTC','SOX9'),]
+#ccomp[ccomp$crispr_calls == 'NTC_3'] = 'NTC_1'
+gp1 = ggplot (ccomp, aes (x = merged_call, y = SNAI2, fill = merged_call)) + 
+ #geom_point (shape = 21, alpha=.5) +
+  # geom_violin (trim=TRUE,size=2,
+  #   width=1,
+  #   scale='width',
+  #   linewidth = .2, alpha=0.7) + 
+  geom_boxplot (
+    linewidth = .2,
+    width=.3,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.6, alpha=0.7
+     ) + 
+  scale_fill_manual (values = c(SOX9 = 'brown', NTC = 'grey60')) + 
+  gtheme
+  
+gp2 = ggplot (ccomp, aes (x = merged_call, y = Cm17, fill = merged_call)) + 
+  #geom_point (shape = 21, alpha=.5) +
+  # geom_violin (trim=TRUE,size=2,
+  #   width=1,
+  #   scale='width',
+  #   linewidth = .2, alpha=0.7) + 
+  geom_boxplot (
+    linewidth = .2,
+    width=.3,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.6, alpha=0.7
+     ) + 
+  scale_fill_manual (values = c(SOX9 = 'brown', NTC = 'grey60')) + 
+  gtheme
+  
+  library (rstatix)
+  stat.test = ccomp %>% 
+  wilcox_test(reformulate ('merged_call', 'SNAI2')) %>%
+          adjust_pvalue (method = "none") %>%
+          add_significance ()
+          stat.test = stat.test %>% add_xy_position (x = metaGroupNames[1], step.increase=0.01)
+          box + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
+          bracket.nudge.y = 0, hide.ns = F,
+          label = "p.adj.signif") + NoLegend()
+        
+  #stat_ellipse(aes(color = crispr_calls), type = "norm", size = 1) +
+srt$SNAI2_prop = ifelse (srt$SNAI2 > 0, 'pos','neg')
+bp = cellComp (srt[,srt$merged_call %in% c('NTC','SOX9')],
+   metaGroups = c('merged_call','SNAI2_prop'),
+   #subset = 'CD8_exhausted',
+   prop=T,
+   plot_as = 'bar',
+   #pal = palette_tnk_cells
+   ) + gtheme
+pdf (file.path ('Plots','SOX9_controls_prolif_removed_scatter.pdf'),width = 14,3)
+DotPlot (srt, group.by = 'merged_call', features= module_genes, scale=F) + gtheme
+wrap_plots (gp1, gp2)
+bp
+dev.off()
+
 
 
 
@@ -446,6 +537,7 @@ cm_cols <- grep("^Cm\\d+", colnames(df), value = TRUE)
 ntc_df1 <- df[df$merged_call == "NTC", ]
 #ntc_df3 <- df[df$merged_call == "NTC_3", ]
 ntc_means1 <- colMeans(ntc_df1[, cm_cols], na.rm = TRUE)
+ntc_means1 = apply (ntc_df1[, cm_cols], 2, median)
 #ntc_means3 <- colMeans(ntc_df3[, cm_cols], na.rm = TRUE)
 #ntc_means = rowMeans (cbind(ntc_means1, ntc_means3))
 ntc_means = ntc_means1
@@ -460,8 +552,8 @@ colnames(diff_matrix) <- cm_cols
 # Compute difference: NTC_1 mean - crispr_call mean
 for (call in all_calls) {
   group_df <- df[df$merged_call == call, ]
-  group_means <- colMeans(group_df[, cm_cols], na.rm = TRUE)
-  
+  #group_means <- colMeans(group_df[, cm_cols], na.rm = TRUE)
+  group_means = apply (group_df[, cm_cols], 2, median)
   diff_matrix[call, ] <- ntc_means - group_means
 }
 
@@ -597,7 +689,7 @@ dev.off()
 
 
 #### Run SCENIC ####
-force = F
+force = T
 org = 'human'
 motif_window = 'tss500bp'#'10kbp'
 scenic_name = 'crispr_tfs'
@@ -628,7 +720,7 @@ srt$mod_2 = unname(rowMeans (auc_mtx))
 
 
 ### Remove proliferating cells ####
-cc_threshold = -0
+cc_threshold = -0.3
 srt$cycling = ifelse (srt$cc > cc_threshold, 'proliferating','rest')
 pdf (file.path ('Plots','proliferation_distribution.pdf'))
 hist (srt$cc, breaks=100)
@@ -761,6 +853,8 @@ dev.off()
 
 
 
+
+
 #kds = kds[30:length (kds)]
 srt$celltype3 = 'celltype3'
 top_kds = unique(srt$merged_call)
@@ -803,21 +897,21 @@ for (kd in top_kds)
 #ann_terms = unique(unlist(lapply (fgseaL, function(x) x[[ann]][[1]]$pathway)))
 
 for (ann in gmt_annotations)
-{
-#ann = 'c5.bp.v7.1.symbol.gmt'
-fgseaL_ann = lapply (fgseaL, function(x) x[[ann]])
-fgseaL_ann = unlist(fgseaL_ann, recursive=F)
-pvalAdjTrheshold = 0.05
-top_pathways = Inf
-fgseaResAll_dp = dotGSEA (fgseaL_ann, padj_threshold = pvalAdjTrheshold, 
-    type = 'fgsea',top_pathways = top_pathways,
-    cluster_rows=T,
-    cluster_cols=T)
-  
-pdf (file.path('Plots',paste0('fGSEA_annotation_',ann,'_filtered_proliferation_dotplot.pdf')), width=6.5, height=5)
-print(fgseaResAll_dp)
-dev.off()
-}  
+  {
+  #ann = 'c5.bp.v7.1.symbol.gmt'
+  fgseaL_ann = lapply (fgseaL, function(x) x[[ann]])
+  fgseaL_ann = unlist(fgseaL_ann, recursive=F)
+  pvalAdjTrheshold = 0.05
+  top_pathways = Inf
+  fgseaResAll_dp = dotGSEA (fgseaL_ann, padj_threshold = pvalAdjTrheshold, 
+      type = 'fgsea',top_pathways = top_pathways,
+      cluster_rows=T,
+      cluster_cols=T)
+    
+  pdf (file.path('Plots',paste0('fGSEA_annotation_',ann,'_filtered_proliferation_dotplot.pdf')), width=6.5, height=5)
+  print(fgseaResAll_dp)
+  dev.off()
+  }  
 
 
 
@@ -947,16 +1041,16 @@ dev.off()
 
 
 # Show lower Cm17 and higher Cm2 in SOX9 KD compared to control
-
-ccomp = srt@meta.data[, c('Cm17','Cm2','crispr_calls')]
-ccomp = ccomp[ccomp$crispr_calls %in% c('NTC_3','NTC_1','SOX9_3'),]
+srt$SNAI2 = srt@assays$RNA@layers$data[rownames(srt) == 'SNAI2',]
+ccomp = srt@meta.data[, c('Cm17','Cm2','merged_call','SNAI2')]
+ccomp = ccomp[ccomp$merged_call %in% c('NTC','SOX9'),]
 #ccomp[ccomp$crispr_calls == 'NTC_3'] = 'NTC_1'
-gp1 = ggplot (ccomp, aes (x = crispr_calls, y = Cm2, fill = crispr_calls)) + 
+gp1 = ggplot (ccomp, aes (x = merged_call, y = SNAI2, fill = merged_call)) + 
  #geom_point (shape = 21, alpha=.5) +
-  geom_violin (trim=TRUE,size=2,
-    width=1,
-    scale='width',
-    linewidth = .2, alpha=0.7) + 
+  # geom_violin (trim=TRUE,size=2,
+  #   width=1,
+  #   scale='width',
+  #   linewidth = .2, alpha=0.7) + 
   geom_boxplot (
     linewidth = .2,
     width=.3,
@@ -967,12 +1061,12 @@ gp1 = ggplot (ccomp, aes (x = crispr_calls, y = Cm2, fill = crispr_calls)) +
   scale_fill_manual (values = c(SOX9_3 = 'brown', NTC_3 = 'grey60', NTC_1 = 'grey40')) + 
   gtheme
   
-gp2 = ggplot (ccomp, aes (x = crispr_calls, y = Cm17, fill = crispr_calls)) + 
+gp2 = ggplot (ccomp, aes (x = merged_call, y = Cm17, fill = merged_call)) + 
   #geom_point (shape = 21, alpha=.5) +
-  geom_violin (trim=TRUE,size=2,
-    width=1,
-    scale='width',
-    linewidth = .2, alpha=0.7) + 
+  # geom_violin (trim=TRUE,size=2,
+  #   width=1,
+  #   scale='width',
+  #   linewidth = .2, alpha=0.7) + 
   geom_boxplot (
     linewidth = .2,
     width=.3,
@@ -983,8 +1077,9 @@ gp2 = ggplot (ccomp, aes (x = crispr_calls, y = Cm17, fill = crispr_calls)) +
   scale_fill_manual (values = c(SOX9_3 = 'brown', NTC_3 = 'grey60', NTC_1 = 'grey40')) + 
   gtheme
   
-  ccomp %>% 
-  wilcox_test(reformulate ('crispr_calls', 'Cm2')) %>%
+  library (rstatix)
+  stat.test = ccomp %>% 
+  wilcox_test(reformulate ('merged_call', 'SNAI2')) %>%
           adjust_pvalue (method = "none") %>%
           add_significance ()
           stat.test = stat.test %>% add_xy_position (x = metaGroupNames[1], step.increase=0.01)
@@ -995,6 +1090,7 @@ gp2 = ggplot (ccomp, aes (x = crispr_calls, y = Cm17, fill = crispr_calls)) +
   #stat_ellipse(aes(color = crispr_calls), type = "norm", size = 1) +
 
 pdf (file.path ('Plots','SOX9_controls_scatter.pdf'),width = 6,3)
+DotPlot (srt, group.by = 'merged_call', features= c('SNAI2','AXL','SERPINE2','SOX6','CALB2','ITLN1'), scale=F)
 wrap_plots (gp1, gp2)
 dev.off()
 
@@ -1330,56 +1426,56 @@ fgseaResAll_dp = lapply (fgseaResAll, function(y) dotGSEA (y, padj_threshold = p
 
 
 
-### Try with DESeq2 modelling in the cell cycle ####
-expr = AverageExpression (srt2, group.by = 'crispr_calls', layer = 'counts')[[1]]
-expr <- matrix(as.integer(expr), nrow = nrow(expr), ncol = ncol(expr),
-                   dimnames = dimnames(expr))
+# ### Try with DESeq2 modelling in the cell cycle ####
+# expr = AverageExpression (srt2, group.by = 'crispr_calls', layer = 'counts')[[1]]
+# expr <- matrix(as.integer(expr), nrow = nrow(expr), ncol = ncol(expr),
+#                    dimnames = dimnames(expr))
 
-colnames (expr) = gsub ('-','_',colnames(expr))
+# colnames (expr) = gsub ('-','_',colnames(expr))
 
-ccomp = aggregate (srt2@meta.data[,c('Cm16')], by = list (crispr_calls = srt2$crispr_calls), FUN = mean)
-ccomp = ccomp[match(colnames(expr), ccomp$crispr_calls),]
-rownames (ccomp) = ccomp$crispr_calls
-colnames (ccomp)[2] = 'cc'
-library (DESeq2)
-#cc = setNames (ccomp$x, ccomp$crispr_calls)
-dds <- DESeqDataSetFromMatrix (countData = expr,
-                              colData = ccomp,
-                              design = ~crispr_calls)
+# ccomp = aggregate (srt2@meta.data[,c('Cm16')], by = list (crispr_calls = srt2$crispr_calls), FUN = mean)
+# ccomp = ccomp[match(colnames(expr), ccomp$crispr_calls),]
+# rownames (ccomp) = ccomp$crispr_calls
+# colnames (ccomp)[2] = 'cc'
+# library (DESeq2)
+# #cc = setNames (ccomp$x, ccomp$crispr_calls)
+# dds <- DESeqDataSetFromMatrix (countData = expr,
+#                               colData = ccomp,
+#                               design = ~crispr_calls)
 
-dds <- DESeq(dds)
-res <- results(dds, contrast=c("crispr_calls","SOX9_3","NTC_1"))
+# dds <- DESeq(dds)
+# res <- results(dds, contrast=c("crispr_calls","SOX9_3","NTC_1"))
 
-normalized_counts <- counts(dds, normalized=TRUE)
-collapsed_counts_norm = t(sapply(setdiff(unique(matched_gene_symbols),c(NA,'')),function(g) colSums(ldm$counts[which(matched_gene_symbols==g),])))
+# normalized_counts <- counts(dds, normalized=TRUE)
+# collapsed_counts_norm = t(sapply(setdiff(unique(matched_gene_symbols),c(NA,'')),function(g) colSums(ldm$counts[which(matched_gene_symbols==g),])))
 
 
-# get normalised data
-load ('normalized_counts.Rd')
-colnames (normalized_counts)
+# # get normalised data
+# load ('normalized_counts.Rd')
+# colnames (normalized_counts)
 
-meta = ldm$sample_metadata
-meta[is.na(meta)] = '-'
-meta_f = meta[colnames (normalized_counts),]
+# meta = ldm$sample_metadata
+# meta[is.na(meta)] = '-'
+# meta_f = meta[colnames (normalized_counts),]
 
-hcc = t(normalized_counts)
-hcc_f <- hcc[,apply (hcc, 2, var, na.rm=TRUE) != 0]
-hcc.pca <- prcomp (hcc_f, scale. = TRUE)
+# hcc = t(normalized_counts)
+# hcc_f <- hcc[,apply (hcc, 2, var, na.rm=TRUE) != 0]
+# hcc.pca <- prcomp (hcc_f, scale. = TRUE)
 
-# Demo Style
-#meta = ldm[[4]]
-#meta[is.na(meta)] = '-'
-meta_f$timepoint_response = paste0 (meta_f$timepoint, '_', meta_f$response)
-pca_p = lapply (colnames(meta_f)[c(3,4,5,6,8,9)], function(x) ggbiplot(hcc.pca, obs.scale = 1, var.scale = 1,
-         groups = meta_f[,x], ellipse = TRUE, circle = TRUE,var.axes = FALSE, filter.drivers = rownames(hcc.pca$rotation)[1],
-         labels = meta_f[,2]) +
-  scale_color_discrete(name = '') +
-  theme(legend.direction = 'horizontal', legend.position = 'top'))
+# # Demo Style
+# #meta = ldm[[4]]
+# #meta[is.na(meta)] = '-'
+# meta_f$timepoint_response = paste0 (meta_f$timepoint, '_', meta_f$response)
+# pca_p = lapply (colnames(meta_f)[c(3,4,5,6,8,9)], function(x) ggbiplot(hcc.pca, obs.scale = 1, var.scale = 1,
+#          groups = meta_f[,x], ellipse = TRUE, circle = TRUE,var.axes = FALSE, filter.drivers = rownames(hcc.pca$rotation)[1],
+#          labels = meta_f[,2]) +
+#   scale_color_discrete(name = '') +
+#   theme(legend.direction = 'horizontal', legend.position = 'top'))
 
-library (patchwork)
-png ('pca_bulk_groups.png', 3000,1000)
-wrap_plots (pca_p, ncol=5)
-dev.off()
+# library (patchwork)
+# png ('pca_bulk_groups.png', 3000,1000)
+# wrap_plots (pca_p, ncol=5)
+# dev.off()
 
 
 
@@ -1873,6 +1969,53 @@ dev.off()
 
 
 
+
+
+
+
+### CHeck expression of TF target genes inferred from scATAC-seq ####
+target_genes = readRDS ('../../../tumor_compartment/scatac_ArchR/genes_with_tf_peaks.rds')
+var_feat = VariableFeatures (srt)
+target_genes = lapply (target_genes, function(x) x[x %in% var_feat])
+guides = names (target_genes)
+names (target_genes) = paste0(names (target_genes), '_target_genes')
+
+srt = ModScoreCor (
+        seurat_obj = srt, 
+        geneset_list = target_genes,
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # 
+        listName = 'tg', outdir = paste0(projdir,'Plots/'))
+
+ccomp = srt@meta.data
+bp = lapply (guides, function(x)
+{
+bp = ggplot (ccomp[ccomp$merged_call %in% c('NTC',x),], aes_string (
+  x = 'merged_call', y = paste0(x,'_target_genes'))) + 
+geom_boxplot () + gtheme
+bp$data$merged_call = factor(bp$data$merged_call, levels = c('NTC',x))
+bp
+})
+
+
+pdf (file.path ('Plots','target_gene_modules_dotplot.pdf'))
+wrap_plots (bp)
+dev.off()
+
+
+
+
+
+
+
+ccomp = srt@meta.data
+ccomp$SOX9 = srt@assays$RNA@layers$data[rownames(srt) == 'SOX9',]
+bp = ggplot (ccomp, aes (x = merged_call, y = SOX9)) + geom_boxplot()
+pdf(file.path('Plots','SOX9_expression.pdf'))
+DotPlot (srt, group.by = 'merged_call', feature=c('SOX9','SNAI2','RUNX1','RUNX2','TWIST1'))
+VlnPlot (srt, group.by = 'merged_call', feature = 'SOX9')
+bp
+dev.off()
 
 
 

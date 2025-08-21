@@ -50,7 +50,7 @@ celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
 
 for (celltype in celltypes)
 	{
-	command <- paste ("bsub -J", paste0(celltype,'_cBPnet'), 
+	command <- paste ("bsub -J", paste0(celltype,'_CBPmaster'),
 		"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.out')), "-e" ,
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),

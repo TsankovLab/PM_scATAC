@@ -44,6 +44,11 @@ sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
 #archp$Sample2 = factor (archp$Sample2, levels = sarc_order$sampleID)
 
 
+
+archp = addClusters (input = archp, resolution = 1.5,
+  reducedDims = "IterativeLSI", name = 'Clusters2',
+  maxClusters = 100,
+  force = TRUE)
 archp_NN = archp[!archp$Sample3 %in% c('normal1','normal2','normal3')]
 
 pdf ()
@@ -54,11 +59,15 @@ umap_p1 = plotEmbedding (ArchRProj = archp_NN, labelMeans = F,
 umap_p2 = plotEmbedding (ArchRProj = archp_NN, labelMeans = T, 
   colorBy = "cellColData", name = "Clusters",
    embedding = "UMAP")
+umap_p3 = plotEmbedding (ArchRProj = archp_NN, labelMeans = T, 
+  colorBy = "cellColData", name = "Clusters2",
+   embedding = "UMAP")
 dev.off()
 
 pdf (file.path ('Plots','sample_clusters_umap.pdf'))
 umap_p1
 umap_p2
+umap_p3
 dev.off()
 
 # Run genescore DAG ####
@@ -68,7 +77,7 @@ force = FALSE
 if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
 
 archp = addImputeWeights (archp)
-celltype_markers = c('WT1','CALB2','RUNX2','TCF3','SOX9','SOX6','MESP1','HMGA1','TWIST1','SNAI2')
+celltype_markers = c('WT1','CALB2','RUNX2','TCF3','SOX9','VIM','AXL','SOX6','MESP1','HMGA1','TWIST1','SNAI2')
 pdf()
 p <- plotEmbedding(
     ArchRProj = archp, 
@@ -76,7 +85,7 @@ p <- plotEmbedding(
     name = celltype_markers, 
     embedding = "UMAP",
     pal = palette_expression,
-    imputeWeights = getImputeWeights(archp)
+    imputeWeights = NULL
 )
 dev.off()
 pdf (file.path('Plots','marker_genes_feature_plots.pdf'), width = 20, height = 20)
@@ -1779,15 +1788,26 @@ archp$sarc_score_cluster = ''
 archp$sarc_score_cluster[archp$Clusters %in% c('C5')] = 'SOX9_high'
 archp$sarc_score_cluster[archp$Clusters %in% c('C3')] = 'SOX9_low'
 archp$sarc_score_cluster[archp$Sample == 'P1'] = 'SOX9_high'
+archp$sarc_score_sample = paste0(archp$sarc_score_cluster, archp$Sample)
+
+# NEW CLUSTERING
+archp$sarc_score_cluster2 = ''
+archp$sarc_score_cluster2[archp$Clusters2 %in% c('C4')] = 'SOX9_low'
+archp$sarc_score_cluster2[archp$Clusters2 %in% c('C9')] = 'SOX9_high'
+archp$sarc_score_cluster2[archp$Clusters2 %in% c('C22')] = 'SOX9_low'
+archp$sarc_score_cluster2[archp$Clusters2 %in% c('C23')] = 'SOX9_high'
+archp$sarc_score_sample2 = paste0(archp$sarc_score_cluster2, archp$Sample)
+
 
 # Check SOX9 footprinting ####
-archp$sarc_score_sample = paste0(archp$sarc_score, archp$Sample)
+archp = archp[archp$sarc_score_sample2 %in% c('SOX9_lowP23','SOX9_highP23','SOX9_lowP11','SOX9_highP11')]
+metaGroupName='sarc_score_sample2'
 # archp2 = archp
 # archp = archp[archp$sarc_score != 'mid']
-archp <- addGroupCoverages (ArchRProj = archp, groupBy = "Clusters")
+archp <- addGroupCoverages (ArchRProj = archp, groupBy = metaGroupName)
 motifPositions <- getPositions (archp)
 
-motifs <- c("SOX9", "SOX6",'RUNX2','RUNX1','SNAI2')
+motifs <- c("SOX9", "SOX6",'RUNX2','RUNX1','SNAI2','GLIS3')
 markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
 
 #markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"]
@@ -1801,25 +1821,27 @@ markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions),
 
 #sams = c('P10','P12',
 sams = 'P23'#),'P4','P5')
-metaGroupName='Clusters'
+
 #for (sam in sams)
 #  {
   #peaks_sample = readRDS (file.path ('PeakCalls',paste0(sam,'-reproduciblePeaks.gr.rds')))
   #motifPositions_sample = lapply (motifPositions, function(x) x[queryHits(findOverlaps(x, peaks_sample))])  
   seFoot <- getFootprints(
     ArchRProj = archp, 
+    flank = 1000,
     #positions = motifPositions_sample[markerMotifs], 
     positions = motifPositions[markerMotifs], 
     groupBy = metaGroupName
   )
   
-    plotFootprints(
-    seFoot = seFoot[,grepl('C10', colnames(seFoot)) | grepl('C7', colnames(seFoot))],
-    ArchRProj = archp, 
-    normMethod = "Subtract",
-    plotName = paste0("Footprints-Subtract-Bias_",sam),
-    addDOC = FALSE, height=4.5, width=3,
-    smoothWindow = 25)
+plotFootprints(
+seFoot = seFoot[,grepl('P11', colnames(seFoot))],
+ArchRProj = archp, 
+flank = 1000,
+normMethod = "Subtract",
+plotName = 'Sarcomatoid TFs',
+addDOC = FALSE, height=4.5, width=3,
+smoothWindow = 25)
   #}
 
 
@@ -1932,3 +1954,131 @@ dev.off()
 pdf (file.path('Plots','uncommitted_feature_plots.pdf'), width = 10, height = 10)
 p
 dev.off()
+
+
+
+
+
+
+# Compute co-occurrence of sarcomatoid TFs ####
+motifMat = getPositions (archp)
+matches = getMatches (archp)
+matchesMat = assay (matches)
+colnames (matchesMat) = gsub ('_.*','',colnames (matchesMat))
+colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
+
+ko_tfs = c('BPTF','TEAD1','TEAD4','SOX9','TWIST1','TCF3','HMGA1','MEF2A','MEF2D','PITX1')
+#matchesMat = matchesMat[,]
+#matchesMat = matchesMat[rowSums (matchesMat) > 0,]
+
+nfeat=5000
+k=25
+top_genes=50
+library(readxl)
+cnmf_spectra_unique_comb_full = as.list (read_excel( "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_study/reproduction2/PM_scRNA_atlas/data/cnmf_per_compartment.xlsx", sheet = "Cms_full"))
+cnmf_spectra_unique_comb_full = lapply (cnmf_spectra_unique_comb_full, function(x) na.omit (x[x != 'NA']))
+
+
+p2g_corr = .2
+  p2g = getPeak2GeneLinks(
+      ArchRProj = archp,
+      corCutOff = p2g_corr,
+      resolution = 1,
+      returnLoops = FALSE
+  )
+p2g$gene = getPeakSet(archp)$nearestGene[match(p2g$idxATAC, getPeakSet(archp)$idx)]
+
+p2g_tf = lapply (lapply (cnmf_spectra_unique_comb_full, function(y) head(y,50)), function(genes_in_module) p2g$idxATAC[p2g$gene %in% genes_in_module])
+tf_ov = list()
+for (ko_tf in ko_tfs)
+  {
+  message (paste0('compute overlap peaks in modules for TF: ', ko_tf))
+  tf_ov[[ko_tf]] = unlist(lapply (p2g_tf, function(peaks_in_module)
+    sum(matchesMat[rowRanges(matches)$idx %in% peaks_in_module, ko_tf]) /
+     length(matchesMat[rowRanges(matches)$idx %in% peaks_in_module,ko_tf])))
+  }
+
+tf_df = do.call (cbind, tf_ov)
+
+tf_scaled = scale(tf_df)
+tf_scaled[is.na(tf_scaled)] = 0
+pdf (file.path ('Plots','tf_target_genes_peaks_overlap.pdf'))
+Heatmap (tf_scaled)
+dev.off()
+
+# Find genes with correlated peaks enriched in crop-seq TFs ####
+tf_target_genes = list()
+
+p2g_corr = -Inf
+  p2g = getPeak2GeneLinks(
+      ArchRProj = archp,
+      corCutOff = p2g_corr,
+      resolution = 1,
+      returnLoops = FALSE
+  )
+p2g$gene = getPeakSet(archp)$nearestGene[match(p2g$idxATAC, getPeakSet(archp)$idx)]
+p2g = p2g[!is.na(p2g$gene),]
+
+for (ko_tf in ko_tfs)
+  {
+  message (paste0('find target genes for TF: ', ko_tf))
+  tf_peaks = matchesMat[,ko_tf]
+  gene_peaks = table (p2g$gene[match (rowRanges(matches)$idx[tf_peaks], p2g$idxATAC)])
+  gene_peaks = names (head (gene_peaks[order(-gene_peaks)],100))
+  tf_target_genes[[ko_tf]] = gene_peaks
+  }
+
+### p2g genes only have a little more than 2,000 genes. Using full peakset instead... #####
+ps = getPeakSet (archp)
+ps2 = ps[!is.na(ps$nearestGene), ]
+for (ko_tf in ko_tfs)
+  {
+  message (paste0('find target genes for TF: ', ko_tf))
+  tf_peaks = rowRanges(matches)$idx[matchesMat[,ko_tf]]
+  gene_peaks = table (rowRanges(matches)$nearestGene[match(ps$idx, tf_peaks)])
+  gene_peaks = names (head (gene_peaks[order(-gene_peaks)],Inf))
+  tf_target_genes[[ko_tf]] = gene_peaks
+  }
+
+saveRDS (tf_target_genes, 'genes_with_tf_peaks.rds')
+
+
+# Export positions of SOX9 motifs ####
+motifMat = getPositions (archp)
+names (motifMat) = gsub ('_.*','', names (motifMat))
+names (motifMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", names (motifMat))
+write.table (as.data.frame (motifMat[['SOX9']]), file = 'SOX9_motifs.bed', row.names=FALSE, col.names=FALSE, sep='\t', quote=F)
+
+## Find SOX9 in peaks of Cm17 module genes
+ps1 = rowRanges (matches)[matchesMat[,'SOX9']]
+ps2 = ps1[ps1$nearestGene %in% cnmf_spectra_unique_comb_full[['Cm17']]]
+write.csv (ps2, 'SOX9_Cm17_hits.csv')
+
+
+
+
+
+
+
+
+
+markers = c('RUNX1','RUNX2','SOX9','VIM','SERPINE2','SNAI2',
+  'AXL','HAPLN1','SOX6','LAMC2','FBN1','LOXL2','CAV1')
+metaGroupName='Clusters2'
+#archp = addImputeWeights (archp)
+  p2_l <- plotGroups(
+    ArchRProj = archp, 
+    groupBy = metaGroupName, 
+    colorBy = "GeneScoreMatrix", 
+    name = markers,
+    plotAs = "violin",
+    alpha = 0.4,
+    getImputeWeights=NULL,
+    addBoxPlot = TRUE#,
+    #pal = palette_tnk_cells
+   )
+
+pdf (file.path ('Plots','markers_genescores_boxplots.pdf'),14,14)
+wrap_plots (p2_l)
+dev.off()
+

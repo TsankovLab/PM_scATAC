@@ -28,10 +28,6 @@ addArchRGenome("hg38")
 
 archp = loadArchRProject (projdir)
 
-
-
-
-
 ### Call peaks with MACS2 by metaGroupName ####
 archp$sarc_score_sample = paste0(archp$sarc_score_cluster,'_', archp$Sample)
 archp2 = archp

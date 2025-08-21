@@ -47,7 +47,8 @@ sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
 # Export bigiwg files ####
 metaGroupName = 'SampleP11'
 metaGroupName = 'Sample3'
-exp_bigwig = FALSE
+metaGroupName = 'Clusters'
+exp_bigwig = F
 if (exp_bigwig)
   {
   getGroupBW(

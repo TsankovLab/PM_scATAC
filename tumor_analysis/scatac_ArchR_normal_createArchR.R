@@ -96,9 +96,9 @@ umap_p4 = plotEmbedding (ArchRProj = archp,
    embedding = "UMAP")
 dev.off()
 
-pdf (file.path('Plots','celltype_umap.pdf'))
-print (umap_p1)
-print (umap_p2)
+pdf (file.path('Plots','qc_umap.pdf'))
+print (umap_p3)
+print (umap_p4)
 dev.off()
 
 # Run genescore DAG ####

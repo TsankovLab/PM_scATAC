@@ -47,7 +47,7 @@ echo $chromBPct_dir
 mkdir $chromBPct_dir
 cd $chromBPct_dir
 
-chmod +x ${repodir}/utils/chrBPnet_training.sh
+chmod +x ${repodir}/utils/chromBPnet_training.sh
 chmod +x ${repodir}/utils/chromBPnet_average_CNT_scores.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
 chmod +x ${repodir}/utils/TFmodisco_profile.sh
@@ -84,9 +84,16 @@ done
 
 
 job_ids=""
-echo "Run training model and contribution scores"
+echo "Run training model"
 for fold_number in 0 1 2 3 4; do
-    job_id=$(bsub -J ${celltype}_cBP \
+
+    # Train chrombpnet model
+    MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
+    
+    if [ ! -f "${MODEL_H5}" ]; then
+        echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
+    rm -r no_bias_model/fold_$fold_number/
+    job_id=$(bsub -J ${celltype}_CBPtrain \
          -P acc_Tsankov_Normal_Lung \
          -q gpu \
          -n 8 \
@@ -97,14 +104,15 @@ for fold_number in 0 1 2 3 4; do
          -R span[hosts=1] \
          -o ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.out \
          -e ${chromBPdir}/chormBPtraining_${celltype}_f${fold_number}.err \
-         ${repodir}/utils/chrBPnet_training.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" \
+         ${repodir}/utils/chromBPnet_training.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" \
          | awk '{print $2}' | sed 's/<//;s/>//')
-    
+
     # Append the job ID to the job_ids string
     if [ -z "$job_ids" ]; then
         job_ids="done(${job_id})"
     else
         job_ids="$job_ids && done(${job_id})"
+    fi
     fi
 done
 
@@ -121,6 +129,51 @@ wait_job_id=$(bsub -J wait_jobs \
 bwait -w "done(${wait_job_id})"
 
 
+echo "Run contribution scores"
+job_ids=""
+
+for fold_number in 0 1 2 3 4; do
+count_scores_file=no_bias_model/fold_${fold_number}/${celltype}_averaged_contribution_scores_counts.h5
+profile_scores_file=no_bias_model/fold_${fold_number}/${celltype}_averaged_contribution_scores_profile.h5
+
+# Compute contribution scores
+if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
+    echo "Contribution scores file not found. Computing contribution scores..."
+    rm -r no_bias_model/fold_$fold_number/
+    job_id=$(bsub -J ${celltype}_CBPtrain \
+         -P acc_Tsankov_Normal_Lung \
+         -q gpu \
+         -n 8 \
+         -W 72:00 \
+         -gpu num=2 \
+         -R a100 \
+         -R rusage[mem=32000] \
+         -R span[hosts=1] \
+         -o ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.out \
+         -e ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.err \
+         ${repodir}/utils/chromBPnet_contribution_scores.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" \
+         | awk '{print $2}' | sed 's/<//;s/>//')
+
+    # Append the job ID to the job_ids string
+    if [ -z "$job_ids" ]; then
+        job_ids="done(${job_id})"
+    else
+        job_ids="$job_ids && done(${job_id})"
+    fi
+    fi
+done
+
+
+# Wait for all jobs to complete
+wait_job_id=$(bsub -J wait_jobs \
+    -P acc_Tsankov_Normal_Lung \
+    -w "$job_ids" \
+    -o wait.log \
+    -e wait.err \
+    /bin/bash -c "echo 'All jobs completed.'" | awk '{print $2}' | sed 's/<//;s/>//')
+
+# Actively wait for the wait_jobs to complete
+bwait -w "done(${wait_job_id})"
 
 
 ### Combine contribution scores 

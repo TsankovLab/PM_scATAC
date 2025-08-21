@@ -39,12 +39,7 @@ mkdir $chromBPdir/$celltype
 cd ${chromBPdir}/${celltype}
 
 
-# Train chrombpnet model
-MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
 
-if [ ! -f "${MODEL_H5}" ]; then
-    echo "chrombpnet_nobias.h5 file not found. Training chromBPnet with bias correction model..."
-rm -r no_bias_model/fold_$fold_number/
 chrombpnet pipeline \
     -ifrag ../fragments_${celltype}.tsv \
     -d "ATAC" \
@@ -57,7 +52,7 @@ chrombpnet pipeline \
     -o no_bias_model/fold_$fold_number
 else
     echo "chrombpnet_nobias.h5 file found!"
-fi
+
 
 # Compute contribution scores
 REGIONS=${celltype}_peakset_all_no_blacklist.bed
