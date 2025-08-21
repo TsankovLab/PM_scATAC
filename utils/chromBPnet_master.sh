@@ -48,6 +48,7 @@ mkdir $chromBPct_dir
 cd $chromBPct_dir
 
 chmod +x ${repodir}/utils/chromBPnet_training.sh
+chmod +x ${repodir}/utils/chromBPnet_contribution_scores.sh
 chmod +x ${repodir}/utils/chromBPnet_average_CNT_scores.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
 chmod +x ${repodir}/utils/TFmodisco_profile.sh
