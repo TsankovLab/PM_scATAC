@@ -140,7 +140,7 @@ profile_scores_file=no_bias_model/fold_${fold_number}/${celltype}_averaged_contr
 # Compute contribution scores
 if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
-    rm -r no_bias_model/fold_$fold_number/
+    
     job_id=$(bsub -J ${celltype}_CBPtrain \
          -P acc_Tsankov_Normal_Lung \
          -q gpu \
