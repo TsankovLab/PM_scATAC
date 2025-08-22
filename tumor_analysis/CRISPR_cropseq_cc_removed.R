@@ -1,3 +1,9 @@
+conda activate scrnatools
+R
+source ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline/load_libraries.R')
+source ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline/ggplot_aestetics.R')
+source ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline/useful_functions.R')
+setwd ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CRISPR_cropseq_analysis/_cellranger_raw_Filter_400_800_25/no_harmony')
 srt = readRDS ('srt_filtered.rds')
 
 
@@ -223,6 +229,61 @@ pdf (file.path('Plots','guides_expression_cc_removed_dotplot.pdf'), height=3.5, 
 gdot_p2
 dev.off()
 
+
+
+
+
+
+
+
+
+#### Show expression of guides in relative genes ####
+guides_mod = unique (srt$merged_call)
+guides_mod = guides_mod[guides_mod != 'NTC']
+srt$control_guide = ifelse (srt$merged_call == 'NTC','control','guide')
+ccomp = srt@meta.data
+ccomp = ccomp[, !colnames(ccomp) %in% guides_mod]
+sub_data = t(srt@assays$RNA@layers$data[rownames(srt) %in% unlist(guides_mod),])
+colnames (sub_data) = rownames (srt) [rownames(srt) %in% unlist(guides_mod)]
+ccomp = cbind (ccomp[,c('merged_call','control_guide')], sub_data)
+ccomp2 = gather (ccomp, guide, expression, 3:(ncol(ccomp)))
+ccomp2 = ccomp2[ccomp2$merged_call == ccomp2$guide | ccomp2$merged_call == 'NTC', ]
+ccomp2$merged_call[ccomp2$merged_call == 'NTC'] = ccomp2$guide[ccomp2$merged_call == 'NTC']
+gp1 = ggplot (ccomp2, aes (x = merged_call, y = expression)) + geom_violin (
+  aes (fill = control_guide),
+  trim=TRUE,size=2,
+    width=1,
+    scale='width',
+    linewidth = .3, alpha=.6) + 
+geom_boxplot (aes (fill = control_guide),
+    linewidth = .3,
+    width=1,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.8, alpha=.6
+     )  + gtheme +
+scale_fill_manual (values = c(control = 'grey', guide='brown'))
+
+stat.test <- ccomp2 %>%
+  group_by (merged_call) %>%
+  wilcox_test(reformulate('control_guide', 'expression')) %>%
+  adjust_pvalue(method = "fdr") %>%
+  add_significance()
+#stat.test = stat.test[stat.test$group1 == 'NTC',]  
+stat.test <- stat.test %>% add_xy_position (x = "merged_call", step.increase=0.3)
+gp1 = gp1 + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
+  bracket.nudge.y = -1, hide.ns = TRUE,
+   label = "p.adj.signif") 
+# gp2 = ggplot (ccomp, aes (x = merged_call, y = G2M.Score)) + geom_boxplot()
+# gp3 = ggplot (ccomp, aes (x = merged_call, y = S.Score)) + geom_boxplot()
+
+gene = c('SOX9','SNAI2','RUNX2','RUNX1','SOX6','TWIST1')
+
+pdf (file.path ('Plots','target_genes_cc_removed_violinplot.pdf'), height=4, width=5)
+gp1
+#DotPlot (srt, features = gene, group.by = 'merged_call')
+#DotPlot (srt, feature = unname (unlist(guides_mod)), group.by = 'control_guide')
+dev.off()
 
 
 

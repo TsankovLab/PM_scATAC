@@ -29,18 +29,29 @@ addArchRGenome("hg38")
 archp = loadArchRProject (projdir)
 
 ### Call peaks with MACS2 by metaGroupName ####
-archp$sarc_score_sample = paste0(archp$sarc_score_cluster,'_', archp$Sample)
 archp2 = archp
-sams = c('P23','P1')
+sams = c('P23')
 archp = archp[archp$Sample2 %in% sams]
-archp = archp[archp$sarc_score_cluster != '']
+archp = archp[archp$sarc_score_cluster2 != '']
+archp$sarc_score_sample2 = paste0(archp$sarc_score_cluster2,'_', archp$Sample)
 #archp = archp[! grepl ('mid',archp$sarc_score_sample)]
-metaGroupName = 'sarc_score_sample'
+archp2$sarc_score_sample2 = ''
+archp2$sarc_score_sample2[match(rownames(archp), rownames(archp2))] = archp$sarc_score_sample2
+
+pdf (file.path ('Plots','SOX9_clusters_umap.pdf'))
+plotEmbedding (ArchRProj = archp2, labelMeans = F, 
+  colorBy = "cellColData", name = "sarc_score_sample2", 
+  #pal = palette_sample,
+   embedding = "UMAP")
+dev.off()
+
+metaGroupName = 'sarc_score_sample2'
+
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 
 # Run no bias chromBPnet model for each cell subtype ####
-metaGroupName = 'sarc_score_sample'
+metaGroupName = 'sarc_score_sample2'
 
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
 repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
@@ -48,7 +59,7 @@ grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
 
 celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
-celltypes = 'SOX9_high_P23'
+#celltypes = 'SOX9_high_P23'
 for (celltype in celltypes)
 	{
 	command <- paste ("bsub -J", paste0(celltype,'_cBPnet'), 
