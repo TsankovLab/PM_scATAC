@@ -136,11 +136,11 @@ job_ids=""
 for fold_number in 0 1 2 3 4; do
 count_scores_file=no_bias_model/fold_${fold_number}/${celltype}_averaged_contribution_scores_counts.h5
 profile_scores_file=no_bias_model/fold_${fold_number}/${celltype}_averaged_contribution_scores_profile.h5
+MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
 
 # Compute contribution scores
 if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
     echo "Contribution scores file not found. Computing contribution scores..."
-    
     job_id=$(bsub -J ${celltype}_CBPtrain \
          -P acc_Tsankov_Normal_Lung \
          -q gpu \
@@ -152,7 +152,7 @@ if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
          -R span[hosts=1] \
          -o ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.out \
          -e ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.err \
-         ${repodir}/utils/chromBPnet_contribution_scores.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" \
+         ${repodir}/utils/chromBPnet_contribution_scores.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" "$MODEL_H5" \
          | awk '{print $2}' | sed 's/<//;s/>//')
 
     # Append the job ID to the job_ids string

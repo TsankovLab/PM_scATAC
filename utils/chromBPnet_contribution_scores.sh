@@ -33,6 +33,8 @@ fold_number=${4}
 echo $fold_number
 biasdir=${5}
 echo $biasdir
+MODEL_H5=${6}
+echo $MODEL_H5
 
 #mkdir $chromBPdir
 mkdir $chromBPdir/$celltype
@@ -43,6 +45,7 @@ cd ${chromBPdir}/${celltype}
 REGIONS=${celltype}_peakset_all_no_blacklist.bed
 GENOME=$grefdir/genome_references/hg38.genome.fa
 CHROM_SIZES=$grefdir/hg38.chrom.sizes
+
 
 chrombpnet contribs_bw -m $MODEL_H5 -r $REGIONS -g $GENOME -c $CHROM_SIZES -op no_bias_model/fold_${fold_number}/contribution_scores
 

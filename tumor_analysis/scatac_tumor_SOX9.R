@@ -2029,25 +2029,29 @@ for (ko_tf in ko_tfs)
   }
 
 ### p2g genes only have a little more than 2,000 genes. Using full peakset instead... #####
-ps = getPeakSet (archp)
-ps2 = ps[!is.na(ps$nearestGene), ]
+#ps = getPeakSet (archp)
+#ps2 = ps[!is.na(ps$nearestGene), ]
 for (ko_tf in ko_tfs)
   {
   message (paste0('find target genes for TF: ', ko_tf))
-  tf_peaks = rowRanges(matches)$idx[matchesMat[,ko_tf]]
-  gene_peaks = table (rowRanges(matches)$nearestGene[match(ps$idx, tf_peaks)])
-  gene_peaks = names (head (gene_peaks[order(-gene_peaks)],Inf))
-  tf_target_genes[[ko_tf]] = gene_peaks
+  tf_peaks = table (rowRanges(matches)$nearestGene[matchesMat[,ko_tf]])
+  #gene_peaks = table (rowRanges(matches)$nearestGene[match(ps$idx, tf_peaks)])
+  tf_peaks = names (head (tf_peaks[order(-tf_peaks)],Inf))
+  tf_target_genes[[ko_tf]] = tf_peaks
   }
 
 saveRDS (tf_target_genes, 'genes_with_tf_peaks.rds')
 
 
 # Export positions of SOX9 motifs ####
-motifMat = getPositions (archp)
-names (motifMat) = gsub ('_.*','', names (motifMat))
-names (motifMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", names (motifMat))
-write.table (as.data.frame (motifMat[['SOX9']]), file = 'SOX9_motifs.bed', row.names=FALSE, col.names=FALSE, sep='\t', quote=F)
+matches = getMatches (archp)
+matchesMat = assays(matches)[[1]]
+colnames (matchesMat) = gsub ('_.*','', colnames (matchesMat))
+colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
+write.table (as.data.frame (rowRanges (matches)[matchesMat[,'SOX9']], row.names = NULL), file = 'SOX9_motifs.bed', row.names=FALSE, col.names=FALSE, sep='\t', quote=F)
+
+
+write.table (as.data.frame (rowRanges (matches)[matchesMat[,'NFYB']], row.names = NULL), file = 'NFYB_motifs.bed', row.names=FALSE, col.names=FALSE, sep='\t', quote=F)
 
 ## Find SOX9 in peaks of Cm17 module genes
 ps1 = rowRanges (matches)[matchesMat[,'SOX9']]

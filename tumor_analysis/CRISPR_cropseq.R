@@ -157,8 +157,6 @@ dev.off()
 srt <- srt[,keep]
 
 
-
-
 # # Remove cells with no guides ####
 # srt = srt[,!is.na(srt$crispr_calls)]
 
@@ -214,7 +212,7 @@ dev.off()
 merged_guides = list (
   MEF2D = c('MEF2D-1','MEF2D-3','MEF2D−3|NTC−3','MEF2D−1|MEF2D−3','MEF2D−1|NTC−3','MEF2D−1|MEF2D−3|NTC−3','MEF2D−1|NTC−1'),
   MEF2A = c('MEF2A−3','MEF2A−1','MEF2A−3|NTC−3','MEF2A−1|NTC−3','MEF2A−3|NTC−1'),
-  PITX1 = c('PITX1−2','PITX1−3','PITX1−1','PITX1−2|PITX1−3','PITX1−1|PITX1−2','PITX1−1|PITX1−3'),
+  PITX1 = c('PITX1−2','PITX1−3','PITX1−1','PITX1−2|PITX1−3','PITX1−1|PITX1−2','PITX1−1|PITX1−3','NTC-1|PITX1-2','NTC-3|PITX1-2','NTC-3|PITX1-3','NTC-1|PITX1-3'),
   BPTF = c('BPTF−3','BPTF−2'),
   HMGA1 = 'HMGA1−3',
   TEAD2 = 'TEAD2-1',
@@ -232,6 +230,23 @@ table (srt$merged_call)
 srt = srt[, !grepl ('\\|', srt$merged_call)]
 
 
+### QC per guide ####
+ccomp_df = as.data.frame (table(srt$merged_call))
+cc_p2 = ggplot (ccomp_df, aes (x= Var1, y= Freq)) +
+        geom_bar (position="stack", stat="identity") +
+        theme (axis.text.x = element_text (angle = 90, vjust = 0.5, hjust=1)) + 
+        ggtitle (paste('Tot cells',ncol(srt))) + theme_bw() + 
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+srt$nFeature_RNAL = log10 (srt$nFeature_RNA)
+srt$nCount_RNAL = log10 (srt$nCount_RNA)
+vln_p = VlnPlot (srt, features = c("nFeature_RNAL", "nCount_RNAL", "percent.mt"), combine=T,group.by = 'merged_call',pt.size = 0, ncol = 3)
+png (file.path("Plots","QC_nFeat_nCount_m.percent_vlnPlot.png"), 3000, 1000, res=300)
+print (cc_p2 | vln_p[[1]] | vln_p[[2]] | vln_p[[3]]) + plot_layout (widths=c(1,2,2,2))
+dev.off()
+
+
+
+
 ### Show changes in variable genes ####
 var_feat_avg = log2(AverageExpression (srt, group.by = 'merged_call', features = VariableFeatures(FindVariableFeatures(srt, nfeat = 5000)))[[1]]+1)
 #var_feat_avg = t(scale(t(var_feat_avg)))
@@ -240,9 +255,9 @@ colnames (var_feat_avg) = gsub ('-','_', colnames(var_feat_avg))
 var_scaled = scale(t(as.matrix(var_feat_avg)))
 var_scaled[is.na(var_scaled)] = 0
 var_scaled = var_scaled[,apply(var_scaled,2,var) > 0]
-var_scaled = var_scaled[!rownames(var_scaled) %in% c('HMGA1','TEAD2'),]
+#var_scaled = var_scaled[!rownames(var_scaled) %in% c('HMGA1','TEAD2'),]
 ncells = table (srt$merged_call)
-ncells = ncells[!names(ncells) %in% c('HMGA1','TEAD2')]
+#ncells = ncells[!names(ncells) %in% c('HMGA1','TEAD2')]
 
 ha = HeatmapAnnotation (cells = anno_barplot(as.numeric(ncells[rownames(var_scaled)])), which='row')
 hm = Heatmap (var_scaled, right_annotation = ha, 
@@ -258,25 +273,17 @@ hm
 dev.off()
 
 
-#### Show expression of relative KO ####
-guides_mod = split(unique(srt$merged_call),unique(srt$merged_call))
-guides_mod = guides_mod[names (guides_mod) != 'NTC']
-srt = ModScoreCor (
-        seurat_obj = srt, 
-        geneset_list = guides_mod,
-        cor_threshold = NULL, 
-        pos_threshold = NULL, # 
-        listName = 'Cm', outdir = paste0(projdir,'Plots/'))
-
+#### Show expression of guides in relative genes ####
 srt$control_guide = ifelse (srt$merged_call == 'NTC','control','guide')
 ccomp = srt@meta.data
 ccomp = ccomp[, !colnames(ccomp) %in% guides_mod]
 sub_data = t(srt@assays$RNA@layers$data[rownames(srt) %in% unlist(guides_mod),])
 colnames (sub_data) = rownames (srt) [rownames(srt) %in% unlist(guides_mod)]
-ccomp = cbind (ccomp, sub_data)
-ccomp2 = ccomp[,c(unique(srt$merged_call)[unique(srt$merged_call) != 'NTC'], 'merged_call', 'control_guide')]
-ccomp2 = gather (ccomp2, guide, expression, 1:(ncol(ccomp2)-2))
-gp1 = ggplot (ccomp2, aes (x = guide, y = expression)) + geom_violin (
+ccomp = cbind (ccomp[,c('merged_call','control_guide')], sub_data)
+ccomp2 = gather (ccomp, guide, expression, 3:(ncol(ccomp)))
+ccomp2 = ccomp2[ccomp2$merged_call == ccomp2$guide | ccomp2$merged_call == 'NTC', ]
+ccomp2$merged_call[ccomp2$merged_call == 'NTC'] = ccomp2$guide[ccomp2$merged_call == 'NTC']
+gp1 = ggplot (ccomp2, aes (x = merged_call, y = expression)) + geom_violin (
   aes (fill = control_guide),
   trim=TRUE,size=2,
     width=1,
@@ -292,12 +299,12 @@ geom_boxplot (aes (fill = control_guide),
 scale_fill_manual (values = c(control = 'grey', guide='brown'))
 
 stat.test <- ccomp2 %>%
-  group_by (guide) %>%
+  group_by (merged_call) %>%
   wilcox_test(reformulate('control_guide', 'expression')) %>%
   adjust_pvalue(method = "fdr") %>%
   add_significance()
 #stat.test = stat.test[stat.test$group1 == 'NTC',]  
-stat.test <- stat.test %>% add_xy_position (x = "guide", step.increase=0.3)
+stat.test <- stat.test %>% add_xy_position (x = "merged_call", step.increase=0.3)
 gp1 = gp1 + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
   bracket.nudge.y = -1, hide.ns = TRUE,
    label = "p.adj.signif") 
@@ -306,18 +313,20 @@ gp1 = gp1 + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
 
 gene = c('SOX9','SNAI2','RUNX2','RUNX1','SOX6','TWIST1')
 
-pdf (file.path ('Plots','target_genes_dotplot.pdf'), height=4, width=6)
+pdf (file.path ('Plots','target_genes_dotplot.pdf'), height=4, width=5)
 gp1
-DotPlot (srt, features = gene, group.by = 'merged_call')
-DotPlot (srt, feature = unname (unlist(guides_mod)), group.by = 'control_guide')
+#DotPlot (srt, features = gene, group.by = 'merged_call')
+#DotPlot (srt, feature = unname (unlist(guides_mod)), group.by = 'control_guide')
 dev.off()
 
 
 ### Try with dotplot
+guides = unique(srt$merged_call)
+guides = guides[!guides %in% 'NTC']
 srt$celltype = 'crispr'
 gdot_p2 = geneDot (
   seurat_obj = srt, 
-  gene = unname(unlist(guides_mod)),
+  gene = unname(unlist(guides)),
   y = 'celltype',
   x = 'merged_call',
   scale.data = T,
@@ -337,27 +346,47 @@ pdf (file.path('Plots','guides_expression_dotplot.pdf'), height=3.5, width=3)
 gdot_p2
 dev.off()
 
+
+
+# Import sarcomatoid module ####
+library(readxl)
+cnmf_spectra_unique_comb_full = as.list (read_excel( "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_study/reproduction2/PM_scRNA_atlas/data/cnmf_per_compartment.xlsx", sheet = "Cms_full"))
+cnmf_spectra_unique_comb_full = lapply (cnmf_spectra_unique_comb_full, function(x) na.omit (x[x != 'NA']))
+
+# compute module scores ####
+if (!all (names(cnmf_spectra_unique_comb_full) %in% colnames(srt@meta.data))) {
+srt = ModScoreCor (
+        seurat_obj = srt, 
+        geneset_list = lapply(cnmf_spectra_unique_comb_full, function(x) head(x,50)),
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # 
+        listName = 'Cm', outdir = paste0(projdir,'Plots/'))
+}
+
+
+
+
 # Show lower Cm17 and higher Cm2 in SOX9 KD compared to control ####
 module_genes = head(cnmf_spectra_unique_comb_full[['Cm17']],50)
-module_genes = rownames(srt)[grep('TGFB', rownames(srt))]
-module_genes = 'SNAI2'
+module_genes = c('RUNX2','RUNX1','SNAI2')
+#module_genes = rownames(srt)[grep('TGFB', rownames(srt))]
+#module_genes = 'SNAI2'
 module_genes_exp = t(srt@assays$RNA@layers$data[rownames(srt) %in% module_genes,])
 rownames(module_genes_exp) = colnames(srt)
 colnames(module_genes_exp) = rownames(srt)[rownames(srt) %in% module_genes]
-ccomp = srt@meta.data[, c('merged_call')]
+ccomp = srt@meta.data[, c('merged_call'),drop=F]
 ccomp = cbind (ccomp, module_genes_exp)
 head (ccomp)
-ccomp = 
-ccomp = ccomp[ccomp$SNAI2 > 0,]
 ccomp = ccomp[ccomp$merged_call %in% c('NTC','SOX9'),]
+ccomp = gather (ccomp, gene, expression, 2:ncol(ccomp))
 #ccomp[ccomp$crispr_calls == 'NTC_3'] = 'NTC_1'
-gp1 = ggplot (ccomp, aes (x = merged_call, y = SNAI2, fill = merged_call)) + 
+gp1 = ggplot (ccomp, aes (x = gene, y = expression)) + 
  #geom_point (shape = 21, alpha=.5) +
   # geom_violin (trim=TRUE,size=2,
   #   width=1,
   #   scale='width',
   #   linewidth = .2, alpha=0.7) + 
-  geom_boxplot (
+  geom_boxplot (aes (fill = merged_call),
     linewidth = .2,
     width=.3,
     outlier.alpha = 0.2,
@@ -367,48 +396,73 @@ gp1 = ggplot (ccomp, aes (x = merged_call, y = SNAI2, fill = merged_call)) +
   scale_fill_manual (values = c(SOX9 = 'brown', NTC = 'grey60')) + 
   gtheme
   
-gp2 = ggplot (ccomp, aes (x = merged_call, y = Cm17, fill = merged_call)) + 
-  #geom_point (shape = 21, alpha=.5) +
-  # geom_violin (trim=TRUE,size=2,
-  #   width=1,
-  #   scale='width',
-  #   linewidth = .2, alpha=0.7) + 
-  geom_boxplot (
-    linewidth = .2,
-    width=.3,
-    outlier.alpha = 0.2,
-    outlier.size = 1,
-     size=0.6, alpha=0.7
-     ) + 
-  scale_fill_manual (values = c(SOX9 = 'brown', NTC = 'grey60')) + 
-  gtheme
+# gp2 = ggplot (ccomp, aes (x = merged_call, y = Cm17, fill = merged_call)) + 
+#   #geom_point (shape = 21, alpha=.5) +
+#   # geom_violin (trim=TRUE,size=2,
+#   #   width=1,
+#   #   scale='width',
+#   #   linewidth = .2, alpha=0.7) + 
+#   geom_boxplot (
+#     linewidth = .2,
+#     width=.3,
+#     outlier.alpha = 0.2,
+#     outlier.size = 1,
+#      size=0.6, alpha=0.7
+#      ) + 
+#   scale_fill_manual (values = c(SOX9 = 'brown', NTC = 'grey60')) + 
+#   gtheme
   
   library (rstatix)
-  stat.test = ccomp %>% 
-  wilcox_test(reformulate ('merged_call', 'SNAI2')) %>%
-          adjust_pvalue (method = "none") %>%
-          add_significance ()
-          stat.test = stat.test %>% add_xy_position (x = metaGroupNames[1], step.increase=0.01)
-          box + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
-          bracket.nudge.y = 0, hide.ns = F,
-          label = "p.adj.signif") + NoLegend()
+stat.test <- ccomp %>%
+  group_by(gene) %>%
+  filter(n_distinct(merged_call) == 2) %>%      # need two groups
+  filter(n_distinct(expression) > 1) %>%        # need variation in expression
+  wilcox_test(expression ~ merged_call) %>%
+  adjust_pvalue(method = "BH") %>%
+  add_significance("p.adj")
+
+
+stat.test <- stat.test %>%
+  add_xy_position(x = "gene", dodge = 0.8)
+gp1 <- gp1 +
+  stat_pvalue_manual(
+    stat.test,
+    remove.bracket = FALSE,
+    bracket.nudge.y = 0.1,   # nudge a bit above your boxes
+    hide.ns = FALSE,
+    label = "p.adj.signif"
+  ) +
+  NoLegend()
         
   #stat_ellipse(aes(color = crispr_calls), type = "norm", size = 1) +
-srt$SNAI2_prop = ifelse (srt$SNAI2 > 0, 'pos','neg')
-bp = cellComp (srt[,srt$merged_call %in% c('NTC','SOX9')],
-   metaGroups = c('merged_call','SNAI2_prop'),
-   #subset = 'CD8_exhausted',
-   prop=T,
-   plot_as = 'bar',
-   #pal = palette_tnk_cells
-   ) + gtheme
-pdf (file.path ('Plots','SOX9_controls_prolif_removed_scatter.pdf'),width = 14,3)
-DotPlot (srt, group.by = 'merged_call', features= module_genes, scale=F) + gtheme
-wrap_plots (gp1, gp2)
-bp
+# srt$SNAI2_prop = ifelse (srt$SNAI2 > 0, 'pos','neg')
+# bp = cellComp (srt[,srt$merged_call %in% c('NTC','SOX9')],
+#    metaGroups = c('merged_call','SNAI2_prop'),
+#    #subset = 'CD8_exhausted',
+#    prop=T,
+#    plot_as = 'bar',
+#    #pal = palette_tnk_cells
+#    ) + gtheme
+pdf (file.path ('Plots','Cm17_genes_in_SOX9.pdf'),width = 14,3)
+#DotPlot (srt, group.by = 'merged_call', features= module_genes, scale=F) + gtheme
+wrap_plots (gp1)
+#bp
 dev.off()
 
+srt$comb = combgenes (srt, genes = c('RUNX2','SNAI2'))
 
+bp = cellComp(
+  seurat_obj = srt,
+  metaGroups = c('merged_call','comb'),
+  plot_as = 'bar',
+  prop = T
+  #pal = palette_celltype_lv1
+  ) + gtheme
+
+
+pdf (file.path ('Plots','donstream_TF_SOX9_prop.pdf'))
+bp
+dev.off()
 
 
 
@@ -486,43 +540,10 @@ pdf (file.path ('Plots','cellcycle_boxplots.pdf'), height=3, width = 4)
 gp1
 dev.off()
 
-
-# Import sarcomatoid module ####
-library(readxl)
-cnmf_spectra_unique_comb_full = as.list (read_excel( "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_study/reproduction2/PM_scRNA_atlas/data/cnmf_per_compartment.xlsx", sheet = "Cms_full"))
-cnmf_spectra_unique_comb_full = lapply (cnmf_spectra_unique_comb_full, function(x) na.omit (x[x != 'NA']))
-
-# compute module scores ####
-if (!all (names(cnmf_spectra_unique_comb_full) %in% colnames(srt@meta.data))) {
-srt = ModScoreCor (
-        seurat_obj = srt, 
-        geneset_list = lapply(cnmf_spectra_unique_comb_full, function(x) head(x,50)),
-        cor_threshold = NULL, 
-        pos_threshold = NULL, # 
-        listName = 'Cm', outdir = paste0(projdir,'Plots/'))
-}
-
-
-gp = list()
-top_kds = unique(srt$merged_call)
-for (kd in top_kds)
-  {
-  ccomp2 = ccomp[ccomp$merged_call %in% top_kds,]
-  #kd = top_kds
-  ccomp2 = ccomp2[ccomp2$merged_call %in% c(kd,'NTC_1'),]
-  ccomp2$merged_call = factor (ccomp2$merged_call, levels = unique(c('NTC_1', ccomp2$merged_call)))
-  gp[[kd]] = ggplot (ccomp2, aes (x = merged_call, y = Cm17)) + geom_boxplot()
-  }
-
-pdf (file.path ('Plots',paste0('NTC_1_boxplot.pdf')), width=12)
-wrap_plots (gp)
-dev.off()
-
 ### Make heatmap of all KDs against reference for all cNMFs
 # Load libraries
 
 library(tidyverse)
-library(pheatmap)
 
 df = as.data.frame (srt@meta.data) 
 df$merged_call[is.na (df$merged_call)] = 'NT'
@@ -608,18 +629,18 @@ Heatmap (t(diff_matrix), row_names_gp=gpar(fontsize = 7), top_annotation=ha,
 dev.off()
 
 
-# De novo marker discovery
-srt2 = srt
-top_kds = names(head(table (df$merged_call)[order(-table(df$merged_call))],30))
-srt = srt[,srt$merged_call %in% top_kds]
-enricher_universe = 'all'
-logfcThreshold = .25
-pvalAdjTrheshold = 0.01
-metaGroupName = 'merged_call'
-top_pathways = 10
-top_genes = 5
-force = F
-source (file.path(scrna_pipeline_dir,'DEG_standard.R'))
+# # De novo marker discovery
+# srt2 = srt
+# top_kds = names(head(table (df$merged_call)[order(-table(df$merged_call))],30))
+# srt = srt[,srt$merged_call %in% top_kds]
+# enricher_universe = 'all'
+# logfcThreshold = .25
+# pvalAdjTrheshold = 0.01
+# metaGroupName = 'merged_call'
+# top_pathways = 10
+# top_genes = 5
+# force = F
+# source (file.path(scrna_pipeline_dir,'DEG_standard.R'))
 
 
 #DEG2
@@ -638,6 +659,7 @@ for (kd in top_kds2)
   force = T
   do.fgsea = TRUE
   rankby = 'LFC' # Ranking to input in fgsea can be 'LFC' or 'pval_signedLFC'
+  rankby = 'pval_signedLFC'
   logfcThreshold = 0.25 # min logFC threshold to consider for testing. Should be set on 0
   pvalAdjTrheshold = 0.05
   topGenes = 20
@@ -650,12 +672,12 @@ for (kd in top_kds2)
   source (file.path(scrna_pipeline_dir,'DEG2.R'))
   }
 
-rankby = 'LFC'
+rankby = 'pval_signedLFC'
 
 gmt_annotations = c(
 #'c2.cp.kegg.v7.1.symbol.gmt',
-'c2.cp.reactome.v7.1.symbol.gmt',
-'c5.bp.v7.1.symbol.gmt',
+# 'c2.cp.reactome.v7.1.symbol.gmt',
+# 'c5.bp.v7.1.symbol.gmt',
 'h.all.v7.1.symbol.gmt'
 )
 
@@ -719,199 +741,17 @@ auc_mtx = auc_mtx[, colnames(auc_mtx) %in% regulon_TFs_in_modules$km2]
 srt$mod_2 = unname(rowMeans (auc_mtx))
 
 
-### Remove proliferating cells ####
-cc_threshold = -0.3
-srt$cycling = ifelse (srt$cc > cc_threshold, 'proliferating','rest')
-pdf (file.path ('Plots','proliferation_distribution.pdf'))
-hist (srt$cc, breaks=100)
-abline (v = cc_threshold, col='red')
-dev.off()
-
-bp = cellComp(
-  seurat_obj = srt,
-  metaGroups = c('crispr_calls','cycling'),
-  plot_as = 'bar',
-  prop = F
-  #pal = palette_celltype_lv1
-  ) + gtheme
-bp1 = cellComp(
-  seurat_obj = srt,
-  metaGroups = c('crispr_calls','cycling'),
-  plot_as = 'bar',
-  prop = T
-  #pal = palette_celltype_lv1
-  ) + gtheme
-bp$data$crispr_calls = factor(bp$data$crispr_calls, levels = unique(bp1$data$crispr_calls[order(-bp1$data$Freq[bp1$data$cycling == 'proliferating'])]))
-pdf (file.path('Plots',paste0('cellcycle_barplots.pdf')), height=6, width=12)
-bp
-dev.off()
-
-
-srt = srt[,srt$cc < cc_threshold]
-#srt = srt[, srt$crispr_calls %in% names(table (srt$crispr_calls)[table (srt$crispr_calls) > 9])]
-
-
-# Import sarcomatoid module ####
-library(readxl)
-cnmf_spectra_unique_comb_full = as.list (read_excel( "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_study/reproduction2/PM_scRNA_atlas/data/cnmf_per_compartment.xlsx", sheet = "Cms_full"))
-cnmf_spectra_unique_comb_full = lapply (cnmf_spectra_unique_comb_full, function(x) na.omit (x[x != 'NA']))
-# compute module scores ####
-if (!all (names(cnmf_spectra_unique_comb_full) %in% colnames(srt@meta.data))) {
-srt = ModScoreCor (
-        seurat_obj = srt, 
-        geneset_list = lapply(cnmf_spectra_unique_comb_full, function(x) head(x,50)),
-        cor_threshold = NULL, 
-        pos_threshold = NULL, # 
-        listName = 'Cm', outdir = paste0(projdir,'Plots/'))
-}
-
-library(tidyverse)
-library(pheatmap)
-
-df = as.data.frame (srt@meta.data) 
-#df$merged_call[is.na (df$merged_call)] = 'NT'
-#df = df[!is.na(df$merged_call),]
-#top_kds = names(head(table (df$merged_call)[order(-table(df$merged_call))],50))
-#df = df[df$merged_call %in% top_kds,]
-
-# Extract Cm columns
-cm_cols <- grep("^Cm\\d+", colnames(df), value = TRUE)
-
-# Get mean expression for NTC_1
-ntc_df1 = df[df$merged_call == "NTC", ]
-# ntc_df3 = df[df$merged_call == "NTC_3", ]
-ntc_means1 = colMeans(ntc_df1[, cm_cols], na.rm = TRUE)
-# ntc_means3 = colMeans(ntc_df3[, cm_cols], na.rm = TRUE)
-#ntc_means = rowMeans (cbind(ntc_means1, ntc_means3))
-ntc_means = ntc_means1
-
-# Get all unique crispr_calls (including NTC_1)
-all_calls <- unique(df$merged_call)
-# Initialize matrix
-diff_matrix <- matrix(nrow = length(all_calls), ncol = length(cm_cols))
-rownames(diff_matrix) <- all_calls
-colnames(diff_matrix) <- cm_cols
-
-# Compute difference: NTC_1 mean - crispr_call mean
-for (call in all_calls) {
-  group_df <- df[df$merged_call == call, ]
-  group_means <- colMeans(group_df[, cm_cols], na.rm = TRUE)
-  
-  diff_matrix[call, ] <- ntc_means - group_means
-}
-
-# Initialize p-value matrix
-pval_matrix <- matrix(NA, nrow = length(all_calls), ncol = length(cm_cols))
-rownames(pval_matrix) <- all_calls
-colnames(pval_matrix) <- cm_cols
-
-# Loop over calls and Cm columns
-for (call in all_calls) {
-  
-  group_df <- df[df$merged_call == call, ]
-  
-  for (cm in cm_cols) {
-    control_vals <- df[df$merged_call %in% c("NTC"), cm]
-    group_vals   <- group_df[[cm]]
-    
-    # Check if both groups have >1 unique values
-    if (length(unique(control_vals)) > 1 && length(unique(group_vals)) > 1) {
-      pval_matrix[call, cm] <- wilcox.test(control_vals, group_vals, exact = FALSE)$p.value
-    } else {
-      pval_matrix[call, cm] <- NA
-    }
-  }
-}
-#diff_matrix[diff_matrix > 0.2] = 0.2
-#diff_matrix[diff_matrix < -0.2] = -0.2
-ha = HeatmapAnnotation (cells = anno_barplot(as.vector(unname(table (srt$merged_call)[rownames(diff_matrix)]))))
-pdf (file.path ('Plots','prolif_removed_knock_downs_heatmap3.pdf'), height=5, width=4)
-Heatmap (t(diff_matrix), row_names_gp=gpar(fontsize = 7), top_annotation=ha,
-  column_split = ifelse (rownames (diff_matrix) == 'NTC','control','KOs'),
-  column_names_rot=45,
-  border=T,
-  column_names_gp = gpar (fontsize=7),
-  cell_fun = function (j, i, x, y, width, height, fill) 
-            {
-           if (t(pval_matrix)[i, j] < 0.001)
-              {
-               grid.text("***", x, y, just='center', vjust=.8,
-                gp = gpar(fontsize = 5, col='black'))
-              } else {
-              if(t(pval_matrix)[i, j] < 0.01)
-                  {
-                  grid.text("**", x, y, just='center', vjust=.8,
-                  gp = gpar(fontsize = 5, col='black'))   
-                  } else {
-                  if(t(pval_matrix)[i, j] < 0.05)
-                    {
-                    grid.text("*", x, y, just='center', vjust=.8,
-                    gp = gpar(fontsize = 5, col='black'))         
-                    }}}
-      })
-dev.off()
+saveRDS (srt, 'srt_filtered.rds')
 
 
 
 
 
-#kds = kds[30:length (kds)]
-srt$celltype3 = 'celltype3'
-top_kds = unique(srt$merged_call)
-top_kds2 = top_kds[!top_kds %in% c('NTC')]
-for (kd in top_kds2)
-  {
-  force = T
-  do.fgsea = TRUE
-  rankby = 'LFC' # Ranking to input in fgsea can be 'LFC' or 'pval_signedLFC'
-  logfcThreshold = 0.25 # min logFC threshold to consider for testing. Should be set on 0
-  pvalAdjTrheshold = 0.05
-  topGenes = 20
-  addGene=NULL # Add gene(s) to include in the DEG heatmap
-  FeatureSets = list (all = NULL)  # Specify subset of features to run the test on
-  metaGroupName1 = 'celltype3' # Specify metaGroup for celltype / clustering
-  metaGroupName2 = 'merged_call' # Specify metaGroup of condition to compare
-  deg2Ident = c('NTC', kd) #vector of 2 elements specifying the comparison between two groups from metaGroupName2
-  top_pathways = Inf
-  source (file.path(scrna_pipeline_dir,'DEG2.R'))
-  }
 
-rankby = 'LFC'
 
-gmt_annotations = c(
-#'c2.cp.kegg.v7.1.symbol.gmt',
-'c2.cp.reactome.v7.1.symbol.gmt',
-'c5.bp.v7.1.symbol.gmt',
-'h.all.v7.1.symbol.gmt'
-)
 
-fgseaL = list()
-for (kd in top_kds)
-  {
-  projdir_deg2 = paste0 ('deg2_',metaGroupName2,'_', metaGroupName1,'_',deg2Ident[[1]],'_vs_',kd,'_lfc_',logfcThreshold)
-  if (file.exists(file.path(projdir_deg2,paste0('fGSEA_annotation_',paste(gmt_annotations,collapse='_'),'_rankby_',rankby,'.rds'))))
-  fgseaL[[kd]] = readRDS (file.path(projdir_deg2, paste0('fGSEA_annotation_',paste(gmt_annotations, collapse='_'),'_rankby_',rankby,'.rds')))  
-  }
 
-#ann
-#ann_terms = unique(unlist(lapply (fgseaL, function(x) x[[ann]][[1]]$pathway)))
 
-for (ann in gmt_annotations)
-  {
-  #ann = 'c5.bp.v7.1.symbol.gmt'
-  fgseaL_ann = lapply (fgseaL, function(x) x[[ann]])
-  fgseaL_ann = unlist(fgseaL_ann, recursive=F)
-  pvalAdjTrheshold = 0.05
-  top_pathways = Inf
-  fgseaResAll_dp = dotGSEA (fgseaL_ann, padj_threshold = pvalAdjTrheshold, 
-      type = 'fgsea',top_pathways = top_pathways,
-      cluster_rows=T,
-      cluster_cols=T)
-    
-  pdf (file.path('Plots',paste0('fGSEA_annotation_',ann,'_filtered_proliferation_dotplot.pdf')), width=6.5, height=5)
-  print(fgseaResAll_dp)
-  dev.off()
-  }  
 
 
 
@@ -1011,7 +851,8 @@ dev.off()
 
 
 #cnmf_module = 'cNMF27'
-genes = head (cnmf_spectra_unique_comb_full[['Cm17']],50)
+genes = head (cnmf_spectra_unique_comb_full[['Cm17']],10)
+genes = c(genes,'RUNX2','RUNX1','SNAI2')
 #genes = rownames (srt)[grep ('KRT', rownames(srt))]
 #genes = genes[!grepl ('KRTAP', genes)]
 ps = as.data.frame (AverageExpression (srt, features = genes, group.by = 'crispr_calls')[[1]])
@@ -1499,7 +1340,7 @@ cnmf_name = 'crispr'
 source (file.path (scrna_pipeline_dir, 'cnmf_prepare_inputs.R'))
   
 ### Import and format spectra files ####
-k_selection = 20
+k_selection = 30
 cnmf_name = 'crispr'
 source (file.path (scrna_pipeline_dir,'cnmf_format_spectra_files.R')) 
 
