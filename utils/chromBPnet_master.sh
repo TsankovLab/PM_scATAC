@@ -91,7 +91,7 @@ all_contrib_jobs=""
 
 for fold_number in 0 1 2 3 4; do
     MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
-    count_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.count_scores.h5
+    count_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.counts_scores.h5
     profile_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.profile_scores.h5
 
     train_job_id=""
