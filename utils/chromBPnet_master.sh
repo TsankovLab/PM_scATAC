@@ -102,8 +102,8 @@ for fold_number in 0 1 2 3 4; do
         train_job_id=$(bsub -J ${celltype}_CBPtrain_f${fold_number} \
              -P acc_Tsankov_Normal_Lung \
              -q gpu \
-             -n 8 \
-             -W 72:00 \
+             -n 1 \
+             -W 24:00 \
              -gpu num=1 \
              -R a100 \
              -R rusage[mem=32000] \
@@ -124,8 +124,8 @@ for fold_number in 0 1 2 3 4; do
                  -P acc_Tsankov_Normal_Lung \
                  -w "done(${train_job_id})" \
                  -q gpu \
-                 -n 8 \
-                 -W 72:00 \
+                 -n 1 \
+                 -W 48:00 \
                  -gpu num=1 \
                  -R a100 \
                  -R rusage[mem=32000] \
@@ -139,8 +139,8 @@ for fold_number in 0 1 2 3 4; do
             contrib_job_id=$(bsub -J ${celltype}_CBPcontrib_f${fold_number} \
                  -P acc_Tsankov_Normal_Lung \
                  -q gpu \
-                 -n 8 \
-                 -W 72:00 \
+                 -n 1 \
+                 -W 48:00 \
                  -gpu num=1 \
                  -R a100 \
                  -R rusage[mem=32000] \
