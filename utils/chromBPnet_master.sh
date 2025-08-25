@@ -98,12 +98,13 @@ for fold_number in 0 1 2 3 4; do
     # --- Submit training job if needed ---
     if [ ! -f "${MODEL_H5}" ]; then
         echo "Training job needed for fold ${fold_number}..."
+        rm -rf no_bias_model/fold_${fold_number}/logs
         train_job_id=$(bsub -J ${celltype}_CBPtrain_f${fold_number} \
              -P acc_Tsankov_Normal_Lung \
              -q gpu \
              -n 8 \
              -W 72:00 \
-             -gpu num=2 \
+             -gpu num=1 \
              -R a100 \
              -R rusage[mem=32000] \
              -R span[hosts=1] \
@@ -125,7 +126,7 @@ for fold_number in 0 1 2 3 4; do
                  -q gpu \
                  -n 8 \
                  -W 72:00 \
-                 -gpu num=2 \
+                 -gpu num=1 \
                  -R a100 \
                  -R rusage[mem=32000] \
                  -R span[hosts=1] \
@@ -140,7 +141,7 @@ for fold_number in 0 1 2 3 4; do
                  -q gpu \
                  -n 8 \
                  -W 72:00 \
-                 -gpu num=2 \
+                 -gpu num=1 \
                  -R a100 \
                  -R rusage[mem=32000] \
                  -R span[hosts=1] \
