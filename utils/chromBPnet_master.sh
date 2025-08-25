@@ -89,8 +89,8 @@ echo "Run training model and contribution scores"
 for fold_number in 0 1 2 3 4; do
 
     MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
-    count_scores_file=no_bias_model/fold_${fold_number}/${celltype}_averaged_contribution_scores_counts.h5
-    profile_scores_file=no_bias_model/fold_${fold_number}/${celltype}_averaged_contribution_scores_profile.h5
+    count_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.count_scores.h5
+    profile_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.profile_scores.h5
 
     train_job_id=""
     contrib_job_id=""
