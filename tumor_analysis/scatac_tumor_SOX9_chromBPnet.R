@@ -59,7 +59,8 @@ grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
 
 celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
-#celltypes = 'SOX9_high_P23'
+celltypes = 'SOX9_high_P23'
+celltypes = 'SOX9_low_P23'
 for (celltype in celltypes)
 	{
 	command <- paste ("bsub -J", paste0(celltype,'_CBPmaster'), 
@@ -78,4 +79,8 @@ for (celltype in celltypes)
 
 
 
-
+chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
+repodir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo
+grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
+biasdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model
+celltype=SOX9_low_P23
