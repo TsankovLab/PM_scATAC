@@ -83,13 +83,15 @@ for fold_number in 0 1 2 3 4; do
 done
 
 #!/bin/bash
+#!/bin/bash
 
-echo "Run training model and contribution scores"
+echo "=== Run training model and contribution scores ==="
+
+all_contrib_jobs=""
 
 for fold_number in 0 1 2 3 4; do
-
     MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
-    count_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.counts_scores.h5
+    count_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.count_scores.h5
     profile_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.profile_scores.h5
 
     train_job_id=""
@@ -117,9 +119,8 @@ for fold_number in 0 1 2 3 4; do
     # --- Submit contribution job if needed ---
     if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
         echo "Contribution job needed for fold ${fold_number}..."
-
-        # If we submitted a training job, depend on it
         if [ -n "$train_job_id" ]; then
+            # Depend on training job
             contrib_job_id=$(bsub -J ${celltype}_CBPcontrib_f${fold_number} \
                  -P acc_Tsankov_Normal_Lung \
                  -w "done(${train_job_id})" \
@@ -135,7 +136,7 @@ for fold_number in 0 1 2 3 4; do
                  ${repodir}/utils/chromBPnet_contribution_scores.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" "$MODEL_H5" \
                  | awk '{print $2}' | sed 's/<//;s/>//')
         else
-            # No training job needed → start immediately
+            # No training job → submit immediately
             contrib_job_id=$(bsub -J ${celltype}_CBPcontrib_f${fold_number} \
                  -P acc_Tsankov_Normal_Lung \
                  -q gpu \
@@ -150,58 +151,57 @@ for fold_number in 0 1 2 3 4; do
                  ${repodir}/utils/chromBPnet_contribution_scores.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" "$MODEL_H5" \
                  | awk '{print $2}' | sed 's/<//;s/>//')
         fi
-    fi
 
+        # Add to global wait string
+        if [ -n "$contrib_job_id" ]; then
+            if [ -z "$all_contrib_jobs" ]; then
+                all_contrib_jobs="done(${contrib_job_id})"
+            else
+                all_contrib_jobs="$all_contrib_jobs && done(${contrib_job_id})"
+            fi
+        fi
+    fi
 done
 
+# --- Wait for all contribution jobs ---
+if [ -n "$all_contrib_jobs" ]; then
+    wait_contrib_job=$(bsub -J wait_all_contrib \
+        -w "$all_contrib_jobs" \
+        -o wait_contrib.log \
+        -e wait_contrib.err \
+        /bin/bash -c "echo 'All contribution jobs completed.'" \
+        | awk '{print $2}' | sed 's/<//;s/>//')
+    bwait -w "done(${wait_contrib_job})"
+fi
 
-### Combine contribution scores 
-echo "combine contribution scores"
-#ml anaconda3/2020.11
-#source deactivate
-source activate h5py # activate another environment with hdf5plugin installed to read h5 files
-
-# Explicitly set PATH to detect hdf5plugin
-# Fix environment variables
+echo "=== Combine contribution scores ==="
+source activate h5py
 export PATH=/sc/arion/work/giottb01/conda/envs/h5py/bin:$PATH
 unset PYTHONPATH
 export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_PATH
 
-conda list | grep hdf5plugin
-/sc/arion/work/giottb01/conda/envs/h5py/bin/python -c "import hdf5plugin; print('hdf5plugin is installed')"
+# Combine HDF5 scores
 /sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores.py $chromBPct_dir $celltype
 
-echo "Take average of bigwig files counts"
-wiggletools mean no_bias_model/fold_0/contribution_scores.counts_scores.bw \
-no_bias_model/fold_1/contribution_scores.counts_scores.bw \
-no_bias_model/fold_2/contribution_scores.counts_scores.bw \
-no_bias_model/fold_3/contribution_scores.counts_scores.bw \
-no_bias_model/fold_4/contribution_scores.counts_scores.bw \
-> no_bias_model/temp_contribution_counts_scores.wig
+# Average bigwig files
+wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.counts_scores.bw \
+    > no_bias_model/temp_contribution_counts_scores.wig
 wigToBigWig no_bias_model/temp_contribution_counts_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_counts.bw
 rm no_bias_model/temp_contribution_counts_scores.wig
 
-echo "Take average of bigwig files profile"
-wiggletools mean no_bias_model/fold_0/contribution_scores.profile_scores.bw \
-no_bias_model/fold_1/contribution_scores.profile_scores.bw \
-no_bias_model/fold_2/contribution_scores.profile_scores.bw \
-no_bias_model/fold_3/contribution_scores.profile_scores.bw \
-no_bias_model/fold_4/contribution_scores.profile_scores.bw \
-> no_bias_model/temp_contribution_profile_scores.wig
+wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.profile_scores.bw \
+    > no_bias_model/temp_contribution_profile_scores.wig
 wigToBigWig no_bias_model/temp_contribution_profile_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
 rm no_bias_model/temp_contribution_profile_scores.wig
 
+# Cleanup fold-level contribution files
 avg_contribution_file=no_bias_model/${celltype}_averaged_contributions_counts.h5
 if [ -f "${avg_contribution_file}" ]; then
-echo "average contribution file found. Delete fold contribution files"
-rm -r no_bias_model/fold_0/contribution*
-rm -r no_bias_model/fold_1/contribution*
-rm -r no_bias_model/fold_2/contribution*
-rm -r no_bias_model/fold_3/contribution*
-rm -r no_bias_model/fold_4/contribution*
+    echo "Average contribution file exists. Cleaning up fold-level contribution files..."
+    rm -rf no_bias_model/fold_{0..4}/contribution*
 fi
 
-echo "Run TFmodisco on averaged h5 contribution counts and profile files"
+echo "=== Run TF-MoDISco on averaged contributions (parallel) ==="
 TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
@@ -224,9 +224,7 @@ TFmd_p_id=$(bsub -J ${celltype}_TFmd_p \
     -e ${chromBPdir}/${celltype}_TFmodisco_profiles.err \
     ${repodir}/utils/TFmodisco_profile.sh $chromBPdir $celltype | awk '{print $2}' | sed 's/<//;s/>//')
 
-
-# Submit the finemo job
-echo "Run finemo for motif calls"
+echo "=== Submit finemo job (depends on TF-MoDISco) ==="
 finemo_job_id=$(bsub -J ${celltype}_finemo \
     -P acc_Tsankov_Normal_Lung \
     -q gpu \
@@ -244,15 +242,13 @@ finemo_job_id=$(bsub -J ${celltype}_finemo \
 
 echo "Submitted finemo job with ID: $finemo_job_id"
 
-# Wait for the finemo job to complete
-echo "Waiting for the finemo job to finish..."
+# Wait for finemo to finish
+echo "Waiting for finemo job..."
 bwait -w "done(${finemo_job_id})"
 
-# Run the R script
+echo "=== Run R script for finemo motif labels ==="
 source activate meso_scatac
-echo "Running R script for finemo motif labels..."
 Rscript $repodir/utils/chromBPnet_finemo_motif_labels.R $chromBPdir $celltype
-
 echo "R script execution completed."
 
 # bsub -J ${celltype}_combS \
