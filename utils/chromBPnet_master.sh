@@ -108,7 +108,7 @@ for fold_number in 0 1 2 3 4; do
              -W 24:00 \
              -gpu num=1 \
              -R a100 \
-             -R rusage[mem=32000] \
+             -R rusage[mem=64000] \
              -R span[hosts=1] \
              -o ${chromBPdir}/chromBPtraining_${celltype}_f${fold_number}.out \
              -e ${chromBPdir}/chromBPtraining_${celltype}_f${fold_number}.err \
@@ -129,7 +129,7 @@ for fold_number in 0 1 2 3 4; do
                  -W 48:00 \
                  -gpu num=1 \
                  -R a100 \
-                 -R rusage[mem=32000] \
+                 -R rusage[mem=64000] \
                  -R span[hosts=1] \
                  -o ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.out \
                  -e ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.err \
@@ -144,7 +144,7 @@ for fold_number in 0 1 2 3 4; do
                  -W 48:00 \
                  -gpu num=1 \
                  -R a100 \
-                 -R rusage[mem=32000] \
+                 -R rusage[mem=64000] \
                  -R span[hosts=1] \
                  -o ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.out \
                  -e ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.err \

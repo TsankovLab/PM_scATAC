@@ -346,13 +346,15 @@ guides_targets = lapply (guides_targets, function(x) x[1])
 guides_targets = unlist (guides_targets[!is.na(guides_targets)])
 tf_db = tf_db[guides_targets]
 tf_db = lapply (tf_db, function(x) x[,2])
-
+tf_db = tf_db[names (tf_db) != 'ATCMNTCCGY_UNKNOWN']
 # Import Harmonizome databases for the missing TCF3 TEAD4 TWIST1 and MEF2A
-d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_list_terms.txt', header=T)
-d11 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/attribute_list_entries.txt', header=T)
-d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_list_terms.txt', header=T)
-d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_list_terms.txt', header=T)
-
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+# d11 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/attribute_list_entries.txt', header=T)
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/ENCODE Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/JASPAR Predicted Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+tf_db = c(tf_db, split(d2$source[d2$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')], d2$target[d2$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')]))
+vf = VariableFeatures(FindVariableFeatures(srt, nfeat= 5000))
+tf_db = lapply (tf_db, function(x) x[x %in% vf])
 srt = ModScoreCor (
         seurat_obj = srt, 
         geneset_list = tf_db,
@@ -368,7 +370,7 @@ ccomp$guide_control = ifelse (ccomp$merged_call == 'NTC', 'control','guide')
 ccomp$TF = sapply (ccomp$TF, function(x) unlist(strsplit(x, '_'))[1])
 ccomp = ccomp[ccomp$merged_call == ccomp$TF | ccomp$merged_call == 'NTC',]
 ccomp$merged_call[ccomp$merged_call == 'NTC'] = ccomp$TF[ccomp$merged_call == 'NTC']
-ccomp = ccomp[ccomp$merged_call != 'ATCMNTCCGY',]
+
 bp = ggplot (ccomp, aes (x = merged_call, y = module)) + geom_boxplot (aes (fill = guide_control)) + gtheme
 
 pdf (file.path ('Plots','TF_targets_boxplots.pdf'),5,5)
@@ -1435,7 +1437,6 @@ dev.off()
 
 
 
-### Check distributions of Cms after cc correction
 ccomp = srt@meta.data
 ccomp2 = srt2@meta.data
 

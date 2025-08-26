@@ -233,6 +233,45 @@ dev.off()
 
 
 
+# import TF targets MsigDB database ####
+tf_db =  read.gmt('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/c3.tft.v7.1.symbol.gmt')
+tf_db = split (tf_db, tf_db$term)
+guides_targets = lapply (unique(srt$merged_call), function(x) which (grepl (x, names (tf_db))))
+guides_targets = lapply (guides_targets, function(x) x[1])
+guides_targets = unlist (guides_targets[!is.na(guides_targets)])
+tf_db = tf_db[guides_targets]
+tf_db = lapply (tf_db, function(x) x[,2])
+tf_db = tf_db[names (tf_db) != 'ATCMNTCCGY_UNKNOWN']
+# Import Harmonizome databases for the missing TCF3 TEAD4 TWIST1 and MEF2A
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+# d11 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/attribute_list_entries.txt', header=T)
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/ENCODE Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/JASPAR Predicted Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+#tf_db = c(tf_db, split(d1$source[d1$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')], d1$target[d1$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')]))
+#vf = VariableFeatures(FindVariableFeatures(srt, nfeat= 10000))
+tf_db = lapply (tf_db, function(x) x[x %in% vf])
+srt = ModScoreCor (
+        seurat_obj = srt, 
+        geneset_list = tf_db,
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # 
+        listName = 'TF_targets', outdir = paste0(projdir,'Plots/'))
+
+ccomp = srt@meta.data
+head (ccomp)
+ccomp = ccomp[, c(names (tf_db), 'merged_call')]
+ccomp = gather (ccomp, TF, module, 1:(ncol(ccomp)-1))
+ccomp$guide_control = ifelse (ccomp$merged_call == 'NTC', 'control','guide')
+ccomp$TF = sapply (ccomp$TF, function(x) unlist(strsplit(x, '_'))[1])
+ccomp = ccomp[ccomp$merged_call == ccomp$TF | ccomp$merged_call == 'NTC',]
+ccomp$merged_call[ccomp$merged_call == 'NTC'] = ccomp$TF[ccomp$merged_call == 'NTC']
+
+bp = ggplot (ccomp, aes (x = merged_call, y = module)) + geom_boxplot (aes (fill = guide_control)) + gtheme
+
+pdf (file.path ('Plots','TF_targets_cc_removed_boxplots.pdf'),5,5)
+bp
+dev.off()
+
 
 
 
@@ -285,6 +324,10 @@ gp1
 #DotPlot (srt, features = gene, group.by = 'merged_call')
 #DotPlot (srt, feature = unname (unlist(guides_mod)), group.by = 'control_guide')
 dev.off()
+
+
+
+
 
 
 
@@ -343,7 +386,7 @@ pdf (file.path ('Plots','SOX9_target_genes_dotplot.pdf'), height=4, width=6)
 DotPlot (srt[,srt$merged_call %in% c('SOX9','NTC')], features = gene, group.by = 'merged_call') + gtheme
 dev.off()
 
-### Assess enrichment of Sox9 targets from Fuchs paper
+### Assess enrichment of Sox9 targets from Fuchs paper ####
 
 srt$celltype_cc_filtered = 'celltype_cc_filtered'
 top_kds = 'SOX9'
@@ -420,4 +463,80 @@ message ('Print enrichment plots for each signficant pathway and cell type')
 
 pdf (file.path ('Plots','SOX9_target_genes_cc_removed_W2to6_dotplot.pdf'), height=4, width=506)
 DotPlot (srt[,srt$merged_call %in% c('SOX9','NTC')], features = unique(pathways$W12), group.by = 'merged_call') + gtheme
+dev.off()
+
+
+
+
+
+
+#### Run cNMF ####
+nfeat = 3000
+nfeat = 5000
+force=F
+k_list = c(5:10)
+k_selections = c(20:30)
+k_list = c(20:30)
+cores= 100
+cnmf_name = 'crispr'
+
+### RUN consensus NMF ####
+source (file.path (scrna_pipeline_dir, 'cnmf_prepare_inputs.R'))
+  
+### Import and format spectra files ####
+k_selection = 30
+cnmf_name = 'crispr'
+source (file.path (scrna_pipeline_dir,'cnmf_format_spectra_files.R')) 
+
+#lapply (cnmf_spectra_unique, function(x) head(x, 20))
+
+srt = ModScoreCor (
+        seurat_obj = srt, 
+        geneset_list = lapply(cnmf_spectra_unique, function(x) head(x,50)),
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # 
+        listName = 'Cm', outdir = paste0(projdir,'Plots/'))
+
+#ccomp = srt@meta.data[,c(names (cnmf_spectra_unique),names (cnmf_spectra_unique_comb_full))]
+ccomp = srt@meta.data[,names (cnmf_spectra_unique)]
+ccomp_cor = cor (ccomp)
+pdf (file.path ('Plots','cnmf_cor_cc_removed_heatmap.pdf'))
+Heatmap (ccomp_cor)
+dev.off()
+
+ccomp = srt@meta.data
+bp = lapply (names (cnmf_spectra_unique), function(x) 
+  ggplot (ccomp, aes_string (x = 'merged_call', y = x)) + geom_boxplot () + gtheme)
+
+pdf (file.path ('Plots','cNMF_cc_removed_cc_removed_boxplots.pdf'),20,20)
+wrap_plots (bp)
+dev.off()
+
+sapply (unique (srt$merged_call), function(x) sapply (cnmf_spectra_unique, function(y) x %in% y))
+
+
+
+# Compare with cnmf from patient samples
+ov = ovmat (c(cnmf_spectra_unique_comb_full, cnmf_spectra_unique), compare_lists=list(names(
+  cnmf_spectra_unique_comb_full), names (cnmf_spectra_unique)))
+
+pdf (file.path ('Plots','cellcycle_overlap_cc_removed_cnmf_heatmap.pdf'))
+ov
+dev.off()
+
+
+
+### Check distributions of Cms after cc correction
+ccomp = srt@meta.data
+ccomp2 = srt2@meta.data
+
+bp = lapply (names (cnmf_spectra_unique_comb_full), function(x) 
+  ggplot (ccomp, aes_string (x = 'crispr_calls', y = x)) + geom_boxplot () + gtheme)
+
+bp2 = lapply (names (cnmf_spectra_unique_comb_full), function(x) 
+  ggplot (ccomp2, aes_string (x = 'crispr_calls', y = x)) + geom_boxplot () + gtheme)
+
+pdf (file.path ('Plots','Cm_cc_removed_boxplots.pdf'),20,20)
+wrap_plots (bp)
+wrap_plots (bp2)
 dev.off()
