@@ -349,6 +349,7 @@ tf_db = lapply (tf_db, function(x) x[,2])
 
 # Import Harmonizome databases for the missing TCF3 TEAD4 TWIST1 and MEF2A
 d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_list_terms.txt', header=T)
+d11 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/attribute_list_entries.txt', header=T)
 d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_list_terms.txt', header=T)
 d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_list_terms.txt', header=T)
 

@@ -190,8 +190,8 @@ if __name__ == '__main__':
         # ('Virus MINT Protein-Virus Interactions', 'virusmint'),
         # ('Wikipathways Pathways', 'wikipathways'),
     ], [
-        # 'gene_attribute_matrix.txt.gz',
-        # 'gene_attribute_edges.txt.gz',
+        'gene_attribute_matrix.txt.gz',
+        'gene_attribute_edges.txt.gz',
         # 'gene_set_library_crisp.txt.gz',
         # 'gene_set_library_up_crisp.txt.gz',
         # 'gene_set_library_dn_crisp.txt.gz',
@@ -199,8 +199,8 @@ if __name__ == '__main__':
         # 'attribute_set_library_up_crisp.txt.gz',
         # 'attribute_set_library_dn_crisp.txt.gz',
         # 'gene_similarity_matrix_cosine.txt.gz',
-        # 'attribute_similarity_matrix_cosine.txt.gz',
+        'attribute_similarity_matrix_cosine.txt.gz',
         'gene_list_terms.txt.gz',
         'attribute_list_entries.txt.gz'
-        # 'processing_script.m'
+        'processing_script.m'
     ])
