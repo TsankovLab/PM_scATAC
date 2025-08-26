@@ -359,9 +359,13 @@ head (ccomp)
 ccomp = ccomp[, c(names (tf_db), 'merged_call')]
 ccomp = gather (ccomp, TF, module, 1:(ncol(ccomp)-1))
 ccomp$guide_control = ifelse (ccomp$merged_call == 'NTC', 'control','guide')
+ccomp$TF = sapply (ccomp$TF, function(x) unlist(strsplit(x, '_'))[1])
+ccomp = ccomp[ccomp$merged_call == ccomp$TF | ccomp$merged_call == 'NTC',]
+ccomp$merged_call[ccomp$merged_call == 'NTC'] = ccomp$TF[ccomp$merged_call == 'NTC']
+ccomp = ccomp[ccomp$merged_call != 'ATCMNTCCGY',]
 bp = ggplot (ccomp, aes (x = merged_call, y = module)) + geom_boxplot (aes (fill = guide_control)) + gtheme
 
-pdf (file.path ('Plots','TF_targets_boxplots.pdf'),20,20)
+pdf (file.path ('Plots','TF_targets_boxplots.pdf'),5,5)
 bp
 dev.off()
 

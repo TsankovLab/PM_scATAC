@@ -201,6 +201,6 @@ if __name__ == '__main__':
         # 'gene_similarity_matrix_cosine.txt.gz',
         # 'attribute_similarity_matrix_cosine.txt.gz',
         'gene_list_terms.txt.gz'
-        # 'attribute_list_entries.txt.gz',
+        'attribute_list_entries.txt.gz',
         # 'processing_script.m'
     ])
