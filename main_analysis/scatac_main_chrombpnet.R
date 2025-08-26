@@ -30,6 +30,7 @@ archp = loadArchRProject (projdir)
 
 ### Call peaks with MACS2 by metaGroupName ####
 metaGroupName = 'celltype_lv1'
+archp = archp[archp$celltype_lv1 %in% c('Fibroblasts','Malignant','Mesothelium')]
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 # Run no bias chromBPnet model for each NKT cell subtype ####
@@ -40,10 +41,10 @@ grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
 
 celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
-celltypes='B_cells'
+#celltypes='B_cells'
 for (celltype in celltypes)
 	{
-	command <- paste ("bsub -J", paste0(celltype,'_cBPnet'), 
+	command <- paste ("bsub -J", paste0(celltype,'_CBPmaster'), 
 		"-P acc_Tsankov_Normal_Lung -q premium -n 1 -W 72:00 -R rusage[mem=64000] -R span[hosts=1] -o",
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.out')), "-e" ,
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),

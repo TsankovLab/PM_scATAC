@@ -6,6 +6,7 @@ source ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline/useful_func
 setwd ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CRISPR_cropseq_analysis/_cellranger_raw_Filter_400_800_25/no_harmony')
 srt = readRDS ('srt_filtered.rds')
 
+scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline'
 
 ### Remove proliferating cells ####
 cc_threshold = -0.3
@@ -329,4 +330,94 @@ bp = cellComp(
 
 pdf (file.path ('Plots','donstream_cc_removed_TF_SOX9_prop.pdf'))
 bp
+dev.off()
+
+
+
+
+
+
+gene = c('SOX9','SNAI2','RUNX2','SNAI3','NFYC','NFIC')
+
+pdf (file.path ('Plots','SOX9_target_genes_dotplot.pdf'), height=4, width=6)
+DotPlot (srt[,srt$merged_call %in% c('SOX9','NTC')], features = gene, group.by = 'merged_call') + gtheme
+dev.off()
+
+### Assess enrichment of Sox9 targets from Fuchs paper
+
+srt$celltype_cc_filtered = 'celltype_cc_filtered'
+top_kds = 'SOX9'
+top_kds2 = top_kds[!top_kds %in% c('NTC')]
+#srt$crispr_calls2[srt$crispr_calls2 %in% c('NTC')] = 'NTC'
+for (kd in top_kds2)
+  {
+  force = F
+  do.fgsea = TRUE
+  rankby = 'LFC' # Ranking to input in fgsea can be 'LFC' or 'pval_signedLFC'
+  rankby = 'pval_signedLFC'
+  logfcThreshold = 0.25 # min logFC threshold to consider for testing. Should be set on 0
+  pvalAdjTrheshold = 0.05
+  topGenes = 20
+  addGene=NULL # Add gene(s) to include in the DEG heatmap
+  FeatureSets = list (all = NULL)  # Specify subset of features to run the test on
+  metaGroupName1 = 'celltype_cc_filtered' # Specify metaGroup for celltype / clustering
+  metaGroupName2 = 'merged_call' # Specify metaGroup of condition to compare
+  deg2Ident = c('NTC', kd) #vector of 2 elements specifying the comparison between two groups from metaGroupName2
+  top_pathways = Inf
+  source (file.path(scrna_pipeline_dir,'DEG2.R'))
+  }
+
+rankby = 'pval_signedLFC'
+
+sox9_gs = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/Sox9_targets_mouse.csv')
+sox9_gs_W1 = sox9_gs$symbol[sox9_gs$W1 > 0]
+sox9_gs_W2 = sox9_gs$symbol[sox9_gs$W2 > 0]
+sox9_gs_W6 = sox9_gs$symbol[sox9_gs$W6 > 0]
+sox9_gs_W12 = sox9_gs$symbol[sox9_gs$W12 > 0]
+sox9_gs_class = split (sox9_gs$symbol, sox9_gs$class)
+pathways = sox9_gs_class
+pathways = lapply (pathways, function(x) mouseMan (x))
+pathways = lapply (pathways, function(x) x$HGNC.symbol)
+
+deg2Cluster = deg2
+if (rankby == 'pval_signedLFC') fgsea_ranks = -log10 (deg2Cluster$p_val + 1e-300) * sign (deg2Cluster$avg_log2FC)
+if (rankby == 'LFC') fgsea_ranks = deg2Cluster$avg_log2FC
+#fgsea_ranks = -log10 (deg2Cluster$p_val + 1e-300) * sign (deg2Cluster$avg_log2FC)
+
+fgsea_ranks = setNames (fgsea_ranks, deg2Cluster$gene)    
+fgsea_ranks = fgsea_ranks[fgsea_ranks != 0]
+#degCluster = degCluster[degCluster$p_val_adj < 01,]
+#fgsea_ranks = -log10(degCluster$p_val_adj) * sign (degCluster$avg_log2FC)
+#fgsea_ranks = (-log10(degCluster$p_val_adj) + 1e-10) + abs(degCluster$avg_log2FC) * sign(degCluster$avg_log2FC)
+#fgsea_ranks = degCluster$avg_log2FC
+fgseaRes = fgseaMultilevel (pathways, 
+    fgsea_ranks, 
+#    minSize=15, 
+#    maxSize=500, # changed this from 1500 to 1000 cause it generated an error
+    BPPARAM = NULL)
+#fgseaResCol = collapsePathways (fgseaRes, stats = fgsea_ranks, pathway = pathways)
+#mainPathways = fgseaRes[fgseaRes$pathway %in% fgseaResCol$mainPathways]
+
+fgsea_ranks
+
+message ('Print enrichment plots for each signficant pathway and cell type')
+  
+        sig_pathways = fgseaRes$pathway[fgseaRes$padj < pvalAdjTrheshold]
+        #gmt.file = paste0 ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/',org,'/',names(fgseaResAll)[x])
+        #pathways = gmtPathways (gmt.file)
+  pdf()
+  ep = lapply (sig_pathways, function(z) {
+           print (plotEnrichment(pathways[[z]],
+           fgsea_ranks) + 
+           labs(title=z))
+        })
+  dev.off()
+  pdf (file.path('Plots','SOX9_Fuchs_enrichment_plots.pdf'),5,3)
+  print(ep)
+  dev.off() 
+
+
+
+pdf (file.path ('Plots','SOX9_target_genes_cc_removed_W2to6_dotplot.pdf'), height=4, width=506)
+DotPlot (srt[,srt$merged_call %in% c('SOX9','NTC')], features = unique(pathways$W12), group.by = 'merged_call') + gtheme
 dev.off()

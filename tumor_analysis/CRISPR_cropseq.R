@@ -311,14 +311,6 @@ gp1 = gp1 + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
 # gp2 = ggplot (ccomp, aes (x = merged_call, y = G2M.Score)) + geom_boxplot()
 # gp3 = ggplot (ccomp, aes (x = merged_call, y = S.Score)) + geom_boxplot()
 
-gene = c('SOX9','SNAI2','RUNX2','RUNX1','SOX6','TWIST1')
-
-pdf (file.path ('Plots','target_genes_dotplot.pdf'), height=4, width=5)
-gp1
-#DotPlot (srt, features = gene, group.by = 'merged_call')
-#DotPlot (srt, feature = unname (unlist(guides_mod)), group.by = 'control_guide')
-dev.off()
-
 
 ### Try with dotplot
 guides = unique(srt$merged_call)
@@ -345,6 +337,37 @@ pdf (file.path('Plots','guides_expression_dotplot.pdf'), height=3.5, width=3)
 #gdot_p2
 gdot_p2
 dev.off()
+
+# import TF targets MsigDB database ####
+tf_db =  read.gmt('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/c3.tft.v7.1.symbol.gmt')
+tf_db = split (tf_db, tf_db$term)
+guides_targets = lapply (unique(srt$merged_call), function(x) which (grepl (x, names (tf_db))))
+guides_targets = lapply (guides_targets, function(x) x[1])
+guides_targets = unlist (guides_targets[!is.na(guides_targets)])
+tf_db = tf_db[guides_targets]
+tf_db = lapply (tf_db, function(x) x[,2])
+
+srt = ModScoreCor (
+        seurat_obj = srt, 
+        geneset_list = tf_db,
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # 
+        listName = 'TF_targets', outdir = paste0(projdir,'Plots/'))
+
+ccomp = srt@meta.data
+head (ccomp)
+ccomp = ccomp[, c(names (tf_db), 'merged_call')]
+ccomp = gather (ccomp, TF, module, 1:(ncol(ccomp)-1))
+ccomp$guide_control = ifelse (ccomp$merged_call == 'NTC', 'control','guide')
+bp = ggplot (ccomp, aes (x = merged_call, y = module)) + geom_boxplot (aes (fill = guide_control)) + gtheme
+
+pdf (file.path ('Plots','TF_targets_boxplots.pdf'),20,20)
+bp
+dev.off()
+
+
+
+
 
 
 
@@ -715,21 +738,37 @@ force = T
 org = 'human'
 motif_window = 'tss500bp'#'10kbp'
 scenic_name = 'crispr_tfs'
-genes.keep = VariableFeatures (FindVariableFeatures (srt, nfeat=5000))
+genes.keep = VariableFeatures (FindVariableFeatures (srt, nfeat=7000))
 source (file.path(scrna_pipeline_dir, 'SCENIC.R'))
 
 # Run SCENIC plots ####
 srt$scenic_mods = 'crispr_tfs'
 motif_window = 'tss500bp'#'10kbp'
 genes.keep = VariableFeatures (FindVariableFeatures (srt, nfeat=5000))
-metaGroupNames = c('crispr_calls','scenic_mods')
+metaGroupNames = c('merged_call','scenic_mods','merged_call')
 reductionName = 'umap'
 source (file.path(scrna_pipeline_dir, 'SCENIC_plots.R'))
 
-auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
-rownames (auc_mtx) = auc_mtx[,1]
-auc_mtx = auc_mtx[,-1]
-colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+#auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+# rownames (auc_mtx) = auc_mtx[,1]
+# auc_mtx = auc_mtx[,-1]
+# colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+ccomp = srt@meta.data
+#ccomp = cbind (ccomp, auc_mtx[rownames(ccomp),])
+
+tpn = c('NFKB2','OSR1','PBX1','PBX3','SOX18','GLIS2','GATA6')
+tpn = paste0('SCENIC_',tpn)
+gpl = lapply (tpn, function(x) ggplot (ccomp, aes_string (x = 'merged_call', y = x)) + geom_boxplot())
+
+pdf (file.path ('Plots','scenic_modules_boxplots.pdf'))
+gpl
+dev.off()
+
+
+
+
+
 
 km = readRDS (file.path ('..','scatac_ArchR','TF_activity_modules.rds'))
 regulon_TFs_in_modules = list(
@@ -741,7 +780,11 @@ auc_mtx = auc_mtx[, colnames(auc_mtx) %in% regulon_TFs_in_modules$km2]
 srt$mod_2 = unname(rowMeans (auc_mtx))
 
 
-saveRDS (srt, 'srt_filtered.rds')
+
+
+
+
+#saveRDS (srt, 'srt_filtered.rds')
 
 
 
@@ -1353,11 +1396,24 @@ srt = ModScoreCor (
         pos_threshold = NULL, # 
         listName = 'Cm', outdir = paste0(projdir,'Plots/'))
 
-ccomp = srt@meta.data[,c(names (cnmf_spectra_unique),names (cnmf_spectra_unique_comb_full))]
+#ccomp = srt@meta.data[,c(names (cnmf_spectra_unique),names (cnmf_spectra_unique_comb_full))]
+ccomp = srt@meta.data[,names (cnmf_spectra_unique)]
 ccomp_cor = cor (ccomp)
 pdf (file.path ('Plots','cnmf_cor_heatmap.pdf'))
 Heatmap (ccomp_cor)
 dev.off()
+
+ccomp = srt@meta.data
+bp = lapply (names (cnmf_spectra_unique), function(x) 
+  ggplot (ccomp, aes_string (x = 'merged_call', y = x)) + geom_boxplot () + gtheme)
+
+pdf (file.path ('Plots','cNMF_boxplots.pdf'),20,20)
+wrap_plots (bp)
+dev.off()
+
+sapply (unique (srt$merged_call), function(x) sapply (cnmf_spectra_unique, function(y) x %in% y))
+
+
 
 # Compare with cnmf from patient samples
 ov = ovmat (c(cnmf_spectra_unique_comb_full, cnmf_spectra_unique), compare_lists=list(names(
@@ -1860,5 +1916,91 @@ dev.off()
 
 
 
+
+
+gene = c('SOX9','SNAI2','RUNX2','SNAI3','NFYC','NFIC')
+
+pdf (file.path ('Plots','SOX9_target_genes_dotplot.pdf'), height=4, width=6)
+DotPlot (srt[,srt$merged_call %in% c('SOX9','NTC')], features = gene, group.by = 'merged_call') + gtheme
+dev.off()
+
+### Assess enrichment of Sox9 targets from Fuchs paper
+
+srt$celltype_not_cc_filtered = 'celltype_not_cc_filtered'
+top_kds = 'SOX9'
+top_kds2 = top_kds[!top_kds %in% c('NTC')]
+#srt$crispr_calls2[srt$crispr_calls2 %in% c('NTC')] = 'NTC'
+for (kd in top_kds2)
+  {
+  force = F
+  do.fgsea = TRUE
+  rankby = 'LFC' # Ranking to input in fgsea can be 'LFC' or 'pval_signedLFC'
+  rankby = 'pval_signedLFC'
+  logfcThreshold = 0.25 # min logFC threshold to consider for testing. Should be set on 0
+  pvalAdjTrheshold = 0.05
+  topGenes = 20
+  addGene=NULL # Add gene(s) to include in the DEG heatmap
+  FeatureSets = list (all = NULL)  # Specify subset of features to run the test on
+  metaGroupName1 = 'celltype_not_cc_filtered' # Specify metaGroup for celltype / clustering
+  metaGroupName2 = 'merged_call' # Specify metaGroup of condition to compare
+  deg2Ident = c('NTC', kd) #vector of 2 elements specifying the comparison between two groups from metaGroupName2
+  top_pathways = Inf
+  source (file.path(scrna_pipeline_dir,'DEG2.R'))
+  }
+
+rankby = 'pval_signedLFC'
+
+sox9_gs = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/Sox9_targets_mouse.csv')
+sox9_gs_W1 = sox9_gs$symbol[sox9_gs$W1 > 0]
+sox9_gs_W2 = sox9_gs$symbol[sox9_gs$W2 > 0]
+sox9_gs_W6 = sox9_gs$symbol[sox9_gs$W6 > 0]
+sox9_gs_W12 = sox9_gs$symbol[sox9_gs$W12 > 0]
+sox9_gs_class = split (sox9_gs$symbol, sox9_gs$class)
+pathways = sox9_gs_class
+pathways = lapply (pathways, function(x) mouseMan (x))
+pathways = lapply (pathways, function(x) x$HGNC.symbol)
+
+deg2Cluster = deg2
+if (rankby == 'pval_signedLFC') fgsea_ranks = -log10 (deg2Cluster$p_val + 1e-300) * sign (deg2Cluster$avg_log2FC)
+if (rankby == 'LFC') fgsea_ranks = deg2Cluster$avg_log2FC
+#fgsea_ranks = -log10 (deg2Cluster$p_val + 1e-300) * sign (deg2Cluster$avg_log2FC)
+
+fgsea_ranks = setNames (fgsea_ranks, deg2Cluster$gene)    
+fgsea_ranks = fgsea_ranks[fgsea_ranks != 0]
+#degCluster = degCluster[degCluster$p_val_adj < 01,]
+#fgsea_ranks = -log10(degCluster$p_val_adj) * sign (degCluster$avg_log2FC)
+#fgsea_ranks = (-log10(degCluster$p_val_adj) + 1e-10) + abs(degCluster$avg_log2FC) * sign(degCluster$avg_log2FC)
+#fgsea_ranks = degCluster$avg_log2FC
+fgseaRes = fgseaMultilevel (pathways, 
+    fgsea_ranks, 
+    minSize=15, 
+    maxSize=500, # changed this from 1500 to 1000 cause it generated an error
+    BPPARAM = NULL)
+#fgseaResCol = collapsePathways (fgseaRes, stats = fgsea_ranks, pathway = pathways)
+#mainPathways = fgseaRes[fgseaRes$pathway %in% fgseaResCol$mainPathways]
+
+fgsea_ranks
+
+message ('Print enrichment plots for each signficant pathway and cell type')
+  
+        sig_pathways = fgseaRes$pathway[fgseaRes$padj < pvalAdjTrheshold]
+        #gmt.file = paste0 ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/',org,'/',names(fgseaResAll)[x])
+        #pathways = gmtPathways (gmt.file)
+  pdf()
+  ep = lapply (sig_pathways, function(z) {
+           print (plotEnrichment(pathways[[z]],
+           fgseaRanks) + 
+           labs(title=z))
+        })
+  dev.off()
+  pdf (file.path('Plots','SOX9_Fuchs_enrichment_plots.pdf'),5,3)
+  print(ep)
+  dev.off() 
+
+
+
+pdf (file.path ('Plots','SOX9_target_genes_W2to6_dotplot.pdf'), height=4, width=206)
+DotPlot (srt[,srt$merged_call %in% c('SOX9','NTC')], features = unique(pathways$W2to6), group.by = 'merged_call') + gtheme
+dev.off()
 
 
