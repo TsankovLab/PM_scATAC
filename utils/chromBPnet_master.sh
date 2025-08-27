@@ -105,34 +105,37 @@ for fold_number in 0 1 2 3 4; do
 done
 
 
-# --- Combine contributions after all folds ---
 echo "=== Combine contribution scores ==="
-combine_job=$(bsub -J ${celltype}_combine \
-    -P acc_Tsankov_Normal_Lung \
-    -w "$all_contrib_jobs" \
-    -q general \
-    -n 1 \
-    -W 4:00 \
-    -R rusage[mem=32000] \
-    -o ${chromBPdir}/${celltype}_combine.out \
-    -e ${chromBPdir}/${celltype}_combine.err \
-    /bin/bash -c "
-        source activate h5py;
-        python $repodir/utils/chromBPnet_average_CNT_scores.py $chromBPct_dir $celltype;
-        wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.count_scores.bw \
-            > no_bias_model/temp_contribution_counts_scores.wig;
-        wigToBigWig no_bias_model/temp_contribution_counts_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_counts.bw;
-        wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.profile_scores.bw \
-            > no_bias_model/temp_contribution_profile_scores.wig;
-        wigToBigWig no_bias_model/temp_contribution_profile_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw;
-        rm -f no_bias_model/temp_contribution_*.wig
-    " | awk '{print $2}' | sed 's/<//;s/>//')
 
+source activate h5py
+export PATH=/sc/arion/work/giottb01/conda/envs/h5py/bin:$PATH
+unset PYTHONPATH
+export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_PATH
 
-# --- Run TF-MoDISco after combine ---
+# Combine HDF5 scores
+/sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores.py $chromBPct_dir $celltype
+
+# Average bigwig files
+wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.counts_scores.bw \
+    > no_bias_model/temp_contribution_counts_scores.wig
+wigToBigWig no_bias_model/temp_contribution_counts_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_counts.bw
+rm no_bias_model/temp_contribution_counts_scores.wig
+
+wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.profile_scores.bw \
+    > no_bias_model/temp_contribution_profile_scores.wig
+wigToBigWig no_bias_model/temp_contribution_profile_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
+rm no_bias_model/temp_contribution_profile_scores.wig
+
+# Cleanup fold-level contribution files
+avg_contribution_file=no_bias_model/${celltype}_averaged_contributions_counts.h5
+if [ -f "${avg_contribution_file}" ]; then
+    echo "Average contribution file exists. Cleaning up fold-level contribution files..."
+    rm -rf no_bias_model/fold_{0..4}/contribution*
+fi
+
+echo "=== Run TF-MoDISco on averaged contributions (parallel) ==="
 TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
     -P acc_Tsankov_Normal_Lung \
-    -w "done(${combine_job})" \
     -q premium \
     -n 8 \
     -W 72:00 \
@@ -144,7 +147,6 @@ TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
 
 TFmd_p_id=$(bsub -J ${celltype}_TFmd_p \
     -P acc_Tsankov_Normal_Lung \
-    -w "done(${combine_job})" \
     -q premium \
     -n 8 \
     -W 72:00 \
@@ -154,8 +156,7 @@ TFmd_p_id=$(bsub -J ${celltype}_TFmd_p \
     -e ${chromBPdir}/${celltype}_TFmodisco_profiles.err \
     ${repodir}/utils/TFmodisco_profile.sh $chromBPdir $celltype | awk '{print $2}' | sed 's/<//;s/>//')
 
-
-# --- Finemo depends on both TF-MoDISco jobs ---
+echo "=== Submit finemo job (depends on TF-MoDISco) ==="
 finemo_job_id=$(bsub -J ${celltype}_finemo \
     -P acc_Tsankov_Normal_Lung \
     -q gpu \
@@ -165,15 +166,18 @@ finemo_job_id=$(bsub -J ${celltype}_finemo \
     -R a100 \
     -R rusage[mem=32000] \
     -R span[hosts=1] \
-    -w "done(${TFmd_c_id}) && done(${TFmd_p_id})" \
     -o ${chromBPdir}/finemo_${celltype}.out \
     -e ${chromBPdir}/finemo_${celltype}.err \
+    -w "done(${TFmd_c_id}) && done(${TFmd_p_id})" \
     ${repodir}/utils/finemo_motif_calls.sh "$chromBPdir" "$celltype" \
     | awk '{print $2}' | sed 's/<//;s/>//')
+echo "Submitted finemo job with ID: $finemo_job_id"
 
+# Wait for finemo to finish
+echo "Waiting for finemo job..."
 bwait -w "done(${finemo_job_id})"
 
-# --- Final R step ---
+echo "=== Run R script for finemo motif labels ==="
 source activate meso_scatac
 Rscript $repodir/utils/chromBPnet_finemo_motif_labels.R $chromBPdir $celltype
 echo "R script execution completed."
