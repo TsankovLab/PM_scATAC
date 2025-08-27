@@ -106,6 +106,7 @@ lexpr.data = lexpr.data[,-icnv@reference_grouped_cell_indices[[1]]]
 avg_cnv = rowMeans (lexpr.data)
 cnv_cor = cor (lexpr.data, avg_cnv)
 cnv_cor_filt = rownames(cnv_cor)[cnv_cor[,1] > 0.5]
+srt2 = srt
 srt = srt[, colnames (srt) %in% cnv_cor_filt]
 
 pdf (file.path ('Plots','cnv_cor_distribution.pdf'))
@@ -113,10 +114,20 @@ hist (cnv_cor)
 dev.off()
 
 
+
 #### Map guides detected to cells ####
 crispr_calls = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/cropseq/raw/Sample1Cropseq/cellranger_output/ALTS06_sample1_0_v1/per_sample_outs/ALTS06_sample1_0/count/crispr_analysis/protospacer_calls_per_cell.csv')
 #crispr_ref = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/cropseq/raw/Sample1Cropseq/cellranger_output/ALTS06_sample1_0_v1/per_sample_outs/ALTS06_sample1_0/count/crispr_analysis/feature_reference.csv')
 srt$crispr_calls = crispr_calls$feature_call[match (colnames(srt), crispr_calls$cell_barcode)]
+srt2$crispr_calls = crispr_calls$feature_call[match (colnames(srt), crispr_calls$cell_barcode)]
+
+# Check if there is enrichment of specific guids in non-correlated CNV cells ####
+srt2$CNV_high_cor = NA
+cnv_cor = cnv_cor[rownames(cnv_cor) %in% colnames (srt2),, drop=F]
+srt2$CNV_high_cor[match(rownames(cnv_cor), colnames(srt2))] = cnv_cor[,1]
+srt2$CNV_high_cor = ifelse (srt2$CNV_high_cor < 0.4, 'low','high')
+table (srt2$crispr_calls[srt2$CNV_high_cor == 'low'], srt2$CNV_high_cor[srt2$CNV_high_cor == 'low'])
+
 
 # Identify cells with one gRNA called or in combination with NTC ####
 x <- srt$crispr_calls
@@ -339,7 +350,7 @@ gdot_p2
 dev.off()
 
 # import TF targets MsigDB database ####
-tf_db =  read.gmt('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/c3.tft.v7.1.symbol.gmt')
+tf_db = read.gmt('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/c3.tft.v7.1.symbol.gmt')
 tf_db = split (tf_db, tf_db$term)
 guides_targets = lapply (unique(srt$merged_call), function(x) which (grepl (x, names (tf_db))))
 guides_targets = lapply (guides_targets, function(x) x[1])
@@ -350,11 +361,45 @@ tf_db = tf_db[names (tf_db) != 'ATCMNTCCGY_UNKNOWN']
 # Import Harmonizome databases for the missing TCF3 TEAD4 TWIST1 and MEF2A
 d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_attribute_edges.txt', header=T)
 # d11 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/attribute_list_entries.txt', header=T)
-d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/ENCODE Transcription Factor Targets/gene_attribute_edges.txt', header=T)
 d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/JASPAR Predicted Transcription Factor Targets/gene_attribute_edges.txt', header=T)
-tf_db = c(tf_db, split(d2$source[d2$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')], d2$target[d2$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')]))
-vf = VariableFeatures(FindVariableFeatures(srt, nfeat= 5000))
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/ENCODE Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+tf_db = c(tf_db, split(d1$source[d1$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')], d1$target[d1$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')]))
+
+# Add signature from Fuchs paper 
+sox9_gs = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/Sox9_targets_mouse.csv')
+sox9_gs_W1 = sox9_gs$symbol[sox9_gs$W1 > 1]
+sox9_gs_W2 = sox9_gs$symbol[sox9_gs$W2 > 1]
+sox9_gs_W6 = sox9_gs$symbol[sox9_gs$W6 > 1]
+sox9_gs_W12 = sox9_gs$symbol[sox9_gs$W12 > 1]
+sox9_gs_class = split (sox9_gs$symbol, sox9_gs$class)
+pathways = sox9_gs_class
+pathways = lapply (pathways, function(x) mouseMan (x))
+pathways = lapply (pathways, function(x) x$HGNC.symbol)
+names (pathways)[2] = 'D0toW2'
+tf_db = c (tf_db, pathways)
+
+### Get TWIST1 targets from paper
+twist1 = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/TWIST1_targets_PMID27546376.csv')
+twist1 = mouseMan (twist1[,1])
+tf_db = c (tf_db, list(TWIST1 = twist1$HGNC.symbol))
+
+vf = VariableFeatures(FindVariableFeatures(srt, nfeat= 10000))
 tf_db = lapply (tf_db, function(x) x[x %in% vf])
+
+### Remove genes associated to cell cycle in each regulon ####
+norm_mat = srt@assays$RNA@layers$data
+cc_cor = cor (srt$Cm16, t(as.matrix(norm_mat)))
+colnames (cc_cor) = rownames(srt)
+
+tf_db = lapply (tf_db, function(x) x[x%in%rownames (srt)])
+cor_res = sapply (tf_db, function(x) 
+  {
+  cor_res = sapply (x, function(y) cor.test (norm_mat[rownames(srt) == y,], unname(srt$Cm16))$p.value)
+  names(cor_res)[cor_res > 0.01]
+  })
+cor_res = lapply (cor_res, function(x) x[!is.na(x)])
+tf_db = cor_res
+
 srt = ModScoreCor (
         seurat_obj = srt, 
         geneset_list = tf_db,
@@ -368,15 +413,29 @@ ccomp = ccomp[, c(names (tf_db), 'merged_call')]
 ccomp = gather (ccomp, TF, module, 1:(ncol(ccomp)-1))
 ccomp$guide_control = ifelse (ccomp$merged_call == 'NTC', 'control','guide')
 ccomp$TF = sapply (ccomp$TF, function(x) unlist(strsplit(x, '_'))[1])
+ccomp$merged_call[ccomp$TF == 'D0' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.1' 
+ccomp$merged_call[ccomp$TF == 'D0toW2' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.0' 
+ccomp$merged_call[ccomp$TF == 'W1to6' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.2' 
+ccomp$merged_call[ccomp$TF == 'W2to6' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.3' 
+ccomp$merged_call[ccomp$TF == 'W12' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.4'
+ccomp$TF[ccomp$TF == 'D0' & ccomp$merged_call == 'SOX9.1'] = 'SOX9.1' 
+ccomp$TF[ccomp$TF == 'D0toW2' & ccomp$merged_call == 'SOX9.0'] = 'SOX9.0' 
+ccomp$TF[ccomp$TF == 'W1to6' & ccomp$merged_call == 'SOX9.2'] = 'SOX9.2' 
+ccomp$TF[ccomp$TF == 'W2to6' & ccomp$merged_call == 'SOX9.3'] = 'SOX9.3' 
+ccomp$TF[ccomp$TF == 'W12' & ccomp$merged_call == 'SOX9.4'] = 'SOX9.4'
 ccomp = ccomp[ccomp$merged_call == ccomp$TF | ccomp$merged_call == 'NTC',]
 ccomp$merged_call[ccomp$merged_call == 'NTC'] = ccomp$TF[ccomp$merged_call == 'NTC']
 
 bp = ggplot (ccomp, aes (x = merged_call, y = module)) + geom_boxplot (aes (fill = guide_control)) + gtheme
 
-pdf (file.path ('Plots','TF_targets_boxplots.pdf'),5,5)
+pdf (file.path ('Plots','TF_targets_cc_genes_removed_boxplots.pdf'),5,5)
 bp
 dev.off()
 
+### Check SOX9 module to see if there are cc genes that can bias things ####
+pdf (file.path ('Plots','SOX9_regulon_dotplot.pdf'), width = 20)
+DotPlot (srt[,srt$merged_call %in% c('SOX9','NTC')], features = tf_db$SOX9_B1, group.by = 'merged_call') + gtheme
+dev.off()
 
 
 
@@ -573,6 +632,27 @@ gp1 = gp1 + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
 # gp3 = ggplot (ccomp, aes (x = merged_call, y = S.Score)) + geom_boxplot()
 pdf (file.path ('Plots','cellcycle_boxplots.pdf'), height=3, width = 4)
 gp1
+dev.off()
+
+
+#### Check viability CRISPR assay from CCLE database
+ccle_cri = read.csv ('../../../../../Public_data/CRISPRGeneEffect.csv')
+rownames (ccle_cri) = ccle_cri[,1]
+ccle_cri = as.data.frame (t(ccle_cri[,-1]))
+ccle_cri_sub = ccle_cri[,'ACH-000153', drop=F]
+row_names = sapply (rownames (ccle_cri_sub), function(x) unlist(strsplit(x, '\\...'))[1])
+ccle_cri_sub = ccle_cri_sub[!duplicated(row_names),, drop=F]
+rownames (ccle_cri_sub) = row_names [!duplicated(row_names)]
+#ccle_cri_sub = as.data.frame (t(ccle_cri_sub))
+
+ccle_res = ccle_cri_sub[unique(srt$merged_call), , drop=F]
+ccle_res = na.omit (ccle_res)
+colnames (ccle_res)[1] = 'ACH000153'
+ccle_res$TF = rownames(ccle_res)
+bp = ggplot (ccle_res, aes (x = TF, y = ACH000153)) + geom_bar (stat= 'identity', fill = 'brown') + gtheme
+bp$data$TF = factor (bp$data$TF, levels = levels (gp1$data$merged_call)[levels (gp1$data$merged_call) != 'NTC']) 
+pdf (file.path ('Plots','CCLE_CRISPR_screens_barplot.pdf'),4,height=3)
+bp
 dev.off()
 
 ### Make heatmap of all KDs against reference for all cNMFs
@@ -1863,6 +1943,9 @@ sp
 dev.off()
 
 
+genes_to_test = tf_db$SOX9_B1
+cor_res = sapply (genes_to_test, function(x) cor.test (norm_mat[rownames(srt) == x,], unname(srt$Cm16))$p.value)
+tf_db$SOX9_B1_cc_removed = names(cor_res)[cor_res > 0.001]
 
 
 
@@ -1879,9 +1962,7 @@ dev.off()
 
 
 
-
-
-### CHeck expression of TF target genes inferred from scATAC-seq ####
+### Check expression of TF target genes inferred from scATAC-seq ####
 target_genes = readRDS ('../../../tumor_compartment/scatac_ArchR/genes_with_tf_peaks.rds')
 var_feat = VariableFeatures (srt)
 target_genes = lapply (target_genes, function(x) x[x %in% var_feat])
@@ -2015,3 +2096,64 @@ DotPlot (srt[,srt$merged_call %in% c('SOX9','NTC')], features = unique(pathways$
 dev.off()
 
 
+tf_db2 = tf_db[names (tf_db) != 'SOX9_B1']
+srt = ModScoreCor (
+        seurat_obj = srt, 
+        geneset_list = tf_db2,
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # 
+        listName = 'TF_targets', outdir = paste0(projdir,'Plots/'))
+
+ccomp = srt@meta.data
+head (ccomp)
+ccomp = ccomp[, c(names (tf_db2), 'merged_call')]
+ccomp = gather (ccomp, TF, module, 1:(ncol(ccomp)-1))
+ccomp$guide_control = ifelse (ccomp$merged_call == 'NTC', 'control','guide')
+ccomp$TF = sapply (ccomp$TF, function(x) unlist(strsplit(x, '_'))[1])
+ccomp = ccomp[ccomp$merged_call == ccomp$TF | ccomp$merged_call == 'NTC',]
+ccomp$merged_call[ccomp$merged_call == 'NTC'] = ccomp$TF[ccomp$merged_call == 'NTC']
+
+bp = ggplot (ccomp, aes (x = merged_call, y = module)) + geom_boxplot (aes (fill = guide_control)) + gtheme
+
+pdf (file.path ('Plots','TF_targets_SOX9_cc_removed_boxplots.pdf'),5,5)
+bp
+dev.off()
+
+
+
+
+
+
+
+
+
+
+#### Check viability CRISPR assay from CCLE database
+ccle_cri = read.csv ('../../../../../Public_data/CRISPRGeneEffect.csv')
+rownames (ccle_cri) = ccle_cri[,1]
+ccle_cri = as.data.frame (t(ccle_cri[,-1]))
+ccle_cri_sub = ccle_cri[,'ACH-000153', drop=F]
+row_names = sapply (rownames (ccle_cri_sub), function(x) unlist(strsplit(x, '\\...'))[1])
+ccle_cri_sub = ccle_cri_sub[!duplicated(row_names),, drop=F]
+rownames (ccle_cri_sub) = row_names [!duplicated(row_names)]
+#ccle_cri_sub = as.data.frame (t(ccle_cri_sub))
+
+ccle_res = ccle_cri_sub[unique(srt$merged_call), , drop=F]
+ccle_res = na.omit (ccle_res)
+
+colnames (ccle_res)[1] = 'ACH000153'
+bp = ggplot (ccle_res, aes (x = rownames(ccle_res), y = ACH000153)) + geom_bar (stat= 'identity')
+pdf (file.path ('Plots','CCLE_CRISPR_screens_barplot.pdf'))
+bp
+dev.off()
+
+
+
+
+dp = DotPlot (srt, group.by = 'merged_call', features = c('TEAD1','TEAD2','TEAD3','TEAD4'), scale =T) + gtheme
+#dp_data1 = dp$data[dp$data$id %in% c('NTC', 'SOX9'),]
+#dp_data2 = gdot_p2$data[gdot_p2$data$y_axis %in% c('NTC', 'SOX9'),]
+pdf (file.path('Plots','TEADs_dotplot.pdf'), height=3.5, width=5)
+#gdot_p2
+dp
+dev.off()

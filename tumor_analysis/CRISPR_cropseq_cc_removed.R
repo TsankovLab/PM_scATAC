@@ -4,12 +4,14 @@ source ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline/load_librar
 source ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline/ggplot_aestetics.R')
 source ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline/useful_functions.R')
 setwd ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CRISPR_cropseq_analysis/_cellranger_raw_Filter_400_800_25/no_harmony')
+
+setwd("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CRISPR_cropseq_analysis/_cellranger_raw_Filter_400_800_25/no_harmony")
 srt = readRDS ('srt_filtered.rds')
 
 scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline'
 
 ### Remove proliferating cells ####
-cc_threshold = -0.3
+cc_threshold = -0
 srt$cycling = ifelse (srt$cc > cc_threshold, 'proliferating','rest')
 pdf (file.path ('Plots','proliferation_distribution.pdf'))
 hist (srt$cc, breaks=100)
@@ -540,3 +542,104 @@ pdf (file.path ('Plots','Cm_cc_removed_boxplots.pdf'),20,20)
 wrap_plots (bp)
 wrap_plots (bp2)
 dev.off()
+
+
+
+
+
+
+
+
+# import TF targets MsigDB database ####
+tf_db = read.gmt('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/c3.tft.v7.1.symbol.gmt')
+tf_db = split (tf_db, tf_db$term)
+guides_targets = lapply (unique(srt$merged_call), function(x) which (grepl (x, names (tf_db))))
+guides_targets = lapply (guides_targets, function(x) x[1])
+guides_targets = unlist (guides_targets[!is.na(guides_targets)])
+tf_db = tf_db[guides_targets]
+tf_db = lapply (tf_db, function(x) x[,2])
+tf_db = tf_db[names (tf_db) != 'ATCMNTCCGY_UNKNOWN']
+# Import Harmonizome databases for the missing TCF3 TEAD4 TWIST1 and MEF2A
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+# d11 = read.table ('../../../git_repo/Harmonizome_TF_databases/CHEA Transcription Factor Targets/attribute_list_entries.txt', header=T)
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/JASPAR Predicted Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+d1 = read.table ('../../../git_repo/Harmonizome_TF_databases/ENCODE Transcription Factor Targets/gene_attribute_edges.txt', header=T)
+tf_db = c(tf_db, split(d1$source[d1$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')], d1$target[d1$target %in% c('TCF3','TWIST1','MEF2A','TEAD4')]))
+
+# Add signature from Fuchs paper 
+sox9_gs = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/Sox9_targets_mouse.csv')
+sox9_gs_W1 = sox9_gs$symbol[sox9_gs$W1 > 1]
+sox9_gs_W2 = sox9_gs$symbol[sox9_gs$W2 > 1]
+sox9_gs_W6 = sox9_gs$symbol[sox9_gs$W6 > 1]
+sox9_gs_W12 = sox9_gs$symbol[sox9_gs$W12 > 1]
+sox9_gs_class = split (sox9_gs$symbol, sox9_gs$class)
+pathways = sox9_gs_class
+pathways = lapply (pathways, function(x) mouseMan (x))
+pathways = lapply (pathways, function(x) x$HGNC.symbol)
+names (pathways)[2] = 'D0toW2'
+tf_db = c (tf_db, pathways)
+
+### Get TWIST1 targets from paper
+twist1 = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/TWIST1_targets_PMID27546376.csv')
+twist1 = mouseMan (twist1[,1])
+tf_db = c (tf_db, list(TWIST1 = twist1$HGNC.symbol))
+
+### Get TEAD4 targets from paper
+tead4 = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/TEAD4_targets_PMID21701496.csv')
+tead4 = mouseMan (tead4$Primary.Annotation)
+tf_db[['TEAD4']] = tead4$HGNC.symbol
+
+vf = VariableFeatures(FindVariableFeatures(srt, nfeat= 10000))
+tf_db = lapply (tf_db, function(x) x[x %in% vf])
+
+### Remove genes associated to cell cycle in each regulon ####
+norm_mat = srt@assays$RNA@layers$data
+cc_cor = cor (srt$Cm16, t(as.matrix(norm_mat)))
+colnames (cc_cor) = rownames(srt)
+
+tf_db = lapply (tf_db, function(x) x[x%in%rownames (srt)])
+cor_res = sapply (tf_db, function(x) 
+  {
+  cor_res = sapply (x, function(y) cor.test (norm_mat[rownames(srt) == y,], unname(srt$Cm16))$p.value)
+  names(cor_res)[cor_res > 0.01]
+  })
+cor_res = lapply (cor_res, function(x) x[!is.na(x)])
+tf_db = cor_res
+
+srt = ModScoreCor (
+        seurat_obj = srt, 
+        geneset_list = tf_db,
+        cor_threshold = NULL, 
+        pos_threshold = NULL, # 
+        listName = 'TF_targets', outdir = paste0(projdir,'Plots/'))
+
+ccomp = srt@meta.data
+head (ccomp)
+ccomp = ccomp[, c(names (tf_db), 'merged_call')]
+ccomp = gather (ccomp, TF, module, 1:(ncol(ccomp)-1))
+ccomp$guide_control = ifelse (ccomp$merged_call == 'NTC', 'control','guide')
+ccomp$TF = sapply (ccomp$TF, function(x) unlist(strsplit(x, '_'))[1])
+ccomp$merged_call[ccomp$TF == 'D0' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.1' 
+ccomp$merged_call[ccomp$TF == 'D0toW2' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.0' 
+ccomp$merged_call[ccomp$TF == 'W1to6' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.2' 
+ccomp$merged_call[ccomp$TF == 'W2to6' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.3' 
+ccomp$merged_call[ccomp$TF == 'W12' & ccomp$merged_call %in% c('SOX9','NTC')] = 'SOX9.4'
+ccomp$TF[ccomp$TF == 'D0' & ccomp$merged_call == 'SOX9.1'] = 'SOX9.1' 
+ccomp$TF[ccomp$TF == 'D0toW2' & ccomp$merged_call == 'SOX9.0'] = 'SOX9.0' 
+ccomp$TF[ccomp$TF == 'W1to6' & ccomp$merged_call == 'SOX9.2'] = 'SOX9.2' 
+ccomp$TF[ccomp$TF == 'W2to6' & ccomp$merged_call == 'SOX9.3'] = 'SOX9.3' 
+ccomp$TF[ccomp$TF == 'W12' & ccomp$merged_call == 'SOX9.4'] = 'SOX9.4'
+ccomp = ccomp[ccomp$merged_call == ccomp$TF | ccomp$merged_call == 'NTC',]
+ccomp$merged_call[ccomp$merged_call == 'NTC'] = ccomp$TF[ccomp$merged_call == 'NTC']
+#ccomp = ccomp[!ccomp$merged_call %in% c('SOX9','SOX9')]
+bp = ggplot (ccomp, aes (x = merged_call, y = module)) + geom_boxplot (aes (fill = guide_control)) + gtheme
+
+pdf (file.path ('Plots','TF_targets_cc_genes_removed_boxplots.pdf'),5,5)
+bp
+dev.off()
+
+
+
+
+
+
