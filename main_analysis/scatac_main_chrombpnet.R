@@ -29,8 +29,12 @@ addArchRGenome("hg38")
 archp = loadArchRProject (projdir)
 
 ### Call peaks with MACS2 by metaGroupName ####
-metaGroupName = 'celltype_lv1'
-archp = archp[archp$celltype_lv1 %in% c('Fibroblasts','Malignant','Mesothelium')]
+archp$celltype_revised_sample = paste0(archp$celltype_lv1, '_', archp$Sample)
+
+#metaGroupName = 'celltype_lv1'
+metaGroupName = 'celltype_revised_sample'
+#archp = archp[archp$celltype_lv1 %in% c('Fibroblasts','Malignant','Mesothelium')]
+archp = archp[archp$celltype_revised_sample %in% c('Fibroblasts_P1')]
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 # Run no bias chromBPnet model for each NKT cell subtype ####
@@ -44,6 +48,7 @@ celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
 #celltypes='B_cells'
 
 celltypes = c('Fibroblasts','Malignant','Mesothelium')
+celltypes = c('Fibroblasts_P1')
 for (celltype in celltypes)
 	{
 	command <- paste ("bsub -J", paste0(celltype,'_CBPmaster'), 

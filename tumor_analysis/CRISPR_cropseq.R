@@ -272,6 +272,7 @@ ncells = table (srt$merged_call)
 
 ha = HeatmapAnnotation (cells = anno_barplot(as.numeric(ncells[rownames(var_scaled)])), which='row')
 hm = Heatmap (var_scaled, right_annotation = ha, 
+  row_names_side = 'left',
   row_split = ifelse (rownames(var_scaled) == 'NTC','control','KO'),
   clustering_distance_columns = 'pearson',
   , clustering_distance_rows = 'pearson', 
@@ -717,25 +718,41 @@ for (call in all_calls) {
 }
 #diff_matrix[diff_matrix > 0.2] = 0.2
 #diff_matrix[diff_matrix < -0.2] = -0.2
-ha = HeatmapAnnotation (cells = anno_barplot(as.vector(unname(table (srt$merged_call)[rownames(diff_matrix)]))))
-pdf (file.path ('Plots','knock_downs_heatmap2.pdf'), height=5, width=5)
-Heatmap (t(diff_matrix), row_names_gp=gpar(fontsize = 7), top_annotation=ha,
+ha = HeatmapAnnotation (cells = anno_barplot(as.vector(unname(table (srt$merged_call)[rownames(diff_matrix)]))), which= 'row')
+# col_fun = colorRamp2(c(-1, 0, 1), c("#4B7EABFF", "#FFE3C5FF", "#C35322FF"))
+x <- seq(-1, 1, length.out = 100)
+# Make palette: blue (-1) -> white (0) -> red (1)
+pal <- colorRampPalette(rev(paletteer::paletteer_c("ggthemes::Orange-Blue-White Diverging", 100)))
+# Generate 100 interpolated colors
+cols <- pal(100)
+
+
+rownames (diff_matrix)
+diff_matrix = diff_matrix[rownames (diff_matrix) != 'NTC',]
+pval_matrix = pval_matrix[rownames (pval_matrix) != 'NTC',]
+diff_matrix[diff_matrix > min(c(abs(min(diff_matrix)), abs(max (diff_matrix))))] = min(c(abs(min(diff_matrix)), abs(max (diff_matrix))))
+diff_matrix[diff_matrix < -min(c(abs(min(diff_matrix)), abs(max (diff_matrix))))] = -min(c(abs(min(diff_matrix)), abs(max (diff_matrix))))
+pdf (file.path ('Plots','knock_downs_heatmap2.pdf'), height=2.7, width=5)
+Heatmap (diff_matrix, row_names_gp=gpar(fontsize = 7), right_annotation=ha,
   column_names_rot=45,
-  border=T,
+  border=T, row_names_side = 'left',
   column_names_gp = gpar (fontsize=7),
+  #col = cols,
+  col = rev(paletteer::paletteer_c("ggthemes::Orange-Blue-White Diverging", 100)),
+  #col = col_fun,
   cell_fun = function (j, i, x, y, width, height, fill) 
             {
-           if (t(pval_matrix)[i, j] < 0.001)
+           if (pval_matrix[i, j] < 0.001)
               {
                grid.text("***", x, y, just='center', vjust=.8,
                 gp = gpar(fontsize = 5, col='black'))
               } else {
-              if(t(pval_matrix)[i, j] < 0.01)
+              if(pval_matrix[i, j] < 0.01)
                   {
                   grid.text("**", x, y, just='center', vjust=.8,
                   gp = gpar(fontsize = 5, col='black'))   
                   } else {
-                  if(t(pval_matrix)[i, j] < 0.05)
+                  if(pval_matrix[i, j] < 0.05)
                     {
                     grid.text("*", x, y, just='center', vjust=.8,
                     gp = gpar(fontsize = 5, col='black'))         

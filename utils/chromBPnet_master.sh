@@ -12,17 +12,39 @@
 #BSUB -eo %J.stderr
 #BSUB -L /bin/bash
 
+# ml anaconda3/2022.10
+# ml cuda/11.7.0
+# ml cudnn/8.9.5-11
+# ml proxies
+# ml java/11.0.2
+# ml tensorrt/8.5.3.1
+
+# NOTES 
+# Install numpy lower than 1.24 to avoid np error
+# e.g. pip install numpy==1.23.5
+# use CUDA > 12.4 to support GPU H100. Check also tensorflow and cudnn versions 
+
+
+
+#ml anaconda3 #/2020.11
 ml anaconda3/2022.10
 source activate chrombpnet
 
 chromBPdir=${1}
+echo $chromBPdir
 grefdir=${2}
+echo $grefdir
 repodir=${3}
+echo $repodir
 celltype=${4}
+echo $celltype
 biasdir=${5}
+echo $biasdir
 
+#mkdir $chromBPdir
 chromBPct_dir=${chromBPdir}/${celltype}
-mkdir -p $chromBPct_dir
+echo $chromBPct_dir
+mkdir $chromBPct_dir
 cd $chromBPct_dir
 
 chmod +x ${repodir}/utils/chromBPnet_training.sh
@@ -31,6 +53,36 @@ chmod +x ${repodir}/utils/chromBPnet_average_CNT_scores.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
 chmod +x ${repodir}/utils/TFmodisco_profile.sh
 chmod +x ${repodir}/utils/finemo_motif_calls.sh
+
+### Create background regions file - Go in the output chromBPnet folder ####
+# Remove regions overlapping black listed regions
+if [ ! -f "${celltype}_peakset_all_no_blacklist.bed" ]; then
+echo 'create peakset with blacklist subtracted'
+bedtools slop -i ${grefdir}/blacklist.bed.gz -g ${grefdir}/hg38.chrom.sizes -b 1057 > temp.bed
+bedtools intersect -v -a ../MACS2_${celltype}/${celltype}_peaks_capped.narrowPeak -b temp.bed  > ${celltype}_peakset_all_no_blacklist.bed
+wc -l ${celltype}_peakset_all_no_blacklist.bed # # Make sure number of peaks is not more than 250K
+fi
+
+# Generate training validation and test chromosome sets
+head -n 23  ${grefdir}/hg38.chrom.sizes >  hg38.chrom.subset.sizes
+
+# Generate background regions
+for fold_number in 0 1 2 3 4; do    
+    negatives_file=no_bias_model/output_negatives_f${fold_number}_negatives.bed
+    if [ ! -f "${negatives_file}" ]; then
+    echo "negatives file not found. Identifying background peaks..."
+    #rm -r output_auxiliary
+    chrombpnet prep nonpeaks \
+        -g ${grefdir}/genome_references/hg38.genome.fa \
+        -p ${celltype}_peakset_all_no_blacklist.bed \
+        -c ${grefdir}/hg38.chrom.sizes \
+        -fl ${grefdir}/folds/fold_${fold_number}.json \
+        -br ${grefdir}/blacklist.bed.gz \
+        -o no_bias_model/output_negatives_f${fold_number}
+    fi
+done
+
+
 
 echo "=== Run training model and contribution scores ==="
 
