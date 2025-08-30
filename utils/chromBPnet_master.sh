@@ -86,11 +86,14 @@ done
 
 echo "=== Run training model and contribution scores ==="
 
+avg_contribution_counts_file=no_bias_model/${celltype}_averaged_contribution_scores_counts.h5
+avg_contribution_profile_file=no_bias_model/${celltype}_averaged_contribution_scores_profile.h5
+
 all_contrib_jobs=""
 
 for fold_number in 0 1 2 3 4; do
     MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
-    count_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.count_scores.h5
+    count_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.counts_scores.h5
     profile_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.profile_scores.h5
 
     train_job_id=""
@@ -123,30 +126,31 @@ for fold_number in 0 1 2 3 4; do
     fi
 
     # --- Contribution job ---
-    if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
-        echo "[Fold ${fold_number}] Contribution job needed."
-        contrib_job_id=$(bsub -J ${celltype}_CBPcontrib_f${fold_number} \
-             -P acc_Tsankov_Normal_Lung \
-             -q gpu \
-             -n 1 \
-             -W 48:00 \
-             -gpu num=1 \
-             -R a100 \
-             -R rusage[mem=64000] \
-             -R span[hosts=1] \
-             -o ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.out \
-             -e ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.err \
-             ${repodir}/utils/chromBPnet_contribution_scores.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" "$MODEL_H5" \
-             | awk '{print $2}' | sed 's/<//;s/>//')
-    else
-        echo "[Fold ${fold_number}] Contribution already exists, skipping."
-        contrib_job_id=$(bsub -J dummy_contrib_${celltype}_f${fold_number} \
-             -o logs/dummy_contrib_${celltype}_f${fold_number}.out \
-             -e logs/dummy_contrib_${celltype}_f${fold_number}.err \
-             /bin/bash -c "echo 'Contribution exists for ${celltype}, fold ${fold_number}'" \
-             | awk '{print $2}' | sed 's/<//;s/>//')
+    if [! -f "${avg_contribution_profile_file}" ]; then
+        if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
+            echo "[Fold ${fold_number}] Contribution job needed."
+            contrib_job_id=$(bsub -J ${celltype}_CBPcontrib_f${fold_number} \
+                 -P acc_Tsankov_Normal_Lung \
+                 -q gpu \
+                 -n 1 \
+                 -W 48:00 \
+                 -gpu num=1 \
+                 -R a100 \
+                 -R rusage[mem=64000] \
+                 -R span[hosts=1] \
+                 -o ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.out \
+                 -e ${chromBPdir}/chromBPnet_contribution_scores_${celltype}_f${fold_number}.err \
+                 ${repodir}/utils/chromBPnet_contribution_scores.sh "$chromBPdir" "$grefdir" "$celltype" "$fold_number" "$biasdir" "$MODEL_H5" \
+                 | awk '{print $2}' | sed 's/<//;s/>//')
+        else
+            echo "[Fold ${fold_number}] Contribution already exists, skipping."
+            contrib_job_id=$(bsub -J dummy_contrib_${celltype}_f${fold_number} \
+                 -o logs/dummy_contrib_${celltype}_f${fold_number}.out \
+                 -e logs/dummy_contrib_${celltype}_f${fold_number}.err \
+                 /bin/bash -c "echo 'Contribution exists for ${celltype}, fold ${fold_number}'" \
+                 | awk '{print $2}' | sed 's/<//;s/>//')
+        fi
     fi
-
     # Collect for global dependency
     if [ -z "$all_contrib_jobs" ]; then
         all_contrib_jobs="done(${contrib_job_id})"
@@ -178,9 +182,7 @@ wigToBigWig no_bias_model/temp_contribution_profile_scores.wig ${grefdir}/hg38.c
 rm no_bias_model/temp_contribution_profile_scores.wig
 
 # Cleanup fold-level contribution files
-avg_contribution_counts_file=no_bias_model/${celltype}_averaged_contribution_scores_counts.h5
-avg_contribution_profile_file=no_bias_model/${celltype}_averaged_contribution_scores_profile.h5
-if [ ! -f "${avg_contribution_counts_file}" ] || [ ! -f "${avg_contribution_profile_file}" ]; then
+if [ -f "${avg_contribution_counts_file}" ] && [ -f "${avg_contribution_profile_file}" ]; then
     echo "Average contribution files exist. Cleaning up fold-level contribution files..."
     rm -rf no_bias_model/fold_{0..4}/contribution*
 fi
@@ -189,7 +191,7 @@ modisco_profile_file=no_bias_model/modisco_profile/modisco_results_profile.h5
 modisco_counts_file=no_bias_model/modisco_counts/modisco_results_counts.h5
 echo "=== Run TF-MoDISco on averaged contributions (parallel) ==="
 
-if [ ! -f "${modisco_counts_file}" ] || [ -f "${avg_contribution_counts_file}" ]; then
+if [ ! -f "${modisco_counts_file}" ] && [ -f "${avg_contribution_counts_file}" ]; then
 TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
@@ -202,7 +204,7 @@ TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
     ${repodir}/utils/TFmodisco_counts.sh $chromBPdir $celltype | awk '{print $2}' | sed 's/<//;s/>//')
 fi
 
-if [ ! -f "${modisco_profile_file}" ] || [ -f "${avg_contribution_profile_file}" ]; then
+if [ ! -f "${modisco_profile_file}" ] && [ -f "${avg_contribution_profile_file}" ]; then
 TFmd_p_id=$(bsub -J ${celltype}_TFmd_p \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
@@ -216,7 +218,7 @@ TFmd_p_id=$(bsub -J ${celltype}_TFmd_p \
 fi
 
 finemo_counts_file=no_bias_model/finemo_out_counts/hits.bed
-if [ -f "${modisco_counts_file}" ] || [ -f "${modisco_profile_file}" ] || [ ! -f "$finemo_counts_file" ]; then
+if [ -f "${modisco_counts_file}" ] && [ -f "${modisco_profile_file}" ] && [ ! -f "$finemo_counts_file" ]; then
 echo "=== Submit finemo job ==="
 finemo_job_id=$(bsub -J ${celltype}_finemo \
     -P acc_Tsankov_Normal_Lung \
