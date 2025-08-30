@@ -126,7 +126,7 @@ for fold_number in 0 1 2 3 4; do
     fi
 
     # --- Contribution job ---
-    if [! -f "${avg_contribution_profile_file}" ]; then
+    if [ ! -f "${avg_contribution_profile_file}" ]; then
         if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
             echo "[Fold ${fold_number}] Contribution job needed."
             contrib_job_id=$(bsub -J ${celltype}_CBPcontrib_f${fold_number} \
@@ -159,39 +159,61 @@ for fold_number in 0 1 2 3 4; do
     fi
 done
 
+### Check if all contribution score counts and profile files have been generated before combining ###
+all_exist_counts=true
+for f in no_bias_model/fold_{0..4}/contribution_scores.counts_scores.bw; do
+    if [ ! -f "$f" ]; then
+        all_exist_counts=false
+        break
+    fi
+done
 
-echo "=== Combine contribution scores ==="
+all_exist_profile=true
+for f in no_bias_model/fold_{0..4}/contribution_scores.profile_scores.bw; do
+    if [ ! -f "$f" ]; then
+        all_exist_profile=false
+        break
+    fi
+done
 
-source activate h5py
-export PATH=/sc/arion/work/giottb01/conda/envs/h5py/bin:$PATH
-unset PYTHONPATH
-export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_PATH
+if [ "$all_exist_counts" = true ] && [ "$all_exist_profile" = true ]; then
+    if [ ! -f "${avg_contribution_counts_file}" ] && [ ! -f "${avg_contribution_profile_file}" ]; then
+    echo "=== Combine contribution scores ==="
+    
+    source activate h5py
+    export PATH=/sc/arion/work/giottb01/conda/envs/h5py/bin:$PATH
+    unset PYTHONPATH
+    export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_PATH
+    
+    # Combine HDF5 scores
+    /sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores.py $chromBPct_dir $celltype
+    
+    # Average bigwig files
+    wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.counts_scores.bw \
+        > no_bias_model/temp_contribution_counts_scores.wig
+    wigToBigWig no_bias_model/temp_contribution_counts_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_counts.bw
+    rm no_bias_model/temp_contribution_counts_scores.wig
+    
+    wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.profile_scores.bw \
+        > no_bias_model/temp_contribution_profile_scores.wig
+    wigToBigWig no_bias_model/temp_contribution_profile_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
+    rm no_bias_model/temp_contribution_profile_scores.wig
+    fi
+fi    
 
-# Combine HDF5 scores
-/sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores.py $chromBPct_dir $celltype
-
-# Average bigwig files
-wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.counts_scores.bw \
-    > no_bias_model/temp_contribution_counts_scores.wig
-wigToBigWig no_bias_model/temp_contribution_counts_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_counts.bw
-rm no_bias_model/temp_contribution_counts_scores.wig
-
-wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.profile_scores.bw \
-    > no_bias_model/temp_contribution_profile_scores.wig
-wigToBigWig no_bias_model/temp_contribution_profile_scores.wig ${grefdir}/hg38.chrom.sizes no_bias_model/${celltype}_averaged_contribution_scores_profile.bw
-rm no_bias_model/temp_contribution_profile_scores.wig
 
 # Cleanup fold-level contribution files
 if [ -f "${avg_contribution_counts_file}" ] && [ -f "${avg_contribution_profile_file}" ]; then
     echo "Average contribution files exist. Cleaning up fold-level contribution files..."
+    
     rm -rf no_bias_model/fold_{0..4}/contribution*
 fi
 
 modisco_profile_file=no_bias_model/modisco_profile/modisco_results_profile.h5
 modisco_counts_file=no_bias_model/modisco_counts/modisco_results_counts.h5
-echo "=== Run TF-MoDISco on averaged contributions (parallel) ==="
 
 if [ ! -f "${modisco_counts_file}" ] && [ -f "${avg_contribution_counts_file}" ]; then
+echo "=== Run TF-MoDISco on averaged contributions ==="
 TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
     -P acc_Tsankov_Normal_Lung \
     -q premium \
