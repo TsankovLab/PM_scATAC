@@ -127,7 +127,6 @@ for fold_number in 0 1 2 3 4; do
         echo "[Fold ${fold_number}] Contribution job needed."
         contrib_job_id=$(bsub -J ${celltype}_CBPcontrib_f${fold_number} \
              -P acc_Tsankov_Normal_Lung \
-             -w 24:00 \
              -q gpu \
              -n 1 \
              -W 48:00 \
