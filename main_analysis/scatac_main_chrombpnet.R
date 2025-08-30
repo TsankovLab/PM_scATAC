@@ -61,11 +61,3 @@ for (celltype in celltypes)
 	
 	system (paste(command, args))
 	}
-
-
-
-
-
-
-
- 

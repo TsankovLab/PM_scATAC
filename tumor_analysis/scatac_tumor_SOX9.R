@@ -455,7 +455,8 @@ selected_TF = selected_TF[selected_TF %in% tf_tumor_pos]
 # Order by mean logFC
 tf_order = rownames(TF_diff_rna)[order (-rowMeans(TF_diff_rna[,c('dev_diff','rna_diff')]))]
 selected_TF_ordered = tf_order[tf_order %in% selected_TF]
-
+guides = c('PITX1','TCF3','TEAD1','TEAD4','MEF2A','MEF2D','HMGA1','SOX9','TWIST1','BPTF')
+TF_labels = unique (c(head (selected_TF_ordered,30), guides))
 
 # Plot distribution of diff deviation and diff expression between tumor and normal
 diff_line = 0
@@ -463,20 +464,32 @@ TF_diff_rna$label = ''
 TF_diff_rna$label[match (selected_TF,rownames(TF_diff_rna))] = selected_TF
 TF_diff_rna$color = TF_diff_rna$label != ''
 TF_diff_rna$label_top = ''
-TF_diff_rna$label_top[match (head (selected_TF_ordered,30),rownames(TF_diff_rna))] = head (selected_TF_ordered,30)
-TF_diff_rna$alpha = 0.7
-TF_diff_rna$alpha[match (selected_TF,rownames(TF_diff_rna))] = .9
-TF_diff_rna$direction_rna = ifelse (apply (TF_diff_rna[,c('tumor_rna','normal_rna')], 1, function(x) which.max (x)) == 1, 'tumor','normal')
-TF_diff_rna$highest_rna =apply (TF_diff_rna[,c('tumor_rna','normal_rna')], 1, function(x) max (x))
-tf_diff_p = ggplot (TF_diff_rna, aes (x= dev_diff, y = rna_diff, size = highest_rna, fill = direction_rna, label = label_top)) + 
-geom_point(aes(color=color, alpha = alpha, size=(highest_rna+1)^2),shape = 21, stroke=0.1) + # Color points based on x value
-scale_color_manual(values = c('FALSE' = "grey", 'TRUE' = "black")) + # Customize colors
-scale_fill_manual(values = c(normal = "grey20", tumor = "darkred")) +
+TF_diff_rna$label_top[match (TF_labels,rownames(TF_diff_rna))] = TF_labels
+TF_diff_rna$alpha = 0.6
+TF_diff_rna$label_guides = ifelse (rownames (TF_diff_rna) %in% guides, 'guides','rest')
+TF_diff_rna$alpha[match (selected_TF,rownames(TF_diff_rna))] = .8
+
+TF_diff_rna$highest_rna = ifelse (apply (TF_diff_rna[,c('tumor_rna','normal_rna')], 1, function(x) which.max (x)) == 1, 'tumor','normal')
+TF_diff_rna$highest_atac = ifelse (apply (TF_diff_rna[,c('tumor_dev','normal_dev')], 1, function(x) which.max (x)) == 1, 'tumor','normal')
+TF_diff_rna$direction = ''
+TF_diff_rna$direction[TF_diff_rna$highest_rna == 'tumor' & TF_diff_rna$highest_atac == 'tumor'] = 'both_high'
+TF_diff_rna$direction[TF_diff_rna$highest_rna == 'tumor' & TF_diff_rna$highest_atac == 'normal'] = 'dev_low'
+TF_diff_rna$direction[TF_diff_rna$highest_rna == 'normal' & TF_diff_rna$highest_atac == 'tumor'] = 'rna_low'
+TF_diff_rna$direction[TF_diff_rna$highest_rna == 'normal' & TF_diff_rna$highest_atac == 'normal'] = 'both_low'
+#TF_diff_rna$direction = ifelse (apply (TF_diff_rna[,c('tumor_rna','normal_rna')], 1, function(x) which.max (x)) == 1, 'tumor','normal')
+TF_diff_rna$highest_rna = apply (TF_diff_rna[,c('tumor_rna','normal_rna')], 1, function(x) max (x))
+TF_diff_rna$alpha[TF_diff_rna$direction != 'both_high'] = 0.6
+
+tf_diff_p = ggplot (TF_diff_rna, 
+  aes (x= dev_diff, y = rna_diff, size = highest_rna, fill = direction, label = label_top)) +
+geom_point (aes(color=color, alpha = alpha),shape = 21, stroke=0.1) + # Color points based on x value
+scale_color_manual (values = c('FALSE' = "grey", 'TRUE' = "black")) + # Customize colors
+scale_fill_manual (values = c(both_low = "grey20", rna_low='grey20', dev_low= 'grey20', both_high = "darkred")) +
 #scale_fill_manual(values = c('FALSE' = "grey", 'TRUE' = "red")) + # Customize colors
-geom_vline(xintercept = diff_line, linetype = "dashed", color = "grey44", linewidth=.3) + # Vertical dashed line
-geom_hline(yintercept = diff_line, linetype = "dashed", color = "grey44", linewidth=.3) + # Vertical dashed line
+geom_vline (xintercept = diff_line, linetype = "dashed", color = "grey44", linewidth=.3) + # Vertical dashed line
+geom_hline (yintercept = diff_line, linetype = "dashed", color = "grey44", linewidth=.3) + # Vertical dashed line
 gtheme_no_rot + # Use a minimal theme
- geom_text_repel(
+ geom_text_repel (aes (color = label_guides, fill = label_guides),
   segment.size=.05,
   max.overlaps = 100,
 # point.padding = 0.2, 
@@ -484,13 +497,13 @@ gtheme_no_rot + # Use a minimal theme
 # nudge_x = .25,
 # nudge_y = .2,
 # segment.curvature = -1e-20
-  ) +
+  ) + 
 xlab ('activity difference') + 
 ylab ('RNA difference') + 
 xlim (c(-0.2, .2)) + 
 ylim (c(-0.6, .6))
 
-pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot3.pdf'),5,height = 4)
+pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot4.pdf'), width = 5,height = 4)
 print (tf_diff_p)
 dev.off()
 saveRDS(selected_TF, 'selected_TF.rds')
