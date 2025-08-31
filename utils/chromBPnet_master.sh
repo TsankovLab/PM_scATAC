@@ -261,12 +261,12 @@ echo "Submitted finemo job with ID: $finemo_job_id"
 # Wait for finemo to finish
 echo "Waiting for finemo job..."
 bwait -w "done(${finemo_job_id})"
+fi
 
 echo "=== Run R script for finemo motif labels ==="
 source activate meso_scatac
 Rscript $repodir/utils/chromBPnet_finemo_motif_labels.R $chromBPdir $celltype
 echo "R script execution completed."
-fi
 
 # bsub -J ${celltype}_combS \
 #      -P acc_Tsankov_Normal_Lung \
