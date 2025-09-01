@@ -253,7 +253,6 @@ if [ -f "${modisco_counts_file}" ] && [ -f "${modisco_profile_file}" ] && [ ! -f
         -R span[hosts=1] \
         -o ${chromBPdir}/finemo_${celltype}.out \
         -e ${chromBPdir}/finemo_${celltype}.err \
-        #-w "done(${TFmd_c_id}) && done(${TFmd_p_id})" \
         ${repodir}/utils/finemo_motif_calls.sh "$chromBPdir" "$celltype" \
         | awk '{print $2}' | sed 's/<//;s/>//')
     echo "Submitted finemo job with ID: $finemo_job_id"
