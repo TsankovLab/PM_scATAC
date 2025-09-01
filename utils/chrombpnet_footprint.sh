@@ -19,7 +19,7 @@ ml proxies
 ml java/11.0.2
 ml tensorrt/8.5.3.1
 
-ml anaconda3/2020.11
+#ml anaconda3/2020.11
 source activate chrombpnet
 
 chromBPdir=${1}
@@ -36,23 +36,32 @@ echo $MODEL_H5
 #chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
 #celltype=low_P23
 #MODEL_H5=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet/${celltype}/no_bias_model/fold_0/models/chrombpnet_nobias.h5
+#/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
-motif_file=motif_tumor.TF.txt
+motif_file=motif_footprints.txt
 
-chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/Endothelial/scatac_ArchR/chromBPnet
-celltype=low
-MODEL_H5=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/Endothelial/scatac_ArchR/chromBPnet/${celltype}/no_bias_model/fold_0/models/chrombpnet_nobias.h5
+chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
+celltype=SOX9_low_P23
+MODEL_H5=${chromBPdir}/${celltype}/no_bias_model/fold_0/models/chrombpnet_nobias.h5
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
-OUTPUT_PREFIX=$chromBPdir/$celltype/footprints
-fold_number=0
-motif_file=motif_endothelial.TF.txt
+OUTPUT_PREFIX=${chromBPdir}/${celltype}/footprints
 
-#mkdir $chromBPdir/$celltype
 cd $chromBPdir/$celltype
 
-chrombpnet footprints -m $MODEL_H5 \
--r ${celltype}_peakset_all_no_blacklist.bed \
--g $grefdir/genome_references/hg38.genome.fa \
--fl $grefdir/folds/fold_${fold_number}.json \
--op $OUTPUT_PREFIX \
--pwm_f ${grefdir}/${motif_file} #[-bs BATCH_SIZE] [--ylim YLIM]
+mkdir footprints
+cd footprints
+for fold_number in {0..4}; do
+    # motif_file=motif_endothelial.TF.txt
+
+    # mkdir -p $chromBPdir/$celltype   # only needed once, so you can keep it outside the loop if you like
+
+    chrombpnet footprints -m $MODEL_H5 \
+        -r ../${celltype}_peakset_all_no_blacklist.bed \
+        -g $grefdir/genome_references/hg38.genome.fa \
+        -fl $grefdir/folds/fold_${fold_number}.json \
+        -op ${OUTPUT_PREFIX}/fold${fold_number} \
+        -pwm_f ../../${motif_file} # [-bs BATCH_SIZE] [--ylim YLIM]
+done
+
+
+

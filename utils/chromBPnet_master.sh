@@ -203,7 +203,7 @@ fi
 
 
 # Cleanup fold-level contribution files
-if [ -f "${avg_contribution_counts_file}" ] && [ -f "${avg_contribution_profile_file}" ]; then
+if [ -f "${avg_contribution_counts_file}" ] && [ -f "${avg_contribution_profile_file}" ] && [ "$all_exist_counts" = true ] && [ "$all_exist_profile" = true ]; then
     echo "Average contribution files exist. Cleaning up fold-level contribution files..."
     
     rm -rf no_bias_model/fold_{0..4}/contribution*
@@ -241,26 +241,26 @@ fi
 
 finemo_counts_file=no_bias_model/finemo_out_counts/hits.bed
 if [ -f "${modisco_counts_file}" ] && [ -f "${modisco_profile_file}" ] && [ ! -f "$finemo_counts_file" ]; then
-echo "=== Submit finemo job ==="
-finemo_job_id=$(bsub -J ${celltype}_finemo \
-    -P acc_Tsankov_Normal_Lung \
-    -q gpu \
-    -n 1 \
-    -W 24:00 \
-    -gpu num=1 \
-    -R a100 \
-    -R rusage[mem=64000] \
-    -R span[hosts=1] \
-    -o ${chromBPdir}/finemo_${celltype}.out \
-    -e ${chromBPdir}/finemo_${celltype}.err \
-    #-w "done(${TFmd_c_id}) && done(${TFmd_p_id})" \
-    ${repodir}/utils/finemo_motif_calls.sh "$chromBPdir" "$celltype" \
-    | awk '{print $2}' | sed 's/<//;s/>//')
-echo "Submitted finemo job with ID: $finemo_job_id"
-
-# Wait for finemo to finish
-echo "Waiting for finemo job..."
-bwait -w "done(${finemo_job_id})"
+    echo "=== Submit finemo job ==="
+    finemo_job_id=$(bsub -J ${celltype}_finemo \
+        -P acc_Tsankov_Normal_Lung \
+        -q gpu \
+        -n 1 \
+        -W 24:00 \
+        -gpu num=1 \
+        -R a100 \
+        -R rusage[mem=64000] \
+        -R span[hosts=1] \
+        -o ${chromBPdir}/finemo_${celltype}.out \
+        -e ${chromBPdir}/finemo_${celltype}.err \
+        #-w "done(${TFmd_c_id}) && done(${TFmd_p_id})" \
+        ${repodir}/utils/finemo_motif_calls.sh "$chromBPdir" "$celltype" \
+        | awk '{print $2}' | sed 's/<//;s/>//')
+    echo "Submitted finemo job with ID: $finemo_job_id"
+    
+    # Wait for finemo to finish
+    echo "Waiting for finemo job..."
+    bwait -w "done(${finemo_job_id})"
 fi
 
 echo "=== Run R script for finemo motif labels ==="

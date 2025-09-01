@@ -61,6 +61,7 @@ biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/N
 celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
 celltypes = 'SOX9_high_P23'
 celltypes = 'SOX9_low_P23'
+celltypes = 'SOX9_high_P1'
 for (celltype in celltypes)
 	{
 	command <- paste ("bsub -J", paste0(celltype,'_CBPmaster'), 

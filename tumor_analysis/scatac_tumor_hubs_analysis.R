@@ -75,7 +75,7 @@ if (!file.exists ('peak_regions.bed'))
 
 ### Hubs analysis #####
 metaGroupName = "Sample3"
-cor_cutoff = 0.3
+cor_cutoff = 0.2
 #max_dist = 12500
 max_dist = 12500
 min_peaks = 5
@@ -1247,3 +1247,52 @@ circos.genomicLabels(cnv_hubs, labels.column = 4, side = "inside",
 
 dev.off()
 
+
+
+
+
+
+# Check SNAI2 locus ####
+archp = addClusters (input = archp, resolution = 1.5,
+  reducedDims = "IterativeLSI", name = 'Clusters2',
+  maxClusters = 100,
+  force = TRUE)
+
+archp$SNAI2_groups = archp$Clusters2
+
+metaGroupName='Clusters2'
+matching_samples=c('normal_pleura','P1','P4','P5','P8','P11','P11_HOX','P12','P14')
+pdf()
+meso_markers <- plotBrowserTrack2 (
+    ArchRProj = archp[archp$Clusters2 %in% c('C4','C9')], 
+    sizes = c(6, 1, 1, 1,1,1),
+    groupBy = metaGroupName, 
+    #region = mega_hubs,
+    genelabelsize=0,
+    geneSymbol = 'SNAI2',
+    normMethod = "ReadsInTSS",
+    scCellsMax=3000,
+    hubs_regions = hubs_obj$hubsCollapsed,
+    plotSummary = c("bulkTrack", "featureTrack", 
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
+    upstream = 100000,
+    pal = palette_sample,
+    #ylim=c(0,0.1),
+    downstream = 10000,
+    #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
+#    loops = getCoAccessibility (archp, corCutOff = 0.25),
+    #  returnLoops = TRUE),
+    useGroups= NULL,
+    loops = getPeak2GeneLinks (archp, corCutOff = 0.2,returnLoops = TRUE),
+    #hubs = hubs_obj$peakLinks2
+)
+dev.off()
+
+plotPDF (meso_markers, ArchRProj = archp, 
+  width=5,height=3, 
+  name =paste0('region_coveragePlots.pdf'),
+  addDOC = F)
