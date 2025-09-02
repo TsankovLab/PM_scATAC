@@ -36,7 +36,7 @@ pdf(file.path('Plots','P23_Clusters2_MA_plot.pdf'), width=5,height=5)
 pma <- markerPlot (seMarker = DAP_list, name = 'C9', cutOff = "FDR <= 0.01", plotAs = "MA")
 pma
 dev.off()
-  
+
 # Take only significant regions ####
 DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
 saveRDS (GRanges(rownames(DAP_res_sig)), 'P23_Clusters2_C9_peaks.rds')
@@ -77,30 +77,7 @@ metaGroupName = 'Clusters2'
 if (!any (ls() == 'mSE')) mSE = fetch_mat (archp_P23, 'Motif')
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData(mSE)$name
-#mMat_mg = mMat[DAM_df$gene, ]
-# mMat_mg = as.data.frame (t(mMat))
-# mMat_mg$metaGroup = as.character (archp_P23@cellColData[,metaGroupName])
-# mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
-# rownames (mMat_mg) = mMat_mg[,1]
-# mMat_mg = mMat_mg[,-1]
 
-
-# #Get active genes from RNA
-# metaGroupName = 'celltype_simplified2'
-# ps = log2(as.data.frame (AverageExpression (srt, 
-# features = colnames(mMat_mg),
-# group.by = metaGroupName)[[1]]) +1)
-# min_exp = .1
-# #ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
-# #active_TFs = rownames(ps)[rowSums(ps) > 0]
-
-# #active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > 0.1]
-# #DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])    
-# mMat_l = as.list (as.data.frame (t(mMat_mg)))
-# mMat_l = lapply (mMat_l, function(x) data.frame (dev = x, row.names = colnames(mMat_mg)))
-# #mMat_l = lapply (mMat_l, function(x) x[rownames(x) %in% active_TFs,,drop=F])
-
-# metaGroupName = 'celltype_lv1'
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
 # metaGroupName = 'celltype_lv1'
 # celltypes = unique (archp_P23@cellColData[,metaGroupName])
@@ -216,23 +193,133 @@ write.table (as.data.frame (rowRanges (matches)[matchesMat[,'NFYB']], row.names 
 
 
 # check SOX9 deviation again
-tf_markers = 'SOX9'
-markerMotifs = getFeatures (archp, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
+archp_P23 = archp[archp$Sample %in% c('P23')]
+archp_P23 = archp_P23[archp_P23@embeddings$UMAP[[1]][[2]] < 0]
+tf_markers = c('SOX9','SNAI2','RUNX2','RUNX1','NFIC')
+markerMotifs = getFeatures (archp_P23, select = paste(tf_markers, collapse="|"), useMatrix = "MotifMatrix")
 markerMotifs = grep ("z:", markerMotifs, value = TRUE)
-archp = addImputeWeights (archp)
+archp_P23 = addImputeWeights (archp_P23)
+
 pdf()
 TF_p = plotEmbedding(
-    ArchRProj = archp, 
+    ArchRProj = archp_P23, 
     colorBy = "MotifMatrix", 
     name = sort(markerMotifs), 
     embedding = "UMAP",
     pal = rev(palette_deviation),
-    imputeWeights = getImputeWeights(archp)
+    imputeWeights = getImputeWeights(archp_P23)
 )
 
+TF_p2 = plotEmbedding(
+    ArchRProj = archp_P23, 
+    colorBy = "GeneScoreMatrix", 
+    name = c('SOX9','SNAI2','RUNX2','RUNX1','NFIC'), 
+    embedding = "UMAP",
+    pal = rev(palette_genescore),
+    imputeWeights = getImputeWeights(archp_P23)
+)
+
+umap_p1 = plotEmbedding (ArchRProj = archp_P23, labelMeans = T, 
+  colorBy = "cellColData", name = "Clusters2", 
+  #pal = palette_sample,
+   embedding = "UMAP")
+
 dev.off()
 
-pdf (file.path('Plots','SOX9_dev_fplot.pdf'), width = 8, height = 8)
-TF_p
+pdf (file.path('Plots','SOX9_dev_P23_fplot.pdf'), width = 14, height = 12)
+wrap_plots (TF_p)
+wrap_plots(TF_p2)
 dev.off()
 
+
+
+
+
+# Import chromBPnet finemo motifs for P1 too ####
+archp_P1 = archp[archp$Clusters %in% c('C2') & archp$Sample == 'P1']
+library ('universalmotif')
+
+# metaGroupName = 'Clusters2'
+# if (!any (ls() == 'mSE')) mSE = fetch_mat (archp_P1, 'Motif')
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData(mSE)$name
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
+# metaGroupName = 'celltype_lv1'
+# celltypes = unique (archp_P23@cellColData[,metaGroupName])
+
+# tf_database = read_meme('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme', skip = 0, readsites = FALSE, readsites.meta = FALSE)
+# tf_database = unique(unlist(lapply(tf_database, function(x) unlist(strsplit(x@name,'_'))[1])))
+
+# list.files (file.path(chromBPdir, celltypes[3],'no_bias_model'))
+chrombpnet_counts = list()
+celltypes = c('SOX9_high_P1')
+for (celltype in celltypes)
+  {
+  message (paste0('reading finemo output for ', celltype))  
+  chrombpnet_counts[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
+  }
+
+
+### Make barplots of most abundant TFs identified in inflamed and non-inflamed cells
+bp_df = data.frame (
+  Freq = c(proportions(head(table (chrombpnet_counts[[1]]$V4)[order (-table (chrombpnet_counts[[1]]$V4))],5))),
+  TF = names (c(head(table (chrombpnet_counts[[1]]$V4)[order (-table (chrombpnet_counts[[1]]$V4))],5))),
+  type = c(rep(celltypes[[1]],5)))
+
+
+library(dplyr)
+
+df_ordered <- bp_df %>%
+  group_by(type) %>%
+  arrange(desc(Freq), .by_group = TRUE) %>%
+  ungroup()
+  
+P1_motif_palette = rev(paletteer::paletteer_d("palettetown::seadra") )
+
+
+df_ordered$TF_type = paste0(df_ordered$TF, df_ordered$type)
+df_ordered$TF_type = factor (df_ordered$TF_type, levels = unique (df_ordered$TF_type))
+bp = ggplot (df_ordered, aes (x = type, y = Freq, fill = TF_type)) +
+  geom_bar (stat = 'identity', position = 'stack') + 
+  scale_fill_manual (values = P1_motif_palette) + gtheme
+
+pdf (file.path ('Plots', 'TF_abundance_P1_barplot.pdf'),4,width=4.5)
+bp
+dev.off()
+
+
+chrombpnet_profile = list()
+celltypes = c('SOX9_high_P1')
+for (celltype in celltypes)
+  {
+  message (paste0('reading finemo output for ', celltype))  
+  chrombpnet_profile[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
+  }
+
+
+### Make barplots of most abundant TFs identified in inflamed and non-inflamed cells
+bp_df = data.frame (
+  Freq = c(proportions(head(table (chrombpnet_profile[[1]]$V4)[order (-table (chrombpnet_profile[[1]]$V4))],5))),
+  TF = names (c(head(table (chrombpnet_profile[[1]]$V4)[order (-table (chrombpnet_profile[[1]]$V4))],5))),
+  type = c(rep(celltypes[[1]],5)))
+
+
+library(dplyr)
+
+df_ordered <- bp_df %>%
+  group_by(type) %>%
+  arrange(desc(Freq), .by_group = TRUE) %>%
+  ungroup()
+  
+P1_motif_palette = rev(paletteer::paletteer_d("palettetown::seadra") )
+
+
+df_ordered$TF_type = paste0(df_ordered$TF, df_ordered$type)
+df_ordered$TF_type = factor (df_ordered$TF_type, levels = unique (df_ordered$TF_type))
+bp = ggplot (df_ordered, aes (x = type, y = Freq, fill = TF_type)) +
+  geom_bar (stat = 'identity', position = 'stack') + 
+  scale_fill_manual (values = P1_motif_palette) + gtheme
+
+pdf (file.path ('Plots', 'TF_abundance_P1_profile_barplot.pdf'),4,width=4.5)
+bp
+dev.off()

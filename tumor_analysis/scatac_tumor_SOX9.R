@@ -44,8 +44,8 @@ sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
 #archp$Sample2 = factor (archp$Sample2, levels = sarc_order$sampleID)
 
 # Check SOX15 and SOX9 expression
-pdf (file.path('Plots','SOX15_SOX9_expression.pdf'))
-DotPlot (srt, features =c('SOX9','SOX15','SOX6'), group.by = 'sampleID')
+pdf (file.path('Plots','SOX15_SOX9_expression.pdf'),width=5)
+DotPlot (srt, features =c('SOX9','SOX15','SOX6','RUNX2','RUNX1','RUNX3','SNAI2','TWIST1','TEAD1','ZN784'), group.by = 'sampleID') + gtheme
 dev.off()
 
 
