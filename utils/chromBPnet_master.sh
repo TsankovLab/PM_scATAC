@@ -127,7 +127,7 @@ for fold_number in 0 1 2 3 4; do
     fi
 
     # --- Contribution job ---
-    if [ ! -f "${avg_contribution_profile_file}" ]; then
+    #if [ ! -f "${avg_contribution_profile_file}" ]; then
         if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
             echo "[Fold ${fold_number}] Contribution job needed."
             contrib_job_id=$(bsub -J ${celltype}_CBPcontrib_f${fold_number} \
@@ -151,7 +151,6 @@ for fold_number in 0 1 2 3 4; do
                  /bin/bash -c "echo 'Contribution exists for ${celltype}, fold ${fold_number}'" \
                  | awk '{print $2}' | sed 's/<//;s/>//')
         fi
-    fi
     # Collect for global dependency
     if [ -z "$all_contrib_jobs" ]; then
         all_contrib_jobs="done(${contrib_job_id})"
