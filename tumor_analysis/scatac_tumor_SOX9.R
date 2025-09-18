@@ -49,6 +49,31 @@ DotPlot (srt, features =c('SOX9','SOX15','SOX6','RUNX2','RUNX1','RUNX3','SNAI2',
 dev.off()
 
 
+markers = c('RUNX1','RUNX2','THAP1','MZF1', 'GLIS3', 'PLAGL1', 'SOX9','VIM','SERPINE2','SNAI2')
+metaGroupName='Sample'
+#archp = addImputeWeights (archp)
+pdf()
+p2_l <- plotGroups(
+  ArchRProj = archp, 
+  groupBy = metaGroupName, 
+  colorBy = "GeneScoreMatrix", 
+  name = markers,
+  plotAs = "violin",
+  alpha = 0.4,
+  getImputeWeights=NULL,
+  addBoxPlot = TRUE#,
+  #pal = palette_tnk_cells
+ )
+dev.off()
+pdf (file.path ('Plots','_RUNXs_genescores.pdf'),14,14)
+print (wrap_plots (p2_l))
+dev.off()
+
+
+
+
+
+
 archp = addClusters (input = archp, resolution = 1.5,
   reducedDims = "IterativeLSI", name = 'Clusters2',
   maxClusters = 100,
@@ -205,9 +230,6 @@ force=FALSE
 peak_reproducibility='1' # Set to 1 to better identify tumor heterogeneity
 if(!all(file.exists(file.path('PeakCalls', paste0(unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds')))) | force) source (file.path('..','..','git_repo','utils','callPeaks.R'))
   
-
-
-
 ### chromVAR analysis ####
 force=TRUE
 if (!all(file.exists(file.path('Annotations',
@@ -215,8 +237,6 @@ if (!all(file.exists(file.path('Annotations',
     'Motif-Positions-In-Peaks.rds',
     'Motif-In-Peaks-Summary.rds'))))| force)
 source (file.path('..','..','git_repo','utils','chromVAR.R'))
-
-
 
 
 #### Compute P2G ####
@@ -253,7 +273,7 @@ normal_sams = c('normal1')
 tumor_sams_rna = c('P1','P11','P12','P13','P14','P3','P4','P5','P8')
 normal_sams_rna = 'normal_pleura'
 
-if(!file.exists('selected_TF.rds') | force)
+if(!file.exists ('selected_TF.rds') | force)
   {
   # Get activity matrix and format
   metaGroupName = 'Sample3'
@@ -860,11 +880,12 @@ dev.off()
   #lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
 
 top_sarc_TF = head(m_cor_levels$TF,20)
+saveRDS (top_sarc_TF, 'top_sarc_TF.rds')
 combined_df$TF = factor (combined_df$TF, levels = top_sarc_TF)
 combined_df = combined_df[combined_df$TF %in% top_sarc_TF, ]
 palette_expression_disc = paletteer::paletteer_c("grDevices::Purple-Blue", length(top_sarc_TF))
 
-bp = ggplot(combined_df, aes(x = TF, y = score, fill = TF, color = type)) + 
+bp = ggplot (combined_df, aes(x = TF, y = score, fill = TF, color = type)) + 
   geom_boxplot(
     aes(group = interaction(TF, type)),  # Split by both TF and type
     position = position_dodge(0.8),
@@ -890,8 +911,6 @@ bp = ggplot(combined_df, aes(x = TF, y = score, fill = TF, color = type)) +
   pdf (paste0 ('Plots/sarcomatoid_score_TF_activity_boxplots.pdf'), width = 8,height=3)
   bp
   dev.off()
-
-
 
 # Compare with TF correlation to sarcomatoid in scRNA ####
 metacells = readRDS (file.path('..','scrna','metacells.rds'))
@@ -972,6 +991,8 @@ matches = getMatches (archp)
 matchesMat = assay (matches)
 colnames (matchesMat) = gsub ('_.*','',colnames (matchesMat))
 colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
+names (motifMat) = gsub ('_.*','',names (motifMat))
+names (motifMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", names (motifMat))
 
 matchesMat = matchesMat[,top_sarc_TF]
 matchesMat = matchesMat[rowSums (matchesMat) > 0,]
@@ -982,28 +1003,66 @@ for (i in 1:ncol(matchesMat))
   {
   for (z in 1:ncol(matchesMat)) 
     {
-    ov = sum (rowSums (matchesMat[,c(i,z)]) == 2) / min (colSums(matchesMat[,c(i,z)]))
+    ov = sum (rowSums (matchesMat[,c(i,z)]) == 2) /  sum(colSums(matchesMat[,c(i,z)]))
     cooc[i,z] = ov
     }
   }
 
 colnames (cooc) = top_sarc_TF
 rownames (cooc) = top_sarc_TF
-diag (cooc) = 1
+diag (cooc) = 0
 
 cooc_hm = Heatmap (
     cooc,
     column_names_rot =45, 
     row_names_gp = gpar(fontsize = 7),
     column_names_gp = gpar(fontsize = 6),
-    col =palette_cooccurrence, 
+    col = rev(palette_cooccurrence), 
     cluster_rows=F,
     cluster_columns = F,
-rect_gp = gpar (col = "white", lwd = 1))
+rect_gp = gpar (col = "white", lwd = 1)
+)
 
-pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps2.pdf'), width = 6,height=5)
+pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps3.pdf'), width = 6,height=5)
 cooc_hm 
 dev.off()
+
+
+# Check distribution of SOX9 SOX6 motif distances in overlapping peaks ####
+tf_pair = c('ZEB1','MESP1')
+tf_pair = c('SOX9','SOX6')
+top_sarc_TF = readRDS ('top_sarc_TF.rds')
+motifMat = getPositions (archp)
+matches = getMatches (archp)
+matchesMat = assay (matches)
+colnames (matchesMat) = gsub ('_.*','',colnames (matchesMat))
+colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
+names (motifMat) = gsub ('_.*','',names (motifMat))
+names (motifMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", names (motifMat))
+
+ov_peaks_soxs = rowRanges (matches)[rowSums(matchesMat[,colnames (matchesMat) %in% tf_pair]) == 2]
+#ranges_soxs =  [rowSums(matchesMat[, colnames (matchesMat) %in% tf_pair]) == 2]
+#tmp = findOverlaps (motifMat[[tf_pair[2]]], ov_peaks_soxs, select='all')
+#any (duplicated (queryHits (tmp)))
+
+pos_in_peaks_tf1 =  motifMat[[tf_pair[1]]][subjectHits (findOverlaps (ov_peaks_soxs, motifMat[[tf_pair[1]]], select='all'))]
+pos_in_peaks_tf1$peak = queryHits (findOverlaps (ov_peaks_soxs, motifMat[[tf_pair[1]]], select='all'))
+pos_in_peaks_tf1 = pos_in_peaks_tf1[!duplicated (pos_in_peaks_tf1$peak)]
+pos_in_peaks_tf2 =  motifMat[[tf_pair[2]]][subjectHits (findOverlaps (ov_peaks_soxs, motifMat[[tf_pair[2]]], select='all'))]
+pos_in_peaks_tf2$peak = queryHits (findOverlaps (ov_peaks_soxs, motifMat[[tf_pair[2]]], select='all'))
+pos_in_peaks_tf2 = pos_in_peaks_tf2[!duplicated (pos_in_peaks_tf2$peak)]
+tf_peaks = unique (c(pos_in_peaks_tf1$peak,as.character(pos_in_peaks_tf2$peak)))
+pos_in_peaks_tf1 = pos_in_peaks_tf1[match (tf_peaks, pos_in_peaks_tf1$peak)]
+pos_in_peaks_tf2 = pos_in_peaks_tf2[match (tf_peaks, pos_in_peaks_tf2$peak)]
+mid_tf1 = start(pos_in_peaks_tf1) + end(pos_in_peaks_tf1) / 2
+mid_tf2 = start(pos_in_peaks_tf2) + end(pos_in_peaks_tf2) / 2
+mid_tf1 - mid_tf2
+
+pdf (file.path ('Plots',paste0('distribution_distance_TF_pair_', paste0(tf_pair, collapse='_'),'hist.pdf')))
+x = hist (abs(mid_tf1 - mid_tf2), breaks=1000)
+dev.off()
+
+x$mid[which.max (x$counts)]
 
 
 ### Import Blum meta-analysis to compare with top TF correlated with scS-score ####
@@ -1025,6 +1084,89 @@ dp = ggplot(blum_df, aes(x = gene, y = 1)) +
 pdf (file.path ('Plots','Blum_top_sarc_TF2.pdf'))
 dp
 dev.off()
+
+
+
+# Check overall genescore and RNA expression of TFs correlated with scS-score ####
+metaGroupName = 'Sample'
+gsgSE = getGroupSE(
+  ArchRProj = archp,
+  useMatrix = 'GeneScoreMatrix',
+  groupBy = metaGroupName,
+  divideN = TRUE,
+  scaleTo = NULL,
+  threads = getArchRThreads(),
+  verbose = TRUE,
+  logFile = createLogFile("getGroupSE")
+)
+gsmat = assays (gsgSE)[[1]]
+rownames (gsmat) = rowData (gsgSE)$name
+gsmat = gsmat[top_sarc_TF,sams]
+gsmat = as.data.frame (gsmat)
+gsmat$TF = rownames (gsmat)
+gs_sarc_TF_df = gather (gsmat, sample, score, 1:(ncol(gsmat)-1))
+gs_sarc_TF_df$type = 'genescore'
+
+rna_sarc_tf = as.data.frame (log2(AverageExpression (srt, features = top_sarc_TF, group.by = 'sampleID')[[1]]+1))
+rna_sarc_tf = rna_sarc_tf[,colnames (rna_sarc_tf) %in% sams]
+rna_sarc_tf$TF = rownames (rna_sarc_tf)
+rna_sarc_TF_df = gather (rna_sarc_tf, sample, score, 1:(ncol(rna_sarc_tf)-1))
+rna_sarc_TF_df$type = 'expression'
+
+sarc_TF_df = rbind (gs_sarc_TF_df, rna_sarc_TF_df)
+sarc_TF_df$TF = factor (sarc_TF_df$TF, levels = top_sarc_TF)
+
+bp1 = ggplot (sarc_TF_df[sarc_TF_df$type == 'genescore',], aes(x = TF, y = score, fill = TF, color=type)) + 
+  geom_boxplot(
+    #aes(group = interaction(TF, type)),  # Split by both TF and type
+    position = position_dodge(0.8),
+    #color = 'grey20',
+    linewidth = 0.4,
+    width = 0.7,
+    outlier.alpha = 0.2,
+    outlier.shape = NA,
+    size = 0.5,
+    alpha = 0.6
+  ) +
+  geom_point(
+    #aes(group = interaction(TF, type), color = type),  # Align points with boxplots
+    position = position_dodge(0.8),  # Ensure same dodge width
+    alpha = 0.5,
+    size = 1
+  ) +
+  gtheme +
+  scale_fill_manual(values = palette_expression_disc) +
+  scale_color_manual (values = c(genescore = 'blue', expression = 'darkgreen')) +
+  ylim (c(0,2.5))
+  #geom_hline(yintercept = 0, color = 'blue', linetype = 'dashed')
+bp2 = ggplot (sarc_TF_df[sarc_TF_df$type == 'expression',], aes(x = TF, y = score, fill = TF, color=type)) + 
+  geom_boxplot(
+    #aes(group = interaction(TF, type)),  # Split by both TF and type
+    position = position_dodge(0.8),
+    #color = 'grey20',
+    linewidth = 0.4,
+    width = 0.7,
+    outlier.alpha = 0.2,
+    outlier.shape = NA,
+    size = 0.5,
+    alpha = 0.6
+  ) +
+  geom_point(
+    #aes(group = interaction(TF, type), color = type),  # Align points with boxplots
+    position = position_dodge(0.8),  # Ensure same dodge width
+    alpha = 0.5,
+    size = 1
+  ) +
+  gtheme +
+  scale_fill_manual(values = palette_expression_disc) +
+  scale_color_manual (values = c(genescore = 'blue', expression = 'darkgreen'))# +
+  #geom_hline(yintercept = 0, color = 'blue', linetype = 'dashed')
+
+pdf (file.path ('Plots','sarcomatoid_score_TF_genescore_and_expression_boxplots.pdf'), width = 5,height=3)
+bp1
+bp2
+dev.off()
+
 
 
 

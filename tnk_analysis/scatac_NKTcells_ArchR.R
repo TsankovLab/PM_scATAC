@@ -1508,9 +1508,9 @@ fold_numbers = c(0,1,2,3,4)
 
 
 ### Check expression of RUNX3 and CTCF predicted by chromBPnet
-pdf (file.path ('Plots','TF_exp_dotplots.pdf'), width=5, height=3)
+pdf (file.path ('Plots','TF_exp_dotplots.pdf'), width=7, height=3)
 DotPlot (srt[,srt$celltype2 != 'Proliferating'], 
-  features= c('RUNX1','RUNX2','RUNX3','NR4A2','NR4A1','NR4A3','EGR2'), group.by = 'celltype2') + gtheme
+  features= c('RUNX1','RUNX2','RUNX3','NR4A2','NR4A1','NR4A3','EGR2','ELK4','ETV1','ELK1'), group.by = 'celltype2') + gtheme
 dev.off()
 
 deg_res = FindMarkers (srt, ident.1 = 'NK_KLRC1', ident.2 = 'NK_FGFBP2', group.by='celltype2')
@@ -1972,5 +1972,73 @@ dev.off()
 
 pmat = aggregate (pmat)
 
+
+
+
+
+#### Show sample distribution of NR4A2 enhancer ####
+archp$celltype_sample = paste0(archp$celltype2, '_', archp$Sample)
+metaGroupName = 'celltype_sample'  
+pMats = getGroupSE(
+  ArchRProj = archp,
+  useMatrix = 'PeakMatrix',
+  groupBy = metaGroupName,
+  divideN = TRUE,
+  scaleTo = NULL,
+  threads = getArchRThreads(),
+  verbose = TRUE,
+  logFile = createLogFile("getGroupSE")
+)
+enhancer_region = GRanges ('chr2:156480366-156480866')
+#promoter_region = getPeakSet (archp)
+#promoter_region =  promoter_region[which(promoter_region$peakType == 'Promoter' & promoter_region$nearestGene == 'NR4A2')]
+#promoter_region = GRanges (seqnames = as.character(seqnames(promoter_region))[1], ranges= IRanges(start = min(start(promoter_region)), end = max(end(promoter_region))))
+
+pmat_enhancer = unlist(as.data.frame (assay (pMats[queryHits(findOverlaps (GRanges(rowData(pMats)), enhancer_region)),])))
+pmat_enhancer_df = data.frame (region = pmat_enhancer, celltype =names(pmat_enhancer))
+pmat_enhancer_df$celltype = gsub ('_P.*','',pmat_enhancer_df$celltype)
+pmat_enhancer_df$sample = sub('.*(P.*)', '\\1', rownames(pmat_enhancer_df))
+pmat_enhancer_df = pmat_enhancer_df[pmat_enhancer_df$sample %in% names (table (pmat_enhancer_df$sample)[table (pmat_enhancer_df$sample) ==6]), ]
+pmat_enhancer_df$celltype = factor(pmat_enhancer_df$celltype, levels = c('NK_KLRC1','CD8_exhausted','CD8','NK_FGFBP2','CD4','Tregs'))
+
+bp = ggplot (pmat_enhancer_df, aes (x= celltype, y= region)) +
+      #geom_violin (trim=TRUE, aes (fill = treatment), alpha=.6) +
+      #geom_violin (aes_string(fill = metaGroupNames[3])) +
+      geom_point (aes (x = celltype, y = region), position='identity', alpha=.7, color="blue", size=1.2) +
+      geom_boxplot(width=0.5, aes (fill = celltype), color='grey22', alpha=.6) +
+      scale_fill_manual (values= palette_tnk_cells) + 
+      #scale_color_manual (values= palette_tnk_cells) + 
+      geom_line (data = pmat_enhancer_df, aes(x = celltype, y = region, group = sample), color='grey22',linewidth=.1, alpha=.5) +
+      gtheme
+
+stat.test2 <- bp$data %>%
+  filter(celltype %in% c("NK_KLRC1", "CD8_exhausted") | TRUE) %>%   # keep all
+  rstatix::pairwise_t_test(
+    region ~ celltype, 
+    paired = TRUE, 
+    p.adjust.method = "fdr"
+  ) %>%
+  filter(group1 %in% c("NK_KLRC1", "CD8_exhausted") | 
+         group2 %in% c("NK_KLRC1", "CD8_exhausted"))
+
+stat.test2 = stat.test2 [grepl ('NK_KLRC1',stat.test2$group1) | grepl ('CD8_exhausted', stat.test2$group1),]
+stat.test2 = stat.test2 %>% add_xy_position (x = "celltype", step.increase=0.05)
+bp = bp + stat_pvalue_manual (stat.test2, remove.bracket=FALSE,
+   bracket.nudge.y = 0, hide.ns = TRUE, position = position_nudge (y = -0.01),
+    label = "p.adj.signif") 
+
+pdf (file.path ('Plots','NR4A2_enhancer_sample_boxplots.pdf'),width=5, height=4)
+wrap_plots (bp)
+dev.off()
+
+
+#pmat_df$type = factor (pmat_df$type, levels =c ('promoter','enhancer'))
+pdf (file.path ('Plots','eNR4F2_accessibility_sample_enhancer_boxplot.pdf'), height=3, width=6)
+ep = ggplot (pmat_enhancer_df, aes (x = celltype, y = region, fill = celltype)) + 
+geom_boxplot () + gtheme +
+scale_fill_manual (values = c(enhancer = '#C1D32FFF', promoter = 'grey'))
+#+ scale_fill_manual (values = c(palette_tnk_cells, palette_myeloid, palette_celltype_lv1))
+ep
+dev.off()
 
 

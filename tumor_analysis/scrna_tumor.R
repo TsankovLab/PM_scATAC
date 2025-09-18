@@ -206,6 +206,26 @@ png(file.path('Plots','sarc_signatures_order_boxplot.png'),1200,600, res=300) #w
 box
 dev.off()
 
+### Compare SOX6 expression with scS-score across samples ####
+avg_exp = log2(AverageExpression (srt, group.by = 'sampleID', feature = c('SOX6','SOX9'))[[1]]+1)
+avg_exp = t(avg_exp)
+ccomp_df = srt@meta.data
+ccomp_df = aggregate (ccomp_df[,c('cNMF20')], by=as.list(srt@meta.data[,'sampleID',drop=F]), 'mean')
+ccomp_df = cbind (ccomp_df, avg_exp[ccomp_df$sampleID,])
+ccomp_df = ccomp_df[!rownames (ccomp_df) %in% c('HU37','HU62'),]
+sp <- ggplot(ccomp_df, aes(x = x, y = SOX6)) + #, fill = sampleID, color = sampleID)) +
+  geom_point(alpha = .8, shape = 21, stroke = 1, aes (fill = sampleID)) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  stat_cor(method = "pearson",
+           label.x.npc = "left",  # place in left side of plot
+           label.y.npc = "top") + # place near top
+  scale_fill_manual(values = rev(palette_sample)) +
+  scale_color_manual(values = rev(palette_sample)) +
+  gtheme
+pdf (file.path ('Plots','SOX6_9_scSscore_scatterplot.pdf'), height=3,width=3.5)
+sp
+dev.off()
+
 
 
 #### FIGURE S2A - Generate Neftel diagram using the four subtypes from bueno ####
@@ -312,7 +332,7 @@ if (!file.exists (paste0('cNMF_normalized/',cnmf_out, '/EnrichR_cNMF_module_gene
 
 
 
-# Make correlation network using TFs from scatac analysis
+# Make correlation network using TFs from scatac analysis ####
 library (hdWGCNA)
 force = FALSE
 # table (srt$sampleID)

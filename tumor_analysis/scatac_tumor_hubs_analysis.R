@@ -47,12 +47,12 @@ sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
 # Export bigiwg files ####
 metaGroupName = 'SampleP11'
 metaGroupName = 'Sample3'
-metaGroupName = 'Clusters'
+metaGroupName = 'Clusters2'
 exp_bigwig = F
 if (exp_bigwig)
   {
   getGroupBW(
-    ArchRProj = archp,
+    ArchRProj = archp[archp$Clusters2 %in% c('C9','C4')],
     groupBy = metaGroupName,
     normMethod = "ReadsInTSS",
     tileSize = 100,

@@ -7,7 +7,8 @@ source (file.path('..','..','git_repo','utils','hubs_track.R'))
 
 # Export bigiwg files ####
 archp$celltype_status = paste0(archp$celltype2, '_', archp$status)
-metaGroupName = 'celltype2'
+archp$celltype_sample = paste0(archp$celltype2, '_', archp$Sample)
+metaGroupName = 'celltype_sample'
 exp_bigwig = T
 if (exp_bigwig)
   {
@@ -668,3 +669,9 @@ cd8_ct = read.csv (file.path('..','..','CD8','scatac_ArchR','barcode_annotation.
 archp$celltype2 = archp$celltype3
 archp$celltype2[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
 archp$celltype2[archp$celltype2 %in% c('C1','C2','C4')] = 'CD8'
+
+
+
+
+
+

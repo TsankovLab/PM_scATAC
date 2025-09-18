@@ -94,7 +94,10 @@ palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#2A5783FF','white','#24693
 
 palette_expression_correlation = paletteer::paletteer_c("ggthemes::Green-Blue-White Diverging",100)
 #palette_expression_cor_fun = colorRamp2(c(-1,0,1), c('#grey','#FCFDFEFF','#2A6F3FFF'))
+palette_cooccurrence = paletteer::paletteer_d("RColorBrewer::BrBG") 
 palette_cooccurrence = colorRamp2(c(0,1), c('white','cornsilk4'))
+palette_cooccurrence = paletteer::paletteer_d("futurevisions::pso") 
+#palette_cooccurrence = paletteer::paletteer_d("palettesForR::GrayViolet",20) 
 palette_expression_cor_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(abs(x))), c('#2A5783FF','#FCFDFEFF','#2A6F3FFF')))}
 #palette_expression_cor = c('#24693DFF','#F6F9FCFF','#4F7FAAFF')
 
@@ -109,7 +112,7 @@ palette_genescore_fun = function(x) {return (colorRamp2(c(-max(abs(x)), 0,max(ab
 palette_fragments = rev(paletteer::paletteer_c("grDevices::Oslo",n=40))
 palette_fragments = paletteer::paletteer_c("grDevices::Plasma",40)
 palette_fragments = paletteer_c("ggthemes::Classic Orange-White-Blue",40)
-palette_fragments_fun = colorRamp2(c(-1,2), c('white',palette_fragments[40]))
+palette_fragments_fun = colorRamp2(c(-1,0,1,2,3,4), c(palette_fragments[40],'white',palette_fragments[15],palette_fragments[10],palette_fragments[5],palette_fragments[1]))
 
 #palette_fragments_cor = 
 palette_fetal = c(fetal='purple',rest = 'grey')

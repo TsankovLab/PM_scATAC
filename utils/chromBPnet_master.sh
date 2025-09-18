@@ -91,6 +91,7 @@ avg_contribution_profile_file=no_bias_model/${celltype}_averaged_contribution_sc
 
 all_contrib_jobs=""
 
+if [ ! -f "${avg_contribution_counts_file}" ] && [ -f "${avg_contribution_profile_file}" ]; then
 for fold_number in 0 1 2 3 4; do
     MODEL_H5=no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
     count_scores_file=no_bias_model/fold_${fold_number}/contribution_scores.counts_scores.h5
@@ -157,7 +158,8 @@ for fold_number in 0 1 2 3 4; do
     else
         all_contrib_jobs="$all_contrib_jobs && done(${contrib_job_id})"
     fi
-done
+    done
+fi
 
 ### Check if all contribution score counts and profile files have been generated before combining ###
 all_exist_counts=true

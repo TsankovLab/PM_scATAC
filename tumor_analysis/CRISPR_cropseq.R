@@ -513,7 +513,7 @@ stat.test <- ccomp %>%
   filter(n_distinct(merged_call) == 2) %>%      # need two groups
   filter(n_distinct(expression) > 1) %>%        # need variation in expression
   wilcox_test(expression ~ merged_call) %>%
-  adjust_pvalue(method = "BH") %>%
+  adjust_pvalue(method = "fdr") %>%
   add_significance("p.adj")
 
 
@@ -2033,15 +2033,40 @@ pdf (file.path ('Plots','SOX9_target_genes_dotplot.pdf'), height=4, width=6)
 DotPlot (srt[,srt$merged_call %in% c('SOX9','NTC')], features = gene, group.by = 'merged_call') + gtheme
 dev.off()
 
-### Assess enrichment of Sox9 targets from Fuchs paper
+### Try with dotplot
+gene = c('SOX9','RUNX2','RUNX1','SNAI2')
+srt$celltype = 'crispr'
+gdot_p2 = geneDot (
+  seurat_obj = srt, 
+  gene = gene,
+  y = 'celltype',
+  x = 'merged_call',
+  scale.data = T,
+  include_NA = FALSE,
+  min_expression = 0,
+  returnDF = F,
+  plotcol = as.character(rev(paletteer::paletteer_c("ggthemes::Orange-Blue-White Diverging", 100))))
+gdot_p2$data = gdot_p2$data %>%
+  filter(x_axis == "NTC" | 'SOX9' == x_axis)
+gdot_p2$data$x_axis = ifelse(gdot_p2$data$x_axis == 'NTC','control', 'guide')
 
+dp = DotPlot (srt, group.by = 'merged_call', features = c('SOX9'), scale =F)
+dp_data1 = dp$data[dp$data$id %in% c('NTC', 'SOX9'),]
+dp_data2 = gdot_p2$data[gdot_p2$data$y_axis %in% c('NTC', 'SOX9'),]
+pdf (file.path('Plots','guides_expression_dotplot.pdf'), height=2.5, width=2.5)
+gdot_p2
+dev.off()
+
+
+
+### Assess enrichment of Sox9 targets from Fuchs paper ####
 srt$celltype_not_cc_filtered = 'celltype_not_cc_filtered'
 top_kds = 'SOX9'
 top_kds2 = top_kds[!top_kds %in% c('NTC')]
 #srt$crispr_calls2[srt$crispr_calls2 %in% c('NTC')] = 'NTC'
 for (kd in top_kds2)
   {
-  force = F
+  force = T
   do.fgsea = TRUE
   rankby = 'LFC' # Ranking to input in fgsea can be 'LFC' or 'pval_signedLFC'
   rankby = 'pval_signedLFC'
@@ -2145,7 +2170,7 @@ dev.off()
 
 
 
-#### Check viability CRISPR assay from CCLE database
+#### Check viability CRISPR assay from CCLE database ####
 ccle_cri = read.csv ('../../../../../Public_data/CRISPRGeneEffect.csv')
 rownames (ccle_cri) = ccle_cri[,1]
 ccle_cri = as.data.frame (t(ccle_cri[,-1]))

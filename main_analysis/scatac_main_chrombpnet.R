@@ -32,9 +32,15 @@ archp = loadArchRProject (projdir)
 archp$celltype_revised_sample = paste0(archp$celltype_lv1, '_', archp$Sample)
 
 #metaGroupName = 'celltype_lv1'
-metaGroupName = 'celltype_revised_sample'
+metaGroupName = 'celltype_lv1'
+celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
+#celltypes='B_cells'
+
+celltypes_remove = c('Fibroblasts','Malignant','Mesothelium')
+celltypes = celltypes[!celltypes %in% celltypes_remove]
 #archp = archp[archp$celltype_lv1 %in% c('Fibroblasts','Malignant','Mesothelium')]
-archp = archp[archp$celltype_revised_sample %in% c('Fibroblasts_P1')]
+#archp = archp[archp$celltype_revised_sample %in% c('Fibroblasts_P1')]
+archp = archp[archp$celltype_lv1 %in% celltypes]
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 # Run no bias chromBPnet model for each NKT cell subtype ####
@@ -44,11 +50,8 @@ repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/g
 grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
 
-celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
-#celltypes='B_cells'
-
-celltypes = c('Fibroblasts','Malignant','Mesothelium')
-celltypes = c('Fibroblasts_P1')
+#celltypes = 'B_cells'
+celltypes = c('T_cells')
 for (celltype in celltypes)
 	{
 	command <- paste ("bsub -J", paste0(celltype,'_CBPmaster'), 

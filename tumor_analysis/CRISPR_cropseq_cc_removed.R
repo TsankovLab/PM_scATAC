@@ -11,7 +11,7 @@ srt = readRDS ('srt_filtered.rds')
 scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline'
 
 ### Remove proliferating cells ####
-cc_threshold = -0
+cc_threshold = -0.3
 srt$cycling = ifelse (srt$cc > cc_threshold, 'proliferating','rest')
 pdf (file.path ('Plots','proliferation_distribution.pdf'))
 hist (srt$cc, breaks=100)
@@ -643,3 +643,28 @@ dev.off()
 
 
 
+
+### Try with dotplot
+gene = c('SOX9','RUNX2','RUNX1', 'SNAI2')
+srt$celltype = 'crispr'
+gdot_p2 = geneDot (
+  seurat_obj = srt, 
+  gene = gene,
+  y = 'celltype',
+  x = 'merged_call',
+  scale.data = T,
+  include_NA = FALSE,
+  min_expression = 0,
+  returnDF = F,
+  plotcol = as.character(rev(paletteer::paletteer_c("ggthemes::Orange-Blue-White Diverging", 100))))
+gdot_p2$data = gdot_p2$data %>%
+  filter(x_axis == "NTC" | 'SOX9' == x_axis)
+gdot_p2$data$x_axis = ifelse(gdot_p2$data$x_axis == 'NTC','control', 'guide')
+
+dp = DotPlot (srt, group.by = 'merged_call', features = c('SOX9'), scale =F)
+dp_data1 = dp$data[dp$data$id %in% c('NTC', 'SOX9'),]
+dp_data2 = gdot_p2$data[gdot_p2$data$y_axis %in% c('NTC', 'SOX9'),]
+pdf (file.path('Plots','guides_expression_dotplot.pdf'), height=2.5, width=3)
+gdot_p2
+gdot_p2
+dev.off()

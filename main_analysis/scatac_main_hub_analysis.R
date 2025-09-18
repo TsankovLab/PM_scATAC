@@ -8,11 +8,15 @@ source (file.path('..','..','git_repo','utils','hubs_track.R'))
 # Export bigiwg files ####
 #archp$celltype_status = paste0(archp$celltype2, '_', archp$status)
 metaGroupName = 'celltype_lv1'
-exp_bigwig = T
+archp$celltype_lv1a = archp$celltype_lv1
+archp$celltype_lv1a[archp$celltype_lv1a == 'Fibroblasts' & archp$Sample == 'P1'] = 'Fibroblasts_P1'
+
+metaGroupName = 'celltype_lv1a'
+exp_bigwig = F
 if (exp_bigwig)
   {
   getGroupBW(
-    ArchRProj = archp,
+    ArchRProj = archp[archp$celltype_lv1 %in% c('Mesothelium','Fibroblasts','Malignant')],
     groupBy = metaGroupName,
     normMethod = "ReadsInTSS",
     tileSize = 100,
@@ -563,6 +567,195 @@ bp
 dev.off()
 
 
+
+
+### Find WT1 hub to check proprortion of chrombBPnet TFs between mesothelium and fibroblasts and maybe malignant ####
+wt1_hubs = c(81,286,5951)
+wt1_hub_peaks = do.call (rbind, hubs_obj$hubsClusters[[1]][wt1_hubs])
+
+# Import chromBPnet finemo motifs for P1 too ####
+#archp_P1 = archp[archp$Clusters %in% c('C2') & archp$Sample == 'P1']
+library ('universalmotif')
+
+# metaGroupName = 'Clusters2'
+# if (!any (ls() == 'mSE')) mSE = fetch_mat (archp_P1, 'Motif')
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData(mSE)$name
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
+# metaGroupName = 'celltype_lv1'
+
+
+chrombpnet_counts = list()
+celltypes = c('Mesothelium','Fibroblasts_P1','Malignant')
+for (celltype in celltypes)
+  {
+  message (paste0('reading finemo output for ', celltype))
+  chrombpnet_counts[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
+  }
+
+# Subset for WT1 hub peaks 
+wt1_hub_peaks_gr = makeGRangesFromDataFrame (wt1_hub_peaks)
+chrombpnet_counts_sub = lapply (chrombpnet_counts, function(x) 
+{
+ colnames (x) = c('chr','start','end') 
+ x = makeGRangesFromDataFrame (x, keep.extra.columns=T)
+ x = x[queryHits (findOverlaps (x, wt1_hub_peaks_gr))]
+ x = as.data.frame (x)
+ colnames (x) = paste0('V',1:ncol(x))
+ x
+})
+
+
+chrombpnet_profile = list()
+celltypes = c('Mesothelium','Fibroblasts_P1','Malignant')
+for (celltype in celltypes)
+  {
+  message (paste0('reading finemo output for ', celltype))  
+  chrombpnet_profile[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
+  }
+
+chrombpnet_profile = lapply (chrombpnet_profile, function(x) x[x$V5 != 'NaN_NaN_NaN',])
+
+# Subset for WT1 hub peaks 
+wt1_hub_peaks_gr = makeGRangesFromDataFrame (wt1_hub_peaks)
+chrombpnet_profile_sub = lapply (chrombpnet_profile, function(x) 
+{
+ colnames (x) = c('chr','start','end') 
+ x = makeGRangesFromDataFrame (x, keep.extra.columns=T)
+ x = x[queryHits (findOverlaps (x, wt1_hub_peaks_gr))]
+ x = as.data.frame (x)
+ colnames (x) = paste0('V',1:ncol(x))
+ x
+})
+
+
+library(dplyr)
+library(ggplot2)
+
+
+top_n <- 5
+n <- length(chrombpnet_counts_sub)
+
+bp_list <- lapply(seq_len(n), function(i) {
+  tbl <- table(chrombpnet_counts_sub[[i]]$V7)
+  tbl_sorted <- sort(tbl, decreasing = TRUE)
+  top_tbl <- head(tbl_sorted, top_n)
+  
+  tf_names <- names(top_tbl)
+  directions <- sapply(tf_names, function(tf) {
+    chrombpnet_counts_sub[[i]]$V6[chrombpnet_counts_sub[[i]]$V7 == tf][1]
+  })
+  
+  data.frame(
+    Freq = proportions(top_tbl),
+    TF   = tf_names,
+    direction = directions,
+    type = rep(celltypes[[i]], length(top_tbl))
+  )
+})
+
+bp_df <- do.call(rbind, bp_list)
+
+# Make neg values negative
+bp_df <- bp_df %>%
+  mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
+
+# Create custom ordering per type
+bp_df <- bp_df %>%
+  group_by(type, direction) %>%
+  mutate(
+    TF_order = ifelse(direction == "pos",
+                      rank(-Freq, ties.method = "first"),  # descending
+                      rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
+  ) %>%
+  ungroup()
+
+# Build a combined factor: ensures pos stack from bottom up, neg from top down
+bp_df <- bp_df %>%
+  arrange(type, direction, TF_order)
+
+bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
+bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
+bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant','Fibroblasts_P1'))
+# Plot stacked bars
+bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+  theme_minimal(base_size = 14) +
+  ylab("Proportion of counts") +
+  xlab("Cell type") +
+  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  
+
+pdf (file.path ('Plots', 'TF_abundance_WT1_cHub_counts_barplot.pdf'),6,width=6.5)
+bp
+dev.off()
+
+
+library(dplyr)
+library(ggplot2)
+
+top_n <- 5
+n <- length(chrombpnet_profile_sub)
+
+bp_list <- lapply(seq_len(n), function(i) {
+  tbl <- table(chrombpnet_profile_sub[[i]]$V7)
+  tbl_sorted <- sort(tbl, decreasing = TRUE)
+  top_tbl <- head(tbl_sorted, top_n)
+  
+  tf_names <- names(top_tbl)
+  directions <- sapply(tf_names, function(tf) {
+    chrombpnet_profile_sub[[i]]$V6[chrombpnet_profile_sub[[i]]$V7 == tf][1]
+  })
+  
+  data.frame(
+    Freq = proportions(top_tbl),
+    TF   = tf_names,
+    direction = directions,
+    type = rep(celltypes[[i]], length(top_tbl))
+  )
+})
+
+bp_df <- do.call(rbind, bp_list)
+
+# Make neg values negative
+bp_df <- bp_df %>%
+  mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
+
+# Create custom ordering per type
+bp_df <- bp_df %>%
+  group_by(type, direction) %>%
+  mutate(
+    TF_order = ifelse(direction == "pos",
+                      rank(-Freq, ties.method = "first"),  # descending
+                      rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
+  ) %>%
+  ungroup()
+
+# Build a combined factor: ensures pos stack from bottom up, neg from top down
+bp_df <- bp_df %>%
+  arrange(type, direction, TF_order)
+
+bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
+bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
+bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant','Fibroblasts_P1'))
+# Plot stacked bars
+bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+  theme_minimal(base_size = 14) +
+  ylab("Proportion of counts") +
+  xlab("Cell type") +
+  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  
+
+pdf (file.path ('Plots', 'TF_abundance_WT1_cHub_profile_barplot.pdf'),6,width=6.5)
+bp
+dev.off()
 
 
 
