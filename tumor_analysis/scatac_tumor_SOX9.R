@@ -651,8 +651,8 @@ pdf()
 set.seed (1234)
 cor_TF_df = draw (Heatmap (median_matrix,
   #left= ha1,
-  row_split = clusters,
-  column_split = clusters,
+#  row_split = clusters,
+#  column_split = clusters,
   row_names_gp = gpar(fontsize = 6),
   clustering_distance_rows='pearson',
   clustering_distance_columns='pearson',
@@ -666,7 +666,7 @@ cor_TF_df = draw (Heatmap (median_matrix,
   #       }}))
 dev.off()
 
-pdf (file.path ('Plots','selected_TF_dev_corr_heatmaps3.pdf'), width = 8,height=7)
+pdf (file.path ('Plots','selected_TF_dev_corr_heatmaps4.pdf'), width = 8,height=7)
 cor_TF_df 
 dev.off()
 

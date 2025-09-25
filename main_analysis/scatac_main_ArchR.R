@@ -1066,6 +1066,7 @@ chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_P
 
 chrombpnet_counts = list()
 celltypes = unique (archp$celltype_lv1)
+celltypes = celltypes[celltypes != 'pDCs']
 for (celltype in celltypes)
   {
   message (paste0('reading finemo output for ', celltype))  
@@ -1137,7 +1138,7 @@ bp_df <- bp_df %>%
 
 bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
 bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant'))
+bp_df$type = factor (bp_df$type, levels = celltypes)
 # Plot stacked bars
 bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
@@ -1151,7 +1152,7 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
 
   
 
-pdf (file.path ('Plots', 'TF_abundance_counts_barplot.pdf'),6,width=6.5)
+pdf (file.path ('Plots', 'TF_abundance_counts_barplot.pdf'),6,width=16.5)
 bp
 dev.off()
 
@@ -1199,11 +1200,11 @@ bp_df <- bp_df %>%
 
 bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
 bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant'))
+bp_df$type = factor (bp_df$type, levels = celltypes)
 # Plot stacked bars
 bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(unique(bp_df$TF))) ) +
+  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
   theme_minimal(base_size = 14) +
   ylab("Proportion of counts") +
   xlab("Cell type") +
@@ -1213,7 +1214,7 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
 
   
 
-pdf (file.path ('Plots', 'TF_abundance_profile_barplot.pdf'),6,width=6.5)
+pdf (file.path ('Plots', 'TF_abundance_profile_barplot.pdf'),6,width=16.5)
 bp
 dev.off()
 

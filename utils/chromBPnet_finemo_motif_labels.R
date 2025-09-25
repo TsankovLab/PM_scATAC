@@ -45,4 +45,3 @@ finemo_hits$qvalue_m1 = modisco_motifs$NULL.qval1[match(finemo_hits$motif_name, 
 finemo_hits$qvalue_m2 = modisco_motifs$NULL.qval2[match(finemo_hits$motif_name, modisco_motifs$NULL.pattern)]
 
 write.table (finemo_hits[,c(1,2,3,18,17,6,19,20,21)], file.path(chromBPdir, celltype,'no_bias_model', paste0(celltype,'_finemo_profile_to_genome_browser.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
-

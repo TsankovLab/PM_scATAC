@@ -300,7 +300,7 @@ sarc_tf_df = do.call (cbind,sarc_tf)
 sarc_tf_df = as.data.frame (sarc_tf_df)
 #sarc_tf_df2$TF = rownames(sarc_tf_df2)
 colnames(sarc_tf_df) = sams
-sarc_tf_df$ENCODE_celltype = factor (top_ext_ct, levels = rev(top_ext_ct))
+sarc_tf_df$ENCODE_celltype = factor (top_ext_ct, levels = top_ext_ct)
 sarc_tf_df = gather (sarc_tf_df, scS, score, 1:(ncol(sarc_tf_df)-1))
 sarc_tf_df$biotype = sapply (as.character(sarc_tf_df$ENCODE_celltype), function(x) unlist(strsplit (x, '\\|'))[1])
 #sarc_tf_df = do.call (rbind, lapply(split(sarc_tf_df, sarc_tf_df$biotype), function(x) head (x,10)))
@@ -314,11 +314,11 @@ bp = lapply (unique (sarc_tf_df$biotype), function(x) ggplot (sarc_tf_df[sarc_tf
     outlier.size = 1,
      size=1, alpha=0.4
      ) +
-  scale_fill_manual (values = rev(paletteer::paletteer_c("grDevices::Purple-Blue",length(unique(sarc_tf_df[sarc_tf_df$biotype == x,]$ENCODE_celltype))))) +
+  scale_fill_manual (values = paletteer::paletteer_c("grDevices::Purple-Blue",length(unique(sarc_tf_df[sarc_tf_df$biotype == x,]$ENCODE_celltype))))+
   geom_vline(xintercept = 0, color = "red", linetype = "dashed", size = .4) + NoLegend() + coord_flip())
   
 
-pdf (paste0 ('Plots/sarcomatoid_score_ENCODE_H3K27_boxplots2.pdf'), width = 11,height=5)
+pdf (paste0 ('Plots/sarcomatoid_score_ENCODE_H3K27_boxplots3.pdf'), width = 11,height=5)
 wrap_plots (bp,ncol=4)
 dev.off()
 

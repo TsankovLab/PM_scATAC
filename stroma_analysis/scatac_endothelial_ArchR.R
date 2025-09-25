@@ -150,6 +150,41 @@ archp = addDeviationsMatrix (
 )
 archp=saveArchRProject(archp)
 
+celltype_markers = 'z:Tsankov_lung_Endothelial'
+pdf ()
+p1 <- plotEmbedding (
+    ArchRProj = archp, 
+    colorBy = "scATAC_normal2Matrix", 
+    name = celltype_markers, 
+    embedding = "UMAP_H",
+    seqnames='z',
+    rastr = FALSE,
+    plotAs = 'points',
+    size= .5,
+    pal = rev(palette_deviation)
+)
+celltype_markers2 = c('z:rawlins_fetal_lung_Latecap',
+  'z:rawlins_fetal_lung_Midcap','z:rawlins_fetal_lung_Venousendo')
+p2 <- plotEmbedding (
+    ArchRProj = archp, 
+    colorBy = "scATAC_datasetsMatrix", 
+    name = celltype_markers2, 
+    embedding = "UMAP_H",
+    seqnames='z',
+    rastr = FALSE,
+    plotAs = 'points',
+    size= .5,
+    pal = rev(palette_deviation)
+)
+dev.off()
+
+pdf (file.path('Plots','endothelial_activity_fplot.pdf'), width = 5, height = 5)
+p1
+p2
+dev.off()
+
+
+
 
 # Compare fetal vs adult endothelial cells using deviations ####
 if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
@@ -268,19 +303,21 @@ archp = addModuleScore (
 ### Plot fetal score on UMAP ####
 archp = addImputeWeights (archp)
 celltype_markers = c('fetal.COL4A1')
-pdf()
-p <- plotEmbedding (
+
+pdf ()
+p1 <- plotEmbedding (
     ArchRProj = archp, 
     colorBy = "cellColData", 
     name = celltype_markers, 
     embedding = "UMAP_H",
-    pal = palette_expression,
-    imputeWeights = NULL, rastr=F,
-    size=10
+    rastr = FALSE,
+    plotAs = 'points',
+    size= .5,
+    pal = palette_expression
 )
 dev.off()
 pdf (file.path('Plots','fetal_fplot_feature_plots.pdf'), width = 5, height = 5)
-p
+p1
 dev.off()
 
 # Export BigWig  ####
