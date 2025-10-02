@@ -100,7 +100,7 @@ if (!file.exists ('srt.rds'))
 	fp (srt, 'HOXB13')
 	dev.off()
 	} else {
-	srt = readRDS ('srt.rds')  
+	srt = readRDS ('srt.rds')
 	}
 
 
@@ -748,5 +748,255 @@ dev.off()
 
 
 
+#### Run inferCNV ####
+library (infercnv)
+library (gtools)
 
-# 
+# Variables needed #
+#org = 'mouse'
+#projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/Romain_prj/' # project folder (use absolute path) where you have your seurat object saved as RDS
+projdir_out = paste0('infercnv/') # output folder 
+dir.create (projdir_out, showWarnings = FALSE)
+# srt_obj  = 'seurat.obj.rds' # Specify the name of your seurat object saved as RDS 
+#metaGroupName = 'seurat_clusters' # Specify the column in your meta data referring to the clustering (usually is 'seurat_clusters')
+#metaGroupName2 = 'samples'
+#cancer_clusters = c('0','4','6','7','8','11','14')
+# cancer_clusters  = c("0", "1", "3", "9", "13", "18", "25", "26") # specify cancer clusters e.g. c('1','2','3')
+# ref_clusters   = c("2", "4", "5", "6","7", "8", "10", "11","12", "14", "15", "16", "17","19", "20","21","22","23","24","27") # specify clusters to use as references e.g. c('5','6')
+# subsample  = NULL
+#chr_exclude = c('chrX','chrY', 'chrM')
+
+#system (paste('mkdir -p',projdir_out))
+
+# subset for malignant cells called from manual annotation and label trasnfer
+#srt = srt [,srt$celltype  == 'Malignant' & srt$predicted.id %in% c('Sarcomatoid','Malignant')]
+srt_cnv = srt[,!srt$sampleID %in% c('HU37','HU62')]
+#srt_cnv$cnv_type = 'sample'
+srt_cnv$cnv_type = srt_cnv$sampleID
+
+#load('/ahg/regevdata/projects/ICA_Lung/Maggie_fast/infercnv/10x_HU37_ResEpi.Rda')
+#ResEpi<-UpdateSeuratObject(ResEpi)
+#data.ref <- as.matrix(GetAssayData(object = ResEpi, slot = "counts")[,colnames(ResEpi)[seq(1,length(colnames(ResEpi)),20)]])
+
+#ResEpi_sub <- ResEpi[,colnames(ResEpi)[seq(1,length(colnames(ResEpi)),20)]]
+#data.ref <- as.matrix(GetAssayData(object = ResEpi, slot = "counts")[,colnames(ResEpi)[seq(1,length(colnames(ResEpi)),20)]])
+#ref = readRDS ('../../tumor_compartment/scrna/scRNA_meso.rds')
+ref = srt[,srt$sampleID %in% c('HU37','HU62')]
+ref$cnv_type = 'reference'
+srt_cnv = merge (srt_cnv, ref)
+#srt_cnv = merge (malig, ResEpi_sub)
+# srt_cnv = NormalizeData (object = srt_cnv, normalization.method = "LogNormalize")
+# srt_cnv = FindVariableFeatures (srt_cnv)
+# srt_cnv = ScaleData (srt_cnv)
+# srt_cnv = RunPCA (srt_cnv, npcs = 30, ndims.print = 1:5, nfeat.print = 5, verbose = FALSE)
+# srt_cnv = RunUMAP (srt_cnv, dims = 1:20)
+
+# srt_cnv_obj  = 'seurat.obj.rds' # Specify the name of your seurat object saved as RDS 
+  
+#srt_cnv = readRDS (paste0(projdir,srt_cnv_obj)) # load seurat object 
+
+# srt_cnv$malig_ref = ifelse (srt_cnv@meta.data[,metaGroupName] %in% cancer_clusters, 'malignant','reference')
+# message ('generate UMAP of malignant and reference clusters')
+# dim_p1 = DimPlot (srt_cnv, group.by = 'cnv_type')
+# png (paste0(projdir_out,'check_malig_clusters_ref_umap.png'), width=1500)
+# print (wrap_plots (dim_p1, ncol=3))
+# dev.off()
+
+# load TxDbi object for the species and get genomic positions of genes
+require (org.Hs.eg.db)
+require (TxDb.Hsapiens.UCSC.hg38.knownGene)
+txdb = TxDb.Hsapiens.UCSC.hg38.knownGene
+seqlevels(txdb) = paste0('chr',1:22) # select chromosomes to include in the analysis
+gene_regions = as.data.frame (genes (txdb))
+
+# map entrez id to symbol ids
+symbol = toTable (org.Hs.egSYMBOL)
+gene_regions$symbol = symbol$symbol[match(gene_regions$gene_id, symbol$gene_id)]
+gene_regions = gene_regions[gene_regions$symbol %in% rownames(srt_cnv),]
+
+#Prepare files for inferCNV input
+message ('Generate expression and annotation files')
+#srt_cnv$orig.ident = srt_cnv@meta.data [,metaGroupName2]
+malig_samples = unique(srt_cnv$cnv_type[srt_cnv$cnv_type != 'reference'])
+        
+exprMat = srt_cnv@assays$RNA@counts        
+gene_regions2 = gene_regions[mixedorder(gene_regions$seqnames), ]
+exprMat = exprMat[gene_regions2$symbol, ]
+
+all (rownames(exprMat) == gene_regions2$symbol)
+rownames (gene_regions2) = gene_regions2$symbol
+colnames (gene_regions2) = NULL
+message ('save gene_regions file')    
+write.table (gene_regions2, paste0(projdir_out,'gene_regions.txt'), sep='\t')
+#exprMat = exprMat[,rownames(annot_df)]
+annot_df = srt_cnv@meta.data[,'cnv_type', drop=F]
+annot_df[,1] = srt_cnv$cnv_type
+
+colnames (annot_df) = NULL
+message ('save annotation file')    
+write.table (annot_df, paste0(projdir_out,'annot_df.txt'), sep='\t', col.names=NA)
+
+
+library (biomaRt)
+
+chr_exclude = c('chrX','chry')
+infercnv_obj = CreateInfercnvObject (raw_counts_matrix=exprMat,
+                                    annotations_file= paste0(projdir_out,'annot_df.txt'),
+                                    delim="\t",
+                                    gene_order_file=paste0(projdir_out,'gene_regions.txt'),
+                                    ref_group_names=c('reference'),
+                                    chr_exclude= chr_exclude
+                                    )
+
+infercnv_result = infercnv::run(infercnv_obj,
+                           cutoff=0.1,  # use 1 for smart-seq, 0.1 for 10x-genomics
+                           out_dir=projdir_out,  # dir is auto-created for storing outputs
+                           cluster_by_groups=T,  # cluster
+                           denoise=T,
+                           HMM=F,
+                           save_rds = F,
+                           no_prelim_plot = T,
+                           no_plot = T,
+                           plot_probabilities = FALSE
+                           )
+
+#if (!is.null(custom_color_pal)) custom_color_pal = infercnv_pal
+# plot_cnv (infercnv_result, out_dir = projdir_out_sam#, #title = paste0('inferCNV_'), 
+  
+#   #output_filename=paste0('inferCNV_',sam,'_subsample_',subsample)
+#   )
+saveRDS (infercnv_result, paste0(projdir_out, 'infercnv.results.obj.Rds'))
+
+
+#### Import inferCNV results to generate inferCNV plot but averaging by sample ####
+library (biomaRt)
+library (GenomicRanges)
+library (BSgenome.Hsapiens.UCSC.hg38)
+# cluster infercnv heatmap not by cluster
+library (infercnv)
+infercnv_result = readRDS (paste0(projdir_out, 'infercnv.results.obj.Rds'))
+icnf_exp = infercnv_result@expr.data
+
+#source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scATAC_functions.R')
+
+makeWindows <- function(genome, blacklist, windowSize = 10e6, slidingSize = 2e6,
+  gene_level_annotation = TxDb.Hsapiens.UCSC.hg38.knownGene){
+  chromSizes <- GRanges(names(seqlengths(genome)), IRanges(1, seqlengths(genome)))
+  chromSizes <- GenomeInfoDb::keepStandardChromosomes(chromSizes, pruning.mode = "coarse")
+  windows <- slidingWindows(x = chromSizes, width = windowSize, step = slidingSize) %>% unlist %>% .[which(width(.)==windowSize),]
+  mcols(windows)$wSeq <- as.character(seqnames(windows))
+    mcols(windows)$wStart <- start(windows)
+    mcols(windows)$wEnd <- end(windows)
+  message("Subtracting Blacklist...")
+  windowsBL <- lapply(seq_along(windows), function(x){
+      if(x %% 100 == 0){
+        message(sprintf("%s of %s", x, length(windows)))
+      }
+      gr <- GenomicRanges::setdiff(windows[x,], blacklist)
+      mcols(gr) <- mcols(windows[x,])
+      return(gr)
+    })
+  names(windowsBL) <- paste0("w",seq_along(windowsBL))
+  windowsBL <- unlist(GRangesList(windowsBL), use.names = TRUE)
+  mcols(windowsBL)$name <- names(windowsBL)
+  message("Adding Nucleotide Information...")
+  windowSplit <- split (windowsBL, as.character(seqnames(windowsBL)))
+  windowNuc <- lapply(seq_along(windowSplit), function(x){
+    message(sprintf("%s of %s", x, length(windowSplit)))
+      chrSeq <- Biostrings::getSeq(genome,chromSizes[which(as.character(seqnames(chromSizes))==names(windowSplit)[x])])
+      grx <- windowSplit[[x]]
+      aFreq <- alphabetFrequency(Biostrings::Views(chrSeq[[1]], ranges(grx)))
+      mcols(grx)$GC <- rowSums(aFreq[, c("G","C")]) / rowSums(aFreq)
+      mcols(grx)$AT <- rowSums(aFreq[, c("A","T")]) / rowSums(aFreq)
+      return(grx)
+    }) %>% GRangesList %>% unlist %>% sortSeqlevels %>% sort
+  windowNuc$N <- 1 - (windowNuc$GC + windowNuc$AT)
+  # get gene density
+  gene_density = genes (gene_level_annotation)
+  mcols(windowNuc)$gene_density = countOverlaps (windowNuc, gene_density)
+  windowNuc
+}
+
+# Get GRanges of bins excluding black list regions
+ws = 100000
+ss = ws
+windowSize = ws
+slidingSize = ss
+genome = BSgenome.Hsapiens.UCSC.hg38
+chromSizes <- GRanges(names(seqlengths(genome)), IRanges(1, seqlengths(genome)))
+chromSizes <- GenomeInfoDb::keepStandardChromosomes(chromSizes, pruning.mode = "coarse")
+windows <- slidingWindows(x = chromSizes, width = windowSize, step = slidingSize) %>% unlist %>% .[which(width(.)==windowSize),]
+  
+#region_df = do.call (rbind, region)
+# specify the database
+ensembl = useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+# loop through rows, get genes, then paste with collapse,
+# and finally bind back with data d.
+gene_info <- getBM (attributes = c("chromosome_name", "start_position", "end_position","external_gene_name"),
+                   filters = "external_gene_name",
+                   values = rownames(icnf_exp),
+                   mart = ensembl)
+
+gene_info_filtered = gene_info[gene_info$chromosome_name %in% c(1:22),]
+colnames (gene_info_filtered) = c('chr','start','end')
+gene_info_filtered$chr = paste0('chr',gene_info_filtered$chr)
+gene_info_gr = makeGRangesFromDataFrame (gene_info_filtered, keep.extra.columns=T)
+
+ov = findOverlaps (windows, gene_info_gr)
+qhits = queryHits (ov)
+shits = subjectHits (ov)
+icnv_regions = lapply (unique(qhits), function(x) 
+tmp = colMeans(icnf_exp[gene_info_gr@elementMetadata[,1][shits[which (qhits == x)]],,drop=F]))
+
+region_names = as.character(windows)[unique(qhits)]
+chr_names = sapply (region_names, function(x) unlist(strsplit (x,'\\:'))[1])
+icnv_regions_df = do.call (cbind, icnv_regions)
+sample_row = srt_cnv$cnv_type
+all (names (sample_row) == colnames(icnf_exp))
+icnv_regions_df_sample = lapply (unique(sample_row), function(x) colMeans (icnv_regions_df[sample_row == x,, drop=F]))
+icnv_regions_df_sample = do.call (cbind, icnv_regions_df_sample)
+colnames (icnv_regions_df_sample) = unique(sample_row)
+sample_to_keep = unique (sample_row)[unique (sample_row) != 'reference']
+icnv_regions_df_sample = icnv_regions_df_sample[,sample_to_keep]
+rownames (icnv_regions_df_sample) = region_names
+icnv_regions_df_sample = t(icnv_regions_df_sample)
+colnames (icnv_regions_df_sample) = chr_names
+chr_names= factor (chr_names, levels = unique(chr_names))
+#rownames(icnv_regions_df_sample) = c('p786','p811','p826','p846','p848','p4','p8','p7','p9','p11','p12','p13')
+
+icnv_regions_df_sample_c = icnv_regions_df_sample
+icnv_regions_df_sample_c[icnv_regions_df_sample_c > 2] = 2
+icnv_regions_df_sample_c[icnv_regions_df_sample_c < 0] = 0
+palette_cnv = rev(paletteer::paletteer_c("ggthemes::Red-Blue-White Diverging",3))
+icnv_regions_df_sample_c = icnv_regions_df_sample_c[c('P1','P3','P4','P5','P8','P11','P12','P13','P14'),]
+ht = Heatmap (
+  icnv_regions_df_sample_c,
+  #row_order = ,
+  column_gap = unit(1,'mm'),
+  column_names_gp = gpar(fontsize = 0),
+  cluster_column_slices = FALSE,
+  column_split = chr_names, 
+  border=T,
+  cluster_columns=F,
+  cluster_rows=F)
+  #colorRamp2(c(0.8, 1, 1.2), c(palette_cnv[1], palette_cnv[2], palette_cnv[3])))
+pdf (file.path ('Plots','cnv_sample_mean_heatmap.pdf'),height=5, width=9)
+ht
+dev.off()
+
+mean_cnv = colMeans (icnv_regions_df_sample_c)
+#mean_cnv = ifelse (mean_cnv < 1, -1 * mean_cnv, mean_cnv)
+#mean_cnv [mean_cnv]
+mean_cnv_df = data.frame (name = region_names, value = mean_cnv, direction = sign(mean_cnv))
+deg_bar = ggplot(mean_cnv_df, aes(x = 1:length(region_names), y = value)) +
+  geom_line(aes(y = value, color = -value), linetype = "solid", linewidth = 1) +
+  paletteer::scale_color_paletteer_c("ggthemes::Red-Blue-White Diverging") +
+  #scale_y_continuous(limits = c(-60, 60), breaks = seq(-60, 60, by = 10)) +
+  theme_void()
+
+pdf (paste0('Plots/cnv_barplot.pdf'),width=14,4)
+print (deg_bar)
+dev.off()
+
+  

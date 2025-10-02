@@ -621,7 +621,7 @@ sams = sams[!sams %in% c('normal1','P3','P13','P11_HOX')] # remove normal,low ce
 
 #archp_meta = archp_meta[archp_meta$Sample3 %in% sams,]
 mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
+  rownames (mMat) = rowData (mSE)$name
 mMat = t(as.matrix(scale(mMat[selected_TF,])))
 
 all (rownames(mMat) == rownames(archp_meta))
@@ -674,7 +674,7 @@ dev.off()
 if (!file.exists('enrichment_pathways_TFs.rds')) source (file.path('..','..','git_repo','tumor_analysis','enrichment_cnmfs.R'))
 TF_cor_sum = readRDS (file.path('enrichment_pathways_TFs.rds'))
 TFrow_order = unname(unlist(row_order (cor_TF_df)))
-TFrow_order_split = rep (names(row_order (cor_TF_df)), lapply (row_order (cor_TF_df),length))
+#TFrow_order_split = rep (names(row_order (cor_TF_df)), lapply (row_order (cor_TF_df),length))
 #TFrow_order_split = TFrow_order_split[TFrow_order]
 rownames (TF_cor_sum) = gsub ('HALLMARK_','',rownames(TF_cor_sum))
 rownames (TF_cor_sum) = gsub ('_', ' ',rownames (TF_cor_sum))
@@ -682,7 +682,7 @@ TF_cor_sum = TF_cor_sum[apply (TF_cor_sum, 1, function(x) any(x > 1)),]
 pdf()
 hm = draw (Heatmap (
     TF_cor_sum[,TFrow_order],
-    column_split = ifelse(TFrow_order_split =='1',2,1),
+ #   column_split = ifelse(TFrow_order_split =='1',2,1),
     column_names_rot =45, 
     row_names_gp = gpar(fontsize = 7),
     column_names_gp = gpar(fontsize = 5),
@@ -695,7 +695,7 @@ hm = draw (Heatmap (
     border=T))
 dev.off()
 
-pdf (file.path ('Plots','selected_TF_dev_corr_pathways_heatmaps2.pdf'), width = 9.5,height=2.6)
+pdf (file.path ('Plots','selected_TF_dev_corr_pathways_heatmaps3.pdf'), width = 9.5,height=2.4)
 hm
 dev.off()
 

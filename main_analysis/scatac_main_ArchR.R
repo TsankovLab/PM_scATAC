@@ -1066,7 +1066,8 @@ chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_P
 
 chrombpnet_counts = list()
 celltypes = unique (archp$celltype_lv1)
-celltypes = celltypes[celltypes != 'pDCs']
+celltypes = c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Endothelial','Myeloid','T_cells','NK_cells','B_cells','Plasma','pDCs') 
+#celltypes = celltypes[celltypes != 'pDCs']
 for (celltype in celltypes)
   {
   message (paste0('reading finemo output for ', celltype))  
@@ -1095,7 +1096,7 @@ for (celltype in celltypes)
 #chrombpnet_profile = lapply (chrombpnet_profile, function(x) x[x$V5 != 'NaN_NaN_NaN',])
 
 
-top_n <- 7
+top_n <- 5
 n <- length(chrombpnet_counts)
 
 bp_list <- lapply(seq_len(n), function(i) {
@@ -1157,7 +1158,7 @@ bp
 dev.off()
 
 
-top_n <- 7
+top_n <- 5
 n <- length(chrombpnet_profile)
 
 bp_list <- lapply(seq_len(n), function(i) {
@@ -1204,7 +1205,7 @@ bp_df$type = factor (bp_df$type, levels = celltypes)
 # Plot stacked bars
 bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF))) +
   theme_minimal(base_size = 14) +
   ylab("Proportion of counts") +
   xlab("Cell type") +
@@ -1217,11 +1218,6 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
 pdf (file.path ('Plots', 'TF_abundance_profile_barplot.pdf'),6,width=16.5)
 bp
 dev.off()
-
-
-
-
-
 
 
 # Subset for peak type (promoter) ####
@@ -1252,7 +1248,8 @@ bp_list <- lapply(seq_len(n), function(i) {
     Freq = proportions(top_tbl),
     TF   = tf_names,
     direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl))
+    type = rep(celltypes[[i]], length(top_tbl)),
+    ptype = 'promoter'
   )
 })
 
@@ -1278,11 +1275,13 @@ bp_df <- bp_df %>%
 
 bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
 bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant'))
+bp_df$type = factor (bp_df$type, levels = celltypes)
+
+bp_df_cp = bp_df
 # Plot stacked bars
-bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
+bp <- ggplot(bp_df_cp, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF))) +
   theme_minimal(base_size = 14) +
   ylab("Proportion of counts") +
   xlab("Cell type") +
@@ -1290,9 +1289,7 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
 
-  
-
-pdf (file.path ('Plots', 'TF_abundance_counts_promoter_barplot.pdf'),6,width=6.5)
+pdf (file.path ('Plots', 'TF_abundance_counts_promoter_barplot.pdf'),6,width=12.5)
 bp
 dev.off()
 
@@ -1314,7 +1311,8 @@ bp_list <- lapply(seq_len(n), function(i) {
     Freq = proportions(top_tbl),
     TF   = tf_names,
     direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl))
+    type = rep(celltypes[[i]], length(top_tbl)),
+    ptype = 'promoter'
   )
 })
 
@@ -1340,11 +1338,12 @@ bp_df <- bp_df %>%
 
 bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
 bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant'))
+bp_df$type = factor (bp_df$type, levels = celltypes)
+bp_df_pp = bp_df
 # Plot stacked bars
-bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
+bp <- ggplot(bp_df_pp, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(unique(bp_df$TF))) ) +
+  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
   theme_minimal(base_size = 14) +
   ylab("Proportion of counts") +
   xlab("Cell type") +
@@ -1352,11 +1351,10 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
 
-  
-
-pdf (file.path ('Plots', 'TF_abundance_profile_promoter_barplot.pdf'),6,width=6.5)
+pdf (file.path ('Plots', 'TF_abundance_profile_promoter_barplot.pdf'),6,width=12.5)
 bp
 dev.off()
+
 
 
 
@@ -1388,11 +1386,12 @@ bp_list <- lapply(seq_len(n), function(i) {
     Freq = proportions(top_tbl),
     TF   = tf_names,
     direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl))
+    type = rep(celltypes[[i]], length(top_tbl)),
+    ptype = 'distal'
   )
 })
 
-bp_df <- do.call(rbind, bp_list)
+bp_df <- do.call (rbind, bp_list)
 
 # Make neg values negative
 bp_df <- bp_df %>%
@@ -1414,9 +1413,11 @@ bp_df <- bp_df %>%
 
 bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
 bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant'))
+bp_df$type = factor (bp_df$type, levels = celltypes)
+bp_df_cd = bp_df
+
 # Plot stacked bars
-bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
+bp <- ggplot(bp_df_cd, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
   scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
   theme_minimal(base_size = 14) +
@@ -1428,7 +1429,7 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
 
   
 
-pdf (file.path ('Plots', 'TF_abundance_counts_NOT_promoter_barplot.pdf'),6,width=6.5)
+pdf (file.path ('Plots', 'TF_abundance_counts_NOT_promoter_barplot.pdf'),6,width=12.5)
 bp
 dev.off()
 
@@ -1450,7 +1451,9 @@ bp_list <- lapply(seq_len(n), function(i) {
     Freq = proportions(top_tbl),
     TF   = tf_names,
     direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl))
+    type = rep(celltypes[[i]], length(top_tbl),
+    ptype = 'distal'
+  ))
   )
 })
 
@@ -1476,9 +1479,11 @@ bp_df <- bp_df %>%
 
 bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
 bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant'))
+bp_df$type = factor (bp_df$type, levels = celltypes)
+bp_df_pd = bp_df
+
 # Plot stacked bars
-bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
+bp <- ggplot(bp_df_pd, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
   scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
   theme_minimal(base_size = 14) +
@@ -1490,11 +1495,79 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
 
   
 
-pdf (file.path ('Plots', 'TF_abundance_profile_NOT_promoter_barplot.pdf'),6,width=6.5)
+pdf (file.path ('Plots', 'TF_abundance_profile_NOT_promoter_barplot.pdf'),6,width=12.5)
 bp
 dev.off()
 
 
+### Combine barplots ####
+bp_df_comb = rbind (bp_df_cd, bp_df_cp)
+bp_df_comb$TF_id = as.character(bp_df_comb$TF_id)
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[1],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[2],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[3],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[4],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[5],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[6],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[7],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[8],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[9],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[10],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[11],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[12],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[grepl ('pattern',bp_df_comb$TF_id)] = 'pattern_not_matching'
+
+# Plot stacked bars
+bp <- ggplot(bp_df_comb, aes(x = type, y = Freq, fill = TF_id)) +
+  geom_bar(stat = "identity") +
+#  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+  theme_minimal(base_size = 14) +
+  ylab("Proportion of counts") +
+  xlab("Cell type") +
+  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1) + 
+  facet_wrap (~ptype)
+
+  
+
+pdf (file.path ('Plots', 'TF_abundance_combined_counts_barplot.pdf'),6,width=32.5)
+bp
+dev.off()
+
+bp_df_comb = rbind (bp_df_pd, bp_df_pp)
+bp_df_comb$TF_id = as.character(bp_df_comb$TF_id)
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[1],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[2],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[3],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[4],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[5],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[6],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[7],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[8],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[9],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[10],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[11],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[12],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+bp_df_comb$TF_id[grepl ('pattern',bp_df_comb$TF_id)] = 'pattern_not_matching'
+
+# Plot stacked bars
+bp <- ggplot(bp_df_comb, aes(x = type, y = Freq, fill = TF_id)) +
+  geom_bar(stat = "identity") +
+#  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+  theme_minimal(base_size = 14) +
+  ylab("Proportion of counts") +
+  xlab("Cell type") +
+  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1) + 
+  facet_wrap (~ptype)
+
+  
+
+pdf (file.path ('Plots', 'TF_abundance_combined_profile_barplot.pdf'),6,width=32.5)
+bp
+dev.off()
 
 
 
@@ -1553,7 +1626,7 @@ ps = getPeakSet (archp)
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
 
 chrombpnet_counts = list()
-celltypes = unique (archp$celltype_lv1)
+celltypes = c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Endothelial','Myeloid','T_cells','NK','B_cells','Plasma','pDCs') 
 for (celltype in celltypes)
   {
   message (paste0('reading finemo output for ', celltype))  
@@ -1561,10 +1634,10 @@ for (celltype in celltypes)
   gr = makeGRangesFromDataFrame (chrombpnet_counts[[celltype]], keep.extra.columns=T, seqnames.field = 'V1', start.field = 'V2', end.field = 'V3')
   chrombpnet_counts[[celltype]]$peak_type = ps$peakType[findOverlaps(gr, ps, select='first')]
   chrombpnet_counts[[celltype]] = chrombpnet_counts[[celltype]][chrombpnet_counts[[celltype]]$V4 != 'NaN_NaN_NaN',] # Some seqlets have NA motif match and qvalues...removing those
+  chrombpnet_counts[[celltype]] = chrombpnet_counts[[celltype]][!is.na(chrombpnet_counts[[celltype]]$V7),]
   nonsig_motifs = chrombpnet_counts[[celltype]]$V7 > 0.05
   chrombpnet_counts[[celltype]]$V4[nonsig_motifs] = chrombpnet_counts[[celltype]]$V6[nonsig_motifs]
   }
-
 
 chrombpnet_profile = list()
 #celltypes = c('Mesothelium','Malignant')
@@ -1575,6 +1648,7 @@ for (celltype in celltypes)
   gr = makeGRangesFromDataFrame (chrombpnet_profile[[celltype]], keep.extra.columns=T, seqnames.field = 'V1', start.field = 'V2', end.field = 'V3')
   chrombpnet_profile[[celltype]]$peak_type = ps$peakType[findOverlaps(gr, ps, select='first')]
   chrombpnet_profile[[celltype]] = chrombpnet_profile[[celltype]][chrombpnet_profile[[celltype]]$V4 != 'NaN_NaN_NaN',] # Some seqlets have NA motif match and qvalues...removing those
+    chrombpnet_profile[[celltype]] = chrombpnet_profile[[celltype]][!is.na(chrombpnet_profile[[celltype]]$V7),]
   nonsig_motifs = chrombpnet_profile[[celltype]]$V7 > 0.05
   chrombpnet_profile[[celltype]]$V4[nonsig_motifs] = chrombpnet_profile[[celltype]]$V6[nonsig_motifs]
   }
@@ -1625,7 +1699,7 @@ bp_df <- bp_df %>%
 
 bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
 bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant'))
+bp_df$type = factor (bp_df$type, levels = celltypes)
 # Plot stacked bars
 bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
@@ -1637,9 +1711,7 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
 
-  
-
-pdf (file.path ('Plots', 'TF_abundance_counts_barplot.pdf'),6,width=6.5)
+pdf (file.path ('Plots', 'TF_abundance_counts_barplot.pdf'),6,width=15.5)
 bp
 dev.off()
 
@@ -1687,11 +1759,11 @@ bp_df <- bp_df %>%
 
 bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
 bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = c('Mesothelium','Malignant'))
+bp_df$type = factor (bp_df$type, levels = celltypes)
 # Plot stacked bars
 bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(unique(bp_df$TF))) ) +
+  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF))) +
   theme_minimal(base_size = 14) +
   ylab("Proportion of counts") +
   xlab("Cell type") +
@@ -1701,8 +1773,17 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
 
   
 
-pdf (file.path ('Plots', 'TF_abundance_profile_barplot.pdf'),6,width=6.5)
+pdf (file.path ('Plots', 'TF_abundance_profile_barplot.pdf'),6,width=15.5)
 bp
 dev.off()
+
+
+#### Generate TSV file with chrombnpent models and absolute paths ####
+
+chrom_df = data.frame (model = celltypes,
+  abs_path = file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet',celltypes,'no_bias_model/modisco_counts'))
+
+write.table (chrom_df, 'chrombpnet_models_paths.tsv',sep='\t')
+
 
 

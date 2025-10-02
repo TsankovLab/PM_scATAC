@@ -40,9 +40,8 @@ echo $MODEL_H5
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
 motif_file=motif_footprints.txt
 
-chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
-celltype=SOX9_low_P23
-MODEL_H5=${chromBPdir}/${celltype}/no_bias_model/fold_0/models/chrombpnet_nobias.h5
+chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
+celltype=NK_KLRC1
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
 OUTPUT_PREFIX=${chromBPdir}/${celltype}/footprints
 
@@ -55,6 +54,7 @@ for fold_number in {0..4}; do
 
     # mkdir -p $chromBPdir/$celltype   # only needed once, so you can keep it outside the loop if you like
 
+    MODEL_H5=${chromBPdir}/${celltype}/no_bias_model/fold_${fold_number}/models/chrombpnet_nobias.h5
     chrombpnet footprints -m $MODEL_H5 \
         -r ../${celltype}_peakset_all_no_blacklist.bed \
         -g $grefdir/genome_references/hg38.genome.fa \
