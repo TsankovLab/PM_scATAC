@@ -9,6 +9,7 @@ source (file.path('..','..','git_repo','utils','hubs_track.R'))
 archp$celltype_status = paste0(archp$celltype2, '_', archp$status)
 archp$celltype_sample = paste0(archp$celltype2, '_', archp$Sample)
 metaGroupName = 'celltype_sample'
+metaGroupName = 'Clusters_H'
 exp_bigwig = T
 if (exp_bigwig)
   {

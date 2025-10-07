@@ -89,7 +89,8 @@ tnk_markers = c('CD3D','CD8A','PDCD1','HAVCR2','CD4', 'FOXP3','GNLY',
   'FGFBP2','KLRC1','XCL1','ICOS')
 tnk_markers = c('CD4','CD8A',
   'PDCD1','FOXP3','GNLY', 'HAVCR2',
-  'FGFBP2','KLRC1','CTLA4')#,'ICOS')
+  'FGFBP2','KLRC1','CTLA4','GZMK','CXCL13','CCR7','TCF7','TOX','IFNG',
+  'CX3CR1','TBX21','ASCL2','IL7R','CXCR4','NR4A2')#,'ICOS')
 archp = addImputeWeights (archp)
 pdf()
 p <- plotEmbedding(
@@ -105,7 +106,7 @@ p = lapply (seq_along(p), function(x) p[[x]] + theme_void() + ggtitle (tnk_marke
 #archp$celltype[archp$Clusters == 'C30'] = 'Fibroblasts_WT1'
 #p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
 
-pdf (file.path('Plots','TNK_markers_fplots.pdf'), width = 7, height = 13)
+pdf (file.path('Plots','TNK_markers_fplots.pdf'), width = 17, height = 13)
 print (wrap_plots(p, ncol=3))
 dev.off()
 
@@ -125,12 +126,15 @@ write.csv (data.frame (barcode = rownames(archp@cellColData), celltype = archp$c
 
 
 # TNK markers ####
-meso_markers = c('CD8A','CTLA4','PDCD1','HAVCR2','TIGIT','TOX','GZMB','IL7R','KLRC1','GNLY','ICOS')
+meso_markers = c('CD4','CD8A',
+  'PDCD1','FOXP3','GNLY', 'HAVCR2',
+  'FGFBP2','KLRC1','CTLA4','GZMK','CXCL13','CCR7','TCF7','TOX','IFNG',
+  'CX3CR1','TBX21','ASCL2','IL7R','CXCR4','NR4A2')#,'ICOS')
 #archp = addImputeWeights (archp)
 qc_param = c('nFrags','TSSEnrichment','ReadsInTSS')
 
 sams = unique(archp$Sample)
-sams = c('P10','P13','P14','P23')
+sams = c('P10','P13','P14','P23','P5')
 for (sam in sams)
 {
 archp_sam = archp[archp$Sample == sam]  
@@ -150,23 +154,23 @@ archp_sam = addClusters (input = archp_sam,
     name='Clusters_H',
     force = TRUE)
 
-pdf()
-umap_p3 = plotEmbedding (ArchRProj = archp_sam, 
-  colorBy = "cellColData", name = "Sample",
-   embedding = "UMAP")
-umap_p4 = plotEmbedding (ArchRProj = archp_sam, 
-  colorBy = "cellColData", name = "celltype2",
-   embedding = "UMAP")
-umap_p5 = plotEmbedding (ArchRProj = archp_sam, 
-  colorBy = "cellColData", name = "Clusters_H",
-   embedding = "UMAP")
-dev.off()
+# pdf()
+# umap_p3 = plotEmbedding (ArchRProj = archp_sam, 
+#   colorBy = "cellColData", name = "Sample",
+#    embedding = "UMAP")
+# umap_p4 = plotEmbedding (ArchRProj = archp_sam, 
+#   colorBy = "cellColData", name = "celltype2",
+#    embedding = "UMAP")
+# umap_p5 = plotEmbedding (ArchRProj = archp_sam, 
+#   colorBy = "cellColData", name = "Clusters_H",
+#    embedding = "UMAP")
+# dev.off()
 
-pdf (file.path('Plots',paste0(sam,'_celltype_harmony_sample_umap.pdf')),5,5)
-print (umap_p3)
-print (umap_p4)
-print (umap_p5)
-dev.off()  
+# pdf (file.path('Plots',paste0(sam,'_celltype_harmony_sample_umap.pdf')),5,5)
+# print (umap_p3)
+# print (umap_p4)
+# print (umap_p5)
+# dev.off()  
 
 archp_sam = addImputeWeights (archp_sam)
 
@@ -179,9 +183,10 @@ p <- plotEmbedding(
     pal = palette_expression,
     imputeWeights = getImputeWeights (archp_sam)
 )
+p = lapply (seq_along(p), function(x) p[[x]] + theme_void() + ggtitle (tnk_markers[x]) + NoLegend())
 dev.off()
 
-pdf (file.path('Plots',paste0('TNK_',sam,'.pdf')), width = 18, height = 12)
+pdf (file.path('Plots',paste0('TNK_',sam,'.pdf')), width = 24, height = 18)
 print(wrap_plots (p, ncol=4))
 dev.off()
 }

@@ -1781,9 +1781,9 @@ dev.off()
 #### Generate TSV file with chrombnpent models and absolute paths ####
 
 chrom_df = data.frame (model = celltypes,
-  abs_path = file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet',celltypes,'no_bias_model/modisco_counts'))
+  abs_path = file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet',celltypes,'no_bias_model/modisco_counts/modisco_results_counts.h5'))
 
-write.table (chrom_df, 'chrombpnet_models_paths.tsv',sep='\t')
+write.table (chrom_df, 'chrombpnet_models_paths.tsv',sep='\t', quote=FALSE, col.names=FALSE, row.names=FALSE)
 
 
 
