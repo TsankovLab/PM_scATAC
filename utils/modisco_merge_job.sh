@@ -22,7 +22,7 @@ contribs_dir=${5}
 batch=${6}
 
 active activate chrombpnet 
-source /sc/arion/work/giottb01/conda/etc/profile.d/conda.sh
+#source /sc/arion/work/giottb01/conda/etc/profile.d/conda.sh
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
     
 /sc/arion/work/giottb01/conda/envs/chrombpnet/bin/python -u ../git_repo/utils/03-merge_modisco.py \

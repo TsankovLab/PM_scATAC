@@ -79,7 +79,7 @@ bsub -J modisco_merge \
 -R span[hosts=1] \
 -o ${output_dir}/modisco_merge_${batch}.out \
 -e ${output_dir}/modisco_merge_${batch}.err \
-../git_repo/utils/modisco_merge_job.sh output_dir=${1} "$output_dir" "$model_head" "$cluster_key" "$modisco_dir" "$contribs_dir" "$batch"
+../git_repo/utils/modisco_merge_job.sh "$output_dir" "$model_head" "$cluster_key" "$modisco_dir" "$contribs_dir" "$batch"
 
 done 
 
