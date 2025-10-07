@@ -83,12 +83,3 @@ bsub -J modisco_merge \
 
 done 
 
-
-
-
-
-
-    
-
-
-
