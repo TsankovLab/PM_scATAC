@@ -66,7 +66,7 @@ contribs_dir=/sc/arion/scratch/giottb01/chromBPnet
 # get batches
 batches=$(cut -f 4 $cluster_key | sort | uniq)
 
-chmod +x ../utils/merge_modisco_job.sh
+chmod +x ../git_repo/utils/modisco_merge_job.sh
 
 for batch in ${batches[@]}; do
 
@@ -77,9 +77,9 @@ bsub -J modisco_merge \
 -W 12:00 \
 -R rusage[mem=80000] \
 -R span[hosts=1] \
--o ${output_dir}/modisco_merged_${batch}.out \
--e ${output_dir}/modisco_merged_${batch}.err \
-../utils/merge_modisco_job.sh output_dir=${1} "$model_head" "$cluster_key" "$modisco_dir" "$contribs_dir" "$batch"
+-o ${output_dir}/modisco_merge_${batch}.out \
+-e ${output_dir}/modisco_merge_${batch}.err \
+../utils/modisco_merge_job.sh output_dir=${1} "$output_dir" "$model_head" "$cluster_key" "$modisco_dir" "$contribs_dir" "$batch"
 
 done 
 

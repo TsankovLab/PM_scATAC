@@ -1,5 +1,5 @@
 #!/bin/bash
-#BSUB -J finemo
+#BSUB -J modisco_merge
 #BSUB -P acc_Tsankov_Normal_Lung
 #BSUB -q gpu
 #BSUB -n 8
@@ -24,8 +24,9 @@ batch=${6}
 source activate chrombpnet 
 
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
-
-python -u ../git_repo/utils/03-merge_modisco.py --out-dir ${output_dir} \
+    
+python -u ../git_repo/utils/03-merge_modisco.py \
+                    --out-dir ${output_dir} \
                     --model-head ${model_head} \
                     --cluster-key ${cluster_key} \
                     --modisco-dir ${modisco_dir} \
