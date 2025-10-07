@@ -209,7 +209,7 @@ def main(args):
         for celltype, patterns in patterns_to_merge:
             print("\t\t@ on celltype", celltype, "with patterns:", patterns)
     
-            shaps_file = f"{contribs_dir}/{celltype}/no_bias_model/{model_head}_averaged_contribution_scores_{model_head}.h5"
+            shaps_file = f"{contribs_dir}/{celltype}/no_bias_model/{celltype}_averaged_contribution_scores_{model_head}.h5"
             results_file = f"{modisco_dir}/{celltype}/no_bias_model/modisco_{model_head}/modisco_results_{model_head}.h5"
             
             with h5.File(shaps_file) as shaps_fh, h5.File(results_file) as results_fh:

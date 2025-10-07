@@ -44,13 +44,21 @@ output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/m
 mkdir $output_dir
 
 model_head=counts
-cluster_key=/sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key.txt
+
+awk -F'\t' 'BEGIN{OFS="\t"} {print $1, "pos_patterns", $2, 1}' /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key.txt > /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key_modified_pos.txt
+awk -F'\t' 'BEGIN{OFS="\t"} {print $1, "pos_patterns", $2, 1}' /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key.txt > /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key_modified_neg.txt
+cat /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key_modified_pos.txt /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key_modified_neg.txt > ${output_dir}/cluster_key_combined.txt
+
+
+cluster_key=${output_dir}/cluster_key_combined.txt
+
+
 modisco_dir=/sc/arion/scratch/giottb01/chromBPnet
 contribs_dir=/sc/arion/scratch/giottb01/chromBPnet
-batch=4
+batch=1
 
 # set inputs
-cluster_key="${gimme_cluster_dir%/}/gimme_cluster_all_cluster_key.tsv"
+#cluster_key="${gimme_cluster_dir%/}/gimme_cluster_all_cluster_key.tsv"
 
 # SUBMIT JOBS ------------------------------------------------------------------
 
