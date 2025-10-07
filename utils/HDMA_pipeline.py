@@ -1,3 +1,5 @@
+conda activate chrombpnet
+
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
 
 python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
@@ -34,19 +36,19 @@ output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/m
 model_head=counts
 
 
-
+### Merge modisco motifs per model head ###
 BATCH_SIZE=5
-bias_params="Heart_c0_thresh0.4"
-out_dir=${modisco_merged_dir}
-model_head="counts"
+#bias_params="Heart_c0_thresh0.4"
+#out_dir=${modisco_merged_dir}
+#model_head="counts"
 
-output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
+output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_${model_head}
 mkdir $output_dir
 
 model_head=counts
 
-awk -F'\t' 'BEGIN{OFS="\t"} {print $1, "pos_patterns", $2, 1}' /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key.txt > /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key_modified_pos.txt
-awk -F'\t' 'BEGIN{OFS="\t"} {print $1, "pos_patterns", $2, 1}' /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key.txt > /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key_modified_neg.txt
+awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "pos_patterns", $2, n}' /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key.txt > /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key_modified_pos.txt
+awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "neg_patterns", $2, n}' /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key.txt > /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key_modified_neg.txt
 cat /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key_modified_pos.txt /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key_modified_neg.txt > ${output_dir}/cluster_key_combined.txt
 
 
@@ -55,7 +57,6 @@ cluster_key=${output_dir}/cluster_key_combined.txt
 
 modisco_dir=/sc/arion/scratch/giottb01/chromBPnet
 contribs_dir=/sc/arion/scratch/giottb01/chromBPnet
-batch=1
 
 # set inputs
 #cluster_key="${gimme_cluster_dir%/}/gimme_cluster_all_cluster_key.tsv"
@@ -63,15 +64,31 @@ batch=1
 # SUBMIT JOBS ------------------------------------------------------------------
 
 # get batches
-batches=( $(cut -f 4 $cluster_key | sort | uniq) )
+batches=$(cut -f 4 $cluster_key | sort | uniq)
+
+chmod +x ../utils/merge_modisco_job.sh
 
 for batch in ${batches[@]}; do
-# Merge modisco clusters (?)
-python -u ../git_repo/utils/03-merge_modisco.py --out-dir ${output_dir} \
-                    --model-head ${model_head} \
-                    --cluster-key ${cluster_key} \
-                    --modisco-dir ${modisco_dir} \
-                    --contribs-dir ${contribs_dir} \
-                    --batch ${batch}
 
-done                      
+bsub -J modisco_merge \
+-P acc_Tsankov_Normal_Lung \
+-q premium \
+-n 8 \
+-W 12:00 \
+-R rusage[mem=80000] \
+-R span[hosts=1] \
+-o ${output_dir}/modisco_merged_${batch}.out \
+-e ${output_dir}/modisco_merged_${batch}.err \
+../utils/merge_modisco_job.sh output_dir=${1} "$model_head" "$cluster_key" "$modisco_dir" "$contribs_dir" "$batch"
+
+done 
+
+
+
+
+
+
+    
+
+
+
