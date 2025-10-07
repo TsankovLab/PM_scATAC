@@ -21,7 +21,7 @@ modisco_dir=${4}
 contribs_dir=${5}
 batch=${6}
 
-source activate chrombpnet 
+conda activate chrombpnet 
 
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
     
