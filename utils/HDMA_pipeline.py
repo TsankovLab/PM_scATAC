@@ -37,7 +37,7 @@ model_head=counts
 
 
 ### Merge modisco motifs per model head ###
-BATCH_SIZE=5
+#BATCH_SIZE=5
 #bias_params="Heart_c0_thresh0.4"
 #out_dir=${modisco_merged_dir}
 #model_head="counts"
@@ -83,3 +83,37 @@ bsub -J modisco_merge \
 
 done 
 
+output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_${model_head}
+cluster_key_path=${output_dir}/cluster_key_combined.txt
+mkdir /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled/
+compiled_modisco_h5_path=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled/modisco_compiled.h5
+compiled_modisco_tsv_path=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled/modisco_compiled.tsv
+modisco_merged_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_${model_head}
+
+python ../git_repo/utils/04a-compile_modisco_obj.py \
+  --output_dir ${output_dir} \
+  --cluster_key_path ${cluster_key_path} \
+  --compiled_modisco_h5_path ${compiled_modisco_h5_path} \
+  --compiled_modisco_tsv_path ${compiled_modisco_tsv_path} \
+  --modisco_merged_dir ${modisco_merged_dir}
+
+
+
+# load conda env
+conda activate chrombpnet
+output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled_${model_head}
+mkdir $output_dir
+
+compiled_h5=$output_dir/modisco_compiled.h5
+out_dir=$output_dir
+
+echo $compiled_h5
+echo $out_dir
+motif_db=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
+
+python -u code/03-chrombpnet/02-compendium/04b-get_tomtom_matches.py --modisco-h5 $compiled_h5 \
+    --out-dir $out_dir \
+    --meme-db $motif_db \
+    --verbose True
+                    
+#echo "done."
