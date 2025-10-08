@@ -36,8 +36,8 @@ metaGroupName = 'celltype_lv1'
 celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
 #celltypes='B_cells'
 
-celltypes_remove = c('Fibroblasts','Malignant','Mesothelium')
-celltypes = celltypes[!celltypes %in% celltypes_remove]
+#celltypes_remove = c('Fibroblasts','Malignant','Mesothelium')
+#celltypes = celltypes[!celltypes %in% celltypes_remove]
 #archp = archp[archp$celltype_lv1 %in% c('Fibroblasts','Malignant','Mesothelium')]
 #archp = archp[archp$celltype_revised_sample %in% c('Fibroblasts_P1')]
 archp = archp[archp$celltype_lv1 %in% celltypes]

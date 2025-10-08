@@ -117,3 +117,43 @@ python -u code/03-chrombpnet/02-compendium/04b-get_tomtom_matches.py --modisco-h
     --verbose True
                     
 #echo "done."
+
+### Run Fi-Nemo on averaged motifs 
+
+chmod +x ../git_repo/utils/finemo_motif_calls_on_merged.sh
+chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
+output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/finemo_on_merged_${model_head}
+#finemo_counts_file=no_bias_model/finemo_out_counts/hits.bed
+#if [ -f "${modisco_counts_file}" ] && [ -f "${modisco_profile_file}" ] && [ ! -f "$finemo_counts_file" ]; then
+for celltype in ${celltypes[@]}; do
+
+    echo "=== Submit finemo job ==="
+    finemo_job_id=$(bsub -J ${celltype}_finemo \
+        -P acc_Tsankov_Normal_Lung \
+        -q gpu \
+        -n 1 \
+        -W 24:00 \
+        -gpu num=1 \
+        -R a100 \
+        -R rusage[mem=64000] \
+        -R span[hosts=1] \
+        -o ${output_dir}/finemo_${celltype}.out \
+        -e ${output_dir}/finemo_${celltype}.err \
+        ../git_repo/utils/finemo_motif_calls_on_merged.sh "$chromBPdir" "$celltype" "$output_dir" "model_head" \
+        | awk '{print $2}' | sed 's/<//;s/>//')
+    echo "Submitted finemo job with ID: $finemo_job_id"
+    
+    # Wait for finemo to finish
+    echo "Waiting for finemo job..."
+    bwait -w "done(${finemo_job_id})"
+fi
+
+echo "=== Run R script for finemo motif labels ==="
+source activate meso_scatac
+Rscript $repodir/utils/chromBPnet_finemo_motif_labels.R $chromBPdir $celltype
+echo "R script execution completed."
+
+
+
+
+
