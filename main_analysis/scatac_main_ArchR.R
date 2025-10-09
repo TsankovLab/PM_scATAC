@@ -1069,7 +1069,7 @@ chrombpnet_counts = list()
 celltypes = unique (archp$celltype_lv1)
 celltypes = c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Endothelial','Myeloid','T_cells','NK_cells','B_cells','Plasma','pDCs') 
 #celltypes = celltypes[celltypes != 'pDCs']
-annotated_motifs = read.table (file.path(chromBPdir,'compiled_counts','modisco_compiled.tsv'), sep='\t', header=T)
+annotated_motifs = read.table (file.path(chromBPdir,'modisco_merged_counts','compiled','modisco_compiled.tsv'), sep='\t', header=T)
 #annotated_motifs$pattern2 = sapply (annotated_motifs$pattern, function(x) unlist(strsplit(x,'__'))[2])
 #rownames (annotated_motifs) = annotated_motifs$pattern2
 for (celltype in celltypes)
