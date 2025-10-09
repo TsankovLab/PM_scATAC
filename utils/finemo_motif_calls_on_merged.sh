@@ -35,11 +35,26 @@ cd ${chromBPdir}/${celltype}/no_bias_model
 
 source activate finemo
 
-if [ ! -f "finemo_out_${model_head}/hits_counts.tsv" ]; then
-    echo "hits_counts.tsv file not found. Running finemo on TFmodisco outputs from contribution score counts ..."
-finemo extract-regions-chrombpnet-h5 -c ${celltype}_averaged_contribution_scores_${model_head}.h5 -o motif_calls_${model_head} -w 2000 #fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 fold_2/${celltype}_contribution_scores.counts_scores.h5 fold_3/${celltype}_contribution_scores.counts_scores.h5 fold_4/${celltype}_contribution_scores.counts_scores.h5 
-finemo call-hits -r motif_calls_${model_head}.npz -m ${chromBPdir}/compiled_${model_head}/modisco_compiled.h5 -o finemo_out_${model_head} -p ../${celltype}_peakset_all_no_blacklist.bed -b 500 -J
-finemo report -r motif_calls_${model_head}.npz -H finemo_out_${model_head}/hits_counts.tsv -p ../${celltype}_peakset_all_no_blacklist.bed -m compiled_${model_head}/modisco_compiled.h5 -o finemo_out_${model_head}/report -W 2000
+if [ ! -f "finemo_out_${model_head}/hits.tsv" ]; then
+    echo "hits.tsv file not found. Running finemo on TFmodisco outputs from contribution score counts ..."
+finemo extract-regions-chrombpnet-h5 \
+    -c ${celltype}_averaged_contribution_scores_${model_head}.h5 \
+    -o motif_calls_${model_head} -w 2000 #fold_$fold_number/${celltype}_contribution_scores.counts_scores.h5 fold_2/${celltype}_contribution_scores.counts_scores.h5 fold_3/${celltype}_contribution_scores.counts_scores.h5 fold_4/${celltype}_contribution_scores.counts_scores.h5 
+
+finemo call-hits \
+    -r motif_calls_${model_head}.npz \
+    -m ${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.h5 \
+    -o finemo_out_${model_head} \
+    -p ../${celltype}_peakset_all_no_blacklist.bed \
+    -b 500 -J
+
+finemo report \
+    -r motif_calls_${model_head}.npz \
+    -H finemo_out_${model_head}/hits.tsv \
+    -p ../${celltype}_peakset_all_no_blacklist.bed \
+    -m /modisco_merged_${model_head}/compiled/modisco_compiled.h5 \
+    -o finemo_out_${model_head}/report -W 2000
+
 else
     echo "hits_counts.tsv file found!"
 fi

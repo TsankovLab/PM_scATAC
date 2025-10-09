@@ -1063,20 +1063,30 @@ library ('universalmotif')
 ps = getPeakSet (archp)
 
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
+chromBPdir = '/sc/arion/scratch/giottb01/chromBPnet'
 
 chrombpnet_counts = list()
 celltypes = unique (archp$celltype_lv1)
 celltypes = c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Endothelial','Myeloid','T_cells','NK_cells','B_cells','Plasma','pDCs') 
 #celltypes = celltypes[celltypes != 'pDCs']
+annotated_motifs = read.table (file.path(chromBPdir,'compiled_counts','modisco_compiled.tsv'), sep='\t', header=T)
+#annotated_motifs$pattern2 = sapply (annotated_motifs$pattern, function(x) unlist(strsplit(x,'__'))[2])
+#rownames (annotated_motifs) = annotated_motifs$pattern2
 for (celltype in celltypes)
   {
   message (paste0('reading finemo output for ', celltype))  
   chrombpnet_counts[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
+  # chrombpnet_counts[[celltype]]$V8 = sub ('pos_patterns.','',chrombpnet_counts[[celltype]]$V6)
+  # chrombpnet_counts[[celltype]]$V8 = sub ('neg_patterns.','',chrombpnet_counts[[celltype]]$V8)
+  chrombpnet_counts[[celltype]]$V9 = paste(annotated_motifs$match0,annotated_motifs$match1,annotated_motifs$match2)[match(chrombpnet_counts[[celltype]]$V8, annotated_motifs$pattern)]
+  chrombpnet_counts[[celltype]]$V9 <- gsub('_HUMAN\\.H11MO\\.(0|1|2)\\.[A-D]', '', chrombpnet_counts[[celltype]]$V9)
+
   gr = makeGRangesFromDataFrame (chrombpnet_counts[[celltype]], keep.extra.columns=T, seqnames.field = 'V1', start.field = 'V2', end.field = 'V3')
   chrombpnet_counts[[celltype]]$peak_type = ps$peakType[findOverlaps(gr, ps, select='first')]
-  chrombpnet_counts[[celltype]] = chrombpnet_counts[[celltype]][chrombpnet_counts[[celltype]]$V4 != 'NaN_NaN_NaN',] # Some seqlets have NA motif match and qvalues...removing those
-  nonsig_motifs = chrombpnet_counts[[celltype]]$V7 > 0.05
-  chrombpnet_counts[[celltype]]$V4[nonsig_motifs] = chrombpnet_counts[[celltype]]$V6[nonsig_motifs]
+  chrombpnet_counts[[celltype]]$direction = ifelse (grepl ('pos_pattern', chrombpnet_counts[[celltype]]$V6), 'positive','negative')
+  #chrombpnet_counts[[celltype]] = chrombpnet_counts[[celltype]][chrombpnet_counts[[celltype]]$V4 != 'NaN_NaN_NaN',] # Some seqlets have NA motif match and qvalues...removing those
+  #nonsig_motifs = chrombpnet_counts[[celltype]]$V7 > 0.05
+  #chrombpnet_counts[[celltype]]$V4[nonsig_motifs] = chrombpnet_counts[[celltype]]$V6[nonsig_motifs]
   }
 
 
@@ -1086,11 +1096,11 @@ for (celltype in celltypes)
   {
   message (paste0('reading finemo output for ', celltype))  
   chrombpnet_profile[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
+  chrombpnet_profile[[celltype]]$V9 = paste(annotated_motifs$match0,annotated_motifs$match1,annotated_motifs$match2)[match(chrombpnet_profile[[celltype]]$V8, annotated_motifs$pattern)]
+  chrombpnet_profile[[celltype]]$V9 <- gsub('_HUMAN\\.H11MO\\.(0|1|2)\\.[A-D]', '', chrombpnet_profile[[celltype]]$V9)
   gr = makeGRangesFromDataFrame (chrombpnet_profile[[celltype]], keep.extra.columns=T, seqnames.field = 'V1', start.field = 'V2', end.field = 'V3')
   chrombpnet_profile[[celltype]]$peak_type = ps$peakType[findOverlaps(gr, ps, select='first')]
-  chrombpnet_profile[[celltype]] = chrombpnet_profile[[celltype]][chrombpnet_profile[[celltype]]$V4 != 'NaN_NaN_NaN',] # Some seqlets have NA motif match and qvalues...removing those
-  nonsig_motifs = chrombpnet_profile[[celltype]]$V7 > 0.05
-  chrombpnet_profile[[celltype]]$V4[nonsig_motifs] = chrombpnet_profile[[celltype]]$V6[nonsig_motifs]
+  chrombpnet_profile[[celltype]]$direction = ifelse (grepl ('pos_pattern', chrombpnet_profile[[celltype]]$V6), 'positive','negative')
   }
 
 #chrombpnet_profile = lapply (chrombpnet_profile, function(x) x[x$V5 != 'NaN_NaN_NaN',])
@@ -1100,20 +1110,21 @@ top_n <- 5
 n <- length(chrombpnet_counts)
 
 bp_list <- lapply(seq_len(n), function(i) {
-  tbl <- table(chrombpnet_counts [[i]]$V4)
+  tbl <- table(chrombpnet_counts [[i]]$V9)
   tbl_sorted <- sort(tbl, decreasing = TRUE)
   top_tbl <- head(tbl_sorted, top_n)
   
   tf_names <- names(top_tbl)
   directions <- sapply(tf_names, function(tf) {
-    chrombpnet_counts[[i]]$V5[chrombpnet_counts [[i]]$V4 == tf][1]
+    chrombpnet_counts[[i]]$direction[chrombpnet_counts [[i]]$V9 == tf][1]
   })
   
   data.frame(
     Freq = proportions(top_tbl),
     TF   = tf_names,
     direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl))
+    type = rep(celltypes[[i]], length(top_tbl)),
+    pattern = chrombpnet_counts[[i]]$V6[match(tf_names, chrombpnet_counts[[i]]$V9)]
   )
 })
 
@@ -1121,13 +1132,13 @@ bp_df <- do.call(rbind, bp_list)
 
 # Make neg values negative
 bp_df <- bp_df %>%
-  mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
+  mutate(Freq = ifelse(direction == "negative", -Freq.Freq, Freq.Freq))
 
 # Create custom ordering per type
 bp_df <- bp_df %>%
   group_by(type, direction) %>%
   mutate(
-    TF_order = ifelse(direction == "pos",
+    TF_order = ifelse(direction == "positive",
                       rank(-Freq, ties.method = "first"),  # descending
                       rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
   ) %>%
@@ -1137,13 +1148,13 @@ bp_df <- bp_df %>%
 bp_df <- bp_df %>%
   arrange(type, direction, TF_order)
 
-bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
+bp_df$TF_id <- bp_df$TF
 bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = celltypes)
+#bp_df$type = factor (bp_df$type, levels = celltypes)
 # Plot stacked bars
 bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(unique(bp_df$TF)))) +
   theme_minimal(base_size = 14) +
   ylab("Proportion of counts") +
   xlab("Cell type") +
@@ -1153,7 +1164,7 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
 
   
 
-pdf (file.path ('Plots', 'TF_abundance_counts_barplot.pdf'),6,width=16.5)
+pdf (file.path ('Plots', 'TF_abundance_counts_barplot3.pdf'),6,width=5.5)
 bp
 dev.off()
 
@@ -1162,34 +1173,36 @@ top_n <- 5
 n <- length(chrombpnet_profile)
 
 bp_list <- lapply(seq_len(n), function(i) {
-  tbl <- table(chrombpnet_profile[[i]]$V4)
+  tbl <- table(chrombpnet_profile [[i]]$V9)
   tbl_sorted <- sort(tbl, decreasing = TRUE)
   top_tbl <- head(tbl_sorted, top_n)
   
   tf_names <- names(top_tbl)
   directions <- sapply(tf_names, function(tf) {
-    chrombpnet_profile[[i]]$V5[chrombpnet_profile[[i]]$V4 == tf][1]
+    chrombpnet_profile[[i]]$direction[chrombpnet_profile [[i]]$V9 == tf][1]
   })
   
   data.frame(
     Freq = proportions(top_tbl),
     TF   = tf_names,
     direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl))
+    type = rep(celltypes[[i]], length(top_tbl)),
+    pattern = chrombpnet_profile[[i]]$V6[match(tf_names, chrombpnet_profile[[i]]$V9)]
   )
 })
+
 
 bp_df <- do.call(rbind, bp_list)
 
 # Make neg values negative
 bp_df <- bp_df %>%
-  mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
+  mutate(Freq = ifelse(direction == "negative", -Freq.Freq, Freq.Freq))
 
 # Create custom ordering per type
 bp_df <- bp_df %>%
   group_by(type, direction) %>%
   mutate(
-    TF_order = ifelse(direction == "pos",
+    TF_order = ifelse(direction == "positive",
                       rank(-Freq, ties.method = "first"),  # descending
                       rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
   ) %>%
@@ -1624,6 +1637,7 @@ library ('universalmotif')
 ps = getPeakSet (archp)
 
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
+chromBPdir = '/sc/arion/scratch/giottb01/chromBPnet'
 
 chrombpnet_counts = list()
 celltypes = c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Endothelial','Myeloid','T_cells','NK','B_cells','Plasma','pDCs') 
@@ -1711,7 +1725,7 @@ bp <- ggplot(bp_df, aes(x = type, y = Freq, fill = TF_id)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
 
-pdf (file.path ('Plots', 'TF_abundance_counts_barplot.pdf'),6,width=15.5)
+pdf (file.path ('Plots', 'TF_abundance_counts_barplot2.pdf'),6,width=15.5)
 bp
 dev.off()
 
@@ -1785,5 +1799,9 @@ chrom_df = data.frame (model = celltypes,
 
 write.table (chrom_df, 'chrombpnet_models_paths.tsv',sep='\t', quote=FALSE, col.names=FALSE, row.names=FALSE)
 
+chrom_df = data.frame (model = celltypes,
+  abs_path = file.path('/sc/arion/scratch/giottb01/chromBPnet',celltypes,'no_bias_model/modisco_profile/modisco_results_profile.h5'))
+
+write.table (chrom_df, '/sc/arion/scratch/giottb01/chromBPnet/chrombpnet_models_profile_paths.tsv',sep='\t', quote=FALSE, col.names=FALSE, row.names=FALSE)
 
 

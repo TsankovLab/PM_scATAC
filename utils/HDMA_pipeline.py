@@ -2,22 +2,23 @@ conda activate chrombpnet
 
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
 #output_dir=/sc/arion/scratch/giottb01/chromBPnet
-output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
+chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
+chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
 
-model_head=counts
-mkdir ${output_dir}/modisco_merged_${model_head}
+model_head=profile
+mkdir ${chromBPdir}/modisco_merged_${model_head}
 
 python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
-  -c ${output_dir}/chrombpnet_models_paths.tsv \
-  -o ${output_dir}/modisco_merged_${model_head}/pfms_pos.txt \
+  -c ${chromBPdir}/chrombpnet_models_${model_head}_paths.tsv \
+  -o ${chromBPdir}/modisco_merged_${model_head}/pfms_pos.txt \
   -p pos_patterns \
   -t 0.3 \
   -ml 3
 
 
 python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
-  -c ${output_dir}/chrombpnet_models_paths.tsv \
-  -o ${output_dir}/modisco_merged_${model_head}/pfms_pos.txt \
+  -c ${chromBPdir}/chrombpnet_models_${model_head}_paths.tsv \
+  -o ${chromBPdir}/modisco_merged_${model_head}/pfms_neg.txt \
   -p neg_patterns \
   -t 0.3 \
   -ml 3
@@ -25,15 +26,15 @@ python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
 
 # Positive motifs
 gimme cluster \
-  ${output_dir}/modisco_merged_${model_head}/pfms_pos.txt \
-  ${output_dir}/modisco_merged_${model_head}/cluster_pos \
+  ${chromBPdir}/modisco_merged_${model_head}/pfms_pos.txt \
+  ${chromBPdir}/modisco_merged_${model_head}/cluster_pos \
   -t 0.8 \
   -N 8
 
 # Negative motifs
 gimme cluster \
-  ${output_dir}/modisco_merged_${model_head}/pfms_neg.txt \
-  ${output_dir}/modisco_merged_${model_head}/cluster_neg \
+  ${chromBPdir}/modisco_merged_${model_head}/pfms_neg.txt \
+  ${chromBPdir}/modisco_merged_${model_head}/cluster_neg \
   -t 0.8 \
   -N 8
 
@@ -48,16 +49,16 @@ gimme cluster \
 #model_head="counts"
 
 
-awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "pos_patterns", $2, n}' ${output_dir}/modisco_merged_${model_head}/cluster_pos/cluster_key.txt > ${output_dir}/modisco_merged_${model_head}/cluster_pos/cluster_key_modified_pos.txt
-awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "neg_patterns", $2, n}' ${output_dir}/modisco_merged_${model_head}/cluster_neg/cluster_key.txt > ${output_dir}/modisco_merged_${model_head}/cluster_neg/cluster_key_modified_neg.txt
-cat ${output_dir}/modisco_merged_${model_head}/cluster_pos/cluster_key_modified_pos.txt ${output_dir}/modisco_merged_${model_head}/cluster_neg/cluster_key_modified_neg.txt > ${output_dir}/modisco_merged_${model_head}/cluster_key_combined.txt
+awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "pos_patterns", $2, n}' ${chromBPdir}/modisco_merged_${model_head}/cluster_pos/cluster_key.txt > ${chromBPdir}/modisco_merged_${model_head}/cluster_pos/cluster_key_modified_pos.txt
+awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "neg_patterns", $2, n}' ${chromBPdir}/modisco_merged_${model_head}/cluster_neg/cluster_key.txt > ${chromBPdir}/modisco_merged_${model_head}/cluster_neg/cluster_key_modified_neg.txt
+cat ${chromBPdir}/modisco_merged_${model_head}/cluster_pos/cluster_key_modified_pos.txt ${chromBPdir}/modisco_merged_${model_head}/cluster_neg/cluster_key_modified_neg.txt > ${chromBPdir}/modisco_merged_${model_head}/cluster_key_combined.txt
 
 
-cluster_key=${output_dir}/modisco_merged_${model_head}/cluster_key_combined.txt
+cluster_key=${chromBPdir}/modisco_merged_${model_head}/cluster_key_combined.txt
 
 
-modisco_dir=${output_dir}
-contribs_dir=${output_dir}
+modisco_dir=${chromBPdir}
+contribs_dir=${chromBPdir}
 
 # set inputs
 #cluster_key="${gimme_cluster_dir%/}/gimme_cluster_all_cluster_key.tsv"
@@ -78,49 +79,38 @@ bsub -J modisco_merge \
 -W 12:00 \
 -R rusage[mem=80000] \
 -R span[hosts=1] \
--o ${output_dir}/modisco_merge_${batch}.out \
--e ${output_dir}/modisco_merge_${batch}.err \
-../git_repo/utils/modisco_merge_job.sh "$output_dir" "$model_head" "$cluster_key" "$modisco_dir" "$contribs_dir" "$batch"
+-o ${chromBPdir}/modisco_merged_${model_head}/modisco_merge_${batch}.out \
+-e ${chromBPdir}/modisco_merged_${model_head}/modisco_merge_${batch}.err \
+../git_repo/utils/modisco_merge_job.sh "$chromBPdir" "$model_head" "$cluster_key" "$modisco_dir" "$contribs_dir" "$batch"
 
 done
 
-output_dir=/sc/arion/scratch/giottb01/chromBPnet/modisco_merged_${model_head}
-cluster_key_path=${output_dir}/cluster_key_combined.txt
-mkdir /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled/
-compiled_modisco_h5_path=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled/modisco_compiled.h5
-compiled_modisco_tsv_path=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled/modisco_compiled.tsv
-modisco_merged_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_${model_head}
+### Compile merged modisco motifs ####
+mkdir $chromBPdir/modisco_merged_${model_head}/compiled
 
 python ../git_repo/utils/04a-compile_modisco_obj.py \
-  --output_dir ${output_dir} \
-  --cluster_key_path ${cluster_key_path} \
-  --compiled_modisco_h5_path ${compiled_modisco_h5_path} \
-  --compiled_modisco_tsv_path ${compiled_modisco_tsv_path} \
-  --modisco_merged_dir ${modisco_merged_dir}
+  --output_dir $chromBPdir/modisco_merged_${model_head} \
+  --cluster_key_path cluster_key \
+  --compiled_modisco_h5_path ${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.h5 \
+  --compiled_modisco_tsv_path ${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.tsv \
+  --modisco_merged_dir ${chromBPdir}/modisco_merged_${model_head}/merged_motifs
 
 
 
-# load conda env
+### Find known motifs matching modisco motifs using TOMTOM tool ####
 conda activate chrombpnet
-output_dir=/sc/arion/scratch/giottb01/chromBPnet/chromBPnet/compiled_${model_head}
-mkdir $output_dir
 
-compiled_h5=$output_dir/modisco_compiled.h5
-out_dir=$output_dir
-
-echo $compiled_h5
-echo $out_dir
+compiled_h5=${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.h5
 motif_db=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
 
 python -u code/03-chrombpnet/02-compendium/04b-get_tomtom_matches.py --modisco-h5 $compiled_h5 \
-    --out-dir $out_dir \
+    --out-dir ${chromBPdir}/modisco_merged_${model_head}/compiled \
     --meme-db $motif_db \
     --verbose True
                     
 #echo "done."
 
 ### Run Fi-Nemo on averaged motifs 
-model_head=counts
 chmod +x ../git_repo/utils/finemo_motif_calls_on_merged.sh
 chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
 #output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/finemo_on_merged_${model_head}
@@ -128,6 +118,9 @@ chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
 #if [ -f "${modisco_counts_file}" ] && [ -f "${modisco_profile_file}" ] && [ ! -f "$finemo_counts_file" ]; then
 celltypes=("Myeloid" "Malignant" "Fibroblasts" "Endothelial" "B_cells" \
            "Mesothelium" "SmoothMuscle" "T_cells" "NK" "Plasma" \
+           "pDCs" "Alveolar")
+
+celltypes=("NK" "Plasma" \
            "pDCs" "Alveolar")
 
 for celltype in ${celltypes[@]}; do
@@ -167,15 +160,15 @@ echo "R script execution completed."
 
 
 
-output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
+chromBPdir_dest=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
 
 for celltype in ${celltypes[@]}; do
-    mkdir -p "${output_dir}/${celltype}/no_bias_model"
+    mkdir -p "${chromBPdir}/${celltype}/no_bias_model"
     rsync -av \
         --include="*/" \
         --include="*.bw" \
         --include="*.tsv" \
         --exclude="*" \
         "${celltype}/no_bias_model/" \
-        "${output_dir}/${celltype}/no_bias_model/"
+        "${chromBPdir_dest}/${celltype}/no_bias_model/"
 done
