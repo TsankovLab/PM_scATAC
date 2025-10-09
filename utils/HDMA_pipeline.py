@@ -83,7 +83,7 @@ bsub -J modisco_merge \
 
 done 
 
-output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_${model_head}
+output_dir=/sc/arion/scratch/giottb01/chromBPnet/modisco_merged_${model_head}
 cluster_key_path=${output_dir}/cluster_key_combined.txt
 mkdir /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled/
 compiled_modisco_h5_path=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled/modisco_compiled.h5
@@ -101,7 +101,7 @@ python ../git_repo/utils/04a-compile_modisco_obj.py \
 
 # load conda env
 conda activate chrombpnet
-output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled_${model_head}
+output_dir=/sc/arion/scratch/giottb01/chromBPnet/chromBPnet/compiled_${model_head}
 mkdir $output_dir
 
 compiled_h5=$output_dir/modisco_compiled.h5
@@ -119,16 +119,20 @@ python -u code/03-chrombpnet/02-compendium/04b-get_tomtom_matches.py --modisco-h
 #echo "done."
 
 ### Run Fi-Nemo on averaged motifs 
-
+model_head=counts
 chmod +x ../git_repo/utils/finemo_motif_calls_on_merged.sh
 chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
-output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/finemo_on_merged_${model_head}
+#output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/finemo_on_merged_${model_head}
 #finemo_counts_file=no_bias_model/finemo_out_counts/hits.bed
 #if [ -f "${modisco_counts_file}" ] && [ -f "${modisco_profile_file}" ] && [ ! -f "$finemo_counts_file" ]; then
+celltypes=("Myeloid" "Malignant" "Fibroblasts" "Endothelial" "B_cells" \
+           "Mesothelium" "SmoothMuscle" "T_cells" "NK" "Plasma" \
+           "pDCs" "Alveolar")
+
 for celltype in ${celltypes[@]}; do
 
     echo "=== Submit finemo job ==="
-    finemo_job_id=$(bsub -J ${celltype}_finemo \
+    bsub -J ${celltype}_finemo \
         -P acc_Tsankov_Normal_Lung \
         -q gpu \
         -n 1 \
@@ -139,21 +143,38 @@ for celltype in ${celltypes[@]}; do
         -R span[hosts=1] \
         -o ${output_dir}/finemo_${celltype}.out \
         -e ${output_dir}/finemo_${celltype}.err \
-        ../git_repo/utils/finemo_motif_calls_on_merged.sh "$chromBPdir" "$celltype" "$output_dir" "model_head" \
-        | awk '{print $2}' | sed 's/<//;s/>//')
+        ../git_repo/utils/finemo_motif_calls_on_merged.sh "$chromBPdir" "$celltype" "model_head" \
+        | awk '{print $2}' | sed 's/<//;s/>//'
     echo "Submitted finemo job with ID: $finemo_job_id"
     
     # Wait for finemo to finish
-    echo "Waiting for finemo job..."
-    bwait -w "done(${finemo_job_id})"
-fi
+    #echo "Waiting for finemo job..."
+    #bwait -w "done(${finemo_job_id})"
+done
 
 echo "=== Run R script for finemo motif labels ==="
-source activate meso_scatac
-Rscript $repodir/utils/chromBPnet_finemo_motif_labels.R $chromBPdir $celltype
+conda activate meso_scatac
+
+for celltype in ${celltypes[@]}; do
+
+Rscript ../git_repo/utils/chromBPnet_finemo_motif_labels.R $chromBPdir $celltype
+
+done
+
 echo "R script execution completed."
 
 
 
 
+output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
 
+for celltype in ${celltypes[@]}; do
+    mkdir -p "${output_dir}/${celltype}/no_bias_model"
+    rsync -av \
+        --include="*/" \
+        --include="*.bw" \
+        --include="*.tsv" \
+        --exclude="*" \
+        "${celltype}/no_bias_model/" \
+        "${output_dir}/${celltype}/no_bias_model/"
+done

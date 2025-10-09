@@ -45,6 +45,7 @@ source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 # Run no bias chromBPnet model for each NKT cell subtype ####
 chromBPdir = '/sc/arion/scratch/giottb01/chromBPnet'
+#chromBPdir = 
 dir.create (chromBPdir)
 repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
 grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
