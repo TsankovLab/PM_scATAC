@@ -2,18 +2,22 @@ conda activate chrombpnet
 
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
 #output_dir=/sc/arion/scratch/giottb01/chromBPnet
+output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
+
+model_head=counts
+mkdir ${output_dir}/modisco_merged_${model_head}
 
 python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
-  -c ../main/scatac_ArchR/chromBPnet/chrombpnet_models_paths.tsv \
-  -o ../main/scatac_ArchR/chromBPnet/pfms.txt \
+  -c ${output_dir}/chrombpnet_models_paths.tsv \
+  -o ${output_dir}/modisco_merged_${model_head}/pfms_pos.txt \
   -p pos_patterns \
   -t 0.3 \
   -ml 3
 
 
 python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
-  -c ../main/scatac_ArchR/chromBPnet/chrombpnet_models_paths.tsv \
-  -o ../main/scatac_ArchR/chromBPnet/pfms_neg.txt \
+  -c ${output_dir}/chrombpnet_models_paths.tsv \
+  -o ${output_dir}/modisco_merged_${model_head}/pfms_pos.txt \
   -p neg_patterns \
   -t 0.3 \
   -ml 3
@@ -21,20 +25,20 @@ python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
 
 # Positive motifs
 gimme cluster \
-  ../main/scatac_ArchR/chromBPnet/pfms.txt \
-  ../main/scatac_ArchR/chromBPnet/cluster_pos \
+  ${output_dir}/modisco_merged_${model_head}/pfms_pos.txt \
+  ${output_dir}/modisco_merged_${model_head}/cluster_pos \
   -t 0.8 \
   -N 8
 
 # Negative motifs
 gimme cluster \
-  ../main/scatac_ArchR/chromBPnet/pfms_neg.txt \
-  ../main/scatac_ArchR/chromBPnet/cluster_neg \
+  ${output_dir}/modisco_merged_${model_head}/pfms_neg.txt \
+  ${output_dir}/modisco_merged_${model_head}/cluster_neg \
   -t 0.8 \
   -N 8
 
 #output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_counts
-model_head=counts
+
 
 
 ### Merge modisco motifs per model head ###
@@ -43,21 +47,17 @@ model_head=counts
 #out_dir=${modisco_merged_dir}
 #model_head="counts"
 
-output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_${model_head}
-mkdir $output_dir
 
-model_head=counts
-
-awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "pos_patterns", $2, n}' /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key.txt > /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key_modified_pos.txt
-awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "neg_patterns", $2, n}' /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key.txt > /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key_modified_neg.txt
-cat /sc/arion/scratch/giottb01/chromBPnet/cluster_pos/cluster_key_modified_pos.txt /sc/arion/scratch/giottb01/chromBPnet/cluster_neg/cluster_key_modified_neg.txt > ${output_dir}/cluster_key_combined.txt
+awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "pos_patterns", $2, n}' ${output_dir}/modisco_merged_${model_head}/cluster_pos/cluster_key.txt > ${output_dir}/modisco_merged_${model_head}/cluster_pos/cluster_key_modified_pos.txt
+awk -F'\t' 'BEGIN{OFS="\t"} {n=int((NR-1)/3)+1; print $1, "neg_patterns", $2, n}' ${output_dir}/modisco_merged_${model_head}/cluster_neg/cluster_key.txt > ${output_dir}/modisco_merged_${model_head}/cluster_neg/cluster_key_modified_neg.txt
+cat ${output_dir}/modisco_merged_${model_head}/cluster_pos/cluster_key_modified_pos.txt ${output_dir}/modisco_merged_${model_head}/cluster_neg/cluster_key_modified_neg.txt > ${output_dir}/modisco_merged_${model_head}/cluster_key_combined.txt
 
 
-cluster_key=${output_dir}/cluster_key_combined.txt
+cluster_key=${output_dir}/modisco_merged_${model_head}/cluster_key_combined.txt
 
 
-modisco_dir=/sc/arion/scratch/giottb01/chromBPnet
-contribs_dir=/sc/arion/scratch/giottb01/chromBPnet
+modisco_dir=${output_dir}
+contribs_dir=${output_dir}
 
 # set inputs
 #cluster_key="${gimme_cluster_dir%/}/gimme_cluster_all_cluster_key.tsv"
@@ -82,7 +82,7 @@ bsub -J modisco_merge \
 -e ${output_dir}/modisco_merge_${batch}.err \
 ../git_repo/utils/modisco_merge_job.sh "$output_dir" "$model_head" "$cluster_key" "$modisco_dir" "$contribs_dir" "$batch"
 
-done 
+done
 
 output_dir=/sc/arion/scratch/giottb01/chromBPnet/modisco_merged_${model_head}
 cluster_key_path=${output_dir}/cluster_key_combined.txt
