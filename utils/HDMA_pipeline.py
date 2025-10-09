@@ -1,9 +1,10 @@
 conda activate chrombpnet
 
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
+#output_dir=/sc/arion/scratch/giottb01/chromBPnet
 
 python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
-  -c ../main/scatac_ArchR/chrombpnet_models_paths.tsv \
+  -c ../main/scatac_ArchR/chromBPnet/chrombpnet_models_paths.tsv \
   -o ../main/scatac_ArchR/chromBPnet/pfms.txt \
   -p pos_patterns \
   -t 0.3 \
@@ -11,7 +12,7 @@ python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
 
 
 python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
-  -c ../main/scatac_ArchR/chrombpnet_models_paths.tsv \
+  -c ../main/scatac_ArchR/chromBPnet/chrombpnet_models_paths.tsv \
   -o ../main/scatac_ArchR/chromBPnet/pfms_neg.txt \
   -p neg_patterns \
   -t 0.3 \
@@ -20,19 +21,19 @@ python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
 
 # Positive motifs
 gimme cluster \
-  /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/pfms.txt \
-  /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/cluster_pos \
+  ../main/scatac_ArchR/chromBPnet/pfms.txt \
+  ../main/scatac_ArchR/chromBPnet/cluster_pos \
   -t 0.8 \
   -N 8
 
 # Negative motifs
 gimme cluster \
-  /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/pfms_neg.txt \
-  /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/cluster_neg \
+  ../main/scatac_ArchR/chromBPnet/pfms_neg.txt \
+  ../main/scatac_ArchR/chromBPnet/cluster_neg \
   -t 0.8 \
   -N 8
 
-output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_counts
+#output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_counts
 model_head=counts
 
 
@@ -141,9 +142,9 @@ for celltype in ${celltypes[@]}; do
         -R a100 \
         -R rusage[mem=64000] \
         -R span[hosts=1] \
-        -o ${output_dir}/finemo_${celltype}.out \
-        -e ${output_dir}/finemo_${celltype}.err \
-        ../git_repo/utils/finemo_motif_calls_on_merged.sh "$chromBPdir" "$celltype" "model_head" \
+        -o ${chromBPdir}/finemo_${celltype}.out \
+        -e ${chromBPdir}/finemo_${celltype}.err \
+        ../git_repo/utils/finemo_motif_calls_on_merged.sh "$chromBPdir" "$celltype" "$model_head" \
         | awk '{print $2}' | sed 's/<//;s/>//'
     echo "Submitted finemo job with ID: $finemo_job_id"
     
