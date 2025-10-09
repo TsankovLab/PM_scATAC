@@ -24,8 +24,8 @@ batch=${6}
 active activate chrombpnet 
 #source /sc/arion/work/giottb01/conda/etc/profile.d/conda.sh
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
-mkdir {output_dir}/modisco_merged_${model_head}/merged_motifs
-    
+mkdir ${output_dir}/modisco_merged_${model_head}/merged_motifs
+
 /sc/arion/work/giottb01/conda/envs/chrombpnet/bin/python -u ../git_repo/utils/03-merge_modisco.py \
                     --out-dir ${output_dir}/modisco_merged_${model_head}/merged_motifs \
                     --model-head ${model_head} \
