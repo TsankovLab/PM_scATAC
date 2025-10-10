@@ -90,7 +90,7 @@ mkdir $chromBPdir/modisco_merged_${model_head}/compiled
 
 python ../git_repo/utils/04a-compile_modisco_obj.py \
   --output_dir $chromBPdir/modisco_merged_${model_head} \
-  --cluster_key_path cluster_key \
+  --cluster_key_path $cluster_key \
   --compiled_modisco_h5_path ${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.h5 \
   --compiled_modisco_tsv_path ${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.tsv \
   --modisco_merged_dir ${chromBPdir}/modisco_merged_${model_head}/merged_motifs
@@ -120,8 +120,8 @@ celltypes=("Myeloid" "Malignant" "Fibroblasts" "Endothelial" "B_cells" \
            "Mesothelium" "SmoothMuscle" "T_cells" "NK" "Plasma" \
            "pDCs" "Alveolar")
 
-celltypes=("NK" "Plasma" \
-           "pDCs" "Alveolar")
+# celltypes=("NK" "Plasma" \
+#            "pDCs" "Alveolar")
 
 for celltype in ${celltypes[@]}; do
 
@@ -162,8 +162,9 @@ echo "R script execution completed."
 
 chromBPdir_dest=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
 
+cd $chromBPdir
 for celltype in ${celltypes[@]}; do
-    mkdir -p "${chromBPdir}/${celltype}/no_bias_model"
+    mkdir -p "${chromBPdir_dest}/${celltype}/no_bias_model"
     rsync -av \
         --include="*/" \
         --include="*.bw" \

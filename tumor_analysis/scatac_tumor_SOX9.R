@@ -358,64 +358,6 @@ dev_res_df = do.call (cbind , dev_res_df)
 colnames (dev_res_df) = names(dev_comparisons)
 rownames (dev_res_df) = pos_features
 
-# # Repeat using genescore
-# gsMat = assays (gsSE)[[1]]
-# rownames (gsMat) = rowData (gsSE)$name
-# gsMat = scale (gsMat[rownames(gsMat) %in% rownames(mMat),])
-
-# # Set comparisons and run test for genescore
-# gs_res = lapply (dev_comparisons, function(x) 
-#   {
-#   tmp = wilcoxauc (gsMat, y = archp$Sample3, groups_use = x)
-#   tmp = tmp[tmp$group == x[1],]
-#   tmp[tmp$logFC > 0,]
-#   })
-# # b_df = data.frame(activity = gsMat['SOX9',], sample = archp$Sample3)
-# # pdf (file.path('Plots','bxp.pdf'))
-# # ggplot(b_df, aes (x = sample, y = activity)) + geom_boxplot()
-# # dev.off()
-
-# #pos_features = unique(unlist(lapply (gs_res, function(x) x$feature)))
-
-# gs_res_df = lapply (names (dev_comparisons), function(x) 
-#   {
-#   tmp = gs_res[[x]]
-#   rownames(tmp) = gs_res[[x]]$feature
-#   tmp = tmp[,c('padj'),drop=FALSE]
-#   tmp[pos_features,,drop=F]
-#   })
-# gs_res_df = do.call (cbind , gs_res_df)
-# colnames (gs_res_df) = names(dev_comparisons)
-# rownames (gs_res_df) = pos_features
-
-# # rownames(gs_res_df) = gs_res_df[,1]
-# # gs_res_df = gs_res_df[, !grepl ('feature',colnames(gs_res_df))]
-# #rownames (dev_res_df) = rowData (mSE)$name
-
-# # Repeat for scRNA  ##
-# rna_comparisons <- setNames(lapply(tumor_sams_rna, function(x) c(x, normal_sams_rna)), tumor_sams_rna)
-
-# # Set comparisons and run test for genescore
-# rna_res = lapply (rna_comparisons, function(x) 
-#   {
-#   tmp = wilcoxauc (srt[rowData(mSE)$name,], group_by = 'sampleID3', groups_use = x)
-#   tmp = tmp[tmp$group == x[1],]
-#   tmp[tmp$logFC > 0,]
-#   })
-# #pos_features = unique(unlist(lapply (rna_res, function(x) x$feature)))
-
-# rna_res_df = lapply (names (rna_comparisons), function(x) 
-#   {
-#   tmp = rna_res[[x]]
-#   rownames(tmp) = rna_res[[x]]$feature
-#   tmp = tmp[,c('padj'),drop=FALSE]
-#   tmp[pos_features,,drop=F]
-#   })
-# rna_res_df = do.call (cbind , rna_res_df)
-# colnames (rna_res_df) = names(rna_comparisons)
-# rownames (rna_res_df) = pos_features
-
-  
 # Also test genetic and chromatin regulators ####
 # rna_res_2 = lapply (rna_comparisons, function(x) 
 #   wilcoxauc (srt, group_by = 'sampleID2', groups_use = x))
@@ -472,6 +414,7 @@ ps = log2(as.data.frame (AverageExpression (
   group.by = metaGroupName)[[1]]) +1)
 min_exp = .5
 active_TFs = rownames(ps)[apply (ps,1,function(x) any(x > min_exp))]
+#active_TFs = rownames(ps)[apply (ps,1,function(x) sum(x > min_exp) >= occurrence_threshold)]
 selected_TF = selected_TF[selected_TF %in% active_TFs]
 tf_tumor_pos = rownames(TF_diff_rna)[TF_diff_rna$rna_diff > 0]
 selected_TF = selected_TF[selected_TF %in% tf_tumor_pos]
@@ -480,7 +423,7 @@ selected_TF = selected_TF[selected_TF %in% tf_tumor_pos]
 tf_order = rownames(TF_diff_rna)[order (-rowMeans(TF_diff_rna[,c('dev_diff','rna_diff')]))]
 selected_TF_ordered = tf_order[tf_order %in% selected_TF]
 guides = c('PITX1','TCF3','TEAD1','TEAD4','MEF2A','MEF2D','HMGA1','SOX9','TWIST1','BPTF')
-TF_labels = unique (c(head (selected_TF_ordered,30), guides))
+TF_labels = unique (c(head (selected_TF_ordered, 30), guides))
 
 # Plot distribution of diff deviation and diff expression between tumor and normal
 diff_line = 0
@@ -527,17 +470,13 @@ ylab ('RNA difference') +
 xlim (c(-0.2, .2)) + 
 ylim (c(-0.6, .6))
 
-pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot4.pdf'), width = 5,height = 4)
+pdf (paste0 ('Plots/Diff_normal_tumor_deviation_and_rna_scatterplot5.pdf'), width = 5,height = 4)
 print (tf_diff_p)
 dev.off()
 saveRDS(selected_TF, 'selected_TF.rds')
 } else {
 selected_TF = readRDS ('selected_TF.rds')
 }
-
-
-
-
 
 
 
@@ -666,7 +605,7 @@ cor_TF_df = draw (Heatmap (median_matrix,
   #       }}))
 dev.off()
 
-pdf (file.path ('Plots','selected_TF_dev_corr_heatmaps4.pdf'), width = 8,height=7)
+pdf (file.path ('Plots','selected_TF_dev_corr_heatmaps5.pdf'), width = 8,height=7)
 cor_TF_df 
 dev.off()
 
@@ -695,7 +634,7 @@ hm = draw (Heatmap (
     border=T))
 dev.off()
 
-pdf (file.path ('Plots','selected_TF_dev_corr_pathways_heatmaps3.pdf'), width = 9.5,height=2.4)
+pdf (file.path ('Plots','selected_TF_dev_corr_pathways_heatmaps4.pdf'), width = 9.5,height=2.4)
 hm
 dev.off()
 
@@ -769,7 +708,6 @@ dev.off()
 
 
 # Plot boxplots ordered by correlation to sarcomatoid score using TF activity and scRNA ####
-  
   selected_TF = readRDS ('selected_TF.rds')
   sarc_module = 'cNMF20'
   archp_meta = as.data.frame (archp@cellColData)
@@ -908,7 +846,7 @@ bp = ggplot (combined_df, aes(x = TF, y = score, fill = TF, color = type)) +
   scale_color_manual(values = c(activity = '#AE123AFF', genescore = '#001260FF')) +
   geom_hline(yintercept = 0, color = 'red', linetype = 'dashed')
 
-  pdf (paste0 ('Plots/sarcomatoid_score_TF_activity_boxplots.pdf'), width = 8,height=3)
+  pdf (paste0 ('Plots/sarcomatoid_score_TF_activity_boxplots2.pdf'), width = 8,height=3)
   bp
   dev.off()
 
