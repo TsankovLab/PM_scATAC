@@ -428,7 +428,7 @@ dev.off()
 
 # Also plot boxplots ordered by correlation to sarcomatoid score ####
 sarc_module = 'cNMF20'
-sarc_module = 'cNMF_sarc_epit'
+#sarc_module = 'cNMF_sarc_epit'
 top_ext_ct = median_matrix[sarc_module,]
 top_ext_ct = top_ext_ct[order (-top_ext_ct)]
 #top_ext_ct2 = sapply (names(top_ext_ct), function(x) unlist(strsplit (x, '\\|'))[1])
@@ -447,6 +447,9 @@ sarc_tf_df = gather (sarc_tf_df, scS, score, 1:(ncol(sarc_tf_df)-1))
 #sarc_tf_df = do.call (rbind, lapply(split(sarc_tf_df, sarc_tf_df$biotype), function(x) head (x,10)))
 palette_expression_disc = paletteer::paletteer_c("grDevices::Purple-Blue",length(unique(sarc_tf_df$normal_celltype)))
 head (sarc_tf_df)
+
+remove_celltypes = c('proximal.Ciliated','proximal.Secretory','Neuronal')
+sarc_tf_df = sarc_tf_df[!sarc_tf_df$normal_celltype %in% remove_celltypes,]
 
 bp = ggplot (sarc_tf_df, aes (x = score, y = normal_celltype)) + 
   #geom_boxplot (alpha=.8, outlier.shape = NA, fill = 'darkred', color='grey22') + 

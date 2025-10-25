@@ -102,9 +102,10 @@ conda activate chrombpnet
 
 compiled_h5=${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.h5
 motif_db=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
-
+tomtom_dir=${chromBPdir}/modisco_merged_${model_head}/compiled_tomtom
+mkdir $tomtom_dir
 python -u code/03-chrombpnet/02-compendium/04b-get_tomtom_matches.py --modisco-h5 $compiled_h5 \
-    --out-dir ${chromBPdir}/modisco_merged_${model_head}/compiled \
+    --out-dir  $tomtom_dir \
     --meme-db $motif_db \
     --verbose True
                     
@@ -157,11 +158,8 @@ done
 
 echo "R script execution completed."
 
-
-
-
+### Copy chromBPnet results files (Excluding large files !!) 
 chromBPdir_dest=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
-
 cd $chromBPdir
 for celltype in ${celltypes[@]}; do
     mkdir -p "${chromBPdir_dest}/${celltype}/no_bias_model"
@@ -169,7 +167,20 @@ for celltype in ${celltypes[@]}; do
         --include="*/" \
         --include="*.bw" \
         --include="*.tsv" \
+        --include="fold_0/***" \
+        --include="fold_1/***" \
+        --include="fold_2/***" \
+        --include="fold_3/***" \
+        --include="fold_4/***" \
         --exclude="*" \
         "${celltype}/no_bias_model/" \
         "${chromBPdir_dest}/${celltype}/no_bias_model/"
 done
+
+cp -r ${chromBPdir}/modisco_merged_counts ${chromBPdir_dest}/
+cp -r ${chromBPdir}/modisco_merged_profile ${chromBPdir_dest}/
+
+### Remove log files ####
+cd $chromBPdir_dest
+find . -type f \( -name "*.out" -o -name "*.err" \) -delete
+

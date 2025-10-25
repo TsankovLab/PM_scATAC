@@ -55,7 +55,8 @@ ggplot2::theme_set(theme_BOR())
 # dim(counts_modisco_reports)
 
 # merged reports
-modisco_merged <- map_dfr(list.files('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_counts', recursive = TRUE, pattern = "merged_modisco.tsv", full.names = TRUE),
+model_head = 'profile'
+modisco_merged = map_dfr(list.files(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_',model_head,'/merged_motifs'), recursive = TRUE, pattern = "modisco_compiled.tsv", full.names = TRUE),
                           ~ read_tsv(.x))
 
 modisco_merged <- modisco_merged %>%
@@ -67,7 +68,7 @@ write_tsv(modisco_merged, file = glue("{out}modisco_merged_reports.tsv"))
 
 
 # compiled reports with tomtom matches againt Vierstra database
-modisco_compiled <- read_tsv('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/compiled_counts/modisco_compiled.tsv') %>%
+modisco_compiled <- read_tsv(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_',model_head,'/compiled/modisco_compiled.tsv')) %>%
   # fix logo names
   mutate(modisco_cwm_fwd = ifelse(grepl("^pos", pattern), gsub("pos.", "pos_patterns.pos.", modisco_cwm_fwd), gsub("neg.", "neg_patterns.neg.", modisco_cwm_fwd)),
          modisco_cwm_rev = ifelse(grepl("^pos", pattern), gsub("pos.", "pos_patterns.pos.", modisco_cwm_rev), gsub("neg.", "neg_patterns.neg.", modisco_cwm_rev)))

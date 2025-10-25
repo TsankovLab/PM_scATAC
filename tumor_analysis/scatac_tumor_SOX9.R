@@ -422,7 +422,7 @@ selected_TF = selected_TF[selected_TF %in% tf_tumor_pos]
 # Order by mean logFC
 tf_order = rownames(TF_diff_rna)[order (-rowMeans(TF_diff_rna[,c('dev_diff','rna_diff')]))]
 selected_TF_ordered = tf_order[tf_order %in% selected_TF]
-guides = c('PITX1','TCF3','TEAD1','TEAD4','MEF2A','MEF2D','HMGA1','SOX9','TWIST1','BPTF')
+guides = c('PITX1','TCF3','TEAD4','MEF2A','MEF2D','HMGA1','SOX9','TWIST1','BPTF')
 TF_labels = unique (c(head (selected_TF_ordered, 30), guides))
 
 # Plot distribution of diff deviation and diff expression between tumor and normal
@@ -478,7 +478,9 @@ saveRDS(selected_TF, 'selected_TF.rds')
 selected_TF = readRDS ('selected_TF.rds')
 }
 
-
+### Export selected TF with pvalues and median dev and exp to make supplementary table 4 ####
+selected_TF_df = cbind (dev_res_df[selected_TF, ],TF_diff_rna[selected_TF,])
+write.csv (selected_TF_df, 'selected_TF_table.csv')
 
 # ### Try running wilcox test for each normal and tumor sample comb ####
 #   # Lists of TFs are quite different using ENCODE normal samples (they have very low # cells) so consider discard them
@@ -1004,22 +1006,41 @@ x$mid[which.max (x$counts)]
 
 
 ### Import Blum meta-analysis to compare with top TF correlated with scS-score ####
+top_sarc_TF = readRDS ('top_sarc_TF.rds')
 blum_df = read.csv (file.path('..','Blum_et_al_SE_score.csv'))
-blum_dfE = data.frame (gene = blum_df$Gene.Name, score = blum_df$correlation.E.score, SE_score = 'epithelioid')
-blum_dfS = data.frame (gene = blum_df$Gene.Name.1, score = blum_df$correlation.S.score, SE_score = 'sarcomatoid')
+blum_dfE = data.frame (gene = blum_df$Gene.Name, 
+  score = blum_df$correlation.E.score, 
+  SE_score = 'epithelioid',
+  pval = blum_df$adjpvalue.E.score)
+blum_dfS = data.frame (
+  gene = blum_df$Gene.Name.1, 
+  score = blum_df$correlation.S.score, 
+  SE_score = 'sarcomatoid',
+  pval = blum_df$adjpvalue.S.score)
 blum_df = rbind (blum_dfE, blum_dfS)
 blum_df = na.omit (blum_df)
+blum_df$sig = blum_df$pval
+blum_df$sig[blum_df$pval < 0.05 & blum_df$pval > 0.01] = '*'
+blum_df$sig[blum_df$pval < 0.01 & blum_df$pval  > 0.001] = '**'
+blum_df$sig[blum_df$pval < 0.001] = '***'
 rownames (blum_df) = blum_df$gene
 blum_df = blum_df[top_sarc_TF, ]
 blum_df$gene = rownames (blum_df)
-blum_df$gene = factor (blum_df$gene, levels = blum_df$gene)
+blum_df$score[is.na(blum_df$score)] = 0
+blum_df$SE_score [is.na(blum_df$SE_score == 'epithelioid')] = 0
+blum_df$score[blum_df$SE_score == 'epithelioid'] = -1 * blum_df$score[blum_df$SE_score == 'epithelioid']
+blum_df$gene = factor (blum_df$gene, levels = rownames (blum_df)[order (-blum_df$score)])
+blum_df = na.omit (blum_df)
 # Create the dot plot
-dp = ggplot(blum_df, aes(x = gene, y = 1)) +
-  geom_point(aes (size = score, color = SE_score)) + # Adds the points
+dp = ggplot(blum_df, aes(x = gene, y = score)) +
+  geom_bar (position="stack", stat="identity",alpha=.7, aes(fill = SE_score)) + # Adds the points
   labs(title = "Correlation to Blum et al") + # Labels
-  scale_color_manual (values = c(epithelioid = 'darkgreen',sarcomatoid = 'firebrick2')) + gtheme
+  scale_fill_manual (values = c(epithelioid = 'blue',sarcomatoid = 'purple')) + 
+  gtheme +
+  geom_text(aes(label=sig), vjust=0.5, hjust = 0.5) #+
+  #geom_text(aes(label=sig), vjust=1, hjust=0.5)
 
-pdf (file.path ('Plots','Blum_top_sarc_TF2.pdf'))
+pdf (file.path ('Plots','Blum_top_sarc_TF2.pdf'), height=3, width = 4)
 dp
 dev.off()
 
@@ -1250,6 +1271,7 @@ matching_samples=c('normal_pleura','P1','P3','P4','P5','P8','P11','P11_HOX','P12
 TF = 'RUNX2'
 TF = 'SOX6'
 TF = 'SOX9'
+TF = 'SNAI2'
 sample_sarc_order_levels = levels(sample_sarc_order)
 #sample_sarc_order_levels = sample_sarc_order_levels[c(7,1:6,8:13)]
 sample_sarc_order_levels = sample_sarc_order_levels[! sample_sarc_order_levels %in% 'normal1']

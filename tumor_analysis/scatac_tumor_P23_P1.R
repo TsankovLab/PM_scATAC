@@ -13,7 +13,7 @@ archp = addClusters (input = archp, resolution = 3,
   force = TRUE)
 
 
-force=T
+force=F
 metaGroupName = 'Clusters2'
 if (!file.exists (paste0('DAP_',metaGroupName,'.rds')) | force)
   {
@@ -784,11 +784,13 @@ dev.off()
 rankby = 'pval_signedLFC'
 
 sox9_gs = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/Sox9_targets_mouse.csv')
-sox9_gs_W1 = sox9_gs$symbol[sox9_gs$W1 > 0]
-sox9_gs_W2 = sox9_gs$symbol[sox9_gs$W2 > 0]
-sox9_gs_W6 = sox9_gs$symbol[sox9_gs$W6 > 0]
-sox9_gs_W12 = sox9_gs$symbol[sox9_gs$W12 > 0]
-sox9_gs_class = split (sox9_gs$symbol, sox9_gs$class)
+D0 = head(sox9_gs$symbol[order(-sox9_gs$D0)],500)
+W1 = head(sox9_gs$symbol[order(-sox9_gs$W1)],500)
+W2 = head(sox9_gs$symbol[order(-sox9_gs$W2)],500)
+W6 = head(sox9_gs$symbol[order(-sox9_gs$W6)],500)
+W12 = head(sox9_gs$symbol[order(-sox9_gs$W12)],500)
+#sox9_gs_class = split (sox9_gs$symbol, sox9_gs$class)
+sox9_gs_class = list (D0 = D0, W1 = W1, W2 = W2, W6 = W6, W12=W12)
 pathways = sox9_gs_class
 pathways = lapply (pathways, function(x) mouseMan (x))
 pathways = lapply (pathways, function(x) x$HGNC.symbol)
@@ -839,4 +841,55 @@ message ('Print enrichment plots for each signficant pathway and cell type')
   pdf (file.path('Plots','SOX9_Fuchs_enrichment_plots.pdf'),width= 5, height= 3)
   print(ep)
   dev.off() 
+
+
+#### Make boxplots of gene modules instead
+gs_feat = getFeatures (archp, 'GeneScoreMatrix')
+pathways = lapply (pathways, function(x) x[x %in% gs_feat])
+archp = addModuleScore (
+  ArchRProj = archp,
+  useMatrix = 'GeneScoreMatrix',
+  name = "Sox9_mouse",
+  features = pathways,
+  nBin = 25,
+  nBgd = 100,
+  seed = 1,
+  threads = getArchRThreads(),
+  logFile = createLogFile("addModuleScore")
+)
+
+ccomp = as.data.frame (archp@cellColData)[, c(paste0('Sox9_mouse.',names (sox9_gs_class)),'Clusters2')]
+ccomp = ccomp[ccomp$Clusters2 %in% c('C4','C9'),]
+library (tidyr)
+ccomp = gather (ccomp, module, score, 1:(ncol(ccomp)-1))
+ccomp$module = factor (ccomp$module, levels = paste0('Sox9_mouse.',c('D0','W1','W2','W6','W12')))
+ccomp$Clusters2 = factor (ccomp$Clusters2, levels = c('C4','C9'))
+gp = ggplot (ccomp, aes (x = Clusters2, y = score), alpha=.5) + 
+  geom_violin (aes (fill = Clusters2), 
+    trim=TRUE,size=2,
+    width=1,
+    scale='width',
+    linewidth = .2, alpha=0.7) + 
+  geom_boxplot (aes (fill = Clusters2),
+    linewidth = .2,
+    width=.4,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.6, alpha=0.7) + 
+  gtheme + 
+  scale_fill_manual (values = c(C4 = 'blue',C9='purple')) + 
+  facet_wrap (~module, ncol = 5, scale='free')
+
+stat.test = gp$data %>% group_by (module) %>%
+wilcox_test (reformulate ('Clusters2', 'score')) %>%
+adjust_pvalue (method = "fdr") %>%
+add_significance ()
+stat.test = stat.test %>% add_xy_position (x = 'Clusters2', step.increase=.4)
+gp = gp + stat_pvalue_manual (stat.test, remove.bracket=FALSE,
+bracket.nudge.y = 0, hide.ns = T,
+label = "p.adj.signif") + NoLegend()
+
+pdf (file.path ('Plots','Fuchs_SOX9_module_scores_boxplot.pdf'), width = 5, height=2.4)
+gp
+dev.off()
 

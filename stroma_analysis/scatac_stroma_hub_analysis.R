@@ -154,12 +154,12 @@ hm = Heatmap (
   column_names_gp = gpar(fontsize = 6),
   row_names_gp = gpar(fontsize = 0),
   column_names_rot = 45,
-  show_column_dend = F,
+  show_column_dend = T,
   row_dend_width = unit(3,'mm'),
   row_dend_side = 'left',
   col=rev (palette_fragments))
 
-pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=4, width=3)
+pdf (file.path (hubs_dir,'Plots',paste0('hubs_',metaGroupName,'_heatmap.pdf')), height=3, width=2)
 hm
 dev.off()
 

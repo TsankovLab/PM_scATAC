@@ -72,8 +72,8 @@ if (!file.exists ('meso_tcga_RSEM_cleaned.rds'))
   idx = sapply (rownames(tcga_meta), function(x) grep (x, colnames(tcga_mat)))
   tcga_mat = tcga_mat[,idx]
   colnames (tcga_mat) = rownames(tcga_meta)
-  # tcga_mat = tcga_mat[,tcga_meta$TUMOR_TYPE != 'Diffuse Malignant Mesothelioma (NOS)']
-  # tcga_meta = tcga_meta[tcga_meta$TUMOR_TYPE != 'Diffuse Malignant Mesothelioma (NOS)',]
+  tcga_mat = tcga_mat[,tcga_meta$TUMOR_TYPE != 'Diffuse Malignant Mesothelioma (NOS)']
+  tcga_meta = tcga_meta[tcga_meta$TUMOR_TYPE != 'Diffuse Malignant Mesothelioma (NOS)',]
   
   saveRDS (tcga_mat, 'meso_tcga_RSEM_cleaned.rds')
   saveRDS (tcga_meta, 'meso_tcga_meta_cleaned.rds')
@@ -154,6 +154,10 @@ meso_bulk_meta_l = list (
   tcga = tcga_meta,
   mesomics = msm_meta2)
 
+# Remove NOS subtype in TCGA
+meso_bulk_meta_l[['tcga']] = meso_bulk_meta_l[['tcga']][meso_bulk_meta_l[['tcga']]$TUMOR_TYPE != 'Diffuse Malignant Mesothelioma (NOS)' ,]
+meso_bulk_l[['tcga']] = meso_bulk_l[['tcga']][,rownames(meso_bulk_meta_l[['tcga']])]
+
 # Harmonize metadata ####
 meso_bulk_meta_l[['tcga']]$TUMOR_TYPE[meso_bulk_meta_l[['tcga']]$TUMOR_TYPE == 'Biphasic Mesothelioma'] = 'Biphasic'
 meso_bulk_meta_l[['tcga']]$TUMOR_TYPE[meso_bulk_meta_l[['tcga']]$TUMOR_TYPE == 'Epithelioid Mesothelioma'] = 'Epithelioid'
@@ -213,6 +217,7 @@ module_l = c(SNAI2 = 'SNAI2')
 module_l = c(CD90 = 'CD44', stem='CD73',stem='CD146')
 module_l = c(ELK4 = 'ELK4')
 module_l = c(HOXB13 = 'HOXB13')
+module_l = c(SOX9 = 'SOX9', SOX6 = 'SOX6')
 
 
 # Make gene modules overlapping megahubs regions in P11 ####
@@ -223,7 +228,7 @@ module_l = c(MBP = 'MBP')
 module_l = c(TXNL4A = 'TXNL4A')
 module_l = list(HOXB13 = 'HOXB13', HOXC13 = 'HOXC13',sarc='AXL')
 module_l = sarc_score
-module_l = list(SOX9 = 'SOX9',SOX6 = 'SOX6')
+module_l = list(SOX9 = 'SOX9',SOX6 = 'SOX6',RUNX2='RUNX2',RUNX1='RUNX1',SNAI2='SNAI2')
 module_l = list(NTM='NTM')
 
 # Run genes on bulk datasets ####
@@ -246,10 +251,7 @@ for (mod_name in names(module_l))
       )
     bp_l[[study]] = ggplot(gene_exp, aes (x= subtype, y= expression)) + 
     ggtitle (paste('RNAseq',study,'cohort')) +
-    theme_minimal() +
-    theme(
-      axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),
-      plot.title = element_text(size = 5)) + 
+    gtheme +  
     geom_boxplot (aes (fill = subtype), outlier.colour="black", outlier.shape=16,
              outlier.size=2,outlier.alpha = 0.2, notch=FALSE,alpha = 0.7, lwd=.2) +
     NoLegend () + 
@@ -270,8 +272,8 @@ for (mod_name in names(module_l))
      stat_testL[[study]] = data.frame (stat.test, dataset = study)
     }
     stat_testL2[[mod_name]] = stat_testL
-    png (paste0 ('Plots/',mod_name,'_expression_avg_boxplots.png'), width = 4000,height=1000, res=300)
-    print (wrap_plots (bp_l, ncol=10))
+    pdf (paste0 ('Plots/',mod_name,'_expression_avg_boxplots.pdf'), width = 5,height=3)
+    print (wrap_plots (bp_l, ncol=3))
     dev.off ()
     }
 
@@ -373,7 +375,13 @@ studies = c ('bueno','tcga','mesomics')
 by_histology=F
 filter_low_exp = 0
 your.gene1 = 'SOX9'
-your.gene2 = 'SOX6'
+your.gene2 = 'VIM'
+
+nfeat = 5000
+k_selection = 25
+cnmf_spectra_unique = readRDS (paste0('../tumor_compartment/scrna/',paste0('cnmf_genelist_',k_selection,'_nfeat_',nfeat,'.rds')))
+sarc_score = head (cnmf_spectra_unique[[20]],50)
+your.gene2 = sarc_score
 sp_l = list()
 for (study in studies)
   {
@@ -411,7 +419,7 @@ for (study in studies)
     sp_l[[study]] = sp
     }
 
-pdf (file.path ('Plots',paste(your.gene1,'_',your.gene2)), width=18, height=4)
+pdf (file.path ('Plots',paste(your.gene1,'_',your.gene2)), width=8, height=3)
 wrap_plots (sp_l, ncol=3)
 dev.off()
 

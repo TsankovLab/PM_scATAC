@@ -1262,6 +1262,19 @@ archp$SNAI2_groups = archp$Clusters2
 
 metaGroupName='Clusters2'
 matching_samples=c('normal_pleura','P1','P4','P5','P8','P11','P11_HOX','P12','P14')
+
+# Generate finemo motif calls only for RUNX for visualization ####
+sox9_high_finemo_counts = read.table ('chromBPnet/SOX9_high_P23/no_bias_model/SOX9_high_P23_finemo_counts_to_genome_browser.tsv')
+sox9_high_finemo_counts = sox9_high_finemo_counts[grep ( 'RUNX',sox9_high_finemo_counts$V4), ]
+sox9_high_finemo_profile = read.table ('chromBPnet/SOX9_high_P23/no_bias_model/SOX9_high_P23_finemo_profile_to_genome_browser.tsv')
+sox9_high_finemo_profile = sox9_high_finemo_profile[grep ( 'RUNX',sox9_high_finemo_profile$V4), ]
+
+write.table (sox9_high_finemo_counts, 'chromBPnet/SOX9_high_P23/finemo_counts_RUNX.tsv', sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+write.table (sox9_high_finemo_profile, 'chromBPnet/SOX9_high_P23/finemo_profile_RUNX.tsv', sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+
+
+sox9_high_finemo_counts_gr = makeGRangesFromDataFrame (sox9_high_finemo_counts[,c(1:3)], seqnames.field = 'V1', start.field = 'V2',end.field = 'V3')
+palette_SOX9 = c(C4 = 'blue', C9 = 'purple')
 pdf()
 meso_markers <- plotBrowserTrack2 (
     ArchRProj = archp[archp$Clusters2 %in% c('C4','C9')], 
@@ -1272,16 +1285,16 @@ meso_markers <- plotBrowserTrack2 (
     geneSymbol = 'SNAI2',
     normMethod = "ReadsInTSS",
     scCellsMax=3000,
-    hubs_regions = hubs_obj$hubsCollapsed,
+    hubs_regions = sox9_high_finemo_counts_gr,
     plotSummary = c("bulkTrack", "featureTrack", 
         "loopTrack","geneTrack", 
         "hubTrack",'hubregiontrack'),
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (DAH_df$region[22]),1000,1000),
     upstream = 100000,
-    pal = palette_sample,
+    pal = palette_SOX9,
     #ylim=c(0,0.1),
-    downstream = 10000,
+    downstream = 100000,
     #loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
     #pal = ifelse(grepl('T',unique (archp2@cellColData[,metaGroupName])),'yellowgreen','midnightblue'),
 #    loops = getCoAccessibility (archp, corCutOff = 0.25),
@@ -1294,5 +1307,12 @@ dev.off()
 
 plotPDF (meso_markers, ArchRProj = archp, 
   width=5,height=3, 
-  name =paste0('region_coveragePlots.pdf'),
+  name =paste0('SNAI2_coveragePlots.pdf'),
   addDOC = F)
+
+
+
+
+
+
+

@@ -207,6 +207,7 @@ box
 dev.off()
 
 ### Compare SOX6 expression with scS-score across samples ####
+library (ggpubr)
 avg_exp = log2(AverageExpression (srt, group.by = 'sampleID', feature = c('SOX6','SOX9'))[[1]]+1)
 avg_exp = t(avg_exp)
 ccomp_df = srt@meta.data
@@ -222,8 +223,18 @@ sp <- ggplot(ccomp_df, aes(x = x, y = SOX6)) + #, fill = sampleID, color = sampl
   scale_fill_manual(values = rev(palette_sample)) +
   scale_color_manual(values = rev(palette_sample)) +
   gtheme
+sp2 <- ggplot(ccomp_df, aes(x = x, y = SOX9)) + #, fill = sampleID, color = sampleID)) +
+  geom_point(alpha = .8, shape = 21, stroke = 1, aes (fill = sampleID)) +
+  geom_smooth(method = "lm", se = FALSE, color = "blue") +
+  stat_cor(method = "pearson",
+           label.x.npc = "left",  # place in left side of plot
+           label.y.npc = "top") + # place near top
+  scale_fill_manual(values = rev(palette_sample)) +
+  scale_color_manual(values = rev(palette_sample)) +
+  gtheme  
 pdf (file.path ('Plots','SOX6_9_scSscore_scatterplot.pdf'), height=3,width=3.5)
 sp
+sp2
 dev.off()
 
 
