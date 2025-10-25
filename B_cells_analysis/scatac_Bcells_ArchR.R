@@ -77,8 +77,8 @@ dev.off()
   print (umap_p5)
   dev.off()
 
-### Remove C3 after Harmonized clustering ####
-archp = archp[archp$Clusters_H != 'C3']
+### Remove C2 after Harmonized clustering ####
+archp = archp[archp$Clusters_H != 'C2']
     archp = addIterativeLSI (ArchRProj = archp,
     useMatrix = "TileMatrix", name = "IterativeLSI",
     force = TRUE, LSIMethod = LSI_method,
@@ -97,8 +97,9 @@ archp = addUMAP (ArchRProj = archp,
 
 archp = addClusters (input = archp,
     reducedDims = "Harmony_project",
-    name='Clusters_H', res=.8,
+    name='Clusters_H', res=.6,
     force = TRUE)
+
 archp = archp[archp$Clusters_H != 'C1']
 
 archp = saveArchRProject (archp)
@@ -198,7 +199,7 @@ DAG_hm = Heatmap (t(scale(gsMat_mg)),
         )
          
   #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
-pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 3, height = 4)
+pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 3, height = 6)
 print (DAG_hm)
 dev.off()
 
@@ -228,7 +229,8 @@ rownames (gsMat) = rowData (gsSE)$name
 gsMat_mg = gsMat[rownames (gsMat) %in% unique(DAG_df$gene), ]
 gsMat_mg = as.data.frame (t(gsMat_mg))
 gsMat_mg = colMeans (gsMat_mg)
-expmat = as.data.frame (log2(AverageExpression (srt, feature = names (gsMat_mg), group.by = 'celltype_simplified')[[1]]+1))
+srt$celltype = 'Bcells'
+expmat = as.data.frame (log2(AverageExpression (srt, feature = names (gsMat_mg), group.by = 'celltype')[[1]]+1))
 
 exp_gs = data.frame (expression = expmat[names(gsMat_mg),], genescore = gsMat_mg)
 exp_gs$protocaderins = ifelse (grepl ('PCDHG',rownames(exp_gs)), 'protocaderin','other')
@@ -538,6 +540,20 @@ dev.off()
 
 
 
+
+
+# Export bigwig files for IGV viewer
+getGroupBW (
+  ArchRProj = archp,
+  groupBy = "Clusters_H",
+  normMethod = "ReadsInTSS",
+  tileSize = 100,
+  maxCells = 5000,
+  ceiling = 4,
+  verbose = TRUE,
+  threads = getArchRThreads(),
+  logFile = createLogFile("getGroupBW")
+)
 
 
 

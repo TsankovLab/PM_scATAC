@@ -39,7 +39,7 @@ celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
 #celltypes_remove = c('Fibroblasts','Malignant','Mesothelium')
 #celltypes = celltypes[!celltypes %in% celltypes_remove]
 #archp = archp[archp$celltype_lv1 %in% c('Fibroblasts','Malignant','Mesothelium')]
-#archp = archp[archp$celltype_revised_sample %in% c('Fibroblasts_P1')]
+archp = archp[archp$celltype_revised_sample %in% c('Mesothelium_P1','Fibroblasts_P1')]
 archp = archp[archp$celltype_lv1 %in% celltypes]
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 

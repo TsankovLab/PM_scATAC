@@ -10,7 +10,7 @@ if (!file.exists(paste0('fragments_',metagroup,'.tsv')) | force)
     fragments_metagroup = as.data.frame (fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == metagroup]], row.names=NULL)
     fragments_metagroup$strand = '.'
     fragments_metagroup = fragments_metagroup[,c(1:3,5)]
-    write.table (fragments_metagroup, file.path('chromBPnet',paste0('fragments_',metagroup,'.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+    write.table (fragments_metagroup, file.path(chromBPdir,paste0('fragments_',metagroup,'.tsv')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
     }
 
 # Call peaks with MACS2 following ENCODE specifications 
@@ -32,7 +32,7 @@ for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
 	{
 	prefix <- metagroup # Replace with your desired prefix
 	message (paste('call peaks with MACS2 for:', metagroup))	
-	fragment_file <- file.path('chromBPnet',paste0('fragments_',metagroup,'.tsv')) # Replace with actual file path
+	fragment_file <- file.path(chromBPdir,paste0('fragments_',metagroup,'.tsv')) # Replace with actual file path
 	# Construct the command
 	command <- paste(
 	  "macs2 callpeak",
@@ -44,7 +44,7 @@ for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
 	  "--shift", shiftsize,
 	  "--extsize", smooth_window,
 	  "--nomodel --keep-dup all --call-summits",
-	  "--outdir", paste0('chromBPnet/','MACS2_',metagroup)
+	  "--outdir", paste0(chromBPdir,'/','MACS2_',metagroup)
 	)
 	
 	# Run the command
@@ -56,9 +56,9 @@ NPEAKS=200000 # capping number of peaks called from MACS2
 message ('Export peak files')	
 for (metagroup in unique(as.character(archp@cellColData[,metaGroupName])))
 	{
-	peaks = read.table (file.path ('chromBPnet',paste0('MACS2_',metagroup), paste0(metagroup,'_peaks.narrowPeak')), sep='\t')	
+	peaks = read.table (file.path (chromBPdir,paste0('MACS2_',metagroup), paste0(metagroup,'_peaks.narrowPeak')), sep='\t')	
 	peaks = head (peaks[order(-peaks[,7]),], NPEAKS)
-	write.table (peaks, file.path('chromBPnet',paste0('MACS2_',metagroup), paste0(metagroup,'_peaks_capped.narrowPeak')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
+	write.table (peaks, file.path(chromBPdir,paste0('MACS2_',metagroup), paste0(metagroup,'_peaks_capped.narrowPeak')), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
 	}
 message ('done!')	
 

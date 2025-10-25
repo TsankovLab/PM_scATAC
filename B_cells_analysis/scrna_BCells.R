@@ -66,7 +66,7 @@ sample_names = c(
 if (!file.exists ('srt.rds'))
 {
 srt = readRDS ('../../main/scrna/srt.rds')
-srt = srt[,srt$celltype_simplified == 'B_cells']
+srt = srt[,srt$celltype_simplified %in% c('B_cells','Plasma')]
 srt = srt[,srt$sampleID %in% sample_names]
 srt = srt[, srt$sampleID %in% names (table (srt$sampleID)[table (srt$sampleID) > 20])]
 
@@ -99,9 +99,10 @@ srt = FindClusters (srt, resolution = 1, verbose = T, n.start = 100)
 
 dp = DimPlot (srt, group.by = 'seurat_clusters', reduction='umap')
 dp2 = DimPlot (srt, group.by = 'sampleID', reduction='umap')
+dp3 = DimPlot (srt, group.by = 'celltype_simplified', reduction='umap')
 
 pdf (file.path('Plots','seurat_clusters_umap.pdf'), width=12)
-print (wrap_plots (dp, dp2))
+print (wrap_plots (dp, dp2,dp3))
 dev.off()
 saveRDS (srt, 'srt.rds')
 } else {
@@ -217,20 +218,6 @@ pdf (file.path('Plots','Bcell_markers2.pdf'),20,20)
 wrap_plots (fps2)
 dev.off()
   
-
-# Export bigwig files for IGV viewer
-getGroupBW (
-  ArchRProj = archp,
-  groupBy = "Clusters_H",
-  normMethod = "ReadsInTSS",
-  tileSize = 100,
-  maxCells = 5000,
-  ceiling = 4,
-  verbose = TRUE,
-  threads = getArchRThreads(),
-  logFile = createLogFile("getGroupBW")
-)
-
 
 
 
