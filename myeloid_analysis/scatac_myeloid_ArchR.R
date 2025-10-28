@@ -706,7 +706,7 @@ cnmf_scatac = readRDS ('cnmf_scatac.rds')
 
 
 ### Try using metacells for each cnmf ####
-sams = c('P1','P10','P11','P12','P13','P14','P23','P5') # Select samples that have at least 100 endothelial cells
+sams = c('P1','P10','P11','P12','P13','P14','P23','P5') # Select samples that have at least 100 myeloid cells
 df = list()
 archp$Sample2 = 'sample'
 sams = 'sample'

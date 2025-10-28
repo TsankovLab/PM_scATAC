@@ -1064,7 +1064,7 @@ dev.off()
 
 
 
-# Import chromBPnet finemo motifs ####
+# Import chromBPnet finemo calls ####
 #archp_P1 = archp[archp$Clusters %in% c('C2') & archp$Sample == 'P1']
 library ('universalmotif')
 
