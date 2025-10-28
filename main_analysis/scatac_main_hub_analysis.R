@@ -8,10 +8,10 @@ source (file.path('..','..','git_repo','utils','hubs_track.R'))
 # Export bigiwg files ####
 #archp$celltype_status = paste0(archp$celltype2, '_', archp$status)
 metaGroupName = 'celltype_lv1'
-archp$celltype_lv1a = archp$celltype_lv1
-archp$celltype_lv1a[archp$celltype_lv1a == 'Fibroblasts' & archp$Sample == 'P1'] = 'Fibroblasts_P1'
+#archp$celltype_lv1a = archp$celltype_lv1
+#archp$celltype_lv1a[archp$celltype_lv1a == 'Fibroblasts' & archp$Sample == 'P1'] = 'Fibroblasts_P1'
 
-metaGroupName = 'celltype_lv1a'
+metaGroupName = 'celltype_lv1'
 exp_bigwig = F
 if (exp_bigwig)
   {
@@ -221,141 +221,134 @@ res_l = lapply (split (res, res$group), function(x){
 
 # celltype specific hubs to input to IGV ####
 c(HUB277 HUB77 HUB68 HUB32 HUB522 HUB5713 HUB26 HUB48 HUB6929 HUB1459 HUB16 HUB2371)
-
 HUB522 HUB5713 HUB277 HUB32 HUB68 HUB1459 HUB26 HUB16 HUB48 HUB77 HUB6929 HUB2371 
+HUB2543 HUB5226 HUB1063 HUB15 HUB25 HUB2387 HUB85 HUB9 HUB32 HUB34 HUB4599 HUB6622)
 
-HUB2543 HUB5226 HUB1063 HUB15 HUB25 HUB2387 HUB85 HUB9 HUB32 HUB34 HUB4599 HUB6622
+# # Generate matrix of fragment counts of hubs x metagroup ####
+# table (archp$celltype_lv1)
+# archp$compartment = archp$celltype_lv1
+# archp$compartment[archp$celltype_lv1 %in% c('Alveolar','Mesothelium','Malignant')] = 'epithelial'
+# archp$compartment[archp$celltype_lv1 %in% c('Endothelial','Fibroblasts','SmoothMuscle')] = 'stroma'
+# archp$compartment[archp$celltype_lv1 %in% c('Myeloid','pDCs')] = 'myeloid'
+# archp$compartment[archp$celltype_lv1 %in% c('B_cells','NK','Plasma','T_cells')] = 'lymphoid'
 
-# Generate matrix of fragment counts of hubs x metagroup ####
-table (archp$celltype_lv1)
-archp$compartment = archp$celltype_lv1
-archp$compartment[archp$celltype_lv1 %in% c('Alveolar','Mesothelium','Malignant')] = 'epithelial'
-archp$compartment[archp$celltype_lv1 %in% c('Endothelial','Fibroblasts','SmoothMuscle')] = 'stroma'
-archp$compartment[archp$celltype_lv1 %in% c('Myeloid','pDCs')] = 'myeloid'
-archp$compartment[archp$celltype_lv1 %in% c('B_cells','NK','Plasma','T_cells')] = 'lymphoid'
+# metaGroupName = 'compartment'
+# if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
+#   {
+#   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
+#     ArchRProj = archp))   
+#   hubsSample_mat = matrix (ncol = length(unique(archp@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
+#   colnames (hubsSample_mat) = unique(archp@cellColData[,metaGroupName])
+#   rownames (hubsSample_mat) = hubs_obj$hubs_id
+#   pb =progress::progress_bar$new(total = length (unique(archp@cellColData[,metaGroupName])))
+#   for (sam in unique(archp@cellColData[,metaGroupName]))
+#     {
+#     pb$tick()  
+#     fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == sam]]  
+#     fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
+#     hubsSample_mat[,sam] = fragments_in_sample_in_hubs
+#     }
+#   frags_in_sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) sum (archp$nFrags[as.character(archp@cellColData[,metaGroupName]) == x]))
+#   hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
+#   saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
+#   } else {
+#   hubsSample_mat = readRDS (file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))  
+#   }
+# hubsSample_mat = as.data.frame (hubsSample_mat)
 
-metaGroupName = 'compartment'
-if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
-  {
-  if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
-    ArchRProj = archp))   
-  hubsSample_mat = matrix (ncol = length(unique(archp@cellColData[,metaGroupName])), nrow = length(hubs_obj$hubsCollapsed))
-  colnames (hubsSample_mat) = unique(archp@cellColData[,metaGroupName])
-  rownames (hubsSample_mat) = hubs_obj$hubs_id
-  pb =progress::progress_bar$new(total = length (unique(archp@cellColData[,metaGroupName])))
-  for (sam in unique(archp@cellColData[,metaGroupName]))
-    {
-    pb$tick()  
-    fragments_in_sample = fragments[fragments$RG %in% rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) == sam]]  
-    fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
-    hubsSample_mat[,sam] = fragments_in_sample_in_hubs
-    }
-  frags_in_sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) sum (archp$nFrags[as.character(archp@cellColData[,metaGroupName]) == x]))
-  hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
-  saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
-  } else {
-  hubsSample_mat = readRDS (file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))  
-  }
-hubsSample_mat = as.data.frame (hubsSample_mat)
+# # Find shared hubs across cell types ####
+# hubsSample_rank = hubsSample_mat / width(hubs_obj$hubsCollapsed)
+# hubsSample_rank = apply (hubsSample_rank, 2, function(x) order(-x))
+# rownames (hubsSample_rank) = rownames(hubsSample_mat)
+# shared_hubs = apply (hubsSample_rank, 1, mean)
+# shared_hubs = shared_hubs[order(shared_hubs)]
+# which (names (shared_hubs) == 'HUB322')
 
-# Find shared hubs across cell types ####
-hubsSample_rank = hubsSample_mat / width(hubs_obj$hubsCollapsed)
-hubsSample_rank = apply (hubsSample_rank, 2, function(x) order(-x))
-rownames (hubsSample_rank) = rownames(hubsSample_mat)
-shared_hubs = apply (hubsSample_rank, 1, mean)
-shared_hubs = shared_hubs[order(shared_hubs)]
-which (names (shared_hubs) == 'HUB322')
-
-# Plot some of shared hubs ####
-hubsCell_mat_t = as.data.frame (t(hubsCell_mat))
-shared_hubs = names(head (shared_hubs[order(shared_hubs)]))
-hubsCell_mat_t = hubsCell_mat_t[rownames(archp@cellColData),]
-archp@cellColData = cbind(archp@cellColData, hubsCell_mat_t[,shared_hubs])
-umap_p1 =  plotEmbedding (
-  ArchRProj = archp, 
-  colorBy = "cellColData",
- name = shared_hubs, 
- embedding = "UMAP",
- imputeWeights = getImputeWeights(archp)
- )
+# # Plot some of shared hubs ####
+# hubsCell_mat_t = as.data.frame (t(hubsCell_mat))
+# shared_hubs = names(head (shared_hubs[order(shared_hubs)]))
+# hubsCell_mat_t = hubsCell_mat_t[rownames(archp@cellColData),]
+# archp@cellColData = cbind(archp@cellColData, hubsCell_mat_t[,shared_hubs])
+# umap_p1 =  plotEmbedding (
+#   ArchRProj = archp, 
+#   colorBy = "cellColData",
+#  name = shared_hubs, 
+#  embedding = "UMAP",
+#  imputeWeights = getImputeWeights(archp)
+#  )
   
-pdf (file.path(hubs_dir,'Plots','shared_hubs_umap.pdf'), 15,15)
-wrap_plots (umap_p1, ncol=4)
-dev.off()
+# pdf (file.path(hubs_dir,'Plots','shared_hubs_umap.pdf'), 15,15)
+# wrap_plots (umap_p1, ncol=4)
+# dev.off()
 
-# Check if VIM is also expressed across cell types in scRNA ####
-# Load RNA 
-srt = readRDS ('../scrna/srt.rds')
-#sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
+# # Check if VIM is also expressed across cell types in scRNA ####
+# # Load RNA 
+# srt = readRDS ('../scrna/srt.rds')
+# #sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
 
-vp = VlnPlot (srt, feature = c('ERG','VIM'), group.by = 'celltype_simplified', col=palette_celltype_lv1) + NoLegend()
+# vp = VlnPlot (srt, feature = c('ERG','VIM'), group.by = 'celltype_simplified', col=palette_celltype_lv1) + NoLegend()
 
-hubsCell_mat = t(hubsCell_mat)[rownames(archp@cellColData),]
-archp@cellColData = cbind(archp@cellColData, log2(hubsCell_mat[,c('HUB322'), drop=F]+1))
-#archp@cellColData = archp@cellColData[, -ncol(archp@cellColData)]
-p <- plotGroups(
-  ArchRProj = archp, 
-  groupBy = "celltype_lv1", 
-  colorBy = "cellColData", 
-  name = "HUB322",
-  plotAs = "violin",
-  pal = palette_celltype_lv1,
-  alpha = 0.4,
-  addBoxPlot = TRUE
- )
-pdf (file.path ('Plots','VIM_expression_accessibility.pdf'), height=5, width=12)
-wrap_plots (vp, p, ncol=2)
-dev.off()
+# hubsCell_mat = t(hubsCell_mat)[rownames(archp@cellColData),]
+# archp@cellColData = cbind(archp@cellColData, log2(hubsCell_mat[,c('HUB322'), drop=F]+1))
+# #archp@cellColData = archp@cellColData[, -ncol(archp@cellColData)]
+# p <- plotGroups(
+#   ArchRProj = archp, 
+#   groupBy = "celltype_lv1", 
+#   colorBy = "cellColData", 
+#   name = "HUB322",
+#   plotAs = "violin",
+#   pal = palette_celltype_lv1,
+#   alpha = 0.4,
+#   addBoxPlot = TRUE
+#  )
+# pdf (file.path ('Plots','VIM_expression_accessibility.pdf'), height=5, width=12)
+# wrap_plots (vp, p, ncol=2)
+# dev.off()
 
-### it is....check correlation of HUB322 with TFs ####
+# ### it is....check correlation of HUB322 with TFs ####
 
-devMethod = 'ArchR'
- if (devMethod == 'ArchR')
-    {
-    TF_db='Motif'
-    if (!exists ('mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
-    mSE = mSE[, archp$cellNames]
-    rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
-    rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
-    }
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-all (colnames (mMat) == rownames(hubsCell_mat))
-hub_exp = log2(hubsCell_mat[,'HUB322']+1)
-zero_val = hub_exp != 0
+# devMethod = 'ArchR'
+#  if (devMethod == 'ArchR')
+#     {
+#     TF_db='Motif'
+#     if (!exists ('mSE')) mSE = ArchR::getMatrixFromProject (archp, useMatrix = paste0(TF_db,'Matrix'))
+#     mSE = mSE[, archp$cellNames]
+#     rowData(mSE)$name = gsub ('_.*','',rowData(mSE)$name)
+#     rowData(mSE)$name = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", rowData(mSE)$name)
+#     }
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData (mSE)$name
+# all (colnames (mMat) == rownames(hubsCell_mat))
+# hub_exp = log2(hubsCell_mat[,'HUB322']+1)
+# zero_val = hub_exp != 0
 
-hub_nz = hub_exp[which(zero_val)]
-mMat_nz = t(as.matrix(mMat))[which(zero_val),]
+# hub_nz = hub_exp[which(zero_val)]
+# mMat_nz = t(as.matrix(mMat))[which(zero_val),]
 
-archp_meta = archp@cellColData
-archp_meta = archp_meta[which(zero_val),]
-hub_tf_cor = lapply (unique(archp@cellColData[,'celltype_lv1']), function(x)
-  as.data.frame (t(cor (hub_nz[match(rownames(archp_meta)[as.character(archp_meta$celltype_lv1) == x],
-    names(hub_nz))], mMat_nz[match(rownames(archp_meta)[as.character(archp_meta$celltype_lv1) == x],
-    rownames(mMat_nz)),], method='spearman')))
-  )
-hub_tf_cor = lapply (hub_tf_cor, function(x) x[order(-x[,1]),, drop=F])
-hub_tf_cor = as.data.frame (t(hub_tf_cor))
-head (hub_tf_cor[order (-hub_tf_cor[,1]),,drop=F],10)
-
-
-cor_df = data.frame (hub = hub_exp[which(zero_val)], tf = t(as.matrix(mMat))[which(zero_val),'ETS1'])
-cor_df$celltype = archp$celltype_lv1[match(rownames(cor_df), rownames(archp@cellColData))]
-cor_df$sample = archp$Sample[match(rownames(cor_df), rownames(archp@cellColData))]
-
-cor (cor_df[cor_df$celltype == 'Malignant','hub'], cor_df[cor_df$celltype == 'Malignant','tf'])
-
-cor_p = ggplot (cor_df[cor_df$celltype == 'T_cells',], aes (x = hub, y = tf, color = celltype)) + geom_point(alpha=.4)
-cor_p2 = ggplot (cor_df[cor_df$celltype == 'T_cells',], aes (x = hub, y = tf, color = sample)) + geom_point(alpha=.4)
-
-pdf (file.path('Plots','HUB322_VIM_correlation_ETS1.pdf'), width=9)
-wrap_plots (cor_p,cor_p2)
-dev.off()
+# archp_meta = archp@cellColData
+# archp_meta = archp_meta[which(zero_val),]
+# hub_tf_cor = lapply (unique(archp@cellColData[,'celltype_lv1']), function(x)
+#   as.data.frame (t(cor (hub_nz[match(rownames(archp_meta)[as.character(archp_meta$celltype_lv1) == x],
+#     names(hub_nz))], mMat_nz[match(rownames(archp_meta)[as.character(archp_meta$celltype_lv1) == x],
+#     rownames(mMat_nz)),], method='spearman')))
+#   )
+# hub_tf_cor = lapply (hub_tf_cor, function(x) x[order(-x[,1]),, drop=F])
+# hub_tf_cor = as.data.frame (t(hub_tf_cor))
+# head (hub_tf_cor[order (-hub_tf_cor[,1]),,drop=F],10)
 
 
+# cor_df = data.frame (hub = hub_exp[which(zero_val)], tf = t(as.matrix(mMat))[which(zero_val),'ETS1'])
+# cor_df$celltype = archp$celltype_lv1[match(rownames(cor_df), rownames(archp@cellColData))]
+# cor_df$sample = archp$Sample[match(rownames(cor_df), rownames(archp@cellColData))]
 
+# cor (cor_df[cor_df$celltype == 'Malignant','hub'], cor_df[cor_df$celltype == 'Malignant','tf'])
 
+# cor_p = ggplot (cor_df[cor_df$celltype == 'T_cells',], aes (x = hub, y = tf, color = celltype)) + geom_point(alpha=.4)
+# cor_p2 = ggplot (cor_df[cor_df$celltype == 'T_cells',], aes (x = hub, y = tf, color = sample)) + geom_point(alpha=.4)
 
+# pdf (file.path('Plots','HUB322_VIM_correlation_ETS1.pdf'), width=9)
+# wrap_plots (cor_p,cor_p2)
+# dev.off()
 
 
 
@@ -374,9 +367,7 @@ res_l = lapply (split (res, res$group), function(x){
   tmp[tmp$logFC > 1,]
 })
 
-
-
-# Run hypergeometric test on SE database 2
+# Run hypergeometric test on SE database 2 ####
 path = system.file (package="liftOver", "extdata", "hg38ToHg19.over.chain")
 ch = import.chain (path)
 SE_path = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/SEdb_ALL/'
@@ -389,7 +380,7 @@ SE_regions = lapply (list.files(SE_path, pattern = '.bed'), function(x) {
 names(SE_regions) = list.files(SE_path, pattern = '.bed')
 SE_regions = SE_regions[grepl ('ENCODE', names(SE_regions))]
 
-# Read in also SE celltypes from Wooseung
+# Read in also SE celltypes from Wooseung ####
 SE_path2 = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/SE_db2_from_Wooseung'
 SE_regions2 = lapply (list.files(SE_path2, pattern = '.bed'), function(x) {
   y = read.table (file.path(SE_path2,x), header=T, sep='\t')
@@ -548,9 +539,9 @@ meso_markers <- plotBrowserTrack2 (
 )
 dev.off()
 plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('MPM_markers_coveragePlots.pdf'),addDOC=F)
-  
 
-metaGroupName = 'celltype_simplified2'
+
+metaGroupName = 'celltype_lv1'
 top_dah = data.frame (
 gene = srt@assays$RNA@data[TF,],
 group = srt@meta.data[,metaGroupName])

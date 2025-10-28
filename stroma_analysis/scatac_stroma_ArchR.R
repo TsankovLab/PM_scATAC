@@ -115,26 +115,26 @@ dev.off()
   dev.off()
 
   #archp$celltype[archp$Clusters == 'C7'] = 'LEC'
-  archp$celltype = 0
-  archp$celltype[archp$Clusters_H %in% c('C2','C3','C4')] = 'Endothelial'
-  archp$celltype[archp$Clusters_H %in% c('C7','C8','C9','C10')] = 'Fibroblasts'
-  archp$celltype[archp$Clusters_H %in% c('C6')] = 'SmoothMuscle'
-  archp$celltype[archp$Clusters_H %in% c('C1')] = 'LEC'
-  archp$celltype[archp$Clusters_H_2 %in% c('C10')] = 'Mesothelium'
-  archp$celltype[archp$Clusters_H %in% c('C5')] = 'Unknown'
-  archp = archp[archp$celltype != 'Unknown']
+  archp$celltype_lv2 = 0
+  archp$celltype_lv2[archp$Clusters_H %in% c('C2','C3','C4')] = 'Endothelial'
+  archp$celltype_lv2[archp$Clusters_H %in% c('C7','C8','C9','C10')] = 'Fibroblasts'
+  archp$celltype_lv2[archp$Clusters_H %in% c('C6')] = 'SmoothMuscle'
+  archp$celltype_lv2[archp$Clusters_H %in% c('C1')] = 'LEC'
+  archp$celltype_lv2[archp$Clusters_H_2 %in% c('C10')] = 'Mesothelium'
+  archp$celltype_lv2[archp$Clusters_H %in% c('C5')] = 'Unknown'
+  archp = archp[archp$celltype_lv2 != 'Unknown']
 
   pdf()
   umap_p3 = plotEmbedding (ArchRProj = archp, 
     colorBy = "cellColData", name = "Sample",labelMeans =F,
      embedding = "UMAP_H", pal = palette_sample)
   umap_p5 = plotEmbedding (ArchRProj = archp, labelMeans =F,
-    colorBy = "cellColData", name = "celltype",
+    colorBy = "cellColData", name = "celltype_lv2",
     pal = palette_stroma,
      embedding = "UMAP_H")
   dev.off()
 
-  pdf (file.path('Plots','celltype_umap2.pdf'),5,5)
+  pdf (file.path('Plots','celltype_lv2_umap2.pdf'),5,5)
   print (umap_p3)
   print (umap_p5)
   dev.off()
@@ -148,7 +148,7 @@ dev.off()
 
 ### Call peaks on celltypes ####
 metaGroupName = 'Clusters_H'
-metaGroupName = 'celltype'
+metaGroupName = 'celltype_lv2'
 force = FALSE
 peak_reproducibility='2'
 pdf() # This is necessary cause cairo throws error and stops the script
@@ -174,12 +174,12 @@ source (file.path ('..','..','git_repo','utils','chromVAR.R'))
 #   }
 
 # Run genescore DAG ####
-metaGroupName = "celltype"
+metaGroupName = "celltype_lv2"
 force = TRUE
 if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
 
 # Differential Accessed motifs ####
-metaGroupName = "celltype"
+metaGroupName = "celltype_lv2"
 force=FALSE
 source (file.path('..','..','git_repo','utils','DAM.R'))
 
@@ -194,7 +194,7 @@ mMat_mg = mMat_mg[,-1]
 mMat_mg = mMat_mg[names (DAM_list),]
 
 # Generate RNA pseudobulk of matching cell types ####
-metaGroupName = 'celltype'
+metaGroupName = 'celltype_lv2'
 #selected_TF = c(rownames(DAM_hm@matrix), 'NR4A3','NR4A2','NR4A1')
 ps = log2(as.data.frame (AverageExpression (srt, features = active_DAM, group.by = metaGroupName)[[1]]) +1)
 colnames (ps) = gsub ('-','_',colnames(ps))
@@ -270,13 +270,13 @@ mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 
 # Subset only for expressed TFs ####
-metaGroupName = 'celltype'
+metaGroupName = 'celltype_lv2'
 ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
 min_exp = 0.5
 ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
 active_TFs = rownames(ps)[rowSums(ps) > 0]
 #positive_TF = corGSM_MM[,1][corGSM_MM[,3] > 0]
-metaGroupName = 'celltype'
+metaGroupName = 'celltype_lv2'
 mMat = mMat[active_TFs,]
 mMat = as.data.frame (t(mMat))
 mMat$metaGroup = as.character (archp@cellColData[,metaGroupName])
@@ -382,7 +382,7 @@ dev.off()
 
 
 # Subset Endothelial cells ####
-metaGroupName = 'celltype'
+metaGroupName = 'celltype_lv2'
 subsetArchRProject(
   ArchRProj = archp,
   cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% 'Endothelial'],
@@ -394,7 +394,7 @@ subsetArchRProject(
 )
 
 # Subset Fibroblasts cells ####
-metaGroupName = 'celltype'
+metaGroupName = 'celltype_lv2'
 subsetArchRProject(
   ArchRProj = archp,
   cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% 'Endothelial'],
@@ -405,7 +405,7 @@ subsetArchRProject(
   force = TRUE
 )
 
-metaGroupName='celltype'
+metaGroupName='celltype_lv2'
 subsetArchRProject_light (ArchRProject = archp,
   cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% c('Fibroblasts')],
   projdir_new = file.path('..','..','Fibroblasts','scatac_ArchR')

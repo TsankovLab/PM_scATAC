@@ -97,10 +97,15 @@ archp = addUMAP (ArchRProj = archp,
 
 archp = addClusters (input = archp,
     reducedDims = "Harmony_project",
-    name='Clusters_H', res=.6,
+    name='Clusters_H', res=.8,
     force = TRUE)
 
-archp = archp[archp$Clusters_H != 'C1']
+archp = archp[archp$Clusters_H != 'C1'] # Further remove low quality clusters 
+
+archp = addClusters (input = archp,
+    reducedDims = "Harmony_project",
+    name='Clusters_H', res=.6,
+    force = TRUE)
 
 archp = saveArchRProject (archp)
 
@@ -150,7 +155,7 @@ if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path
 DAG_list = readRDS (paste0('DAG_',metaGroupName,'.rds'))
 FDR_threshold = .05
 lfc_threshold = 0.5
-top_genes = 10
+top_genes = 5
 DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
 DAG_top_list = lapply (seq_along (DAG_top_list), function(x) {
   res = DAG_top_list[[x]]
@@ -199,10 +204,20 @@ DAG_hm = Heatmap (t(scale(gsMat_mg)),
         )
          
   #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
-pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 3, height = 6)
+pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 3, height = 4)
 print (DAG_hm)
 dev.off()
 
+
+### Cell Annotation ####
+archp$celltype_lv2 = archp$Clusters_H
+archp$celltype_lv2[archp$celltype_lv2 == 'C1'] = 'Plasma'
+archp$celltype_lv2[archp$celltype_lv2 == 'C2'] = 'B_cell_Memory_C2'
+archp$celltype_lv2[archp$celltype_lv2 == 'C3'] = 'B_cell_Memory_C3'
+archp$celltype_lv2[archp$celltype_lv2 == 'C4'] = 'B_cell_Naive_C4'
+archp$celltype_lv2[archp$celltype_lv2 == 'C5'] = 'B_cell_Naive_C5'
+
+write.csv (data.frame (barcode = archp@cellcolData), celltype_lv2 = archp$celltype_lv2), 'barcode_annotation.csv')
 
 top_genes = Inf
 DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
@@ -294,7 +309,7 @@ if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupNa
 source (file.path('..','..','git_repo','utils','callPeaks.R'))
 
 ### chromVAR analysis ####
-force=T
+force=F
 if (!all(file.exists(file.path('Annotations',
   c('Motif-Matches-In-Peaks.rds',
     'Motif-Positions-In-Peaks.rds',
@@ -338,7 +353,7 @@ rownames(mMat) = rowData(mSE)$name
   names (DAM_list2) = names (DAM_list)
   FDR_threshold = 1e-2
   meandiff_threshold = 0
-  top_genes = 10
+  top_genes = 5
   DAM_top_list = DAM_list2[sapply (DAM_list2, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$MeanDiff) > meandiff_threshold,]) > 0)]
   DAM_top_list = lapply (seq_along(DAM_top_list), function(x) {
     res = DAM_top_list[[x]]
@@ -386,14 +401,31 @@ rownames(mMat) = rowData(mSE)$name
           #rect_gp = gpar(col = "white", lwd = .5),
           border=TRUE,
           col = palette_deviation_fun(scale(mMat_mg))
-
           #right_annotation = motif_ha
           )
 
-  #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+#DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
 pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmaps.pdf')), width = 3, height = 4)
 print(DAM_hm)
 dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ### Co-expression of TFs across cells #### 

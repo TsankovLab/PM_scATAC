@@ -111,15 +111,15 @@ print (wrap_plots(p, ncol=3))
 dev.off()
 
 ### Annotate meso cells ####
-archp$celltype2 = 0
-archp$celltype2[archp$Clusters_H %in% c('C7')] = 'NK_FGFBP2'
-archp$celltype2[archp$Clusters_H %in% c('C8','C9')] = 'NK_KLRC1'
-archp$celltype2[archp$Clusters_H %in% c('C16')] = 'Tregs'
-archp$celltype2[archp$Clusters_H %in% c('C14','C20','C11','C17','C12','C13')] = 'CD4'
-archp$celltype2[archp$Clusters_H %in% c('C1','C5','C6','C18','C15','C19','C10')] = 'CD8'
-archp$celltype2[archp$Clusters_H %in% c('C3','C2','C4')] = 'CD8_exhausted'
+archp$celltype_lv2 = archp$Clusters_H
+archp$celltype_lv2[archp$celltype_lv2 %in% c('C7')] = 'NK_FGFBP2'
+archp$celltype_lv2[archp$celltype_lv2 %in% c('C8','C9')] = 'NK_KLRC1'
+archp$celltype_lv2[archp$celltype_lv2 %in% c('C16')] = 'Tregs'
+archp$celltype_lv2[archp$celltype_lv2 %in% c('C14','C20','C11','C17','C12','C13')] = 'CD4'
+archp$celltype_lv2[archp$celltype_lv2 %in% c('C1','C5','C6','C18','C15','C19','C10')] = 'CD8'
+archp$celltype_lv2[archp$celltype_lv2 %in% c('C3','C2','C4')] = 'CD8_exhausted'
 
-write.csv (data.frame (barcode = rownames(archp@cellColData), celltype = archp$celltype2), 'barcode_annotation.csv')
+write.csv (data.frame (barcode = archp@cellcolData), celltype_lv2 = archp$celltype_lv2), 'barcode_annotation.csv')
 
 
 
@@ -159,7 +159,7 @@ archp_sam = addClusters (input = archp_sam,
 #   colorBy = "cellColData", name = "Sample",
 #    embedding = "UMAP")
 # umap_p4 = plotEmbedding (ArchRProj = archp_sam, 
-#   colorBy = "cellColData", name = "celltype2",
+#   colorBy = "cellColData", name = "celltype_lv2",
 #    embedding = "UMAP")
 # umap_p5 = plotEmbedding (ArchRProj = archp_sam, 
 #   colorBy = "cellColData", name = "Clusters_H",
@@ -211,11 +211,11 @@ dev.off()
 
 # Check QC in P10 to assess if CD8 exhausted KLRC1+ are doublets
 qc_param = c('TSSEnrichment','nFrags','ReadsInTSS')
-archp$celltype2_smaple = paste0(archp$celltype2, '_',archp$Sample)
+archp$celltype_lv2_smaple = paste0(archp$celltype_lv2, '_',archp$Sample)
 pdf()
 p3 <- lapply (unique(archp$Sample), function (x) plotGroups(
     ArchRProj = archp[archp$Sample == x], 
-    groupBy = "celltype2_smaple", 
+    groupBy = "celltype_lv2_smaple", 
     colorBy = "cellColData", 
     name = qc_param,
     plotAs = "violin",
@@ -241,7 +241,7 @@ dev.off()
 
 
 # # Subset CD8 cells ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 subsetArchRProject(
   ArchRProj = archp,
   cells = rownames(archp@cellColData)[as.character(archp@cellColData[,metaGroupName]) %in% c('CD8','CD8_exhausted')],
@@ -254,11 +254,11 @@ subsetArchRProject(
 
 
 # cd8_ct = read.csv (file.path('..','..','CD8','scatac_ArchR','barcode_annotation.csv')) # get annotation from subclustered CD8 cells
-# archp$celltype2[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
-# archp$celltype2[archp$celltype2 %in% c('C1','C2','C4')] = 'CD8'
+# archp$celltype_lv2[match(cd8_ct$barcode, rownames(archp@cellColData))] = cd8_ct$celltype
+# archp$celltype_lv2[archp$celltype_lv2 %in% c('C1','C2','C4')] = 'CD8'
 pdf()
 umap_p1 = plotEmbedding (ArchRProj = archp, 
-    colorBy = "cellColData", name = "celltype2",
+    colorBy = "cellColData", name = "celltype_lv2",
      embedding = "UMAP_H",labelMeans =F,
      pal = palette_tnk_cells
      )
@@ -271,12 +271,9 @@ pdf (file.path('Plots','celltype_umap_harmony.pdf'),5,width=8)
 print (wrap_plots (umap_p1,umap_p2))
 dev.off()
 
-# Export annotation
-write.csv (data.frame (barcode= rownames(archp@cellColData), celltype = archp$celltype2), 'barcode_annotation.csv')
-
 
 # Check expression of GZMB PRF1 and KLRC1 ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 archp = addImputeWeights (archp)
 markers = c('GZMA','GZMB','GZMK','GZMH','IFNG','TNF','PRF1',
   'TOX','CD96','HAVCR2','CTLA4','ENTPD1','KLRC1','LAYN')
@@ -285,7 +282,7 @@ inhibitory_markers = c('KIR3DL1','KIR2DL3')
 
 pdf()
 p2 <- plotGroups(
-    ArchRProj = archp,#[archp$celltype2 %in% c('NK_KLRC1','NK_FGFBP2')], 
+    ArchRProj = archp,#[archp$celltype_lv2 %in% c('NK_KLRC1','NK_FGFBP2')], 
     groupBy = metaGroupName, 
     colorBy = "GeneScoreMatrix", 
     name = markers,
@@ -306,7 +303,7 @@ dev.off()
 
 
 ### Call peaks on celltypes ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 force=TRUE
 peak_reproducibility=2
 if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds'))) | force) 
@@ -323,7 +320,7 @@ source (file.path ('..','..','git_repo','utils','chromVAR.R'))
 
 
 # Differential Accessed motifs ####
-metaGroupName = "celltype2"
+metaGroupName = "celltype_lv2"
 force=FALSE
 source (file.path('..','..','git_repo','utils','DAM.R'))
 
@@ -332,7 +329,7 @@ mMat = assays (mSE)[[1]]
 rownames(mMat) = rowData(mSE)$name
 
 # Filter by RNA expression ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 active_TFs = exp_genes (srt, active_DAM, min_exp = 0.1, metaGroupName)
 mMat = mMat[active_TFs, ]
 
@@ -345,7 +342,7 @@ mMat_mg = mMat_mg[,-1]
 mMat_mg = mMat_mg[names (DAM_list),]
 
 # Generate RNA pseudobulk of matching cell types ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 #selected_TF = c(rownames(DAM_hm@matrix), 'NR4A3','NR4A2','NR4A1')
 ps = log2(as.data.frame (AverageExpression (srt, features = active_DAM, group.by = metaGroupName)[[1]]) +1)
 colnames (ps) = gsub ('-','_',colnames(ps))
@@ -420,7 +417,7 @@ mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData (mSE)$name
 
 # Subset only for expressed TFs ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
 min_exp = 0.1
 ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
@@ -483,7 +480,7 @@ rownames (mMat) = rowData (mSE)$name
 mMat = as.matrix(mMat)#[selected_TF,])
 
 # Filter by RNA expression ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
 mMat = mMat[active_TFs, ]
 
@@ -571,7 +568,7 @@ dev.off()
 # Differential Peaks in CD8 exhausted vs CD8 ####
 # Find DAP ####
 #force = FALSE
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 force=F
 if (!file.exists ('DAP_CD8_CD8_ext_pairwise.rds') | force)
   {
@@ -801,10 +798,10 @@ dev.off()
 
 # # Run DAM NK KLRC1 + CD8 ext vs FGFBP2 + CD8 ####
 # library (presto)
-# metaGroupName = 'celltype2'
+# metaGroupName = 'celltype_lv2'
 
 # # Subset only for expressed TFs ####
-# metaGroupName = 'celltype2'
+# metaGroupName = 'celltype_lv2'
 # ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
 # min_exp = 0.1
 # ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
@@ -833,7 +830,7 @@ dev.off()
 tf_ext = names (km$cluster[km$cluster == 1])
 
 # # Take highest mean of NK KLRC1 + CD8 exhausted TFs ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 
 if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
 mMat = assays (mSE)[[1]]
@@ -925,12 +922,12 @@ write.csv (mat_combined, 'top_TF_CD8_NK_dual_ext_TF_activity_RNA.csv')
 # Run DAM NK KLRC1 + CD8 ext vs FGFBP2 + CD8 ####
 
 # # Differential Accessed motifs ####
-# metaGroupName = "celltype2"
+# metaGroupName = "celltype_lv2"
 # force=FALSE
 # source (file.path('..','..','git_repo','utils','DAM.R'))
 
 # library (presto)
-# metaGroupName = 'celltype2'
+# metaGroupName = 'celltype_lv2'
 
 # if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
 # mMat = assays (mSE)[[1]]
@@ -1054,7 +1051,7 @@ write.csv (ext_TF_df,'exhausted_TF_rna.csv')
 # tf_ext = res_l[['ext']]$feature[res_l[['ext']]$padj < 0.01]
 
 # # Take highest mean of NK KLRC1 + CD8 exhausted TFs ####
-# metaGroupName = 'celltype2'
+# metaGroupName = 'celltype_lv2'
 
 # if (!exists('mSE')) mSE = fetch_mat(archp, 'Motif')
 # mMat = assays (mSE)[[1]]
@@ -1083,8 +1080,8 @@ write.csv (ext_TF_df,'exhausted_TF_rna.csv')
 
 ### Plot deviation and expression of NR4A2 across samples ####
 sample_names = c('P1','P10','P11','P12','P13','P3','P4','P5','P8') # Use only matching samples
-archp$sample_celltype2 = paste0(archp$Sample,'|',archp$celltype2)
-metaGroupName = 'sample_celltype2'
+archp$sample_celltype_lv2 = paste0(archp$Sample,'|',archp$celltype_lv2)
+metaGroupName = 'sample_celltype_lv2'
 TF = 'IRF4'
 TF = 'EOMES'
 TF = 'CBFB'
@@ -1100,8 +1097,8 @@ rownames (mMat_mg) = mMat_mg[,1]
 mMat_mg = setNames(mMat_mg[,2], rownames(mMat_mg))
 
 # Generate RNA pseudobulk of matching cell types ####
-srt$sample_celltype2 = paste0(srt$sampleID,'|',srt$celltype2)
-metaGroupName = 'sample_celltype2'
+srt$sample_celltype_lv2 = paste0(srt$sampleID,'|',srt$celltype_lv2)
+metaGroupName = 'sample_celltype_lv2'
 ps = log2(as.data.frame (AverageExpression (srt, features = TF, group.by = metaGroupName)[[1]]) +1)
 colnames (ps) = gsub ('-','_',colnames(ps))
 mMat_mg = mMat_mg[sapply (names(mMat_mg), function(x) unlist(strsplit(x, '\\|'))[1] %in% sample_names)]
@@ -1145,7 +1142,7 @@ ext_ps_gr = extendGR (gr = ext_ps_gr, upstream = 3000, downstream = 3000)
 peak_windows = slidingWindows (x = ext_ps_gr, width = 50, step = 25)
 
 # Create peak enrichment plots with CD8 ext peaks ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 force = TRUE
 ext_l = list()
 
@@ -1244,7 +1241,7 @@ peak_windows_riegel = slidingWindows (x = ext_hg38_sub, width = 50, step = 25)
 # peak_windows_l =  lapply (1:length(peak_windows[[1]]), function(x) unlist(lapply (peak_windows, function(y) y[x])))
 
 # Create peak enrichment plots with Riegel peaks ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 force = FALSE
 ext_l = list()
 
@@ -1324,7 +1321,7 @@ dev.off()
 
 
 ### Find all peaks around exhausted TFs and correlate accessibility and RNA expression across celltype pseudobulks ####
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 TF = read.csv ('exhausted_TF_rna.csv')
 TF = c('NR4A2','RUNX2') # include only those that show balanced expression between NK KLRC1 and CD8 ext
 # Get all peaks correlated with exhausted TF
@@ -1426,7 +1423,7 @@ run_p2g = T
     }
     
 ### Plot NR4A2 region ####
-archp$celltype3 =  archp$celltype2
+archp$celltype3 =  archp$celltype_lv2
 archp$celltype3[archp$celltype3 == 'CD4'] =  c('C1_CD4')
 archp$celltype3[archp$celltype3 == 'CD8'] =  c('C2_CD8')
 archp$celltype3[archp$celltype3 == 'NK_FGFBP2'] =  c('C3_NK_FGFBP2')
@@ -1487,7 +1484,7 @@ plotPDF (meso_markers, ArchRProj = archp,
   name =paste0(paste(TF, collapse='_'),'_coveragePlots.pdf'),
   addDOC = F)
 
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 top_dah = data.frame (
 gene = srt@assays$RNA@data[TF,],
 group = srt@meta.data[,metaGroupName])
@@ -1518,11 +1515,11 @@ fold_numbers = c(0,1,2,3,4)
 
 ### Check expression of RUNX3 and CTCF predicted by chromBPnet
 pdf (file.path ('Plots','TF_exp_dotplots.pdf'), width=7, height=3)
-DotPlot (srt[,srt$celltype2 != 'Proliferating'], 
-  features= c('RUNX1','RUNX2','RUNX3','NR4A2','NR4A1','NR4A3','EGR2','ELK4','ETV1','ELK1'), group.by = 'celltype2') + gtheme
+DotPlot (srt[,srt$celltype_lv2 != 'Proliferating'], 
+  features= c('RUNX1','RUNX2','RUNX3','NR4A2','NR4A1','NR4A3','EGR2','ELK4','ETV1','ELK1'), group.by = 'celltype_lv2') + gtheme
 dev.off()
 
-deg_res = FindMarkers (srt, ident.1 = 'NK_KLRC1', ident.2 = 'NK_FGFBP2', group.by='celltype2')
+deg_res = FindMarkers (srt, ident.1 = 'NK_KLRC1', ident.2 = 'NK_FGFBP2', group.by='celltype_lv2')
 deg_res[rownames(deg_res) %in% c('RUNX1','RUNX2','RUNX3'),]
 head (deg_res,10)
 
@@ -1569,7 +1566,7 @@ plotPDF (meso_markers, ArchRProj = archp,
 
   
 TF='ICOS'
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 top_dah = data.frame (
 gene = srt@assays$RNA@data[TF,],
 group = srt@meta.data[,metaGroupName])
@@ -1594,7 +1591,7 @@ dev.off()
 
 
 # Check footprint of RUNX and NR4A2 across celltypes ####
-metaGroupName='celltype2'
+metaGroupName='celltype_lv2'
 archp <- addGroupCoverages (ArchRProj = archp, groupBy = metaGroupName)
 motifPositions <- getPositions (archp)
 
@@ -1629,7 +1626,7 @@ smoothWindow = 25)
 # rownames (mMat) = rowData (mSE)$name
 
 # # Subset only for expressed TFs ####
-# metaGroupName = 'celltype2'
+# metaGroupName = 'celltype_lv2'
 # ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat), group.by = metaGroupName)[[1]]) +1)
 # min_exp = 0.1
 # ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
@@ -1672,7 +1669,7 @@ smoothWindow = 25)
 # dev.off()
 
 # # correlate cell types using selected TF in scrna ####
-# metaGroupName = 'celltype2'
+# metaGroupName = 'celltype_lv2'
 # nfeats = active_TFs
 # ps = log2(as.data.frame (AverageExpression (srt, features = nfeats, group.by = metaGroupName)[[1]]) +1)
 # colnames (ps) = gsub ('-','_',colnames(ps))
@@ -1725,7 +1722,7 @@ smoothWindow = 25)
 
   
 # # correlate cell types using variable genes in scrna ####
-# metaGroupName = 'celltype2'
+# metaGroupName = 'celltype_lv2'
 # ps = log2(as.data.frame (AverageExpression (srt, features = VariableFeatures(srt), group.by = metaGroupName)[[1]]) +1)
 # colnames (ps) = gsub ('-','_',colnames(ps))
 # ps = ps[,rownames(mMat)]
@@ -1900,7 +1897,7 @@ dev.off()
 # Differential Peaks in CD8 exhausted vs CD8 ####
 # Find DAP ####
 #force = FALSE
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 force=F
 if (!file.exists ('DAP_CD8_CD8_ext_pairwise.rds') | force)
   {
@@ -1927,7 +1924,7 @@ rownames(DAP_res) = as.character(DAP_res_regions)
 # Take only significant regions ####
 DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
 
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 pb_l = list()
 for (ct in unique(archp@cellColData[,metaGroupName]))
   {
@@ -1986,7 +1983,7 @@ pmat = aggregate (pmat)
 
 
 #### Show sample distribution of NR4A2 enhancer ####
-archp$celltype_sample = paste0(archp$celltype2, '_', archp$Sample)
+archp$celltype_sample = paste0(archp$celltype_lv2, '_', archp$Sample)
 metaGroupName = 'celltype_sample'  
 pMats = getGroupSE(
   ArchRProj = archp,

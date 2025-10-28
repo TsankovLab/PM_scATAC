@@ -61,6 +61,7 @@ sample_names = c(
 # Load RNA
 srt = readRDS ('../scrna/srt.rds')
 srt$celltype_simplified2[srt$celltype_simplified2 == 'pDC'] = 'pDCs'
+srt = srt[,srt$sampleID %in% sample_names]
 sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
 
 pdf (file.path ('Plots','pan_TFs_dotplot.pdf'))

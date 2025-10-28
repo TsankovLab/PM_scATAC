@@ -406,20 +406,21 @@ df = do.call (rbind, df)
 # Re-Annotate based on cnmf clustering ####
 all (names(km_cnmf$cluster) == rownames(archp@cellColData))
 archp$cnmf_cluster = paste0('cnmf_cluster_',km_cnmf$cluster)
-archp$cnmf_celltypes = archp$cnmf_cluster
-archp$cnmf_celltypes[archp$cnmf_cluster == 'cnmf_cluster_1'] = 'IM'
-archp$cnmf_celltypes[archp$cnmf_cluster == 'cnmf_cluster_2'] = 'Mono'
-archp$cnmf_celltypes[archp$cnmf_cluster == 'cnmf_cluster_3'] = 'SPP1'
-archp$cnmf_celltypes[archp$cnmf_cluster == 'cnmf_cluster_4'] = 'IFN_CXCLs'
-archp$cnmf_celltypes[archp$cnmf_cluster == 'cnmf_cluster_5'] = 'cDCs'
-archp$cnmf_celltypes[archp$cnmf_cluster == 'cnmf_cluster_6'] = 'TREM2'
+archp$celltype_lv2 = archp$cnmf_cluster
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_1'] = 'IM'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_2'] = 'Mono'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_3'] = 'SPP1'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_4'] = 'IFN_CXCLs'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_5'] = 'cDCs'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_6'] = 'TREM2'
 
+write.csv (data.frame (barcode = archp@cellcolData), celltype_lv2 = archp$celltype_lv2), 'barcode_annotation.csv')
 # Integrate MACs with myeloid annotation
-#archp$celltype2[match(rownames(archp_MAC@cellColData), rownames(archp@cellColData))] = archp_MAC$cnmf_celltypes
+#archp$celltype2[match(rownames(archp_MAC@cellColData), rownames(archp@cellColData))] = archp_MAC$celltype_lv2
 
 pdf()
 umap_p5 = plotEmbedding (ArchRProj = archp, 
-  colorBy = "cellColData", name = "cnmf_celltypes",
+  colorBy = "cellColData", name = "celltype_lv2",
    embedding = "UMAP_H")
 dev.off()
 
@@ -428,12 +429,8 @@ print (umap_p5)
 dev.off()
 
 
-write.csv (data.frame (barcode = rownames(archp@cellColData), celltype = archp$celltype2), 'barcode_annotation.csv')
-write.csv (data.frame (barcode = rownames(archp@cellColData), celltype = archp$cnmf_celltypes), 'barcode_annotation_cnmf_celltypes.csv')
-
-
 # Differential Accessed motifs ####
-metaGroupName = "cnmf_celltypes"
+metaGroupName = "celltype_lv2"
 force=F
 source (file.path('..','..','git_repo','utils','DAM.R'))
 
@@ -650,12 +647,12 @@ umap_result <- umap(mMat, n_neighbors = 15, min_dist = 0.1, metric = "euclidean"
 library(ggplot2)
 
 umap_df = as.data.frame(umap_result)
-umap_df$celltypes = archp$cnmf_celltypes
+umap_df$celltypes = archp$celltype_lv2
 umap_df$FRIP = log2 (archp$nFrags+1)
 umap_df$Sample = archp$Sample
 umap_df$mod_2 = archp$mod_2
 umap_df = cbind (umap_df, t(scale(t(as.data.frame (archp@cellColData[,names(shared_cnmf)])))))
-sp = lapply (unique(archp$cnmf_celltypes), function(x) 
+sp = lapply (unique(archp$celltype_lv2), function(x) 
   ggplot (umap_df[umap_df$celltypes == x,], aes(V1, V2, color = celltypes)) +
   geom_point(size = 2) +
   labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
@@ -690,7 +687,7 @@ dev.off()
 
 sp1 = lapply (unique(umap_df$Sample), function(y) 
   {
-  lapply (unique(archp$cnmf_celltypes), function(x) 
+  lapply (unique(archp$celltype_lv2), function(x) 
   ggplot (umap_df[umap_df$celltypes == x & umap_df$Sample == y,], aes(V1, V2, color = celltypes)) +
   geom_point(size = 2) +
   labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
@@ -817,10 +814,10 @@ library (tidyr)
 
 # Plot
 ccomp = as.data.frame (archp@cellColData)
-#ccomp = ccomp[ccomp$cnmf_celltypes %in% c('cDCs'),]
-ccomp$cnmf_celltypes = factor (ccomp$cnmf_celltypes, levels = rev(c('Mono','TREM2','SPP1','IFN_CXCLs','cDCs','IM')))
+#ccomp = ccomp[ccomp$celltype_lv2 %in% c('cDCs'),]
+ccomp$celltype_lv2 = factor (ccomp$celltype_lv2, levels = rev(c('Mono','TREM2','SPP1','IFN_CXCLs','cDCs','IM')))
 ccomp$module = archp$mod_2
-rp <- ggplot(ccomp, aes(x = module, y = cnmf_celltypes, fill = ..x..)) +
+rp <- ggplot(ccomp, aes(x = module, y = celltype_lv2, fill = ..x..)) +
   geom_density_ridges_gradient(
   scale = 3,
   rel_min_height = 0.01,
@@ -1328,12 +1325,12 @@ smoothWindow = 25)
 
 ### Check inflammation score across TAMs ####
 mod_df = data.frame (
-  #celltype = archp$cnmf_celltypes,
+  #celltype = archp$celltype_lv2,
   #sample = archp$Sample,
   #Infl_module = archp$mod_2,
   Infl_module = archp$mod_2)
 mod_df = aggregate(archp$mod_2, by=list(
-  celltype = archp$cnmf_celltypes,
+  celltype = archp$celltype_lv2,
   sample = archp$Sample), FUN=mean)
 head (mod_df)
 df_order = mod_df %>% 
@@ -1792,7 +1789,7 @@ hm = Heatmap (dah_hm,
   column_names_rot=45,
   border=T)
 
-pdf (file.path ('Plots','top_DAH_cnmf_celltypes_heatmap.pdf'), width=5)
+pdf (file.path ('Plots','top_DAH_celltype_lv2_heatmap.pdf'), width=5)
 hm
 dev.off()
 
@@ -1884,7 +1881,7 @@ dev.off()
 
 
 # Check footprint across celltypes ####
-metaGroupName='cnmf_celltypes'
+metaGroupName='celltype_lv2'
 archp <- addGroupCoverages (ArchRProj = archp, groupBy = metaGroupName)
 motifPositions <- getPositions (archp)
 
@@ -1948,7 +1945,7 @@ dev.off()
 
 
 # Export bigiwg files ####
-metaGroupName = 'cnmf_celltypes'
+metaGroupName = 'celltype_lv2'
 exp_bigwig = TRUE
 if (exp_bigwig)
   {

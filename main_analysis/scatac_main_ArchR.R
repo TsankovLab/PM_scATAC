@@ -26,7 +26,7 @@ packages = c(
   'RColorBrewer')
 lapply(packages, require, character.only = TRUE)
 
-####### ANALYSIS of TUMOR compartment #######
+####### ANALYSIS of main data #######
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
@@ -72,121 +72,247 @@ celltype_order = c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMus
 #archp$Sample2 = archp$Sample
 #archp$Sample2 = factor (archp$Sample2, levels = sarc_order)
 
-### Gene score based analysis ####
-run_GS_analysis = FALSE
 
-if (run_GS_analysis)
-  {
-  # Find DAG ####
-  metaGroupName = "Clusters"
-  metaGroupName = 'celltype_revised'
-  force = FALSE
-  if (!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force)
-    {
-    DAG_list = getMarkerFeatures (
-      ArchRProj = archp, 
-      testMethod = "wilcoxon",
-            #useGroups = "ClusterA",
-            #bgdGroups = "Clusters1B",
-      binarize = FALSE,
-      useMatrix = "GeneScoreMatrix",
-      groupBy = metaGroupName
-    #  useSeqnames="z"
-    )
+  ### QC plots ####
+  pdf()
+  p1 = plotFragmentSizes(ArchRProj = archp, groupBy = 'Sample', pal = palette_sample)
+  p2 = plotTSSEnrichment(ArchRProj = archp, groupBy = 'Sample', pal = palette_sample)
 
-    listnames = colnames (DAG_list)
-    DAG_list = lapply (1:ncol (DAG_list), function(x) 
-      {
-      df = DAG_list[,x]  
-      df = do.call (cbind, (assays(df)))
-      colnames(df) = names (assays(DAG_list))
-      df$gene = rowData (DAG_list)$name
-      df
-      })
-    names (DAG_list) = listnames
-    saveRDS (DAG_list, paste0 ('DAG_',metaGroupName,'.rds'))    
-    } else {
-    DAG_list = readRDS (paste0('DAG_',metaGroupName,'.rds'))
-    }
-  
-  FDR_threshold = 1e-2
-  lfc_threshold = 0
-  top_genes = 20
-  DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
-  DAG_top_list = lapply (seq_along(DAG_top_list), function(x) {
-    res = DAG_top_list[[x]]
-    res = na.omit (res)
-    res = res[res$FDR < FDR_threshold,]
-    res = res[order (res$FDR), ]
-    res = res[abs(res$Log2FC) > lfc_threshold,]
-    res$comparison = names(DAG_top_list)[x]
-    if (nrow(res) < top_genes) 
-      {
-      res
-      } else {
-      head (res,top_genes)
-      }
-    })
-  DAG_df = Reduce (rbind ,DAG_top_list)
-  
-  if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
-  gsSE = gsSE[, archp$cellNames]
-  gsMat = assays (gsSE)[[1]]
-  rownames (gsMat) = rowData (gsSE)$name
-  gsMat_mg = gsMat[rownames (gsMat) %in% DAG_df$gene, ]
-  gsMat_mg = as.data.frame (t(gsMat_mg))
-  gsMat_mg$metaGroup = as.character(archp@cellColData[,metaGroupName])
-  gsMat_mg = aggregate (.~ metaGroup, gsMat_mg, mean)
-  rownames (gsMat_mg) = gsMat_mg[,1]
-  gsMat_mg = gsMat_mg[,-1]
-  gsMat_mg = gsMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
-  DAG_hm = Heatmap (t(scale(gsMat_mg)), 
-          row_labels = colnames (gsMat_mg),
-          column_title = paste('top',top_genes),
-          clustering_distance_columns = 'euclidean',
-          clustering_distance_rows = 'euclidean',
-          cluster_rows = F,
-          #col = pals_heatmap[[5]],
-          cluster_columns=F,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 6),
-          column_names_gp = gpar(fontsize = 4),
-          rect_gp = gpar(col = "white", lwd = .5),
-          border=TRUE
-          #right_annotation = motif_ha
-          )
+  p3 <- plotGroups(
+    ArchRProj = archp, 
+    groupBy = "Sample", 
+    colorBy = "cellColData", 
+    name = "TSSEnrichment",
+    plotAs = "violin",
+    pal = palette_sample,
+    alpha = 0.4,
+    addBoxPlot = TRUE
+   )
+
+  p4 <- plotGroups(
+    ArchRProj = archp, 
+    groupBy = "Sample", 
+    colorBy = "cellColData", 
+    name = "nFrags",
+    plotAs = "violin",
+    pal = palette_sample,
+    alpha = 0.4,
+    addBoxPlot = TRUE
+   )
+dev.off()
+  pdf (file.path ('Plots', 'QC_plots.pdf'))
+  wrap_plots (p1, p2 ,p3, p4)
+  dev.off()
+
+
+  varfeat = 25000
+  LSI_method = 2
+  archp = addIterativeLSI (ArchRProj = archp,
+    useMatrix = "TileMatrix", name = "IterativeLSI",
+    force = TRUE, LSIMethod = LSI_method,
+    varFeatures = varfeat)
+
+  archp = addClusters (input = archp, resolution = 3,
+    reducedDims = "IterativeLSI", maxClusters = 100,
+    force = TRUE)
+  archp = addUMAP (ArchRProj = archp, 
+    reducedDims = "IterativeLSI",
+    force = TRUE)
+
+pdf ()  
+umap_p0 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Clusters",
+   embedding = "UMAP",
+   #pal = palette_celltype_lv1,
+   labelMeans = FALSE)
+
+umap_p1 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "celltype_revised",
+   embedding = "UMAP",
+   pal = palette_celltype_lv1,
+   labelMeans = FALSE)
+
+umap_p2 = plotEmbedding (ArchRProj = archp, 
+  colorBy = "cellColData", name = "Sample",
+   embedding = "UMAP",
+   pal = palette_sample,
+   labelMeans = FALSE)
+dev.off()
+
+pdf (file.path ('Plots','celltype_revised_umap.pdf'))
+umap_p0
+umap_p1
+umap_p2
+dev.off()
+
+
+# Plot gene score of cell type markers ####
+meso_markers = c(
+  'KRT19','AMOTL2','EGFR',
+  'HP','BDKRB1','ZBTB7C',
+  'SFTA3','SFTPB','LINC00261',
+  'COL1A1','FBN1','COL6A2',
+  'MYH11','COL4A2','COL4A1',
+  'CLDN5','VWF','CDH5',
+  'LYZ','IL1B','CD83',
+  'CD3E','BCL11B','RUNX3',
+  'GNLY', 'KLRD1','ITGAE',
+  'CD79A','PAX5','BLK',
+  'IGLL5','ELL2','ELL2',
+  'VASH2','MAD1L1','ZFAT')
+#meso_markers = rev (meso_markers)
+
+if (!any (ls() == 'gsSE')) gsSE = fetch_mat (archp, mat = 'GeneScore')
+gsMat = assays (gsSE)[[1]]
+
+rownames (gsMat) = rowData (gsSE)$name
+gsMat_mg = gsMat[meso_markers, ]
+gsMat_mg = as.data.frame (t(gsMat_mg))
+gsMat_mg$metaGroup = as.character(archp@cellColData[,metaGroupName])
+gsMat_mg = aggregate (.~ metaGroup, gsMat_mg, mean)
+rownames (gsMat_mg) = gsMat_mg[,1]
+gsMat_mg = gsMat_mg[,-1]
+gsMat_mg = gsMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
+gsMat_mg = gsMat_mg[celltype_order,]
+
+DAG_hm = Heatmap (t(t(scale(gsMat_mg))), 
+        column_labels = colnames (gsMat_mg),
+        column_title = paste('top',top_genes),
+        clustering_distance_columns = 'euclidean',
+        clustering_distance_rows = 'euclidean',
+        cluster_rows = F,
+        row_names_side = 'left',
+        #col = palette_genescore_fun(gsMat_mg),
+        col = palette_expression,
+        #col = pals_heatmap[[5]],
+        cluster_columns=F,#col = pals_heatmap[[1]],
+        row_names_gp = gpar(fontsize = 8),
+        column_names_rot = 45,
+        column_names_gp = gpar(fontsize = 6),
+        rect_gp = gpar(col = "white", lwd = .1),
+        border=TRUE
+        #right_annotation = motif_ha
+        )
 
   #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
-pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps.pdf'), width = 8, height = 50)
+pdf (file.path('Plots',paste0('DAG_clusters_',metaGroupName,'_heatmaps2.pdf')), width = 6, height = 3)
 print(DAG_hm)
 dev.off()
 
 
 
 
-# Plot gene score of cell type markers ####
-meso_markers = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
-meso_markers = c(meso_markers, 'IGLL5')
-meso_markers = meso_markers[meso_markers != 'IGHM']
-#meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
-meso_markers = c()
-meso_markers = c('TOX','PCDHGA6','PCDHGC3')
-archp = addImputeWeights (archp)
 
-pdf()
-p <- plotEmbedding(
-    ArchRProj = archp,
-    colorBy = "GeneScoreMatrix", 
-    name = meso_markers, 
-    embedding = "UMAP",
-    pal = palette_expression,
-    imputeWeights = getImputeWeights(archp)
-)
-dev.off()
-#p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
+# ### Gene score based analysis ####
 
-pdf (file.path('Plots','marker_genes_feature_plots_3.pdf'), width = 8, height = 5)
-print (wrap_plots (p, ncol = 3))
-dev.off()
+#   # Find DAG ####
+#   #metaGroupName = "Clusters"
+#   metaGroupName = 'celltype_lv1'
+#   force = FALSE
+#   if (!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force)
+#     {
+#     DAG_list = getMarkerFeatures (
+#       ArchRProj = archp, 
+#       testMethod = "wilcoxon",
+#             #useGroups = "ClusterA",
+#             #bgdGroups = "Clusters1B",
+#       binarize = FALSE,
+#       useMatrix = "GeneScoreMatrix",
+#       groupBy = metaGroupName
+#     #  useSeqnames="z"
+#     )
+
+#     listnames = colnames (DAG_list)
+#     DAG_list = lapply (1:ncol (DAG_list), function(x) 
+#       {
+#       df = DAG_list[,x]  
+#       df = do.call (cbind, (assays(df)))
+#       colnames(df) = names (assays(DAG_list))
+#       df$gene = rowData (DAG_list)$name
+#       df
+#       })
+#     names (DAG_list) = listnames
+#     saveRDS (DAG_list, paste0 ('DAG_',metaGroupName,'.rds'))    
+#     } else {
+#     DAG_list = readRDS (paste0('DAG_',metaGroupName,'.rds'))
+#     }
+  
+#   FDR_threshold = 1e-2
+#   lfc_threshold = 0
+#   top_genes = 3
+#   DAG_top_list = DAG_list[sapply (DAG_list, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$Log2FC) > lfc_threshold,]) > 0)]
+#   DAG_top_list = lapply (seq_along(DAG_top_list), function(x) {
+#     res = DAG_top_list[[x]]
+#     res = na.omit (res)
+#     res = res[res$FDR < FDR_threshold,]
+#     res = res[order (res$FDR), ]
+#     res = res[abs(res$Log2FC) > lfc_threshold,]
+#     res$comparison = names(DAG_top_list)[x]
+#     if (nrow(res) < top_genes) 
+#       {
+#       res
+#       } else {
+#       head (res,top_genes)
+#       }
+#     })
+#   DAG_df = Reduce (rbind ,DAG_top_list)
+  
+#   if (!any (ls() == 'gsSE')) gsSE = ArchR::getMatrixFromProject (archp, useMatrix = 'GeneScoreMatrix')
+#   gsSE = gsSE[, archp$cellNames]
+#   gsMat = assays (gsSE)[[1]]
+#   rownames (gsMat) = rowData (gsSE)$name
+#   gsMat_mg = gsMat[rownames (gsMat) %in% DAG_df$gene, ]
+#   gsMat_mg = as.data.frame (t(gsMat_mg))
+#   gsMat_mg$metaGroup = as.character(archp@cellColData[,metaGroupName])
+#   gsMat_mg = aggregate (.~ metaGroup, gsMat_mg, mean)
+#   rownames (gsMat_mg) = gsMat_mg[,1]
+#   gsMat_mg = gsMat_mg[,-1]
+#   gsMat_mg = gsMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
+#   DAG_hm = Heatmap (t(scale(gsMat_mg)), 
+#           row_labels = colnames (gsMat_mg),
+#           column_title = paste('top',top_genes),
+#           clustering_distance_columns = 'euclidean',
+#           clustering_distance_rows = 'euclidean',
+#           cluster_rows = F,
+#           #col = pals_heatmap[[5]],
+#           cluster_columns=F,#col = pals_heatmap[[1]],
+#           row_names_gp = gpar(fontsize = 6),
+#           column_names_gp = gpar(fontsize = 4),
+#           rect_gp = gpar(col = "white", lwd = .5),
+#           border=TRUE
+#           #right_annotation = motif_ha
+#           )
+
+#   #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+# pdf (paste0('Plots/DAG_clusters_',metaGroupName,'_heatmaps2.pdf'), width = 8, height = 50)
+# print(DAG_hm)
+# dev.off()
+
+
+# # Plot gene score of cell type markers ####
+# meso_markers = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/highlevel_MPM_markers.csv')[[1]]
+# meso_markers = c(meso_markers, 'IGLL5')
+# meso_markers = meso_markers[meso_markers != 'IGHM']
+# #meso_markers = c(meso_markers, 'KRT5','LILRA4','MS4A1')
+# meso_markers = c()
+# meso_markers = c('TOX','PCDHGA6','PCDHGC3')
+# archp = addImputeWeights (archp)
+
+# pdf()
+# p <- plotEmbedding(
+#     ArchRProj = archp,
+#     colorBy = "GeneScoreMatrix", 
+#     name = meso_markers, 
+#     embedding = "UMAP",
+#     pal = palette_expression,
+#     imputeWeights = getImputeWeights(archp)
+# )
+# dev.off()
+# #p = lapply (p, function(x) x + theme_void() + NoLegend ()) #+ ggtitle scale_fill_gradient2 (rev (viridis::plasma(100))))
+
+# pdf (file.path('Plots','marker_genes_feature_plots_3.pdf'), width = 8, height = 5)
+# print (wrap_plots (p, ncol = 3))
+# dev.off()
 
 # Generate CNV map for each sample ####
 # Get Granges of blacklist regions 
@@ -212,7 +338,16 @@ deleted_chr = c('chr4','chr22','chr13')
 if (!exists ('fragments_l')) fragments_l = getFragmentsFromProject (archp)
 print_mat = F
 force=F
+
+# Load also normal mesothelium to compare CNV against ####
+archp_n = loadArchRProject ('../../tumor_compartment/scatac_ArchR')
+archp_n = archp_n[archp_n$Sample2 == 'normal1']
+if (!exists ('fragments_n')) fragments_n = getFragmentsFromProject (archp_n)
+fragments_n = unlist (fragments_n)
+fragments_l[['normal1']] = fragments_n
+
 # Loop per sample and run CNV analysis
+sample_names = c(sample_names, 'normal1')
 cnaObj_l = list()
 for (sam in sample_names)
   {
@@ -229,11 +364,13 @@ for (sam in sample_names)
   }
 
   #rownames(meta.data_df2) = sapply (rownames(meta.data_df2), function(x) unlist(strsplit (x,'\\.'))[2])
-  sgn_l[[sam]]@meta.data = sgn_l[[sam]]@meta.data[,!colnames(sgn_l[[sam]]@meta.data) %in% colnames(meta.data)]
-  sgn_l[[sam]]@meta.data = cbind (sgn_l[[sam]]@meta.data, meta.data[match(colnames(sgn_l[[sam]]), rownames(meta.data)),])
+  # sgn_l[[sam]]@meta.data = sgn_l[[sam]]@meta.data[,!colnames(sgn_l[[sam]]@meta.data) %in% colnames(meta.data)]
+  # sgn_l[[sam]]@meta.data = cbind (sgn_l[[sam]]@meta.data, meta.data[match(colnames(sgn_l[[sam]]), rownames(meta.data)),])
 
   # Print CNV heatmap
-  malignant_cells = rownames(archp@cellColData)[archp$celltype_lv1 == 'Malignant']
+  colnames(cnaObj_l[['normal1']]) = sapply (colnames(cnaObj_l[['normal1']]), function(x) unlist(strsplit(x,'\\#'))[2])
+  colnames(cnaObj_l[['normal1']]) = paste0('normal1#',colnames(cnaObj_l[['normal1']]))
+  malignant_cells = c(rownames(archp@cellColData)[archp$celltype_lv1 == 'Malignant'], colnames(cnaObj_l[['normal1']]))
   for (sam in sample_names)
     {
     mat_type = 'z'
@@ -267,7 +404,8 @@ for (sam in sample_names)
     mat_type = 'z'
     cnaObj_mat = t(cnaObj_l[[sam]]@assays@data@listData[[mat_type]])
     colnames (cnaObj_mat) = paste0(seqnames(rowRanges(cnaObj_l[[sam]])),':', ranges(rowRanges(cnaObj_l[[sam]])))
-    bc = sub (paste0(sam,'#'), '', colnames(cnaObj_l[[sam]]))
+    bc = colnames(cnaObj_l[[sam]])
+    if (any (grep ('\\#', colnames(cnaObj_l[[sam]])))) bc = sapply (colnames(cnaObj_l[[sam]]), function(x) unlist(strsplit(x, '\\#'))[2])
     rownames (cnaObj_mat) = paste0(sam,'#',bc)
     cnaObj_mat = cnaObj_mat[rownames(cnaObj_mat) %in% malignant_cells,]
     cnaObj_mat[is.na(cnaObj_mat)] = 0
@@ -278,7 +416,7 @@ cnaMat_obj_avg = lapply (cnaMat_obj_l, function(x) colMeans (x))
 cnaMat_obj_avg = do.call (cbind, cnaMat_obj_avg)
 cnaMat_obj_avg = cnaMat_obj_avg[,sample_names]
 ha = rowAnnotation (sample = colnames(cnaMat_obj_avg), col = list(sample = palette_sample))
-pdf (file.path('Plots', paste0('GL_method_',mat_type,'_CNV_heatmap.pdf')), width=6,height=3)
+pdf (file.path('Plots', paste0('GL_method_',mat_type,'_CNV_heatmap2.pdf')), width=6,height=3)
     print (Heatmap (t(cnaMat_obj_avg), 
     cluster_rows=F,#col=col_fun,
     cluster_columns=F, 
@@ -291,6 +429,7 @@ pdf (file.path('Plots', paste0('GL_method_',mat_type,'_CNV_heatmap.pdf')), width
     column_names_gp = gpar(fontsize = 0),
     column_title_gp = gpar(fontsize = 7),
     column_split = row_chr,
+    row_split = ifelse ('normal1' == colnames(cnaMat_obj_avg),'normal','tumor'),
     column_gap = unit(.5, "mm"),
     cluster_column_slices = F,
     row_title_gp = gpar(fontsize = 1),
@@ -391,7 +530,7 @@ if (run_chromVAR)
 
   # Find DAM ####
   metaGroupName = "celltype_lv1"
-  force = FALSE
+  force = TRUE
   if (!file.exists (paste0('DAM_',metaGroupName,'.rds')) | force)
     {
     DAM_list = getMarkerFeatures (
@@ -429,7 +568,8 @@ if (run_chromVAR)
   # Filter by genes minimally expressed from scRNA (in at least 1 celltype) ####
   ps = log2(as.data.frame (AverageExpression (srt, 
     features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
-    group.by = 'celltype_simplified2')[[1]]) +1)
+    group.by = 'celltype_lv1')[[1]]) +1)
+  colnames (ps) = gsub ('-','_',colnames(ps))
   min_exp = 0.1
   DAM_list2 = lapply (names(DAM_list), function(x) DAM_list[[x]][DAM_list[[x]]$gene %in% rownames(ps)[ps[,x] > min_exp],])
   #active_TFs = rownames(ps)[rowSums(ps) > 0]
@@ -458,94 +598,130 @@ if (run_chromVAR)
   DAM_df = Reduce (rbind ,DAM_top_list)
   
 
-### Run TF correlation to identify TF modules across all cells #### 
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = as.matrix(mMat)#[selected_TF,])
-mMat = mMat[names(km$cluster)[km$cluster ==3],]
+  # # Get deviation matrix ####
+  force = F
+  if (!exists ('mSE') | force) mSE = fetch_mat (archp, 'Motif')
+  mMat = assays (mSE)[[1]]
+  rownames (mMat) = rowData (mSE)$name
+  mMat_mg = mMat[DAM_df$gene, ]
+  mMat_mg = as.data.frame (t(mMat_mg))
+  mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
+  mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
+  rownames (mMat_mg) = mMat_mg[,1]
+  mMat_mg = mMat_mg[,-1]
+  mMat_mg = mMat_mg[names (DAM_list),]
+  mMat_mg = na.omit (mMat_mg)
+  #mMat_mg = mMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
+  DAM_hm = Heatmap (scale(mMat_mg), 
+          column_labels = colnames (mMat_mg),
+          column_title = paste('top',top_genes),
+          clustering_distance_columns = 'euclidean',
+          clustering_distance_rows = 'euclidean',
+          cluster_rows = F,
+          #col = pals_heatmap[[5]],
+          cluster_columns=F,#col = pals_heatmap[[1]],
+          row_names_gp = gpar(fontsize = 8),
+          column_names_gp = gpar(fontsize = 7),
+          column_names_rot = 45,
+          name = 'TF activity',
+          #rect_gp = gpar(col = "white", lwd = .5),
+          border=TRUE,
+          col = palette_deviation_fun(scale(mMat_mg))
+          #right_annotation = motif_ha
+          )
 
-mMat_cor = cor (as.matrix(t(scale(mMat))), method = 'spearman')
-
-set.seed(1234)
-centers=4
-km = kmeans (mMat_cor, centers=centers)
-
-pdf (file.path ('Plots','TME_TF_modules_heatmap.pdf'), width = 4,height=3)
-cor_mMat_hm = draw (Heatmap (mMat_cor,
-  clustering_distance_rows='euclidean' ,
-  clustering_distance_columns = 'euclidean', 
-  col=palette_deviation_cor_fun, 
-  row_split = km$cluster,
-  column_split = km$cluster,
-  border=T,
-  row_names_gp = gpar(fontsize = 0), 
-  column_names_gp = gpar(fontsize = 0)
-  ))
+#DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmaps2.pdf')), width = 8, height = 3)
+print(DAM_hm)
 dev.off()
+# ### Run TF correlation to identify TF modules across all cells #### 
+# if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData (mSE)$name
+# mMat = as.matrix(mMat)#[selected_TF,])
+# mMat = mMat[names(km$cluster)[km$cluster ==3],]
 
-pdf (file.path ('Plots','TF_modules_heatmap2.pdf'), width = 4,height=3)
-cor_mMat_hm
-dev.off()
+# mMat_cor = cor (as.matrix(t(scale(mMat))), method = 'spearman')
 
-tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
-names (tf_modules) = paste0('mod_',unique(km$cluster))
-tf_modules = do.call (cbind, tf_modules)
-archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
-archp@cellColData = cbind (archp@cellColData, tf_modules) 
+# set.seed(1234)
+# centers=4
+# km = kmeans (mMat_cor, centers=centers)
 
-pdf()
-TF_p = plotEmbedding (
-    ArchRProj = archp,
-    colorBy = "cellColData",
-    name = paste0('mod_',unique(km$cluster)), 
-    pal = rev(palette_deviation_correlation),
-    #useSeqnames='z',
-    embedding = "UMAP")
-dev.off()
-pdf (file.path ('Plots','TF_modules_umap2.pdf'), width = 20,height=6)
-wrap_plots (TF_p, ncol=5)
-dev.off()
+# pdf (file.path ('Plots','TME_TF_modules_heatmap.pdf'), width = 4,height=3)
+# cor_mMat_hm = draw (Heatmap (mMat_cor,
+#   clustering_distance_rows='euclidean' ,
+#   clustering_distance_columns = 'euclidean', 
+#   col=palette_deviation_cor_fun, 
+#   row_split = km$cluster,
+#   column_split = km$cluster,
+#   border=T,
+#   row_names_gp = gpar(fontsize = 0), 
+#   column_names_gp = gpar(fontsize = 0)
+#   ))
+# dev.off()
 
-# Find shared TF across celltypes ####
-tf_name2 = unlist(sapply (c('TGIF1','TWIST2','NFKB2','HMGA2'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
-tf_name2 = paste0('z:',tf_name2)
-archp = addImputeWeights (archp)
-pdf()
-TF_p = plotEmbedding (
-    ArchRProj = archp,
-    colorBy = "MotifMatrix",
-    name = tf_name2, 
-    useSeqnames='z',
-    pal = rev (palette_deviation),    
-    embedding = "UMAP",
-    imputeWeights = getImputeWeights(archp)
-    )
-dev.off()
-pdf (file.path ('Plots','pan_TF_fplots.pdf'), width = 30,height=16)
-wrap_plots (TF_p, ncol=5)
-dev.off()
+# pdf (file.path ('Plots','TF_modules_heatmap2.pdf'), width = 4,height=3)
+# cor_mMat_hm
+# dev.off()
+
+# tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+# names (tf_modules) = paste0('mod_',unique(km$cluster))
+# tf_modules = do.call (cbind, tf_modules)
+# archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
+# archp@cellColData = cbind (archp@cellColData, tf_modules) 
+
+# pdf()
+# TF_p = plotEmbedding (
+#     ArchRProj = archp,
+#     colorBy = "cellColData",
+#     name = paste0('mod_',unique(km$cluster)), 
+#     pal = rev(palette_deviation_correlation),
+#     #useSeqnames='z',
+#     embedding = "UMAP")
+# dev.off()
+# pdf (file.path ('Plots','TF_modules_umap2.pdf'), width = 20,height=6)
+# wrap_plots (TF_p, ncol=5)
+# dev.off()
+
+# # Find shared TF across celltypes ####
+# tf_name2 = unlist(sapply (c('TGIF1','TWIST2','NFKB2','HMGA2'), function(x) rownames(assay(mSE))[grepl (x, rownames(assay(mSE)))]))
+# tf_name2 = paste0('z:',tf_name2)
+# archp = addImputeWeights (archp)
+# pdf()
+# TF_p = plotEmbedding (
+#     ArchRProj = archp,
+#     colorBy = "MotifMatrix",
+#     name = tf_name2, 
+#     useSeqnames='z',
+#     pal = rev (palette_deviation),    
+#     embedding = "UMAP",
+#     imputeWeights = getImputeWeights(archp)
+#     )
+# dev.off()
+# pdf (file.path ('Plots','pan_TF_fplots.pdf'), width = 30,height=16)
+# wrap_plots (TF_p, ncol=5)
+# dev.off()
 
 
-tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
-names (tf_modules) = paste0('mod_',unique(km$cluster))
-tf_modules = do.call (cbind, tf_modules)
-archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
-archp@cellColData = cbind (archp@cellColData, tf_modules)
+# tf_modules = lapply (unique(km$cluster), function(x) colMeans (mMat[names(km$cluster[km$cluster == x]),]))
+# names (tf_modules) = paste0('mod_',unique(km$cluster))
+# tf_modules = do.call (cbind, tf_modules)
+# archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
+# archp@cellColData = cbind (archp@cellColData, tf_modules)
 
-archp = addImputeWeights (archp)
-TF_p = lapply (paste0('mod_',unique(km$cluster)), function(x) plotEmbedding (
-    ArchRProj = archp,
-    colorBy = "cellColData",
-    name = x, 
-    pal = palette_deviation,
-    #useSeqnames='z',
-    imputeWeights = getImputeWeights(archp),
-    embedding = "UMAP"))
+# archp = addImputeWeights (archp)
+# TF_p = lapply (paste0('mod_',unique(km$cluster)), function(x) plotEmbedding (
+#     ArchRProj = archp,
+#     colorBy = "cellColData",
+#     name = x, 
+#     pal = palette_deviation,
+#     #useSeqnames='z',
+#     imputeWeights = getImputeWeights(archp),
+#     embedding = "UMAP"))
 
-pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 30,height=14)
-wrap_plots (TF_p, ncol=5)
-dev.off()
+# pdf (file.path ('Plots','TF_modules_umap.pdf'), width = 30,height=14)
+# wrap_plots (TF_p, ncol=5)
+# dev.off()
 
 
 ### Subset ArchR project ####
@@ -614,13 +790,51 @@ subsetArchRProject_light (ArchRProject = archp,
   )
 
 
+#### Annotate barcode with level2  annotations in scATAC-seq ####
+tnk_ann = read.csv ('../../NKT_cells/scatac_ArchR/barcode_annotation.csv')
+mye_ann = read.csv ('../../myeloid_cells/scatac_ArchR/barcode_annotation.csv')
+stro_ann = read.csv ('../../stroma/scatac_ArchR/barcode_annotation.csv')
+bcells_ann = read.csv ('../../B_cells/scatac_ArchR/barcode_annotation.csv')
+celltype_lv2_df = rbind (tnk_ann, mye_ann, stro_ann, bcells_ann)
+archp$celltype_lv2 = celltype_lv2_df$celltype_lv2[match(rownames(archp@cellColData), celltype_lv2_df$barcode)]
+archp$celltype_lv2[archp$celltype_lv1 == 'Malignant'] = 'Malignant'
+archp$celltype_lv2[archp$celltype_lv1 == 'pDCs'] = 'pDCs'
+archp$celltype_lv2[archp$celltype_lv1 == 'Alveolar'] = 'Alveolar'
+
+# Save annotation in repo
+annotation_df = data.frame (barcode = rownames(archp@cellColData), celltype_lv1 = archp$celltype_lv1, celltype_lv2 = archp$celltype_lv2)
+write.csv (annotation_df, '../../git_repo/barcode_anntation.csv')
+
+
+
+#### Annotate barcode with level2 annotations in scRNA-seq ####
+srt_tnk = readRDS (file.path('..','..','NKT_cells','scrna','srt.rds'))
+tnk_ann = srt_tnk$celltype_lv2
+tnk_ann = tnk_ann[names(tnk_ann) %in% colnames(srt)]
+srt$celltype_lv2 = srt$celltype_lv1
+srt$celltype_lv2[match (names(tnk_ann), colnames(srt))] = tnk_ann
+
+mye_ann = read.csv ('../../myeloid_cells/scatac_ArchR/barcode_annotation.csv')
+stro_ann = read.csv ('../../stroma/scatac_ArchR/barcode_annotation.csv')
+bcells_ann = read.csv ('../../B_cells/scatac_ArchR/barcode_annotation.csv')
+celltype_lv2_df = rbind (tnk_ann, mye_ann, stro_ann, bcells_ann)
+archp$celltype_lv2 = celltype_lv2_df$celltype_lv2[match(rownames(archp@cellColData), celltype_lv2_df$barcode)]
+archp$celltype_lv2[archp$celltype_lv1 == 'Malignant'] = 'Malignant'
+archp$celltype_lv2[archp$celltype_lv1 == 'pDCs'] = 'pDCs'
+archp$celltype_lv2[archp$celltype_lv1 == 'Alveolar'] = 'Alveolar'
+
+# Save annotation in repo
+annotation_df = data.frame (barcode = rownames(archp@cellColData), celltype_lv1 = archp$celltype_lv1, celltype_lv2 = archp$celltype_lv2)
+write.csv (annotation_df, '../../git_repo/barcode_anntation.csv')
+
+
 # Show that enhancer linked to NR4A2 is only up in NK KLRC1 and CD8 exhausted across all cells ####
-nkt_ann = read.csv (file.path('..','..','NKT_cells','scatac_ArchR','barcode_annotation_nkt.csv'))
-mye_ann = read.csv (file.path('..','..','myeloid_cells','scatac_ArchR','barcode_annotation.csv'))
-archp$celltype2 = archp$celltype_revised
-archp$celltype2[match(nkt_ann$barcode, rownames(archp@cellColData))] = nkt_ann$celltype
-archp$celltype2[match(mye_ann$barcode, rownames(archp@cellColData))] = mye_ann$celltype
-metaGroupName = 'celltype2'  
+#nkt_ann = read.csv (file.path('..','..','NKT_cells','scatac_ArchR','barcode_annotation_nkt.csv'))
+#mye_ann = read.csv (file.path('..','..','myeloid_cells','scatac_ArchR','barcode_annotation.csv'))
+# archp$celltype2 = archp$celltype_revised
+# archp$celltype2[match(nkt_ann$barcode, rownames(archp@cellColData))] = nkt_ann$celltype
+# archp$celltype2[match(mye_ann$barcode, rownames(archp@cellColData))] = mye_ann$celltype
+metaGroupName = 'celltype_lv2'
 pMats = getGroupSE(
   ArchRProj = archp,
   useMatrix = 'PeakMatrix',
@@ -646,6 +860,7 @@ pmat_promoter_df = data.frame (region = pmat_promoter, celltype =names(pmat_prom
 pmat_promoter_df$type = 'promoter'
 pmat_df = rbind (pmat_enhancer_df, pmat_promoter_df)
 pmat_df$type = factor (pmat_df$type, levels =c ('promoter','enhancer'))
+
 pdf (file.path ('Plots','eNR4F2_accessibility_barplot.pdf'), height=3, width=6)
 ep = ggplot (pmat_df, aes (x = celltype, y = region, fill = type)) + 
 geom_bar(stat = 'identity',position ='stack', color='grey22') + gtheme +
@@ -656,21 +871,74 @@ dev.off()
 
 
 # Check expression of NR4A2 across cell types ####
-srt_tnk = readRDS (file.path('..','..','NKT_cells','scrna','srt.rds'))
-tnk_ann = srt_tnk$celltype2
-tnk_ann = tnk_ann[names(tnk_ann) %in% colnames(srt)]
-srt$celltype3 = srt$celltype
-srt$celltype3[match (names(tnk_ann), colnames(srt))] = tnk_ann
+ps = log2(as.data.frame (AverageExpression (srt, 
+    features = 'NR4A2',
+    group.by = 'celltype_lv1')[[1]]) +1)
+ps = as.data.frame (t(ps))
+ee = ggplot (ps, aes (x = rownames(ps), y = V1)) + 
+geom_bar(stat = 'identity',position ='stack', color='grey22') + gtheme +
+scale_fill_manual (values = c(enhancer = '#C1D32FFF', promoter = 'grey'))
 
-srt$celltype_simplified3 = srt$celltype_simplified
-srt$celltype_simplified3[match (names(tnk_ann), colnames(srt))] = tnk_ann
-pdf(file.path ('Plots','NR4A2_dotplot.pdf'), width = 9)
-VlnPlot (srt, feature = 'NR4A2', group.by = 'celltype3', cols = c(palette_tnk_cells, palette_celltype_lv1))
-VlnPlot (srt[,!srt$celltype_simplified3 %in% c('NK','T_cells')], feature = 'NR4A2', group.by = 'celltype_simplified3', cols = c(palette_tnk_cells, palette_celltype_lv1))
+pdf (file.path ('Plots','eNR4F2_expression_barplot.pdf'), height=3, width=6)
+ee
 dev.off()
 
+pdf(file.path ('Plots','NR4A2_dotplot.pdf'), width = 9)
+VlnPlot (srt, feature = 'NR4A2', group.by = 'celltype3', cols = c(palette_tnk_cells, palette_celltype_lv1))
+VlnPlot (srt[,!srt$celltype_lv1 %in% c('NK','T_cells')], feature = 'NR4A2', group.by = 'celltype_lv2', cols = c(palette_tnk_cells, palette_celltype_lv1))
+dev.off()
 
+### Show as UMAP #####
 
+# # first need to add features to peakMatrix ####
+# ps <- archp@peakSet
+# ps$name <- paste0(seqnames(ps),"_peak",ps$idx)
+# archp@peakSet <- ps
+# archp =  addPeakMatrix (ArchRProj = archp, force = TRUE, threads = 16)
+
+# ps[queryHits (findOverlaps (ps,enhancer_region))]
+# ps[queryHits (findOverlaps (ps,promoter_region))]
+
+# archp = addImputeWeights (archp)
+
+# pdf ()
+# e_p = plotEmbedding(
+#   ArchRProj = archp,
+#   colorBy = "PeakMatrix",
+#   name = c("chr2_peak20773"),
+#   embedding = "UMAP",
+#   quantCut = c(0.01, 0.95),
+#   imputeWeights = getImputeWeights(ArchRProj = archp),
+#   rastr = TRUE,
+#   plotAs = "points"
+# )
+
+# p_p = plotEmbedding(
+#   ArchRProj = archp,
+#   colorBy = "PeakMatrix",
+#   name = c("chr2_peak20739"),
+#   embedding = "UMAP",
+#   quantCut = c(0.01, 0.95),
+#   imputeWeights = getImputeWeights(ArchRProj = archp),
+#   rastr = TRUE,
+#   plotAs = "points"
+# )
+
+# ct = plotEmbedding(
+#   ArchRProj = archp,
+#   colorBy = "cellColData",
+#   name = c("celltype_lv2"),
+#   embedding = "UMAP",
+# #  quantCut = c(0.01, 0.95),
+# #  imputeWeights = getImputeWeights(ArchRProj = archp),
+#   rastr = TRUE,
+#   plotAs = "points"
+# )
+# dev.off()
+
+# pdf(file.path ('Plots','NR4A2_enhancer_accessibility_umap.pdf'), width = 12)
+# wrap_plots (e_p, p_p, ct)
+# dev.off()
 
 # Show regions linked to IL1B across all cells ####
 nkt_ann = read.csv (file.path('..','..','NKT_cells','scatac_ArchR','barcode_annotation_nkt.csv'))
@@ -741,47 +1009,37 @@ dev.off()
 
 
 
+# # Input exhausted peaks as chromvar score ####
+# T_ext = list(
+#   T_ext = readRDS (file.path('..','..','NKT_cells','scatac_ArchR','T_cell_exhaustion_peaks.rds')),
+#   T_ext2 = readRDS (file.path('..','..','NKT_cells','scatac_ArchR','T_cell_exhaustion_peaks.rds')))
 
+# # Import chrombpnet output and cross-reference with scRNA-seq TF expression
+# archp = addBgdPeaks (archp, force= TRUE)
+# archp = addPeakAnnotations (ArchRProj = archp, 
+#      regions = T_ext, name = "T_exhausted",force=T)
 
+# archp = addDeviationsMatrix (
+#   ArchRProj = archp, 
+#   peakAnnotation = "T_exhausted",
+#   force = TRUE
+# )
 
-
-
-
-
-
-
-
-# Input exhausted peaks as chromvar score ####
-T_ext = list(
-  T_ext = readRDS (file.path('..','..','NKT_cells','scatac_ArchR','T_cell_exhaustion_peaks.rds')),
-  T_ext2 = readRDS (file.path('..','..','NKT_cells','scatac_ArchR','T_cell_exhaustion_peaks.rds')))
-
-# Import chrombpnet output and cross-reference with scRNA-seq TF expression
-archp = addBgdPeaks (archp, force= TRUE)
-archp = addPeakAnnotations (ArchRProj = archp, 
-     regions = T_ext, name = "T_exhausted",force=T)
-
-archp = addDeviationsMatrix (
-  ArchRProj = archp, 
-  peakAnnotation = "T_exhausted",
-  force = TRUE
-)
-
-pdf()
-if (!any (ls() == 'tSE')) tSE = fetch_mat (archp, 'T_exhausted')
-TF_p = plotEmbedding (
-    ArchRProj = archp,
-    colorBy = "T_exhaustedMatrix",
-    name = 'z:T_ext', 
-    #useSeqnames='z',
-    pal = rev (palette_deviation),    
-    embedding = "UMAP",
-    imputeWeights = getImputeWeights(archp)
-    )
-dev.off()
-pdf (file.path ('Plots','T_exhausted_fplots.pdf'), width = 30,height=16)
-TF_p
-dev.off()
+# pdf()
+# if (!any (ls() == 'tSE')) tSE = fetch_mat (archp, 'T_exhausted')
+# TF_p = plotEmbedding (
+#     ArchRProj = archp,
+#     colorBy = "T_exhaustedMatrix",
+#     name = 'z:T_ext', 
+#     #useSeqnames='z',
+#     pal = rev (palette_deviation),    
+#     embedding = "UMAP",
+#     imputeWeights = getImputeWeights(archp)
+#     )
+# dev.off()
+# pdf (file.path ('Plots','T_exhausted_fplots.pdf'), width = 30,height=16)
+# TF_p
+# dev.off()
 
 
 
@@ -1003,396 +1261,409 @@ bp
 dev.off()
 
 
-# Subset for peak type (promoter) ####
-chrombpnet_counts_p1 = lapply (chrombpnet_counts, function(x) {
-  x = x[x$peak_type == 'Promoter',]
-  x = x[!is.na(x$peak_type),]
-  })
-chrombpnet_profile_p1 = lapply (chrombpnet_profile, function(x) 
+# # Subset for peak type (promoter) ####
+# chrombpnet_counts_p1 = lapply (chrombpnet_counts, function(x) {
+#   x = x[x$peak_type == 'Promoter',]
+#   x = x[!is.na(x$peak_type),]
+#   })
+# chrombpnet_profile_p1 = lapply (chrombpnet_profile, function(x) 
+#   {
+#   x = x[x$peak_type == 'Promoter',]
+#   x = x[!is.na(x$peak_type),]
+#   })
+
+# top_n <- 5
+# n <- length(chrombpnet_counts_p1 )
+
+# bp_list <- lapply(seq_len(n), function(i) {
+#   tbl <- table(chrombpnet_counts_p1 [[i]]$V4)
+#   tbl_sorted <- sort(tbl, decreasing = TRUE)
+#   top_tbl <- head(tbl_sorted, top_n)
+  
+#   tf_names <- names(top_tbl)
+#   directions <- sapply(tf_names, function(tf) {
+#     chrombpnet_counts_p1[[i]]$V5[chrombpnet_counts_p1 [[i]]$V4 == tf][1]
+#   })
+  
+#   data.frame(
+#     Freq = proportions(top_tbl),
+#     TF   = tf_names,
+#     direction = directions,
+#     type = rep(celltypes[[i]], length(top_tbl)),
+#     ptype = 'promoter'
+#   )
+# })
+
+# bp_df <- do.call(rbind, bp_list)
+
+# # Make neg values negative
+# bp_df <- bp_df %>%
+#   mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
+
+# # Create custom ordering per type
+# bp_df <- bp_df %>%
+#   group_by(type, direction) %>%
+#   mutate(
+#     TF_order = ifelse(direction == "pos",
+#                       rank(-Freq, ties.method = "first"),  # descending
+#                       rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
+#   ) %>%
+#   ungroup()
+
+# # Build a combined factor: ensures pos stack from bottom up, neg from top down
+# bp_df <- bp_df %>%
+#   arrange(type, direction, TF_order)
+
+# bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
+# bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
+# bp_df$type = factor (bp_df$type, levels = celltypes)
+
+# bp_df_cp = bp_df
+# # Plot stacked bars
+# bp <- ggplot(bp_df_cp, aes(x = type, y = Freq, fill = TF_id)) +
+#   geom_bar(stat = "identity") +
+#   scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF))) +
+#   theme_minimal(base_size = 14) +
+#   ylab("Proportion of counts") +
+#   xlab("Cell type") +
+#   ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
+
+# pdf (file.path ('Plots', 'TF_abundance_counts_promoter_barplot.pdf'),6,width=12.5)
+# bp
+# dev.off()
+
+
+# top_n <- 5
+# n <- length(chrombpnet_profile_p1)
+
+# bp_list <- lapply(seq_len(n), function(i) {
+#   tbl <- table(chrombpnet_profile_p1[[i]]$V4)
+#   tbl_sorted <- sort(tbl, decreasing = TRUE)
+#   top_tbl <- head(tbl_sorted, top_n)
+  
+#   tf_names <- names(top_tbl)
+#   directions <- sapply(tf_names, function(tf) {
+#     chrombpnet_profile_p1[[i]]$V5[chrombpnet_profile_p1[[i]]$V4 == tf][1]
+#   })
+  
+#   data.frame(
+#     Freq = proportions(top_tbl),
+#     TF   = tf_names,
+#     direction = directions,
+#     type = rep(celltypes[[i]], length(top_tbl)),
+#     ptype = 'promoter'
+#   )
+# })
+
+# bp_df <- do.call(rbind, bp_list)
+
+# # Make neg values negative
+# bp_df <- bp_df %>%
+#   mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
+
+# # Create custom ordering per type
+# bp_df <- bp_df %>%
+#   group_by(type, direction) %>%
+#   mutate(
+#     TF_order = ifelse(direction == "pos",
+#                       rank(-Freq, ties.method = "first"),  # descending
+#                       rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
+#   ) %>%
+#   ungroup()
+
+# # Build a combined factor: ensures pos stack from bottom up, neg from top down
+# bp_df <- bp_df %>%
+#   arrange(type, direction, TF_order)
+
+# bp_df$TF_id <- paste (bp_df$TF, bp_df$type, sep = "_")
+# bp_df$TF_id <- factor (bp_df$TF_id, levels = unique(bp_df$TF_id))
+# bp_df$type = factor (bp_df$type, levels = celltypes)
+# bp_df_pp = bp_df
+# # Plot stacked bars
+# bp <- ggplot(bp_df_pp, aes(x = type, y = Freq, fill = TF_id)) +
+#   geom_bar(stat = "identity") +
+#   scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+#   theme_minimal(base_size = 14) +
+#   ylab("Proportion of counts") +
+#   xlab("Cell type") +
+#   ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+#   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
+
+# pdf (file.path ('Plots', 'TF_abundance_profile_promoter_barplot.pdf'),6,width=12.5)
+# bp
+# dev.off()
+
+
+
+
+
+# # Subset for peak type (NOT promoter) ####
+# chrombpnet_counts_p2 =  lapply (chrombpnet_counts, function(x) {
+#   x = x[x$peak_type == 'Distal',]
+#   x = x[!is.na(x$peak_type),]
+#   })
+# chrombpnet_profile_p2 =  lapply (chrombpnet_profile, function(x) {
+#   x = x[x$peak_type == 'Distal',]
+#   x = x[!is.na(x$peak_type),]
+#   })
+
+# top_n <- 5
+# n <- length(chrombpnet_counts_p2)
+
+# bp_list <- lapply(seq_len(n), function(i) {
+#   tbl <- table(chrombpnet_counts_p2[[i]]$V4)
+#   tbl_sorted <- sort(tbl, decreasing = TRUE)
+#   top_tbl <- head(tbl_sorted, top_n)
+  
+#   tf_names <- names(top_tbl)
+#   directions <- sapply(tf_names, function(tf) {
+#     chrombpnet_counts_p2[[i]]$V5[chrombpnet_counts_p2[[i]]$V4 == tf][1]
+#   })
+  
+#   data.frame(
+#     Freq = proportions(top_tbl),
+#     TF   = tf_names,
+#     direction = directions,
+#     type = rep(celltypes[[i]], length(top_tbl)),
+#     ptype = 'distal'
+#   )
+# })
+
+# bp_df <- do.call (rbind, bp_list)
+
+# # Make neg values negative
+# bp_df <- bp_df %>%
+#   mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
+
+# # Create custom ordering per type
+# bp_df <- bp_df %>%
+#   group_by(type, direction) %>%
+#   mutate(
+#     TF_order = ifelse(direction == "pos",
+#                       rank(-Freq, ties.method = "first"),  # descending
+#                       rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
+#   ) %>%
+#   ungroup()
+
+# # Build a combined factor: ensures pos stack from bottom up, neg from top down
+# bp_df <- bp_df %>%
+#   arrange(type, direction, TF_order)
+
+# bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
+# bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
+# bp_df$type = factor (bp_df$type, levels = celltypes)
+# bp_df_cd = bp_df
+
+# # Plot stacked bars
+# bp <- ggplot(bp_df_cd, aes(x = type, y = Freq, fill = TF_id)) +
+#   geom_bar(stat = "identity") +
+#   scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+#   theme_minimal(base_size = 14) +
+#   ylab("Proportion of counts") +
+#   xlab("Cell type") +
+#   ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
+
+  
+
+# pdf (file.path ('Plots', 'TF_abundance_counts_NOT_promoter_barplot.pdf'),6,width=12.5)
+# bp
+# dev.off()
+
+
+# top_n <- 5
+# n <- length(chrombpnet_profile_p2)
+
+# bp_list <- lapply(seq_len(n), function(i) {
+#   tbl <- table(chrombpnet_profile_p2[[i]]$V4)
+#   tbl_sorted <- sort(tbl, decreasing = TRUE)
+#   top_tbl <- head(tbl_sorted, top_n)
+  
+#   tf_names <- names(top_tbl)
+#   directions <- sapply(tf_names, function(tf) {
+#     chrombpnet_profile_p2[[i]]$V5[chrombpnet_profile_p2[[i]]$V4 == tf][1]
+#   })
+  
+#   data.frame(
+#     Freq = proportions(top_tbl),
+#     TF   = tf_names,
+#     direction = directions,
+#     type = rep(celltypes[[i]], length(top_tbl),
+#     ptype = 'distal'
+#   ))
+#   )
+# })
+
+# bp_df <- do.call(rbind, bp_list)
+
+# # Make neg values negative
+# bp_df <- bp_df %>%
+#   mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
+
+# # Create custom ordering per type
+# bp_df <- bp_df %>%
+#   group_by(type, direction) %>%
+#   mutate(
+#     TF_order = ifelse(direction == "pos",
+#                       rank(-Freq, ties.method = "first"),  # descending
+#                       rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
+#   ) %>%
+#   ungroup()
+
+# # Build a combined factor: ensures pos stack from bottom up, neg from top down
+# bp_df <- bp_df %>%
+#   arrange(type, direction, TF_order)
+
+# bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
+# bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
+# bp_df$type = factor (bp_df$type, levels = celltypes)
+# bp_df_pd = bp_df
+
+# # Plot stacked bars
+# bp <- ggplot(bp_df_pd, aes(x = type, y = Freq, fill = TF_id)) +
+#   geom_bar(stat = "identity") +
+#   scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+#   theme_minimal(base_size = 14) +
+#   ylab("Proportion of counts") +
+#   xlab("Cell type") +
+#   ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+#   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
+
+  
+
+# pdf (file.path ('Plots', 'TF_abundance_profile_NOT_promoter_barplot.pdf'),6,width=12.5)
+# bp
+# dev.off()
+
+
+# ### Combine barplots ####
+# bp_df_comb = rbind (bp_df_cd, bp_df_cp)
+# bp_df_comb$TF_id = as.character(bp_df_comb$TF_id)
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[1],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[2],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[3],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[4],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[5],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[6],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[7],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[8],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[9],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[10],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[11],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[12],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[grepl ('pattern',bp_df_comb$TF_id)] = 'pattern_not_matching'
+
+# # Plot stacked bars
+# bp <- ggplot(bp_df_comb, aes(x = type, y = Freq, fill = TF_id)) +
+#   geom_bar(stat = "identity") +
+# #  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+#   theme_minimal(base_size = 14) +
+#   ylab("Proportion of counts") +
+#   xlab("Cell type") +
+#   ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1) + 
+#   facet_wrap (~ptype)
+
+  
+
+# pdf (file.path ('Plots', 'TF_abundance_combined_counts_barplot.pdf'),6,width=32.5)
+# bp
+# dev.off()
+
+# bp_df_comb = rbind (bp_df_pd, bp_df_pp)
+# bp_df_comb$TF_id = as.character(bp_df_comb$TF_id)
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[1],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[2],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[3],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[4],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[5],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[6],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[7],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[8],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[9],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[10],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[11],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[12],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
+# bp_df_comb$TF_id[grepl ('pattern',bp_df_comb$TF_id)] = 'pattern_not_matching'
+
+# # Plot stacked bars
+# bp <- ggplot(bp_df_comb, aes(x = type, y = Freq, fill = TF_id)) +
+#   geom_bar(stat = "identity") +
+# #  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
+#   theme_minimal(base_size = 14) +
+#   ylab("Proportion of counts") +
+#   xlab("Cell type") +
+#   ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#   geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1) + 
+#   facet_wrap (~ptype)
+
+  
+
+# pdf (file.path ('Plots', 'TF_abundance_combined_profile_barplot.pdf'),6,width=32.5)
+# bp
+# dev.off()
+
+
+
+# ps = getPeakSet(archp)
+# chrombpnet_counts = list()
+# celltypes = c('Fibroblasts_P1')
+# for (celltype in celltypes)
+#   {
+#   message (paste0('reading finemo output for ', celltype))  
+#   chrombpnet_counts[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
+#   gr = makeGRangesFromDataFrame (chrombpnet_counts[[celltype]], keep.extra.columns=T, seqnames.field = 'V1', start.field = 'V2', end.field = 'V3')
+#   chrombpnet_counts[[celltype]]$peak_type = ps$peakType[findOverlaps(gr, ps, select='first')]
+#   }
+
+
+
+
+
+
+
+# # Import chromBPnet tfmodisco results to check for composite motifs ####
+# #archp_P1 = archp[archp$Clusters %in% c('C2') & archp$Sample == 'P1']
+# library ('universalmotif')
+
+# ps = getPeakSet (archp)
+
+# chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
+# celltype = 'Mesothelium'
+# library (httr)
+# library (XML)
+
+
+# # Load tfmodisco calls of contribution counts ####
+# modisco_motifs = as.data.frame(readHTMLTable(file.path(chromBPdir,celltype, 'no_bias_model','modisco_profile',paste0(celltype,'_report'),'motifs.html')))
+
+# # Check expression of profile motifs ####
+# table (srt$celltype_lv1)
+
+# genes = c('SP3','SP4','KLF12','FOS','FOSB','JUNB','ELK4','ELK1','GABPA','NFIC','NFIB','WT1','SALL4','EGR2','PITX2','NKX2-5','ZSCAN22','GLI1','GLI2','GLI3')
+# pdf (file.path('Plots','chrombpnet_motifs_expression_dotplot.pdf'))
+# DotPlot (srt, genes, group.by = 'celltype_lv1') + gtheme
+# dev.off()
+
+
+
+### Export fragment files of annotated cells for GEO submission ####
+# Get fragments from each sample
+library (rtracklayer)
+fragments_l = getFragmentsFromProject (archp)
+tmpdir = '/sc/arion/scratch/giottb01/meso_scatac_fragments'
+for (sam in names (fragments_l))
   {
-  x = x[x$peak_type == 'Promoter',]
-  x = x[!is.na(x$peak_type),]
-  })
-
-top_n <- 5
-n <- length(chrombpnet_counts_p1 )
-
-bp_list <- lapply(seq_len(n), function(i) {
-  tbl <- table(chrombpnet_counts_p1 [[i]]$V4)
-  tbl_sorted <- sort(tbl, decreasing = TRUE)
-  top_tbl <- head(tbl_sorted, top_n)
-  
-  tf_names <- names(top_tbl)
-  directions <- sapply(tf_names, function(tf) {
-    chrombpnet_counts_p1[[i]]$V5[chrombpnet_counts_p1 [[i]]$V4 == tf][1]
-  })
-  
-  data.frame(
-    Freq = proportions(top_tbl),
-    TF   = tf_names,
-    direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl)),
-    ptype = 'promoter'
-  )
-})
-
-bp_df <- do.call(rbind, bp_list)
-
-# Make neg values negative
-bp_df <- bp_df %>%
-  mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
-
-# Create custom ordering per type
-bp_df <- bp_df %>%
-  group_by(type, direction) %>%
-  mutate(
-    TF_order = ifelse(direction == "pos",
-                      rank(-Freq, ties.method = "first"),  # descending
-                      rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
-  ) %>%
-  ungroup()
-
-# Build a combined factor: ensures pos stack from bottom up, neg from top down
-bp_df <- bp_df %>%
-  arrange(type, direction, TF_order)
-
-bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
-bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = celltypes)
-
-bp_df_cp = bp_df
-# Plot stacked bars
-bp <- ggplot(bp_df_cp, aes(x = type, y = Freq, fill = TF_id)) +
-  geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF))) +
-  theme_minimal(base_size = 14) +
-  ylab("Proportion of counts") +
-  xlab("Cell type") +
-  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
-
-pdf (file.path ('Plots', 'TF_abundance_counts_promoter_barplot.pdf'),6,width=12.5)
-bp
-dev.off()
-
-
-top_n <- 5
-n <- length(chrombpnet_profile_p1)
-
-bp_list <- lapply(seq_len(n), function(i) {
-  tbl <- table(chrombpnet_profile_p1[[i]]$V4)
-  tbl_sorted <- sort(tbl, decreasing = TRUE)
-  top_tbl <- head(tbl_sorted, top_n)
-  
-  tf_names <- names(top_tbl)
-  directions <- sapply(tf_names, function(tf) {
-    chrombpnet_profile_p1[[i]]$V5[chrombpnet_profile_p1[[i]]$V4 == tf][1]
-  })
-  
-  data.frame(
-    Freq = proportions(top_tbl),
-    TF   = tf_names,
-    direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl)),
-    ptype = 'promoter'
-  )
-})
-
-bp_df <- do.call(rbind, bp_list)
-
-# Make neg values negative
-bp_df <- bp_df %>%
-  mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
-
-# Create custom ordering per type
-bp_df <- bp_df %>%
-  group_by(type, direction) %>%
-  mutate(
-    TF_order = ifelse(direction == "pos",
-                      rank(-Freq, ties.method = "first"),  # descending
-                      rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
-  ) %>%
-  ungroup()
-
-# Build a combined factor: ensures pos stack from bottom up, neg from top down
-bp_df <- bp_df %>%
-  arrange(type, direction, TF_order)
-
-bp_df$TF_id <- paste (bp_df$TF, bp_df$type, sep = "_")
-bp_df$TF_id <- factor (bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = celltypes)
-bp_df_pp = bp_df
-# Plot stacked bars
-bp <- ggplot(bp_df_pp, aes(x = type, y = Freq, fill = TF_id)) +
-  geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
-  theme_minimal(base_size = 14) +
-  ylab("Proportion of counts") +
-  xlab("Cell type") +
-  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
-
-pdf (file.path ('Plots', 'TF_abundance_profile_promoter_barplot.pdf'),6,width=12.5)
-bp
-dev.off()
-
-
-
-
-
-# Subset for peak type (NOT promoter) ####
-chrombpnet_counts_p2 =  lapply (chrombpnet_counts, function(x) {
-  x = x[x$peak_type == 'Distal',]
-  x = x[!is.na(x$peak_type),]
-  })
-chrombpnet_profile_p2 =  lapply (chrombpnet_profile, function(x) {
-  x = x[x$peak_type == 'Distal',]
-  x = x[!is.na(x$peak_type),]
-  })
-
-top_n <- 5
-n <- length(chrombpnet_counts_p2)
-
-bp_list <- lapply(seq_len(n), function(i) {
-  tbl <- table(chrombpnet_counts_p2[[i]]$V4)
-  tbl_sorted <- sort(tbl, decreasing = TRUE)
-  top_tbl <- head(tbl_sorted, top_n)
-  
-  tf_names <- names(top_tbl)
-  directions <- sapply(tf_names, function(tf) {
-    chrombpnet_counts_p2[[i]]$V5[chrombpnet_counts_p2[[i]]$V4 == tf][1]
-  })
-  
-  data.frame(
-    Freq = proportions(top_tbl),
-    TF   = tf_names,
-    direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl)),
-    ptype = 'distal'
-  )
-})
-
-bp_df <- do.call (rbind, bp_list)
-
-# Make neg values negative
-bp_df <- bp_df %>%
-  mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
-
-# Create custom ordering per type
-bp_df <- bp_df %>%
-  group_by(type, direction) %>%
-  mutate(
-    TF_order = ifelse(direction == "pos",
-                      rank(-Freq, ties.method = "first"),  # descending
-                      rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
-  ) %>%
-  ungroup()
-
-# Build a combined factor: ensures pos stack from bottom up, neg from top down
-bp_df <- bp_df %>%
-  arrange(type, direction, TF_order)
-
-bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
-bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = celltypes)
-bp_df_cd = bp_df
-
-# Plot stacked bars
-bp <- ggplot(bp_df_cd, aes(x = type, y = Freq, fill = TF_id)) +
-  geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
-  theme_minimal(base_size = 14) +
-  ylab("Proportion of counts") +
-  xlab("Cell type") +
-  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
-
-  
-
-pdf (file.path ('Plots', 'TF_abundance_counts_NOT_promoter_barplot.pdf'),6,width=12.5)
-bp
-dev.off()
-
-
-top_n <- 5
-n <- length(chrombpnet_profile_p2)
-
-bp_list <- lapply(seq_len(n), function(i) {
-  tbl <- table(chrombpnet_profile_p2[[i]]$V4)
-  tbl_sorted <- sort(tbl, decreasing = TRUE)
-  top_tbl <- head(tbl_sorted, top_n)
-  
-  tf_names <- names(top_tbl)
-  directions <- sapply(tf_names, function(tf) {
-    chrombpnet_profile_p2[[i]]$V5[chrombpnet_profile_p2[[i]]$V4 == tf][1]
-  })
-  
-  data.frame(
-    Freq = proportions(top_tbl),
-    TF   = tf_names,
-    direction = directions,
-    type = rep(celltypes[[i]], length(top_tbl),
-    ptype = 'distal'
-  ))
-  )
-})
-
-bp_df <- do.call(rbind, bp_list)
-
-# Make neg values negative
-bp_df <- bp_df %>%
-  mutate(Freq = ifelse(direction == "neg", -Freq.Freq, Freq.Freq))
-
-# Create custom ordering per type
-bp_df <- bp_df %>%
-  group_by(type, direction) %>%
-  mutate(
-    TF_order = ifelse(direction == "pos",
-                      rank(-Freq, ties.method = "first"),  # descending
-                      rank(Freq, ties.method = "first"))   # ascending for neg (opposite)
-  ) %>%
-  ungroup()
-
-# Build a combined factor: ensures pos stack from bottom up, neg from top down
-bp_df <- bp_df %>%
-  arrange(type, direction, TF_order)
-
-bp_df$TF_id <- paste(bp_df$TF, bp_df$type, sep = "_")
-bp_df$TF_id <- factor(bp_df$TF_id, levels = unique(bp_df$TF_id))
-bp_df$type = factor (bp_df$type, levels = celltypes)
-bp_df_pd = bp_df
-
-# Plot stacked bars
-bp <- ggplot(bp_df_pd, aes(x = type, y = Freq, fill = TF_id)) +
-  geom_bar(stat = "identity") +
-  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
-  theme_minimal(base_size = 14) +
-  ylab("Proportion of counts") +
-  xlab("Cell type") +
-  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1)
-
-  
-
-pdf (file.path ('Plots', 'TF_abundance_profile_NOT_promoter_barplot.pdf'),6,width=12.5)
-bp
-dev.off()
-
-
-### Combine barplots ####
-bp_df_comb = rbind (bp_df_cd, bp_df_cp)
-bp_df_comb$TF_id = as.character(bp_df_comb$TF_id)
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[1],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[2],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[3],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[4],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[5],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[6],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[7],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[8],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[9],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[10],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[11],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[12],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[grepl ('pattern',bp_df_comb$TF_id)] = 'pattern_not_matching'
-
-# Plot stacked bars
-bp <- ggplot(bp_df_comb, aes(x = type, y = Freq, fill = TF_id)) +
-  geom_bar(stat = "identity") +
-#  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
-  theme_minimal(base_size = 14) +
-  ylab("Proportion of counts") +
-  xlab("Cell type") +
-  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1) + 
-  facet_wrap (~ptype)
-
-  
-
-pdf (file.path ('Plots', 'TF_abundance_combined_counts_barplot.pdf'),6,width=32.5)
-bp
-dev.off()
-
-bp_df_comb = rbind (bp_df_pd, bp_df_pp)
-bp_df_comb$TF_id = as.character(bp_df_comb$TF_id)
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[1],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[2],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[3],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[4],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[5],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[6],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[7],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[8],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[9],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[10],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[11],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] = gsub (celltypes[12],'',bp_df_comb$TF_id[!grepl ('pattern', bp_df_comb$TF_id)] )
-bp_df_comb$TF_id[grepl ('pattern',bp_df_comb$TF_id)] = 'pattern_not_matching'
-
-# Plot stacked bars
-bp <- ggplot(bp_df_comb, aes(x = type, y = Freq, fill = TF_id)) +
-  geom_bar(stat = "identity") +
-#  scale_fill_manual(values = paletteer_d("palettesForR::LaTeX", length(bp_df$TF)) ) +
-  theme_minimal(base_size = 14) +
-  ylab("Proportion of counts") +
-  xlab("Cell type") +
-  ggtitle("Top 10 TFs (pos vs neg, ordered stacks)") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1) + 
-  facet_wrap (~ptype)
-
-  
-
-pdf (file.path ('Plots', 'TF_abundance_combined_profile_barplot.pdf'),6,width=32.5)
-bp
-dev.off()
-
-
-
-ps = getPeakSet(archp)
-chrombpnet_counts = list()
-celltypes = c('Fibroblasts_P1')
-for (celltype in celltypes)
-  {
-  message (paste0('reading finemo output for ', celltype))  
-  chrombpnet_counts[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
-  gr = makeGRangesFromDataFrame (chrombpnet_counts[[celltype]], keep.extra.columns=T, seqnames.field = 'V1', start.field = 'V2', end.field = 'V3')
-  chrombpnet_counts[[celltype]]$peak_type = ps$peakType[findOverlaps(gr, ps, select='first')]
+    if (!file.exists(file.path(tmpdir,paste0(sam,'_fragments.bed'))))
+      export(fragments_l[[sam]], file.path(tmpdir, paste0(sam,'_fragments.bed')))
   }
-
-
-
-
-
-
-
-# Import chromBPnet tfmodisco results to check for composite motifs ####
-#archp_P1 = archp[archp$Clusters %in% c('C2') & archp$Sample == 'P1']
-library ('universalmotif')
-
-ps = getPeakSet (archp)
-
-chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
-celltype = 'Mesothelium'
-library (httr)
-library (XML)
-
-
-# Load tfmodisco calls of contribution counts ####
-modisco_motifs = as.data.frame(readHTMLTable(file.path(chromBPdir,celltype, 'no_bias_model','modisco_profile',paste0(celltype,'_report'),'motifs.html')))
-
-# Check expression of profile motifs ####
-table (srt$celltype_lv1)
-
-genes = c('SP3','SP4','KLF12','FOS','FOSB','JUNB','ELK4','ELK1','GABPA','NFIC','NFIB','WT1','SALL4','EGR2','PITX2','NKX2-5','ZSCAN22','GLI1','GLI2','GLI3')
-pdf (file.path('Plots','chrombpnet_motifs_expression_dotplot.pdf'))
-DotPlot (srt, genes, group.by = 'celltype_lv1') + gtheme
-dev.off()
-
+    
 
 
