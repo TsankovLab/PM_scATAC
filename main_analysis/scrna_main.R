@@ -60,6 +60,56 @@ sample_names = c(
 
 # Load RNA
 srt = readRDS ('../scrna/srt.rds')
+srt_p14 = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/P14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds')
+srt_p14 = subset(x = srt_p14, features = rownames(srt))
+srt2 = SplitObject (srt, split.by = 'sampleID')
+srt_p14$celltype_lv1 = srt_p14$celltype
+srt_p14$celltype_lv1[srt_p14$celltype_lv1 == 'LEC'] = 'Endothelial'
+srt_p14$celltype_lv1[srt_p14$celltype_lv1 == 'Smooth Muscle'] = 'SmoothMuscle'
+srt_p14 = srt_p14[,srt_p14$celltype_lv1 != 'NA']
+srt_p14 = srt_p14[,srt_p14$celltype_lv1 != 'doublets']
+srt = merge (x = srt_p14, y= srt2)
+srt[["RNA"]] = JoinLayers(srt[["RNA"]])
+
+
+
+# Initiate pipeline
+scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline'
+
+org = 'human'
+
+### Data processing and clustering variables ###
+batch = 'no'
+variablefeatures = 'scran'
+nfeat = 2000 # number of variable genes to consider for dimentionality reduction
+sigPCs = 15
+ccRegress = T # Regress cell cycle gene expression 
+vars_to_regress=NULL
+metaGroupNames = c('sampleID','celltype_lv1')
+res = c(2) # denovo cluster resolutions 
+
+source (file.path(scrna_pipeline_dir,'data_processing.R'))
+source (file.path(scrna_pipeline_dir,'harmony_and_clustering.R'))
+
+srt_tnk = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/srt.rds')
+srt_stroma = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/stroma/scrna/srt.rds')
+srt_tumor = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/srt.rds')
+
+table (colnames (srt_tnk) %in% colnames (srt),srt_tnk$sampleID)
+table (colnames (srt_tumor[,!srt_tumor$sampleID %in% c('HU37','HU62')]) %in% colnames (srt))
+table (colnames (srt_stroma) %in% colnames (srt))
+
+saveRDS (srt, 'srt.rds')
+
+head (srt)
+
+pdf (file.path ('Plots','celltypes_lv1_umap.pdf'))
+DimPlot (srt, group.by = 'celltype_lv1')
+DimPlot (srt, group.by = 'sampleID')
+dev.off()
+
+
+
 srt$celltype_simplified2[srt$celltype_simplified2 == 'pDC'] = 'pDCs'
 srt = srt[,srt$sampleID %in% sample_names]
 sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)

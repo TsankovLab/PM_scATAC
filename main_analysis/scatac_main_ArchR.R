@@ -825,7 +825,7 @@ archp$celltype_lv2[archp$celltype_lv1 == 'Alveolar'] = 'Alveolar'
 
 # Save annotation in repo
 annotation_df = data.frame (barcode = rownames(archp@cellColData), celltype_lv1 = archp$celltype_lv1, celltype_lv2 = archp$celltype_lv2)
-write.csv (annotation_df, '../../git_repo/barcode_anntation.csv')
+write.csv (annotation_df, '../../git_repo/files/barcode_anntation.csv')
 
 
 # Show that enhancer linked to NR4A2 is only up in NK KLRC1 and CD8 exhausted across all cells ####
