@@ -24,7 +24,7 @@ if (!file.exists (file.path('cNMF',paste0('counts_nmf_',nfeat,'_',cnmf_name,'.tx
 	if ('layers' %in% slotNames (srt@assays$RNA))
 		{	
 		count_mat = t(srt@assays$RNA@layers$counts[rownames(srt) %in% vf,])
-		colnames (count_mat) = rownames (srt)
+		colnames (count_mat) = rownames (srt[rownames(srt) %in% vf,])
 		rownames (count_mat) = colnames (srt)
 		} else {
 		count_mat = t(srt@assays$RNA@counts[vf,])
