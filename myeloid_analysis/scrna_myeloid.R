@@ -97,19 +97,14 @@ dev.off()
 ### Find cNMF shared between myeloid in each sample ####
 #### Run cNMF ####
 nfeat = 5000
-force=F
+force=T
 k_list = c(5:10)
 k_selections = c(5:10)
 cores= 100
 
 # Run cNMF only in samples matching scATAC-seq samples 
-sams = unique (archp$Sample)
-sams = sams[sams %in% unique(srt$sampleID)]
-srt2 = srt[, srt$sampleID %in% sams]
-#srt2 = srt2[, srt2$sampleID %in% names (table (srt2$sampleID)[table (srt2$sampleID) > 100])]
-#srt2 = srt
-sams = unique (srt2$sampleID)
-for (sam in sams)
+srt2 = srt
+for (sam in unique(srt$sampleID))
 	{
 	print(sam)	
 	srt = srt2[,srt2$sampleID == sam]	
