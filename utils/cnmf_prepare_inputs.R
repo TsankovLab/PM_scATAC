@@ -1,7 +1,13 @@
 require (scran)
 
-sce = SingleCellExperiment (list(counts=srt@assays$RNA@counts, logcounts = srt@assays$RNA@data),
+if ('layers' %in% slotNames (srt@assays$RNA))
+	{
+	sce = SingleCellExperiment (list(counts=srt@assays$RNA@layers$counts, logcounts = srt@assays$RNA@layers$data),
 	rowData=rownames(srt)) 
+	} else {
+	sce = SingleCellExperiment (list(counts=srt@assays$RNA@counts, logcounts = srt@assays$RNA@data),
+	rowData=rownames(srt)) 
+	}
 	sce = modelGeneVar(sce)
 	# remove batchy genes
 	batchy_genes = c('RPL','RPS','MT-')

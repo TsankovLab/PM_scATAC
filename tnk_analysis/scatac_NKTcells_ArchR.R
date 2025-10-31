@@ -28,11 +28,8 @@ addArchRGenome("hg38")
 
 archp = loadArchRProject (projdir)
 srt = readRDS (file.path ('..','scrna','srt.rds'))
-srt_main = readRDS ('../../main/scrna/srt.rds')
+#srt_main = readRDS ('../../main/scrna/srt.rds')
 
-trim_clusters = FALSE
-if (trim_clusters) 
-{
 
 ## Reduce dimension and harmonize ####
 
@@ -41,24 +38,24 @@ if (trim_clusters)
   LSI_method = 2
   archp = addIterativeLSI (ArchRProj = archp,
     useMatrix = "TileMatrix", name = "IterativeLSI",
-    force = TRUE, LSIMethod = LSI_method,
+    force = FALSE, LSIMethod = LSI_method,
     varFeatures = varfeat)
 
   archp = addHarmony (
     ArchRProj = archp,
     reducedDims = "IterativeLSI",
     name = "Harmony_project",
-    groupBy ='Sample', force=TRUE
+    groupBy ='Sample', force=FALSE
 )
 
 archp = addUMAP (ArchRProj = archp,
     reducedDims = "Harmony_project", name='UMAP_H',
-    force = TRUE)
+    force = FALSE)
 
 archp = addClusters (input = archp,
     reducedDims = "Harmony_project",
     name='Clusters_H', res=2,
-    force = TRUE)
+    force = FALSE)
 
 pdf()
 umap_p3 = plotEmbedding (ArchRProj = archp, 
@@ -81,7 +78,7 @@ dev.off()
 
 # Run genescore DAG ####
 metaGroupName = "Clusters_H"
-force = TRUE
+force = FALSE
 if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
 
 # TNK markers ####
