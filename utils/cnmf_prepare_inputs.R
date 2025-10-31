@@ -19,14 +19,28 @@ cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(
 dir.create (file.path(cnmf_out,'Plots'), recursive=T)
 
 # Export count matrices ####
-if (!file.exists (file.path('cNMF',paste0('counts_nmf_',nfeat,'_',cnmf_name,'.txt'))) | force) 
+if (!file.exists (file.path('cNMF',paste0('counts_nmf_',nfeat,'_',cnmf_name,'.txt'))) | force)
 	{
-	count_mat = t(srt@assays$RNA@counts[vf,])
+	if ('layers' %in% slotNames (srt@assays$RNA))
+		{	
+		count_mat = t(srt@assays$RNA@layers$counts[rownames(srt) %in% vf,])
+		colnames (count_mat) = rownames (srt)
+		rownames (count_mat) = colnames (srt)
+		} else {
+		count_mat = t(srt@assays$RNA@counts[vf,])
+		}	
 	write.table (count_mat, (file.path('cNMF',paste0('counts_nmf_',nfeat,'_',cnmf_name,'.txt'))), sep='\t', col.names = NA)
 	}
 if (!file.exists (file.path('cNMF',paste0('norm_nmf_',nfeat,'_',cnmf_name,'.txt'))) | force) 
 	{
-	norm_mat = t(srt@assays$RNA@data[vf,])	
+	if ('layers' %in% slotNames (srt@assays$RNA))
+		{	
+		norm_mat = t(srt@assays$RNA@layers$data[rownames(srt) %in% vf,])
+		colnames (norm_mat) = rownames (srt)
+		rownames (norm_mat) = colnames (srt)
+		} else {
+		norm_mat = t(srt@assays$RNA@data[vf,])	
+		}
 	write.table (norm_mat, (file.path('cNMF',paste0('norm_nmf_',nfeat,'_',cnmf_name,'.txt'))), sep='\t', col.names = NA)	
 	}
 	
