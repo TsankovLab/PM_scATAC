@@ -62,7 +62,7 @@ gtheme_italic_y = theme(
 # Boxplots / violins ####
 bxp = geom_boxplot (
     linewidth = .2,
-    width=.8,
+    width=.7,
     outlier.alpha = 0.2,
     outlier.size = 1,
      size=0.6, alpha=0.7

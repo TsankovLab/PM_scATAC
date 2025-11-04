@@ -29,9 +29,11 @@ addArchRGenome("hg38")
 # Load ArchR project ####
 archp = loadArchRProject (projdir)
 
+cell_subsets_order = c('Mono_CD14','Mono_CD16','TAM_CXCLs','TAM_TREM2','TAM_MARCO','cDCs','TAM_interstitial')
+
 # Load RNA ####
 srt = readRDS (file.path('..','scrna','srt.rds'))
-sample_levels = c('Monocytes','TREM2','SPP1','cDCs','IFN_CXCLs','IM')
+#sample_levels = c('Monocytes','TREM2','SPP1','cDCs','IM')
 
 ## Reduce dimension and harmonize ####
   varfeat = 25000
@@ -64,12 +66,11 @@ archp = addClusters (input = archp,
     name='Clusters_H', res=1,
     force = TRUE)
 
-
 ### Annotate cell types ####
-archp$celltype2 = 0
-archp$celltype2[archp$Clusters_H %in% c('C6','C7','C9')] = 'Monocytes'
-archp$celltype2[archp$Clusters_H %in% c('C8')] = 'cDCs'
-archp$celltype2[archp$Clusters_H %in% c('C1','C2','C3','C4','C5','C10','C11')] = 'TAMs'
+archp$celltype_lv2 = 0
+archp$celltype_lv2[archp$Clusters_H %in% c('C6','C7','C9')] = 'Monocytes'
+archp$celltype_lv2[archp$Clusters_H %in% c('C8')] = 'cDCs'
+archp$celltype_lv2[archp$Clusters_H %in% c('C1','C2','C3','C4','C5','C10','C11')] = 'TAMs'
 
 pdf()
 umap_p3 = plotEmbedding (ArchRProj = archp, labelMeans = F,
@@ -77,7 +78,7 @@ umap_p3 = plotEmbedding (ArchRProj = archp, labelMeans = F,
   pal= palette_sample,
    embedding = "UMAP_H")
 umap_p4 = plotEmbedding (ArchRProj = archp, labelMeans = F,
-  colorBy = "cellColData", name = "celltype2",
+  colorBy = "cellColData", name = "celltype_lv2",
    embedding = "UMAP_H",
    pal = palette_myeloid2)
 umap_p5 = plotEmbedding (ArchRProj = archp, 
@@ -118,6 +119,7 @@ mono_markers = c('VCAN','FCN1','CXCL8','CXCL2','IL1B','EREG','TIMP1','THBS1','CC
 dc_markers = macs_markers[macs_markers$group %in% c('DC1','DC2','mregDC'),'gene']
 ap1_complex = c('JUN','FOSB','FOS','BACH1','SMARCC1','FOSL2','JUND','JDP2','BATF','CEBPB','CEBPA','CEBPZ','FOSL1','NFE2','NFE2L2','NFE2L1')
 selected_markers = c('FCN1','EREG','TIMP1', 'CCR7','LAMP3','HLA-DQA1','C1QA','CD68','C5AR2')
+
 pdf()
 p2 <- plotEmbedding(
     ArchRProj = archp,
@@ -209,15 +211,14 @@ if (!all(file.exists(file.path('Annotations',
 source (file.path ('..','..','git_repo','utils','chromVAR.R'))
   
 
-
 # Add cNMF modules from scRNA-seq ####
 shared_cnmf = readRDS (file.path('..','scrna','shared_cnmf_myeloid.rds'))
 shared_cnmf = lapply (shared_cnmf, function(x) x[x %in% getFeatures (archp)])
 shared_cnmf = lapply (shared_cnmf, function(x) head (x, 50))
-remove_modules = c('cDCs2','CC_S','CC_G2M','LILRA') # remove monocyres cDC and CC modules. Consider re-inculding CC 
+remove_modules = c('Stress','TAM_unknown','CC')
 shared_cnmf = shared_cnmf[!names(shared_cnmf) %in% remove_modules]
 
-force = FALSE
+force = F
 if (!all (names (shared_cnmf) %in% colnames (archp@cellColData)) | force)
   {
   archp@cellColData = archp@cellColData[,!colnames(archp@cellColData) %in% names(shared_cnmf)]
@@ -236,17 +237,17 @@ if (!all (names (shared_cnmf) %in% colnames (archp@cellColData)) | force)
   }
 
 # Assign TAMs to cNMF modules from scRNA-seq ####
-archp_MAC = archp[!archp$celltype2 %in% c('Monocytes','cDCs')]
-cnmf_scatac = as.data.frame (scale(t(scale(t(archp@cellColData[,names(shared_cnmf)])))))
+#archp_MAC = archp[!archp$celltype_lv2 %in% c('Monocytes','cDCs')]
+cnmf_scatac = as.data.frame (t(scale(t(scale(archp@cellColData[,names(shared_cnmf)])))))
+#cnmf_scatac = as.data.frame (scale(archp@cellColData[,names(shared_cnmf)]))
 if (!file.exists ('cnmf_scatac.rds')) saveRDS (cnmf_scatac, 'cnmf_scatac.rds')
-
 
 cap = 3
 cnmf_scatac_cap = cnmf_scatac
 cnmf_scatac_cap[cnmf_scatac_cap > cap] = cap
 cnmf_scatac_cap[cnmf_scatac_cap < -cap] = -cap
 set.seed (123)
-km_cnmf = kmeans (t(scale(t(cnmf_scatac_cap))), centers=6) # double scale modules and cluster using k-means
+km_cnmf = kmeans (cnmf_scatac_cap, centers=7) # double scale modules and cluster using k-means
 ha = HeatmapAnnotation (sample = archp$Sample, col=list(sample = palette_sample))
 hm = Heatmap (t(cnmf_scatac_cap), 
   col = palette_genescore_fun(cnmf_scatac_cap), 
@@ -260,10 +261,9 @@ hm = Heatmap (t(cnmf_scatac_cap),
   column_names_gp = gpar (fontsize = 0),
   border=T)
 
-pdf (file.path ('Plots','cnmf_scatac_scaled_only_MAC2_heatmap4.pdf'), height=1.5)
+pdf (file.path ('Plots','cnmf_scatac_scaled_heatmap.pdf'), height=1.5)
 hm
 dev.off()
-
 
 # Show TAM modules in UMAPs ####
 archp = addImputeWeights (archp)
@@ -278,143 +278,33 @@ p <- plotEmbedding (
 )
 # p2 <- plotEmbedding (
 #     ArchRProj = archp, 
-#     colorBy = "cellColData", 
-#     name = names (shared_cnmf), 
+#     colorBy = "GeneScoreMatrix", 
+#     name = c('C3','FOSB','CSF1R','A2M','NAIP','ADAP2','FOLR2','MALAT1' ),
 #     embedding = "UMAP_H",
 #     pal = palette_expression,
 #     imputeWeights = getImputeWeights(archp)
 # )
 dev.off()
-pdf (file.path ('Plots','shared_cnmf_TAMs_fplots2.pdf'),14,14)
+pdf (file.path ('Plots','shared_cnmf_TAMs_fplots.pdf'),14,14)
 wrap_plots (p, ncol=6)
+# p2
 dev.off()
 
-
-#### Identify TF regulators correlated to each scRNA cnmf #####
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-#mMat = scale(as.matrix(mMat))#[selected_TF,])
-
-# Filter by RNA expression ####
-metaGroupName = 'celltype2'
-active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
-mMat = t(scale (mMat[active_TFs, ]))
-if (!file.exists ('mMat_scaled_active.rds')) saveRDS (mMat, 'mMat_scaled_active.rds')
-
-
-cnmf_scatac = readRDS ('cnmf_scatac.rds')
-mMat = readRDS ('mMat_scaled_active.rds')
-tf_cnmf_cor = cor (mMat, cnmf_scatac, method='spearman')
-cell_subsets = colnames(tf_cnmf_cor)[c(4,1,3,5,6,2)]
-top_5 = unlist(lapply (cell_subsets, function(x) head (rownames(tf_cnmf_cor[order(-tf_cnmf_cor[,x]),]),5)))
-
-
-DAM_hm = Heatmap (tf_cnmf_cor[top_5,cell_subsets], 
-          #row_labels = colnames (mMat_mg),
-          #column_title = paste('top',top_genes),
-          clustering_distance_columns = 'euclidean',
-          clustering_distance_rows = 'euclidean',
-          cluster_rows = F,
-          #col = pals_heatmap[[5]],
-          cluster_columns=F,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 8),
-          column_names_gp = gpar(fontsize = 8),
-          column_names_rot = 45,
-          name = 'chromVAR',
-          #rect_gp = gpar(col = "white", lwd = .5),
-          border=TRUE,
-          col = rev(palette_deviation)#,
-          #width = unit(2, "cm")
-          #right_annotation = motif_ha
-          )
-
-pdf (file.path ('Plots','cnmf_clusters_DAM_heatmap4.pdf'), width = 3,height=4)
-draw (DAM_hm)
-dev.off()
-
-### Try using metacells for each cnmf ####
-sams = c('P1','P10','P11','P12','P13','P14','P23','P5') # Select samples that have at least 100 endothelial cells
-df = list()
-
-library (zoo)
-bin_width <- 30   # Number of observations per bin
-overlap <- 30
-cnmf_mods = c('Mono','cDCs','TREM2','SPP1','IFN_CXCLs','IM')
-#archp$Sample2 = 'sample'
-#sams = 'sample'
-
-for (sam in sams)
-{
-  cnmf_l = list()
-  for (cnmf_mod in cnmf_mods)
-  {
-  metacells_order = cnmf_scatac[,cnmf_mod][archp$Sample == sam]
-  metacells_order = order (-metacells_order)
-  mMat_sam = mMat[archp$Sample == sam, ]
-  mMat_sam = mMat_sam[metacells_order,]
-  cnmf_sam = cnmf_scatac[,cnmf_mod][archp$Sample == sam][metacells_order]
-  
- cnmf_l[[cnmf_mod]] <- cor (
-  rollapply (mMat_sam, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"),
-  rollapply (cnmf_sam, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"), 
-  method = 'spearman')  
-  }
-df[[sam]] = as.data.frame (do.call (cbind, cnmf_l))
-colnames (df[[sam]]) = cnmf_mods
-#df[[sam]]$sample = sam
-}
-
-# Convert list to 3D array: rows x cols x n_matrices
-array_3d <- array(unlist(df), dim = c(nrow(df[[1]]), ncol(df[[1]]), length(df)))
-
-# Apply median across the third dimension (i.e., across matrices)
-median_matrix <- apply(array_3d, c(1, 2), median)
-rownames (median_matrix) = rownames (df[[1]])
-colnames (median_matrix) = colnames (df[[1]])
-top_5 = unlist(lapply (cnmf_mods, function(x) head (rownames(median_matrix[order(-median_matrix[,x]),]),5)))
-top_5 = unlist(lapply (cnmf_mods, function(x) head (rownames(df[[1]][order(-df[[1]][,x]),]),5)))
-
-DAM_hm = Heatmap (df[[1]][top_5,cnmf_mods], 
-          #row_labels = colnames (mMat_mg),
-          #column_title = paste('top',top_genes),
-          clustering_distance_columns = 'euclidean',
-          clustering_distance_rows = 'euclidean',
-          cluster_rows = F,
-          #col = pals_heatmap[[5]],
-          cluster_columns=F,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 8),
-          column_names_gp = gpar(fontsize = 8),
-          column_names_rot = 45,
-          name = 'chromVAR',
-          #rect_gp = gpar(col = "white", lwd = .5),
-          border=TRUE,
-          col = rev(palette_deviation)#,
-          #width = unit(2, "cm")
-          #right_annotation = motif_ha
-          )
-
-pdf (file.path ('Plots','cnmf_clusters_DAM_metacells_heatmap.pdf'), width = 3,height=4)
-draw (DAM_hm)
-dev.off()
-
-
-#df = tail (df,50)
-# Create the scatterplot with a polished aesthetic
-df = do.call (rbind, df)
 
 # Re-Annotate based on cnmf clustering ####
 all (names(km_cnmf$cluster) == rownames(archp@cellColData))
 archp$cnmf_cluster = paste0('cnmf_cluster_',km_cnmf$cluster)
 archp$celltype_lv2 = archp$cnmf_cluster
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_1'] = 'IM'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_2'] = 'Mono'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_3'] = 'SPP1'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_4'] = 'IFN_CXCLs'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_5'] = 'cDCs'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_6'] = 'TREM2'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_1'] = 'Mono_CD16'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_2'] = 'TAM_MARCO'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_3'] = 'Mono_CD14'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_4'] = 'TAM_CXCLs'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_5'] = 'TAM_TREM2'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_6'] = 'TAM_interstitial'
+archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_7'] = 'cDCs'
+#archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_6'] = 'TREM2'
 
-write.csv (data.frame (barcode = archp@cellcolData), celltype_lv2 = archp$celltype_lv2), 'barcode_annotation.csv')
+write.csv (data.frame (barcode = rownames(archp@cellColData), celltype_lv2 = archp$celltype_lv2), 'barcode_annotation.csv')
 # Integrate MACs with myeloid annotation
 #archp$celltype2[match(rownames(archp_MAC@cellColData), rownames(archp@cellColData))] = archp_MAC$celltype_lv2
 
@@ -428,40 +318,48 @@ pdf (file.path('Plots','celltype_umap_TAM_annotated_umap2.pdf'),5,5)
 print (umap_p5)
 dev.off()
 
+force=T
+top_genes=5
+metaGroupName='celltype_lv2'
+DAM_df = DAM (
+  ArchRProj = archp,
+  metaGroupName = metaGroupName,
+  FDR_threshold = 1e-2,
+  meandiff_threshold = 0,
+  top_genes=top_genes,
+  filter_by_scRNA=TRUE, # use 'srt' object. Make sure has same metaGroupName
+  min_exp=.1,
+  force = force)
 
-# Differential Accessed motifs ####
-metaGroupName = "celltype_lv2"
-force=F
-source (file.path('..','..','git_repo','utils','DAM.R'))
 
+# Order the dataframe by that factor
+DAM_df$comparison <- factor(DAM_df$comparison, levels = cell_subsets_order)
+DAM_df <- DAM_df[order(DAM_df$comparison), ]
+
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat_mg = mMat[active_DAM, ]
-mMat_mg = as.data.frame (t(mMat_mg))
+rownames(mMat) = rowData(mSE)$name
+
+mMat = mMat[unique(DAM_df$gene), ]
+
+#mMat_mg = mMat[active_DAM, ]
+mMat_mg = as.data.frame (t(mMat))
 mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
 mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
 rownames (mMat_mg) = mMat_mg[,1]
 mMat_mg = mMat_mg[,-1]
-mMat_mg = mMat_mg[names (DAM_list),]
+mMat_mg = mMat_mg[levels (DAM_df$comparison),unique(DAM_df$gene)]
 
-# Generate RNA pseudobulk of matching cell types ####
-metaGroupName = 'celltype'
-#selected_TF = c(rownames(DAM_hm@matrix), 'NR4A3','NR4A2','NR4A1')
-ps = log2(as.data.frame (AverageExpression (srt, features = active_DAM, group.by = metaGroupName)[[1]]) +1)
-colnames (ps) = gsub ('-','_',colnames(ps))
-ps = ps[, colnames(DAM_hm@matrix)]
-ps_tf = ps[active_DAM,]
-
-  
-DAM_hm = Heatmap (t(scale(mMat_mg)), 
+# Generate heatmap ####
+ DAM_hm = Heatmap (t(scale(mMat_mg)), 
           row_labels = colnames (mMat_mg),
           column_title = paste('top',top_genes),
           clustering_distance_columns = 'euclidean',
           clustering_distance_rows = 'euclidean',
           cluster_rows = F,
           #col = pals_heatmap[[5]],
-          cluster_columns=F,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+          cluster_columns = F,#col = pals_heatmap[[1]],
+          row_names_gp = gpar(fontsize = 8),
           column_names_gp = gpar(fontsize = 8),
           column_names_rot = 45,
           name = 'chromVAR',
@@ -472,77 +370,188 @@ DAM_hm = Heatmap (t(scale(mMat_mg)),
           #right_annotation = motif_ha
           )
 
-scaled_ps = t(scale(t(ps_tf)))
-scaled_ps[is.na(scaled_ps)] = 0
-TF_exp_selected_hm = Heatmap (scaled_ps,
-        #right_annotation=tf_mark,
-        #column_split = column_split_rna,
-        cluster_rows = F, #km = 4, 
-        name = 'expression (scaled)',
-        column_gap = unit(.5, "mm"),
-        row_gap = unit(.2, "mm"),
-        clustering_distance_rows = 'euclidean',
-        clustering_distance_columns = 'euclidean',
-        cluster_columns=F, 
-        col = palette_expression,
-        row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
-        column_names_gp = gpar(fontsize = 8),
-          column_names_rot = 45,
-        border=T,
-        width = unit(2, "cm"))
 
-TF_exp_selected_hm2 = Heatmap (ps_tf,
-        #right_annotation=tf_mark,
-        #column_split = column_split_rna,
-        cluster_rows = F, #km = 4, 
-        name = 'expression',
-        column_gap = unit(.5, "mm"),
-        row_gap = unit(.2, "mm"),
-        clustering_distance_rows = 'euclidean',
-        clustering_distance_columns = 'euclidean',
-        cluster_columns=F, 
-        col = palette_expression,
-        row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
-        column_names_gp = gpar(fontsize = 8),
-          column_names_rot = 45,
-        border=T,
-        width = unit(2, "cm"))
-
-pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 3,height=4)
-draw (DAM_hm )#+ TF_exp_selected_hm + TF_exp_selected_hm2)
+pdf (file.path ('Plots','DAM_heatmaps.pdf'), width = 3,height=4)
+draw (DAM_hm) # + TF_exp_selected_hm + TF_exp_selected_hm2)
 dev.off()
    
+
+# #### Identify TF regulators correlated to each scRNA cnmf #####
+# if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData (mSE)$name
+# #mMat = scale(as.matrix(mMat))#[selected_TF,])
+
+# # Filter by RNA expression ####
+# metaGroupName = 'celltype_lv2'
+# min_exp = .1
+# active_TFs = exp_genes (srt, rownames(mMat), min_exp = min_exp, metaGroupName)
+# mMat = t(scale (mMat[active_TFs, ]))
+# if (!file.exists ('mMat_scaled_active.rds')) saveRDS (mMat, 'mMat_scaled_active.rds')
+
+
+# cnmf_scatac = readRDS ('cnmf_scatac.rds')
+# mMat = readRDS ('mMat_scaled_active.rds')
+# tf_cnmf_cor = cor (mMat, cnmf_scatac, method='spearman')
+# cell_subsets = colnames(tf_cnmf_cor)[c(1, 5, 2, 4, 3)]
+# top_5 = unique (unlist(lapply (cell_subsets, function(x) head (rownames(tf_cnmf_cor[order(-tf_cnmf_cor[,x]),]),5))))
+
+
+# DAM_hm = Heatmap (tf_cnmf_cor[top_5, cell_subsets], 
+#           #row_labels = colnames (mMat_mg),
+#           #column_title = paste('top',top_genes),
+#           clustering_distance_columns = 'euclidean',
+#           clustering_distance_rows = 'euclidean',
+#           cluster_rows = F,
+#           #col = pals_heatmap[[5]],
+#           cluster_columns=F,#col = pals_heatmap[[1]],
+#           row_names_gp = gpar(fontsize = 8),
+#           column_names_gp = gpar(fontsize = 8),
+#           column_names_rot = 45,
+#           name = 'chromVAR',
+#           #rect_gp = gpar(col = "white", lwd = .5),
+#           border=TRUE,
+#           col = rev(palette_deviation)#,
+#           #width = unit(2, "cm")
+#           #right_annotation = motif_ha
+#           )
+
+# pdf (file.path ('Plots','cnmf_clusters_DAM_heatmap.pdf'), width = 3,height=4)
+# draw (DAM_hm)
+# dev.off()
+
+# ### Try using metacells for each cnmf ####
+# sams = c('P1','P10','P11','P12','P13','P14','P23','P5') # Select samples that have at least 100 endothelial cells
+# df = list()
+
+# library (zoo)
+# bin_width <- 30   # Number of observations per bin
+# overlap <- 30
+# cnmf_mods = c('Mono','cDCs','TREM2','SPP1','IFN_CXCLs','IM')
+# #archp$Sample2 = 'sample'
+# #sams = 'sample'
+
+# for (sam in sams)
+# {
+#   cnmf_l = list()
+#   for (cnmf_mod in cnmf_mods)
+#   {
+#   metacells_order = cnmf_scatac[,cnmf_mod][archp$Sample == sam]
+#   metacells_order = order (-metacells_order)
+#   mMat_sam = mMat[archp$Sample == sam, ]
+#   mMat_sam = mMat_sam[metacells_order,]
+#   cnmf_sam = cnmf_scatac[,cnmf_mod][archp$Sample == sam][metacells_order]
+  
+#  cnmf_l[[cnmf_mod]] <- cor (
+#   rollapply (mMat_sam, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"),
+#   rollapply (cnmf_sam, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"), 
+#   method = 'spearman')  
+#   }
+# df[[sam]] = as.data.frame (do.call (cbind, cnmf_l))
+# colnames (df[[sam]]) = cnmf_mods
+# #df[[sam]]$sample = sam
+# }
+
+# # Convert list to 3D array: rows x cols x n_matrices
+# array_3d <- array(unlist(df), dim = c(nrow(df[[1]]), ncol(df[[1]]), length(df)))
+
+# # Apply median across the third dimension (i.e., across matrices)
+# median_matrix <- apply(array_3d, c(1, 2), median)
+# rownames (median_matrix) = rownames (df[[1]])
+# colnames (median_matrix) = colnames (df[[1]])
+# top_5 = unlist(lapply (cnmf_mods, function(x) head (rownames(median_matrix[order(-median_matrix[,x]),]),5)))
+# top_5 = unlist(lapply (cnmf_mods, function(x) head (rownames(df[[1]][order(-df[[1]][,x]),]),5)))
+
+# DAM_hm = Heatmap (df[[1]][top_5,cnmf_mods], 
+#           #row_labels = colnames (mMat_mg),
+#           #column_title = paste('top',top_genes),
+#           clustering_distance_columns = 'euclidean',
+#           clustering_distance_rows = 'euclidean',
+#           cluster_rows = F,
+#           #col = pals_heatmap[[5]],
+#           cluster_columns=F,#col = pals_heatmap[[1]],
+#           row_names_gp = gpar(fontsize = 8),
+#           column_names_gp = gpar(fontsize = 8),
+#           column_names_rot = 45,
+#           name = 'chromVAR',
+#           #rect_gp = gpar(col = "white", lwd = .5),
+#           border=TRUE,
+#           col = rev(palette_deviation)#,
+#           #width = unit(2, "cm")
+#           #right_annotation = motif_ha
+#           )
+
+# pdf (file.path ('Plots','cnmf_clusters_DAM_metacells_heatmap.pdf'), width = 3,height=4)
+# draw (DAM_hm)
+# dev.off()
+
+
+#df = tail (df,50)
+# Create the scatterplot with a polished aesthetic
+# df = do.call (rbind, df)
+
 ### Co-expression of TFs across cells #### 
 
-### Run TF correlation to identify TF modules across TNK cells #### 
-mMat = readRDS ('mMat_scaled_active.rds')
+### Run TF correlation to identify TF modules across TNK cells ####
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+#mMat = scale(as.matrix(mMat))#[selected_TF,])
+
+# # Filter by RNA expression ####
+metaGroupName = 'celltype_lv2'
+min_exp = .1
+active_TFs = exp_genes (srt, rownames(mMat), min_exp = min_exp, metaGroupName)
+mMat = t(scale (mMat[active_TFs, ]))
 mMat_cor = cor (as.matrix(mMat), method = 'spearman')
 
-set.seed(1234)
+set.seed(123)
 centers=2
 km = kmeans (mMat_cor, centers=centers)
 if (!file.exists ('TF_activity_modules.rds')) saveRDS (km, 'TF_activity_modules.rds')
 
 
 genes_highlight = c(
-  'JUNB',
-'FOSL2',
-'JUN',
-'SMARCC1',
-'FOSL1',
-'JUND',
-'FOS',
-'JDP2',
-'BACH1',
-'FOSB',
-'BATF',
-'NFE2',
-'NFE2L2',
-'NFKB2',
-'NFKB1',
-'REL',
-'RELA',
-'RELB')
+'IKZF1
+HIVEP3
+HIVEP1
+NFKB2
+RELB
+RELA
+NFKB1
+REL
+NFE2L2
+NFE2
+BATF
+JDP2
+FOSB
+SMARCC1
+JUND
+FOSL1
+BACH1
+JUNB
+FOSL2
+FOS
+JUN')
+
+genes_highlight2 = c(
+'NFE2L2
+NFE2
+BATF
+JDP2
+FOSB
+SMARCC1
+JUND
+FOSL1
+BACH1
+JUNB
+FOSL2
+FOS
+JUN')
+# saveRDS (genes_highlight,'inflammation_TFs.rds')
+
+genes_highlight = unlist(strsplit(genes_highlight,'\n'))
+genes_highlight2 = unlist(strsplit(genes_highlight2,'\n'))
 ha2 = rowAnnotation (foo = anno_mark(at = match(genes_highlight,colnames(mMat_cor)), 
     labels = genes_highlight, labels_gp = gpar(fontsize = 7)))
 
@@ -575,235 +584,227 @@ cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
 #        }}))
 dev.off()
 
-pdf (file.path ('Plots','TF_modules_heatmap4.pdf'), width = 4.6, height=3)
+pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4.6, height=3)
 cor_mMat_hm
 dev.off()
 
 # Add metacolumns of average TF modules activity ####
-tf_modules = lapply (unique(km$cluster), function(x) colMeans (t(mMat)[rownames(t(mMat)) %in% names(km$cluster[km$cluster == x]),]))
-names (tf_modules) = paste0('mod_',unique(km$cluster))
+archp$inflamed = ifelse (archp$mod_2 > 0, 'inflamed','non_inflamed')
+tf_modules = lapply (unique(km$cluster), function(x) colMeans (t((mMat))[rownames(t(mMat)) %in% names(km$cluster[km$cluster == x]),]))
+
+
+tf_modules = c (tf_modules, 
+  list(AP1NFKB1 = colMeans (t((mMat))[rownames(t(mMat)) %in% genes_highlight,]),
+  AP1 = colMeans (t((mMat))[rownames(t(mMat)) %in% genes_highlight2,])))
+# tf_modules = c(tf_modules, list(AP1 = colMeans (t(scale(mMat))[rownames(t(mMat)) %in% c('JUN','FOSB','FOS','BACH1','SMARCC1','FOSL2','JUND','JDP2','BATF'),])))
+#tf_module_infl = colMeans (t)
+
+
+names (tf_modules)[1:2] = paste0('mod_',unique(km$cluster))
 tf_modules = do.call (cbind, tf_modules)
-archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% paste0('mod_',unique(km$cluster))]
+archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% colnames(tf_modules)]
 archp@cellColData = cbind (archp@cellColData, tf_modules) 
 
 pdf()
 TF_p = plotEmbedding (
     ArchRProj = archp,
     colorBy = "cellColData",
-    name = paste0('mod_',unique(km$cluster)),
+    name = paste0('mod_',c(1:2)),
     pal = rev(palette_deviation_correlation),
     imputeWeights=NULL,
     #useSeqnames='z',
     embedding = "UMAP_H")
 dev.off()
 
-pdf (file.path ('Plots','TF_modules_umap2.pdf'), width = 20,height=16)
+pdf (file.path ('Plots','TF_modules_fplots.pdf'), width = 20,height=16)
 wrap_plots (TF_p, ncol=5)
 dev.off()
 
 # Generate same heatmap but using scrna ####
 metacells = readRDS (file.path ('..','scrna','metacells.rds'))
-metacells_mat = metacells@assays$RNA$data[rownames(mMat_cor),]
+metacells_mat = as.matrix(metacells@assays$RNA$data)[rownames(mMat_cor),]
 metacells_mat = cor (t(metacells_mat), method = 'spearman')
 all (rownames(metacells_mat) == rownames(mMat_cor))
 tf_order = unname(unlist(row_order(cor_mMat_hm)))
 
-pdf (file.path ('Plots','TF_modules_RNA_heatmap2.pdf'), width = 4,height=3)
+pdf (file.path ('Plots','TF_modules_RNA_heatmap.pdf'), width = 4,height=3)
 cor_mMat_hm2 = draw (Heatmap (metacells_mat[tf_order,tf_order],# row_km=15,
   row_split = km$cluster,
   column_split = km$cluster,
   cluster_rows=F,
   cluster_columns = F,
-  col=palette_expression_cor_fun, 
+  col=palette_expression_correlation, 
   border=T,
   row_names_gp = gpar(fontsize = 0), 
   column_names_gp = gpar(fontsize = 0)))
 dev.off()
 
-pdf (file.path ('Plots','TF_modules_ATAC_RNA_heatmap2.pdf'), width = 4,height=3)
-cor_mMat_hm2
-dev.off()
 
+# ### Plot UMAP using chromvar TF ####
+# mMat = readRDS ('mMat_scaled_active.rds')
+# library (uwot)
+# set.seed(42)  # for reproducibility
+# umap_result <- umap(mMat, n_neighbors = 15, min_dist = 0.1, metric = "euclidean")
+# library(ggplot2)
 
-pdf (file.path ('Plots','TF_modules_RNA_heatmap3.pdf'), width = 4,height=3)
-cor_mMat_hm2 = draw (Heatmap (metacells_mat[tf_order,tf_order],# row_km=15,
-  col=palette_expression_cor_fun, 
-  border=T,
-  row_names_gp = gpar(fontsize = 0), 
-  column_names_gp = gpar(fontsize = 0)))
-dev.off()
+# umap_df = as.data.frame(umap_result)
+# umap_df$celltypes = archp$celltype_lv2
+# umap_df$FRIP = log2 (archp$nFrags+1)
+# umap_df$Sample = archp$Sample
+# umap_df$mod_2 = archp$mod_2
+# umap_df = cbind (umap_df, t(scale(t(as.data.frame (archp@cellColData[,names(shared_cnmf)])))))
+# sp = lapply (unique(archp$celltype_lv2), function(x) 
+#   ggplot (umap_df[umap_df$celltypes == x,], aes(V1, V2, color = celltypes)) +
+#   geom_point(size = 2) +
+#   labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
+#   theme_minimal())
+# sp2 = lapply (names (shared_cnmf), function(x) 
+#   ggplot (umap_df, aes_string('V1', 'V2', color = x)) +
+#   geom_point(size = .2) +
+#   scale_color_viridis_b() +
+#   labs(title = "chromvar UMAP cnmf scores", x = "UMAP1", y = "UMAP2") +
+#   theme_minimal())
+# spq = ggplot (umap_df, aes(V1, V2, color = Sample)) +
+#   geom_point(size = 2) +
+#   labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
+#   theme_minimal()
+# spq2 = ggplot (umap_df, aes(V1, V2, color = mod_2)) +
+#   geom_point(size = 2) +
+#   scale_color_viridis_b() +
+#   labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
+#   theme_minimal()  
+# png (file.path ('Plots','chromvar_cnmf_scores_umap.png'), 3000,3000,res=300)
+# wrap_plots (sp2)
+# dev.off()
 
-pdf (file.path ('Plots','TF_modules_ATAC_RNA_heatmap3.pdf'), width = 4,height=3)
-cor_mMat_hm2
-dev.off()
+# png (file.path ('Plots','chromvar_infl_scores_umap.png'), 3000,3000,res=300)
+# spq2
+# dev.off()
 
+# pdf (file.path ('Plots','chromvar_umap.pdf'))
+# sp
+# spq
+# dev.off()
 
+# sp1 = lapply (unique(umap_df$Sample), function(y) 
+#   {
+#   lapply (unique(archp$celltype_lv2), function(x) 
+#   ggplot (umap_df[umap_df$celltypes == x & umap_df$Sample == y,], aes(V1, V2, color = celltypes)) +
+#   geom_point(size = 2) +
+#   labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
+#   theme_minimal())
+#   })
 
-### Plot UMAP using chromvar TF ####
-mMat = readRDS ('mMat_scaled_active.rds')
-library (uwot)
-set.seed(42)  # for reproducibility
-umap_result <- umap(mMat, n_neighbors = 15, min_dist = 0.1, metric = "euclidean")
-library(ggplot2)
-
-umap_df = as.data.frame(umap_result)
-umap_df$celltypes = archp$celltype_lv2
-umap_df$FRIP = log2 (archp$nFrags+1)
-umap_df$Sample = archp$Sample
-umap_df$mod_2 = archp$mod_2
-umap_df = cbind (umap_df, t(scale(t(as.data.frame (archp@cellColData[,names(shared_cnmf)])))))
-sp = lapply (unique(archp$celltype_lv2), function(x) 
-  ggplot (umap_df[umap_df$celltypes == x,], aes(V1, V2, color = celltypes)) +
-  geom_point(size = 2) +
-  labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
-  theme_minimal())
-sp2 = lapply (names (shared_cnmf), function(x) 
-  ggplot (umap_df, aes_string('V1', 'V2', color = x)) +
-  geom_point(size = .2) +
-  scale_color_viridis_b() +
-  labs(title = "chromvar UMAP cnmf scores", x = "UMAP1", y = "UMAP2") +
-  theme_minimal())
-spq = ggplot (umap_df, aes(V1, V2, color = Sample)) +
-  geom_point(size = 2) +
-  labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
-  theme_minimal()
-spq2 = ggplot (umap_df, aes(V1, V2, color = mod_2)) +
-  geom_point(size = 2) +
-  scale_color_viridis_b() +
-  labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
-  theme_minimal()  
-png (file.path ('Plots','chromvar_cnmf_scores_umap.png'), 3000,3000,res=300)
-wrap_plots (sp2)
-dev.off()
-
-png (file.path ('Plots','chromvar_infl_scores_umap.png'), 3000,3000,res=300)
-spq2
-dev.off()
-
-pdf (file.path ('Plots','chromvar_umap.pdf'))
-sp
-spq
-dev.off()
-
-sp1 = lapply (unique(umap_df$Sample), function(y) 
-  {
-  lapply (unique(archp$celltype_lv2), function(x) 
-  ggplot (umap_df[umap_df$celltypes == x & umap_df$Sample == y,], aes(V1, V2, color = celltypes)) +
-  geom_point(size = 2) +
-  labs(title = "UMAP of Iris Data", x = "UMAP1", y = "UMAP2") +
-  theme_minimal())
-  })
-
-pdf (file.path ('Plots','chromvar_per_sample_umap.pdf'), width=10)
-lapply (sp1, function(x) wrap_plots(x))
-dev.off()
+# pdf (file.path ('Plots','chromvar_per_sample_umap.pdf'), width=10)
+# lapply (sp1, function(x) wrap_plots(x))
+# dev.off()
 
 
 
-# Make scatterplots of inflammation vs cnmfs ####
-cnmf_mods = c('Mono','SPP1','TREM2','IFN_CXCLs','IM')
-cnmf_scatac = readRDS ('cnmf_scatac.rds')
+# # Make scatterplots of inflammation vs cnmfs ####
+# cnmf_mods = c('Mono','SPP1','TREM2','IFN_CXCLs','IM')
+# cnmf_scatac = readRDS ('cnmf_scatac.rds')
 
 
-### Try using metacells for each cnmf ####
-sams = c('P1','P10','P11','P12','P13','P14','P23','P5') # Select samples that have at least 100 myeloid cells
-df = list()
-archp$Sample2 = 'sample'
-sams = 'sample'
-library (zoo)
-bin_width <- 30   # Number of observations per bin
-overlap <- 30
-for (sam in sams)
-{
-  cnmf_l = list()
-  for (cnmf_mod in cnmf_mods)
-  {
-  metacells_order = cnmf_scatac[,cnmf_mod][archp$Sample2 == sam]
-  metacells_order = order (-metacells_order)
-  mMat_sam = archp$mod_2[archp$Sample2 == sam]
-  mMat_sam = mMat_sam[metacells_order]
-  cnmf_sam = cnmf_scatac[,cnmf_mod][archp$Sample2 == sam]
-  cnmf_sam = cnmf_sam[metacells_order]
+# ### Try using metacells for each cnmf ####
+# sams = c('P1','P10','P11','P12','P13','P14','P23','P5') # Select samples that have at least 100 myeloid cells
+# df = list()
+# archp$Sample2 = 'sample'
+# sams = 'sample'
+# library (zoo)
+# bin_width <- 30   # Number of observations per bin
+# overlap <- 30
+# for (sam in sams)
+# {
+#   cnmf_l = list()
+#   for (cnmf_mod in cnmf_mods)
+#   {
+#   metacells_order = cnmf_scatac[,cnmf_mod][archp$Sample2 == sam]
+#   metacells_order = order (-metacells_order)
+#   mMat_sam = archp$mod_2[archp$Sample2 == sam]
+#   mMat_sam = mMat_sam[metacells_order]
+#   cnmf_sam = cnmf_scatac[,cnmf_mod][archp$Sample2 == sam]
+#   cnmf_sam = cnmf_sam[metacells_order]
   
- cnmf_l[[cnmf_mod]] <- cor (
-  rollapply (mMat_sam, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"),
-  rollapply (cnmf_sam, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"), 
-  method = 'spearman')  
-  }
-df[[sam]] = as.data.frame (do.call (cbind, cnmf_l))
-colnames (df[[sam]]) = cnmf_mods
-#df[[sam]]$sample = sam
-}
+#  cnmf_l[[cnmf_mod]] <- cor (
+#   rollapply (mMat_sam, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"),
+#   rollapply (cnmf_sam, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left"), 
+#   method = 'spearman')  
+#   }
+# df[[sam]] = as.data.frame (do.call (cbind, cnmf_l))
+# colnames (df[[sam]]) = cnmf_mods
+# #df[[sam]]$sample = sam
+# }
 
-# Convert list to 3D array: rows x cols x n_matrices
-array_3d <- array(unlist(df), dim = c(nrow(df[[1]]), ncol(df[[1]]), length(df)))
+# # Convert list to 3D array: rows x cols x n_matrices
+# array_3d <- array(unlist(df), dim = c(nrow(df[[1]]), ncol(df[[1]]), length(df)))
 
-# Apply median across the third dimension (i.e., across matrices)
-median_matrix <- apply(array_3d, c(1, 2), median)
-rownames (median_matrix) = rownames (df[[1]])
-colnames (median_matrix) = colnames (df[[1]])
-top_5 = unlist(lapply (cnmf_mods, function(x) head (rownames(median_matrix[order(-median_matrix[,x]),]),5)))
-
-
+# # Apply median across the third dimension (i.e., across matrices)
+# median_matrix <- apply(array_3d, c(1, 2), median)
+# rownames (median_matrix) = rownames (df[[1]])
+# colnames (median_matrix) = colnames (df[[1]])
+# top_5 = unlist(lapply (cnmf_mods, function(x) head (rownames(median_matrix[order(-median_matrix[,x]),]),5)))
 
 
-atac_mat = cbind (cnmf_scatac, mod_2 = archp$mod_2, sample = archp$Sample)
-atac_mat_long = gather (as.data.frame(atac_mat), cnmf, score, 1:(ncol(atac_mat)-2))
-atac_mat_long$cnmf = factor (atac_mat_long$cnmf, levels = cnmf_mods)
 
-library (ggpointdensity)
-# remove outliers
-#atac_mat_longL = split (atac_mat_long, atac_mat_long$cnmf)
-#atac_mat_longL = lapply (atac_mat_longL, function(x) x[x$score > quantile(x$score,.005) & x$score < quantile(x$score,.995),])
-#atac_mat_long = do.call (rbind,atac_mat_longL)
-sp = ggplot (atac_mat_long, aes(x = score, y = mod_2, fill = sample)) +
-  geom_point(shape = 21,
-    alpha = 0.6, 
-    size = 2
-  ) + 
-  facet_wrap (~ interaction(cnmf, sample, sep = " | "), scales = 'free', ncol= length(cnmf_mods)) #+
-   #geom_pointdensity (alpha=1, size=.1)# +
-#   scale_color_viridis (option='F') +
-# # Scatterplot points with transparency and size
-#   geom_smooth(
-#     method = "lm", 
-#     color = "white", 
-#     fill = "white", 
-#     se = FALSE, 
-#     linetype = "dashed", 
-#     size = .4
-#   ) + # Regression line with confidence interval
-#   theme_void() + # Clean theme
-#   labs(
-#     title = "mod_2 vs cnmfs",
-#     #subtitle = "Scatterplot with Regression Line and Correlation Coefficient",
-#     x = "cnmf",
-#     y = "mod_2")
-#   # ) +
-  # theme(
-  #   plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-  #   plot.subtitle = element_text(size = 14, hjust = 0.5),
-  #   axis.title = element_text(size = 14),
-  #   axis.text = element_text(size = 12),
-  #   panel.grid.major = element_line(color = "grey90"),
-  #   panel.grid.minor = element_blank()
-  # ) 
 
-png (file.path ('Plots','cnmf_km_sample_scatterplots.png'),width=3000, height=5500, res=300)
-sp
-dev.off()
+# atac_mat = cbind (cnmf_scatac, mod_2 = archp$mod_2, sample = archp$Sample)
+# atac_mat_long = gather (as.data.frame(atac_mat), cnmf, score, 1:(ncol(atac_mat)-2))
+# atac_mat_long$cnmf = factor (atac_mat_long$cnmf, levels = cnmf_mods)
 
-sp = sp + stat_cor (
-    aes(label = paste(..rr.label.., ..p.label.., sep = " | ")), 
-    method = "spearman", 
-    #label.x = min(df$fetal) + 0.1 * diff(range(df$fetal)), 
-    #label.y = max(df$fetal_gs) - 0.1 * diff(range(df$fetal_gs)),
-    color = "grey11",
-    size = 1
-  )   
-pdf (file.path ('Plots','cnmf_AP1_scatterplots3.pdf'),width=7, height=1.4)
-sp
-dev.off()
+# library (ggpointdensity)
+# # remove outliers
+# #atac_mat_longL = split (atac_mat_long, atac_mat_long$cnmf)
+# #atac_mat_longL = lapply (atac_mat_longL, function(x) x[x$score > quantile(x$score,.005) & x$score < quantile(x$score,.995),])
+# #atac_mat_long = do.call (rbind,atac_mat_longL)
+# sp = ggplot (atac_mat_long, aes(x = score, y = mod_2, fill = sample)) +
+#   geom_point(shape = 21,
+#     alpha = 0.6, 
+#     size = 2
+#   ) + 
+#   facet_wrap (~ interaction(cnmf, sample, sep = " | "), scales = 'free', ncol= length(cnmf_mods)) #+
+#    #geom_pointdensity (alpha=1, size=.1)# +
+# #   scale_color_viridis (option='F') +
+# # # Scatterplot points with transparency and size
+# #   geom_smooth(
+# #     method = "lm", 
+# #     color = "white", 
+# #     fill = "white", 
+# #     se = FALSE, 
+# #     linetype = "dashed", 
+# #     size = .4
+# #   ) + # Regression line with confidence interval
+# #   theme_void() + # Clean theme
+# #   labs(
+# #     title = "mod_2 vs cnmfs",
+# #     #subtitle = "Scatterplot with Regression Line and Correlation Coefficient",
+# #     x = "cnmf",
+# #     y = "mod_2")
+# #   # ) +
+#   # theme(
+#   #   plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+#   #   plot.subtitle = element_text(size = 14, hjust = 0.5),
+#   #   axis.title = element_text(size = 14),
+#   #   axis.text = element_text(size = 12),
+#   #   panel.grid.major = element_line(color = "grey90"),
+#   #   panel.grid.minor = element_blank()
+#   # ) 
+
+# png (file.path ('Plots','cnmf_km_sample_scatterplots.png'),width=3000, height=5500, res=300)
+# sp
+# dev.off()
+
+# sp = sp + stat_cor (
+#     aes(label = paste(..rr.label.., ..p.label.., sep = " | ")), 
+#     method = "spearman", 
+#     #label.x = min(df$fetal) + 0.1 * diff(range(df$fetal)), 
+#     #label.y = max(df$fetal_gs) - 0.1 * diff(range(df$fetal_gs)),
+#     color = "grey11",
+#     size = 1
+#   )   
+# pdf (file.path ('Plots','cnmf_AP1_scatterplots3.pdf'),width=7, height=1.4)
+# sp
+# dev.off()
 
 # # Try with ridge plots ####
 library (ggridges)
@@ -815,8 +816,10 @@ library (tidyr)
 # Plot
 ccomp = as.data.frame (archp@cellColData)
 #ccomp = ccomp[ccomp$celltype_lv2 %in% c('cDCs'),]
-ccomp$celltype_lv2 = factor (ccomp$celltype_lv2, levels = rev(c('Mono','TREM2','SPP1','IFN_CXCLs','cDCs','IM')))
-ccomp$module = archp$mod_2
+#ccomp$celltype_lv2 = factor (ccomp$celltype_lv2, levels = rev(cell_subsets_order))
+ccomp$module = ccomp$mod_2
+median_order = sort (unlist(lapply (split (ccomp$module, ccomp$celltype_lv2), function(x) median(x))))
+ccomp$celltype_lv2 = factor (ccomp$celltype_lv2, levels = names (median_order))
 rp <- ggplot(ccomp, aes(x = module, y = celltype_lv2, fill = ..x..)) +
   geom_density_ridges_gradient(
   scale = 3,
@@ -830,7 +833,7 @@ rp <- ggplot(ccomp, aes(x = module, y = celltype_lv2, fill = ..x..)) +
   theme_ridges() +                      # Optional: clean ridge plot theme
   theme(legend.position = "right")     # Adjust legend position
 #   theme_classic() + facet_wrap (~sample, ncol=5)
-pdf (file.path ('Plots','cnmf_inflammation_module_ridge_plots.pdf'), width = 5,height=3)
+pdf (file.path ('Plots','scatac_cnmf_inflammation_module_ridge_plots_AP1.pdf'), width = 7,height=5)
 rp
 dev.off()
 
@@ -846,24 +849,24 @@ dev.off()
 
 
 
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = scale(as.matrix (mMat[active_TFs,]))#[selected_TF,])
-mMat = mMat[names(km$cluster[km$cluster == 2]),]
+# if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData (mSE)$name
+# mMat = scale(as.matrix (mMat[active_TFs,]))#[selected_TF,])
+# mMat = mMat[names(km$cluster[km$cluster == 2]),]
 
-mMat = colMeans (mMat)
-all (colnames (mMat) == rownames(archp@cellColData))
-archp$AP1 = mMat
-rna_mod_cor = cor (srt@meta.data[,cnmf_mods],srt@meta.data[,'2'])
-atac_mod_cor = cor (scale(archp@cellColData[,cnmf_mods]),mMat, method='spearman')
-#cor.test (archp@cellColData[,names(shared_cnmf)],archp@cellColData[,'mod_2'])
+# mMat = colMeans (mMat)
+# all (colnames (mMat) == rownames(archp@cellColData))
+# archp$AP1 = mMat
+# rna_mod_cor = cor (srt@meta.data[,cnmf_mods],srt@meta.data[,'2'])
+# atac_mod_cor = cor (scale(archp@cellColData[,cnmf_mods]),mMat, method='spearman')
+# #cor.test (archp@cellColData[,names(shared_cnmf)],archp@cellColData[,'mod_2'])
 
-hm2 = Heatmap (atac_mod_cor, border=T, col = palette_deviation_fun(atac_mod_cor))
-hm1 = Heatmap (rna_mod_cor, cluster_rows=F, border=T, col = rev (palette_deviation_correlation))
-pdf (file.path ('Plots','atac_module_cor3.pdf'), width=3.5, height=3)
-hm2 + hm1
-dev.off()
+# hm2 = Heatmap (atac_mod_cor, border=T, col = palette_deviation_fun(atac_mod_cor))
+# hm1 = Heatmap (rna_mod_cor, cluster_rows=F, border=T, col = rev (palette_deviation_correlation))
+# pdf (file.path ('Plots','atac_module_cor3.pdf'), width=3.5, height=3)
+# hm2 + hm1
+# dev.off()
 
 
 
@@ -1018,99 +1021,99 @@ dev.off()
 
 
 
-### Plot correlation of regulon score of TFs found in km2 along with correlation of km2 average score from atac #####
-#auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
-auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
-rownames (auc_mtx) = auc_mtx[,1]
-auc_mtx = auc_mtx[,-1]
-colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
-regulon_TFs_in_modules = list(
-  km1 = colnames(auc_mtx)[colnames(auc_mtx) %in% names(km$cluster[km$cluster == 1])],
-  km2 = colnames(auc_mtx)[colnames(auc_mtx) %in% names(km$cluster[km$cluster == 2])]
-  )
-auc_mtx = auc_mtx[, colnames(auc_mtx) %in% regulon_TFs_in_modules$km2]
+### Plot correlation of regulon score of TFs found in km1 along with correlation of km2 average score from atac #####
+# #auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+# auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+# rownames (auc_mtx) = auc_mtx[,1]
+# auc_mtx = auc_mtx[,-1]
+# colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+# regulon_TFs_in_modules = list(
+#   km1 = colnames(auc_mtx)[colnames(auc_mtx) %in% names(km$cluster[km$cluster == 1])],
+#   km2 = colnames(auc_mtx)[colnames(auc_mtx) %in% names(km$cluster[km$cluster == 2])]
+#   )
+# auc_mtx = auc_mtx[, colnames(auc_mtx) %in% regulon_TFs_in_modules$km1]
 
-#colnames(srt@meta.data)[colnames(srt@meta.data) == 'Mono'] = 'Monocytes'
-cnmf_mods = c('Mono','SPP1','TREM2','IFN_CXCLs','IM')
-rownames(auc_mtx) = gsub ('\\.','-',rownames(auc_mtx))
-all (rownames(auc_mtx) == colnames(srt))
+# #colnames(srt@meta.data)[colnames(srt@meta.data) == 'Mono'] = 'Monocytes'
+# cnmf_mods = cell_subsets_order
+# rownames(auc_mtx) = gsub ('\\.','-',rownames(auc_mtx))
+# all (rownames(auc_mtx) == colnames(srt))
 
-auc_mtx_cor = as.data.frame (cor (auc_mtx, srt@meta.data[,cnmf_mods]))
-auc_mtx_cor$TF = rownames(auc_mtx_cor)
+# auc_mtx_cor = as.data.frame (cor (auc_mtx, srt@meta.data[,cnmf_mods]))
+# auc_mtx_cor$TF = rownames(auc_mtx_cor)
 
-auc_mtx_avg_scaled_l = gather (auc_mtx_cor, celltype, score,1:(ncol(auc_mtx_cor)-1))
-auc_mtx_avg_scaled_l$celltype = factor (auc_mtx_avg_scaled_l$celltype, levels = c('Mono','SPP1','TREM2','IFN_CXCLs','IM'))
-
-
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = as.matrix(mMat)#[selected_TF,])
-atac_mod_2 = as.data.frame(t(mMat[regulon_TFs_in_modules$km2,]))
-
-atac_mod_2 = as.data.frame (cor (atac_mod_2, t(scale(t(as.data.frame(archp@cellColData[,cnmf_mods]))))))
-atac_mod_2$TF = rownames(atac_mod_2)
-atac_mod_2 = gather (atac_mod_2, celltype, score,1:(ncol(atac_mod_2)-1))
-atac_mod_2$celltype = factor (atac_mod_2$celltype, levels = cnmf_mods)
-
-### Plot  TF activity
-atac_mod_2_summary <- atac_mod_2 %>%
-  group_by(celltype) %>%
-  dplyr::  summarize(
-    mean_score = mean(score, na.rm = TRUE),
-    sd_score = sd(score, na.rm = TRUE),
-    n = n(),
-    se = sd_score / sqrt(n)  # standard error
-  )
-atac_mod_2_summary$celltype = factor (atac_mod_2_summary$celltype, levels = cnmf_mods)
-
-gp = ggplot(atac_mod_2_summary, aes(x = celltype, y = mean_score, group = 1)) +
-  geom_line(color = "darkred", size = 1.5) +
-  geom_ribbon(aes(ymin = mean_score - se, ymax = mean_score + se),
-              fill = "darkred", alpha = 0.2) +
-  theme_minimal() +
-  labs(
-    x = "Celltype",
-    y = "Mean Score",
-    title = "Mean Score per Celltype with Standard Error Shading"
-  ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-### Plot SCENIC regulon scores
-rna_mod_2_summary <- auc_mtx_avg_scaled_l %>%
-  group_by(celltype) %>%
-  dplyr::  summarize(
-    mean_score = mean(score, na.rm = TRUE),
-    sd_score = sd(score, na.rm = TRUE),
-    n = n(),
-    se = sd_score / sqrt(n)  # standard error
-  )
-rna_mod_2_summary$celltype = factor (rna_mod_2_summary$celltype, levels = cnmf_mods)
+# auc_mtx_avg_scaled_l = gather (auc_mtx_cor, celltype, score,1:(ncol(auc_mtx_cor)-1))
+# auc_mtx_avg_scaled_l$celltype = factor (auc_mtx_avg_scaled_l$celltype, levels = c('Mono','SPP1','TREM2','IFN_CXCLs','IM'))
 
 
-gp = ggplot() +
-  # First dataset (normal scale, left axis)
-  geom_line(data = atac_mod_2_summary, aes(x = celltype, y = mean_score, group=1), color = "darkred", size = .5) +
-  geom_ribbon(data = atac_mod_2_summary, aes(x = celltype, ymin = mean_score - se, ymax = mean_score + se, group=1), 
-              fill = "darkred", alpha = 0.2) +
+# if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData (mSE)$name
+# mMat = as.matrix(mMat)#[selected_TF,])
+# atac_mod_2 = as.data.frame(t(mMat[regulon_TFs_in_modules$km2,]))
 
-  # Second dataset (scaled, right axis)
-  geom_line(data = rna_mod_2_summary, aes(x = celltype, y = mean_score, group=1), color = "navyblue", size = .5) +
-  geom_ribbon(data = rna_mod_2_summary, aes(x = celltype, ymin = mean_score - se, ymax = mean_score + se, group=1),
-              fill = "navyblue", alpha = 0.2) +
+# atac_mod_2 = as.data.frame (cor (atac_mod_2, t(scale(t(as.data.frame(archp@cellColData[,cnmf_mods]))))))
+# atac_mod_2$TF = rownames(atac_mod_2)
+# atac_mod_2 = gather (atac_mod_2, celltype, score,1:(ncol(atac_mod_2)-1))
+# atac_mod_2$celltype = factor (atac_mod_2$celltype, levels = cnmf_mods)
 
-  theme_minimal() +
-  labs(
-    x = "Celltype",
-    title = "Overlayed Mean Score Lines with Separate Y Axes"
-  ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "grey44", size = .5) 
+# ### Plot  TF activity
+# atac_mod_2_summary <- atac_mod_2 %>%
+#   group_by(celltype) %>%
+#   dplyr::  summarize(
+#     mean_score = mean(score, na.rm = TRUE),
+#     sd_score = sd(score, na.rm = TRUE),
+#     n = n(),
+#     se = sd_score / sqrt(n)  # standard error
+#   )
+# atac_mod_2_summary$celltype = factor (atac_mod_2_summary$celltype, levels = cnmf_mods)
+
+# gp = ggplot(atac_mod_2_summary, aes(x = celltype, y = mean_score, group = 1)) +
+#   geom_line(color = "darkred", size = 1.5) +
+#   geom_ribbon(aes(ymin = mean_score - se, ymax = mean_score + se),
+#               fill = "darkred", alpha = 0.2) +
+#   theme_minimal() +
+#   labs(
+#     x = "Celltype",
+#     y = "Mean Score",
+#     title = "Mean Score per Celltype with Standard Error Shading"
+#   ) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# ### Plot SCENIC regulon scores
+# rna_mod_2_summary <- auc_mtx_avg_scaled_l %>%
+#   group_by(celltype) %>%
+#   dplyr::  summarize(
+#     mean_score = mean(score, na.rm = TRUE),
+#     sd_score = sd(score, na.rm = TRUE),
+#     n = n(),
+#     se = sd_score / sqrt(n)  # standard error
+#   )
+# rna_mod_2_summary$celltype = factor (rna_mod_2_summary$celltype, levels = cnmf_mods)
 
 
-pdf (file.path ('Plots','inflamed_module_atac_rna_lineplot3.pdf'),width=5,height=5)
-gp
-dev.off()
+# gp = ggplot() +
+#   # First dataset (normal scale, left axis)
+#   geom_line(data = atac_mod_2_summary, aes(x = celltype, y = mean_score, group=1), color = "darkred", size = .5) +
+#   geom_ribbon(data = atac_mod_2_summary, aes(x = celltype, ymin = mean_score - se, ymax = mean_score + se, group=1), 
+#               fill = "darkred", alpha = 0.2) +
+
+#   # Second dataset (scaled, right axis)
+#   geom_line(data = rna_mod_2_summary, aes(x = celltype, y = mean_score, group=1), color = "navyblue", size = .5) +
+#   geom_ribbon(data = rna_mod_2_summary, aes(x = celltype, ymin = mean_score - se, ymax = mean_score + se, group=1),
+#               fill = "navyblue", alpha = 0.2) +
+
+#   theme_minimal() +
+#   labs(
+#     x = "Celltype",
+#     title = "Overlayed Mean Score Lines with Separate Y Axes"
+#   ) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#     geom_hline(yintercept = 0, linetype = "dashed", color = "grey44", size = .5) 
+
+
+# pdf (file.path ('Plots','inflamed_module_atac_rna_lineplot3.pdf'),width=5,height=5)
+# gp
+# dev.off()
 
 
 
@@ -1224,60 +1227,60 @@ dev.off()
 
 
 
-# Show all TFs included in inflammation module ####
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = as.matrix(mMat)#[selected_TF,])
-atac_mod_2 = as.data.frame(t(mMat[regulon_TFs_in_modules$km2,]))
+# # Show all TFs included in inflammation module ####
+# if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+# mMat = assays (mSE)[[1]]
+# rownames (mMat) = rowData (mSE)$name
+# mMat = as.matrix(mMat)#[selected_TF,])
+# atac_mod_2 = as.data.frame(t(mMat[regulon_TFs_in_modules$km2,]))
 
-atac_mod_2 = as.data.frame (cor (atac_mod_2, t(scale(t(as.data.frame(archp@cellColData[,cnmf_mods]))))))
-#atac_mod_2$TF = rownames(atac_mod_2)
+# atac_mod_2 = as.data.frame (cor (atac_mod_2, t(scale(t(as.data.frame(archp@cellColData[,cnmf_mods]))))))
+# #atac_mod_2$TF = rownames(atac_mod_2)
 
-hm = Heatmap (
-    atac_mod_2[,cnmf_mods],
-#    right_annotation = ha2,
-    column_names_rot =45, 
-    row_names_gp = gpar(fontsize = 5),
-    column_names_gp = gpar(fontsize = 6),
-    col = rev(as.character(palette_deviation[-1])), 
-    cluster_rows=T,
-    cluster_columns = F,
-    border=T
-#rect_gp = gpar (col = "white", lwd = 1)
-)
-
-
-### Check AP1 on the RNA side ####
-auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
-rownames (auc_mtx) = auc_mtx[,1]
-auc_mtx = auc_mtx[,-1]
-colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
-auc_mtx = auc_mtx[, colnames(auc_mtx) %in% regulon_TFs_in_modules$km2]
-
-rownames(auc_mtx) = gsub ('\\.','-',rownames(auc_mtx))
-all (rownames(auc_mtx) == colnames(srt))
-
-auc_mtx_cor = as.data.frame (cor (auc_mtx, srt@meta.data[,cnmf_mods]))
-#auc_mtx_cor$TF = rownames(auc_mtx_cor)
-
-hm2 = Heatmap (
-    auc_mtx_cor[,cnmf_mods],
-    #right_annotation = ha2,
-    column_names_rot =45, 
-    row_names_gp = gpar(fontsize = 5),
-    column_names_gp = gpar(fontsize = 6),
-    col = rev(as.character(palette_expression_correlation[-1])), 
-    cluster_rows=T,
-    cluster_columns = F,
-    border=T
-#rect_gp = gpar (col = "white", lwd = 1)
-)
+# hm = Heatmap (
+#     atac_mod_2[,cnmf_mods],
+# #    right_annotation = ha2,
+#     column_names_rot =45, 
+#     row_names_gp = gpar(fontsize = 5),
+#     column_names_gp = gpar(fontsize = 6),
+#     col = rev(as.character(palette_deviation[-1])), 
+#     cluster_rows=T,
+#     cluster_columns = F,
+#     border=T
+# #rect_gp = gpar (col = "white", lwd = 1)
+# )
 
 
-pdf (file.path ('Plots','inflammation_module_atac_rna_TFs_cor_heatmap2.pdf'), width = 3.6,height=3)
-hm 
-dev.off()
+# ### Check AP1 on the RNA side ####
+# auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+# rownames (auc_mtx) = auc_mtx[,1]
+# auc_mtx = auc_mtx[,-1]
+# colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+# auc_mtx = auc_mtx[, colnames(auc_mtx) %in% regulon_TFs_in_modules$km2]
+
+# rownames(auc_mtx) = gsub ('\\.','-',rownames(auc_mtx))
+# all (rownames(auc_mtx) == colnames(srt))
+
+# auc_mtx_cor = as.data.frame (cor (auc_mtx, srt@meta.data[,cnmf_mods]))
+# #auc_mtx_cor$TF = rownames(auc_mtx_cor)
+
+# hm2 = Heatmap (
+#     auc_mtx_cor[,cnmf_mods],
+#     #right_annotation = ha2,
+#     column_names_rot =45, 
+#     row_names_gp = gpar(fontsize = 5),
+#     column_names_gp = gpar(fontsize = 6),
+#     col = rev(as.character(palette_expression_correlation[-1])), 
+#     cluster_rows=T,
+#     cluster_columns = F,
+#     border=T
+# #rect_gp = gpar (col = "white", lwd = 1)
+# )
+
+
+# pdf (file.path ('Plots','inflammation_module_atac_rna_TFs_cor_heatmap2.pdf'), width = 3.6,height=3)
+# hm 
+# dev.off()
 
 
 
@@ -1301,7 +1304,7 @@ metaGroupName='inflamed'
 archp <- addGroupCoverages (ArchRProj = archp, groupBy = metaGroupName)
 motifPositions <- getPositions (archp)
 
-motifs <- c('NFKB1','JUNB','FOS','JUND')
+motifs <- c('NFKB2','JUNB','FOS','JUND')
 
 markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
 
@@ -1351,159 +1354,159 @@ bp
 dev.off()
 
 
-# # Compute co-occurrence of TFs ####
-km = readRDS ('TF_activity_modules.rds')
-infl_TF = names(km$cluster[km$cluster == 2])
-metaGroupName = 'inflamed'
-celltypes = unique (archp@cellColData[,metaGroupName])
-motifMat = getPositions (archp)
-matches = getMatches (archp)
+# # # # Compute co-occurrence of TFs ####
+# km = readRDS ('TF_activity_modules.rds')
+# infl_TF = names(km$cluster[km$cluster == 2])
+# metaGroupName = 'inflamed'
+# celltypes = unique (archp@cellColData[,metaGroupName])
+# motifMat = getPositions (archp)
+# matches = getMatches (archp)
 
-# Find DAP ####
-#force = FALSE
-force=F
-if (!file.exists (paste0('DAP_',metaGroupName,'.rds')) | force)
-  {
-  DAP_list = getMarkerFeatures (
-    ArchRProj = archp, 
-    testMethod = "wilcoxon",
-          useGroups = celltypes[1],
-          bgdGroups = celltypes[2],
-    k=100,
-    binarize = FALSE,
-    useMatrix = "PeakMatrix",
-    groupBy = metaGroupName
-  #  useSeqnames="z"
-  )
-  saveRDS (DAP_list, paste0('DAP_',metaGroupName,'.rds'))
-  } else {
-  DAP_list = readRDS (paste0('DAP_',metaGroupName,'.rds'))
-  }
-DAP_res = do.call (cbind, (assays(DAP_list)))
-colnames (DAP_res) = names(assays(DAP_list))
-DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
-rownames(DAP_res) = as.character(DAP_res_regions)
-DAP_res = DAP_res[!is.na(DAP_res$FDR),]
-DAP_res = DAP_res[DAP_res$FDR < 0.05,]
-DAP_res_l = list(up = GRanges(rownames(DAP_res)[DAP_res$Log2FC > 0]),
-                down = GRanges(rownames(DAP_res)[DAP_res$Log2FC < 0]))
-sapply (DAP_res_l, length)
-names (DAP_res_l) = celltypes
+# # Find DAP ####
+# #force = FALSE
+# force=T
+# if (!file.exists (paste0('DAP_',metaGroupName,'.rds')) | force)
+#   {
+#   DAP_list = getMarkerFeatures (
+#     ArchRProj = archp, 
+#     testMethod = "wilcoxon",
+#           useGroups = celltypes[1],
+#           bgdGroups = celltypes[2],
+#     k=100,
+#     binarize = FALSE,
+#     useMatrix = "PeakMatrix",
+#     groupBy = metaGroupName
+#   #  useSeqnames="z"
+#   )
+#   saveRDS (DAP_list, paste0('DAP_',metaGroupName,'.rds'))
+#   } else {
+#   DAP_list = readRDS (paste0('DAP_',metaGroupName,'.rds'))
+#   }
+# DAP_res = do.call (cbind, (assays(DAP_list)))
+# colnames (DAP_res) = names(assays(DAP_list))
+# DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
+# rownames(DAP_res) = as.character(DAP_res_regions)
+# DAP_res = DAP_res[!is.na(DAP_res$FDR),]
+# DAP_res = DAP_res[DAP_res$FDR < 0.05,]
+# DAP_res_l = list(up = GRanges(rownames(DAP_res)[DAP_res$Log2FC > 0]),
+#                 down = GRanges(rownames(DAP_res)[DAP_res$Log2FC < 0]))
+# sapply (DAP_res_l, length)
+# names (DAP_res_l) = celltypes
 
-cooc_l = list()
-ov_size_l=list()
-for (celltype in celltypes)
-  {
-  matches_ct = matches[queryHits(findOverlaps (matches, DAP_res_l[[celltype]]))]
-  matchesMat = assay (matches_ct)
-  colnames (matchesMat) = gsub ('_.*','',colnames (matchesMat))
-  colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
-  matchesMat = matchesMat[,infl_TF]
-  matchesMat = matchesMat[rowSums (matchesMat) > 0,]
+# cooc_l = list()
+# ov_size_l=list()
+# for (celltype in celltypes)
+#   {
+#   matches_ct = matches[queryHits(findOverlaps (matches, DAP_res_l[[celltype]]))]
+#   matchesMat = assay (matches_ct)
+#   colnames (matchesMat) = gsub ('_.*','',colnames (matchesMat))
+#   colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
+#   matchesMat = matchesMat[,infl_TF]
+#   matchesMat = matchesMat[rowSums (matchesMat) > 0,]
   
-  cooc = matrix (ncol = ncol(matchesMat), nrow= ncol(matchesMat))
-  ov_size = matrix (ncol = ncol(matchesMat), nrow= ncol(matchesMat))
+#   cooc = matrix (ncol = ncol(matchesMat), nrow= ncol(matchesMat))
+#   ov_size = matrix (ncol = ncol(matchesMat), nrow= ncol(matchesMat))
   
-  for (i in 1:ncol(matchesMat))
-    {
-    for (z in 1:ncol(matchesMat)) 
-      {
-      #if (sum(rowSums (matchesMat[,c(i,z)]) == 2) < 10)
-     #   {
-      #  cooc[i,z] = 0
-      #  } else {
-        ov = sum (rowSums (matchesMat[,c(i,z)]) == 2) / min (colSums(matchesMat[,c(i,z)]))
-        cooc[i,z] = ov
-        ov_size[i,z] = sum(rowSums (matchesMat[,c(i,z)]) == 2)
-      #  }      
-      }
-    }
+#   for (i in 1:ncol(matchesMat))
+#     {
+#     for (z in 1:ncol(matchesMat)) 
+#       {
+#       #if (sum(rowSums (matchesMat[,c(i,z)]) == 2) < 10)
+#      #   {
+#       #  cooc[i,z] = 0
+#       #  } else {
+#         ov = sum (rowSums (matchesMat[,c(i,z)]) == 2) / sum (colSums(matchesMat[,c(i,z)]))
+#         cooc[i,z] = ov
+#         ov_size[i,z] = sum(rowSums (matchesMat[,c(i,z)]) == 2)
+#       #  }      
+#       }
+#     }
   
-  colnames (cooc) = infl_TF
-  rownames (cooc) = infl_TF
-  diag (cooc) = 0
-  cooc_l[[celltype]] = cooc#[rowSums(cooc) >0,rowSums(cooc) >0]
-  colnames (ov_size) = infl_TF
-  rownames (ov_size) = infl_TF
-  ov_size_l[[celltype]] = ov_size
-  }
-#cooc_l[[celltype]][lower.tri (cooc_l[[celltype]])]
-cooc_diff = cooc_l[[1]] - cooc_l[[2]]
-cooc_diff[is.na(cooc_diff)] = 0
-ov_size_max = pmin(ov_size_l[[1]], ov_size_l[[2]])
-diag(ov_size_max) = 0
+#   colnames (cooc) = infl_TF
+#   rownames (cooc) = infl_TF
+#   diag (cooc) = 0
+#   cooc_l[[celltype]] = cooc#[rowSums(cooc) >0,rowSums(cooc) >0]
+#   colnames (ov_size) = infl_TF
+#   rownames (ov_size) = infl_TF
+#   ov_size_l[[celltype]] = ov_size
+#   }
+# #cooc_l[[celltype]][lower.tri (cooc_l[[celltype]])]
+# cooc_diff = cooc_l[[1]] - cooc_l[[2]]
+# cooc_diff[is.na(cooc_diff)] = 0
+# ov_size_max = pmin(ov_size_l[[1]], ov_size_l[[2]])
+# diag(ov_size_max) = 0
 
-cooc_hm = Heatmap (
-    cooc_diff,
-    column_names_rot =45, 
-    row_names_gp = gpar(fontsize = 3),
-    column_names_gp = gpar(fontsize = 3),
-    col =palette_cooccurrence_cor, 
-    cluster_rows=T,
-    cluster_columns = T#,
-#rect_gp = gpar (col = "white", lwd = 1)
-)
+# cooc_hm = Heatmap (
+#     cooc_diff,
+#     column_names_rot =45, 
+#     row_names_gp = gpar(fontsize = 3),
+#     column_names_gp = gpar(fontsize = 3),
+#     col =palette_cooccurrence_cor, 
+#     cluster_rows=T,
+#     cluster_columns = T#,
+# #rect_gp = gpar (col = "white", lwd = 1)
+# )
 
-pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps_diff.pdf'), width = 8,height=6)
-cooc_hm 
-dev.off()
+# pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps_diff.pdf'), width = 8,height=6)
+# cooc_hm 
+# dev.off()
 
-## Try with scatterplot 
-cooc_diff_df = as.data.frame (cooc_diff)
-cooc_diff_df$TF2 = rownames (cooc_diff_df)
-cooc_diff_df = gather (cooc_diff_df, TF, overlap, 1:(ncol(cooc_diff_df)- 1))
+# ## Try with scatterplot 
+# cooc_diff_df = as.data.frame (cooc_diff)
+# cooc_diff_df$TF2 = rownames (cooc_diff_df)
+# cooc_diff_df = gather (cooc_diff_df, TF, overlap, 1:(ncol(cooc_diff_df)- 1))
 
-# overlap size
-ov_size_max_df = as.data.frame(ov_size_max)
-ov_size_max_df$TF2 = rownames(ov_size_max_df)
-ov_size_max_df = gather (ov_size_max_df, TF, size, 1:(ncol(ov_size_max_df)- 1))
+# # overlap size
+# ov_size_max_df = as.data.frame(ov_size_max)
+# ov_size_max_df$TF2 = rownames(ov_size_max_df)
+# ov_size_max_df = gather (ov_size_max_df, TF, size, 1:(ncol(ov_size_max_df)- 1))
 
-ov_diff_size_df = cbind (cooc_diff_df, ov_size_max_df)
-ov_diff_size_df$TF_pair = paste0(ov_diff_size_df$TF2,'_', ov_diff_size_df$TF)
-ov_diff_size_df = ov_diff_size_df[, c(3,6,7)]
-ov_diff_size_df$topTFs = ifelse (ov_diff_size_df$overlap > 0.5 & ov_diff_size_df$size > 1000, ov_diff_size_df$TF_pair, '') 
-sp = ggplot (ov_diff_size_df, aes (x = overlap, y = size, label = topTFs)) + 
-geom_point() + 
-geom_text_repel (size=2) +
-gtheme_no_rot
+# ov_diff_size_df = cbind (cooc_diff_df, ov_size_max_df)
+# ov_diff_size_df$TF_pair = paste0(ov_diff_size_df$TF2,'_', ov_diff_size_df$TF)
+# ov_diff_size_df = ov_diff_size_df[, c(3,6,7)]
+# ov_diff_size_df$topTFs = ifelse (ov_diff_size_df$overlap > 0.5 & ov_diff_size_df$size > 1000, ov_diff_size_df$TF_pair, '') 
+# sp = ggplot (ov_diff_size_df, aes (x = overlap, y = size, label = topTFs)) + 
+# geom_point() + 
+# geom_text_repel (size=2) +
+# gtheme_no_rot
 
-pdf (file.path ('Plots','peak_overlap_inflamed_scatterplot.pdf'))
-sp
-dev.off()
-
-
-# Compare cNMF modules with inflammatory program in scATAC-seq and scRNA-seq ####
-shared_cnmf = readRDS (file.path('..','scrna','shared_cnmf_myeloid.rds'))
-shared_cnmf = lapply (shared_cnmf, function(x) x[x %in% getFeatures (archp)])
-#remove_modules = c('cnmf.3','cnmf.6','cnmf.7','cnmf.5') # remove monocyres cDC and CC modules. Consider re-inculding CC 
-
-pdf (file.path ('Plots','scrna_celltype_dimplot.pdf'))
-DimPlot (srt, group.by = 'celltype', reduction = 'umap')
-dev.off()
-
-srt = ModScoreCor (
-    seurat_obj = srt, 
-    geneset_list = shared_cnmf, 
-    cor_threshold = NULL, 
-    pos_threshold = NULL, # threshold for fetal_pval2
-    listName = 'shared_cnmf', outdir = NULL)
+# pdf (file.path ('Plots','peak_overlap_inflamed_scatterplot.pdf'))
+# sp
+# dev.off()
 
 
+# # Compare cNMF modules with inflammatory program in scATAC-seq and scRNA-seq ####
+# shared_cnmf = readRDS (file.path('..','scrna','shared_cnmf_myeloid.rds'))
+# shared_cnmf = lapply (shared_cnmf, function(x) x[x %in% getFeatures (archp)])
+# #remove_modules = c('cnmf.3','cnmf.6','cnmf.7','cnmf.5') # remove monocyres cDC and CC modules. Consider re-inculding CC 
+
+# pdf (file.path ('Plots','scrna_celltype_dimplot.pdf'))
+# DimPlot (srt, group.by = 'celltype', reduction = 'umap')
+# dev.off()
+
+# srt = ModScoreCor (
+#     seurat_obj = srt, 
+#     geneset_list = shared_cnmf, 
+#     cor_threshold = NULL, 
+#     pos_threshold = NULL, # threshold for fetal_pval2
+#     listName = 'shared_cnmf', outdir = NULL)
 
 
-# TF_modules = c(
-# 'JUNB
-# FOSL2
-# JUN
-# SMARCC1
-# FOSL1
-# JUND
-# FOS
-# JDP2
-# BACH1
-# FOSB')
-# TF_modules = strsplit(TF_modules, '\n')
-# names (TF_modules) = 'AP1'
+
+
+# # TF_modules = c(
+# # 'JUNB
+# # FOSL2
+# # JUN
+# # SMARCC1
+# # FOSL1
+# # JUND
+# # FOS
+# # JDP2
+# # BACH1
+# # FOSB')
+# # TF_modules = strsplit(TF_modules, '\n')
+# # names (TF_modules) = 'AP1'
 
 
 
@@ -1512,55 +1515,55 @@ srt = ModScoreCor (
 #force = FALSE
 archp$inflamed = ifelse (archp$mod_2 > 0, 'inflamed','non_inflamed')
 metaGroupName = 'inflamed'
-force=F
-if (!file.exists ('DAP_inflamed_pairwise.rds') | force)
+force=T
+if (!file.exists ('DAG_inflamed_pairwise.rds') | force)
   {
-  DAP_list = getMarkerFeatures (
+  DAG_list = getMarkerFeatures (
     ArchRProj = archp, 
     testMethod = "wilcoxon",
           useGroups = "inflamed",
           bgdGroups = "non_inflamed",
     k=100,
     binarize = FALSE,
-    useMatrix = "PeakMatrix",
+    useMatrix = "GeneScoreMatrix",
     groupBy = metaGroupName
   #  useSeqnames="z"
   )
-  saveRDS (DAP_list, 'DAP_inflamed_pairwise.rds')
+  saveRDS (DAG_list, 'DAG_inflamed_pairwise.rds')
   } else {
-  DAP_list = readRDS ('DAP_inflamed_pairwise.rds')
+  DAG_list = readRDS ('DAG_inflamed_pairwise.rds')
   }
-DAP_res = do.call (cbind, (assays(DAP_list)))
-colnames (DAP_res) = names(assays(DAP_list))
-DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
-rownames (DAP_res) = as.character(DAP_res_regions)
+DAG_res = do.call (cbind, (assays(DAG_list)))
+colnames (DAG_res) = names(assays(DAG_list))
+#DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
+rownames (DAG_res) = rowData(DAG_list)$name
 
 pdf(file.path('Plots','inflamed_MA_plot.pdf'), width=5,height=5)
-pma <- markerPlot (seMarker = DAP_list, name = 'inflamed', cutOff = "FDR <= 0.01", plotAs = "MA")
-pma
+gma <- markerPlot (seMarker = DAG_list, name = 'inflamed', cutOff = "FDR <= 0.01", plotAs = "MA")
+gma
 dev.off()
   
 # Take only significant regions ####
-DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
-saveRDS (GRanges(rownames(DAP_res_sig)), 'inflamed_peaks.rds')
+DAG_res_sig = DAG_res[DAG_res$FDR < .01 & DAG_res$Log2FC > 0, ]
+saveRDS (DAG_res_sig, 'inflamed_genescore.rds')
 
-### Perform enrichment on DAP ####
-archp = addBgdPeaks (archp, force= T)
-archp = addMotifAnnotations (ArchRProj = archp, 
-      motifSet = "cisbp", 
-      #motifSet = 'JASPAR2020',
-      #name = "JASPAR2020_Motif",
-      force=T)
-enrichMotifs <- peakAnnoEnrichment(
-    seMarker = DAP_list,
-    ArchRProj = archp,
-    peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
-  )
-heatmapEM <- plotEnrichHeatmap(enrichMotifs, n = 7, transpose = TRUE)
-pdf (file.path ('Plots','enrich_inflamation_heatmap.pdf'))
-heatmapEM
-dev.off()
+# ### Perform enrichment on DAP ####
+# archp = addBgdPeaks (archp, force= T)
+# archp = addMotifAnnotations (ArchRProj = archp, 
+#       motifSet = "cisbp", 
+#       #motifSet = 'JASPAR2020',
+#       #name = "JASPAR2020_Motif",
+#       force=T)
+# enrichMotifs <- peakAnnoEnrichment(
+#     seMarker = DAP_list,
+#     ArchRProj = archp,
+#     peakAnnotation = "Motif",
+#     cutOff = "FDR <= 0.1 & Log2FC >= 0.5"
+#   )
+# heatmapEM <- plotEnrichHeatmap(enrichMotifs, n = 7, transpose = TRUE)
+# pdf (file.path ('Plots','enrich_inflamation_heatmap.pdf'))
+# heatmapEM
+# dev.off()
 
 # Run GSEA enrichment analysis #### 
 #!!! To run this analysis load only ArcHR and clusterprofiler packages !!!!
@@ -1581,51 +1584,60 @@ gmt.file = paste0 ('../../git_repo/files/c5.bp.v7.1.symbol.gmt')
 # gmt.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/GSE24026_PD1_LIGATION_VS_CTRL_IN_ACT_TCELL_LINE_UP.v2024.1.Hs.gmt'
 # csv.file = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/GSEA_gs/human/Tcell_exhastuion_genes_PMID37091230.csv'
 pathways = clusterProfiler::read.gmt (gmt.file)
-pathways = pathways[grep('inflammatory', pathways$term,ignore.case=T),]
+#pathways = pathways[grep('inflammatory', pathways$term,ignore.case=T),]
 #pathways = read.csv (csv.file)
 pathways = split(pathways$gene, pathways$term)
 #pathways = gmtPathways (gmt.file)
-DAP_list = readRDS ('DAP_inflamed_pairwise.rds')
-DAP_res = do.call (cbind, (assays(DAP_list)))
-colnames (DAP_res) = names(assays(DAP_list))
-DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
-rownames(DAP_res) = as.character(DAP_res_regions)
+DAG_list = readRDS ('DAG_inflamed_pairwise.rds')
+DAG_res = do.call (cbind, (assays(DAG_list)))
+colnames (DAG_res) = names(assays(DAG_list))
+#DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
+rownames(DAG_res) = rowData (DAG_list)$name
 
-peak_genes = unname(ps[queryHits (findOverlaps(ps, GRanges (rownames(DAP_res))))]$nearestGene)
-names (peak_genes) = as.character(ps)[queryHits(findOverlaps (ps,GRanges (rownames(DAP_res))))]
-peak_genes = peak_genes[rownames(DAP_res)]
-#peak_genes = setNames (-log10(DAP_res$Pval) * sign (DAP_res$Log2FC), peak_genes)
-peak_genes = setNames (DAP_res$Log2FC, peak_genes)
-#peak_genes = peak_genes[!duplicated(names(peak_genes))]
-#names (peak_genes) = 
-peak_genes = peak_genes[!duplicated(names(peak_genes))]
-peak_genes = peak_genes[!is.na(names(peak_genes))]
+# peak_genes = unname(ps[queryHits (findOverlaps(ps, GRanges (rownames(DAP_res))))]$nearestGene)
+# names (peak_genes) = as.character(ps)[queryHits(findOverlaps (ps,GRanges (rownames(DAP_res))))]
+# peak_genes = peak_genes[rownames(DAP_res)]
+# #peak_genes = setNames (-log10(DAP_res$Pval) * sign (DAP_res$Log2FC), peak_genes)
+# peak_genes = setNames (DAP_res$Log2FC, peak_genes)
+# #peak_genes = peak_genes[!duplicated(names(peak_genes))]
+# #names (peak_genes) = 
+# peak_genes = peak_genes[!duplicated(names(peak_genes))]
+# peak_genes = peak_genes[!is.na(names(peak_genes))]
+ranked_genes = setNames(DAG_res$Log2FC,rownames(DAG_res))
 library (BiocParallel)
 BiocParallel::register(BiocParallel::SerialParam())
 
 ### fgsea throws a BiocParallel error when I load all packages including clusterProfiler...try avoiding loading packages except ArchR and fgsea
 #peak_genes2 = setNames(order(peak_genes), names(peak_genes))
 fgseaRes = fgseaMultilevel (pathways, 
-          peak_genes,#, 
+          ranked_genes,#, 
           minSize=15, 
-        #  scoreType='pos',
+          scoreType='pos',
           maxSize=1500,
           nproc=1,
           nPermSimple=100000,
           BPPARAM = NULL
           )
+collapsedPathways <- collapsePathways(fgseaRes[order(pval)][padj < 0.05], 
+                                              pathways, ranked_genes)
+mainPathways <- fgseaRes[pathway %in% collapsedPathways$mainPathways][
+                                 order(-NES), pathway]
+fgseaRes_df = as.data.frame (fgseaRes[pathway %in% mainPathways,])
+#head (fgseaRes_df[order (fgseaRes_df$pval), ],100)
 pvalAdjTrheshold = 0.05
-top_pathways=5
-fgseaRes$padj = fgseaRes$pval
+top_pathways=15
+#fgseaRes_df = as.data.frame (fgseaRes)
+#fgseaRes_df$padj = fgseaRes_df$pval
+#fgseaRes$padj = fgseaRes$pval
 fgseaResAll_dp = dotGSEA (
-  list(fgseaRes), 
+  list(fgseaRes_df), 
   padj_threshold = pvalAdjTrheshold, 
   type = 'fgsea',
   top_pathways = top_pathways,
   cluster_rows=F,
   cluster_cols=F)
 
-pdf (file.path ('Plots','fgsea_dotplot.pdf'), width=7, height=3)
+pdf (file.path ('Plots','fgsea_dotplot2.pdf'), width=9, height=6)
 fgseaResAll_dp
 dev.off()
 
@@ -1653,7 +1665,7 @@ dev.off()
 
 
 ## Run peak2genes results with hubs links ####
-run_p2g = T
+run_p2g = F
   if (run_p2g)
     {
     maxDist = 250000
@@ -1678,7 +1690,8 @@ hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))
 
 
 # Generate matrix of fragment counts of hubs x barcodes ####
-if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))))
+force=F
+if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))) | force)
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
     ArchRProj = archp))    
@@ -1724,7 +1737,7 @@ all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 ### Compute differential hub analysis 
 # Compute differential hub accessibility DHA ####
 library (presto)
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 metagroup = as.character (archp@cellColData[,metaGroupName])
 res = wilcoxauc (log2(hubsCell_mat+1), metagroup)
@@ -1742,14 +1755,14 @@ head (res_df[res_df$group == 'TREM2',],20)
 top_hubs = 5
 res_df_top = res_df %>% group_by (group) %>%
   slice_head(n = top_hubs)
-
-levels_order = unique(res_df_top$group)
-metagroup = factor (metagroup, levels = levels_order, ordered=T)
+res_df_top$group = factor (res_df_top$group, levels = cell_subsets_order)
+res_df_top = res_df_top[order(res_df_top$group), ]
 
 
 # Generate matrix of fragment counts of hubs x metagroup ####
-metaGroupName = 'celltype2'
-if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))))
+metaGroupName = 'celltype_lv2'
+force = T
+if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds'))) | force)
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
     ArchRProj = archp))   
@@ -1764,7 +1777,7 @@ if (!file.exists(file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.r
     fragments_in_sample_in_hubs = countOverlaps (hubs_obj$hubsCollapsed, fragments_in_sample)
     hubsSample_mat[,sam] = fragments_in_sample_in_hubs
     }
-  frags_in_sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) sum (archp$ReadsInTSS[as.character(archp@cellColData[,metaGroupName]) == x]))
+  frags_in_sample = sapply (unique(archp@cellColData[,metaGroupName]), function(x) sum (archp$nFrags[as.character(archp@cellColData[,metaGroupName]) == x]))
   hubsSample_mat = t(t(hubsSample_mat) * (10^6 / frags_in_sample)) # scale
   saveRDS (hubsSample_mat, file.path (hubs_dir,paste0('hubs_sample_',metaGroupName,'_mat.rds')))
   } else {
@@ -1775,6 +1788,7 @@ hubsSample_mat = as.data.frame (hubsSample_mat)
 #as.character(archp@cellColData[,metaGroupName])[order(metagroup, na.last=T)]
 #ha = HeatmapAnnotation (celltype = metagroup[order (metagroup, na.last=T)])
 #hubs_mat
+hubsSample_mat = hubsSample_mat[,levels(res_df_top$group)]
 dah_hm = t(scale(t(log2(hubsSample_mat[res_df_top$feature,unique(res_df_top$group)]))))
 #dah_hm[dah_hm > 2] = 2
 #dah_hm[dah_hm < -2] = -2
@@ -1789,18 +1803,18 @@ hm = Heatmap (dah_hm,
   column_names_rot=45,
   border=T)
 
-pdf (file.path ('Plots','top_DAH_celltype_lv2_heatmap.pdf'), width=5)
+pdf (file.path ('Plots','top_DAH_celltype_lv2_heatmap2.pdf'), width=5, height=5)
 hm
 dev.off()
 
 
 #TF = 'SNAI1'
-TF = sapply (unique(res_df_top$gene), function(x) unlist(strsplit(x, '-'))[1])
-metaGroupName = 'celltype2'
+# TF = sapply (unique(res_df_top$gene), function(x) unlist(strsplit(x, '-'))[1])
+# metaGroupName = 'celltype_lv2'
 
 # Compare inflamed vs non-inflamed Momacs ####
 library (presto)
-archp$inflamed = ifelse (archp$mod_2 > 0, 'inflamed','non_inflamed')
+#archp$inflamed = ifelse (archp$mod_1 > 0, 'inflamed','non_inflamed')
 metaGroupName = 'inflamed'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
 metagroup = as.character (archp@cellColData[,metaGroupName])
@@ -1816,22 +1830,28 @@ res_l = lapply (split (res, res$group), function(x){
 res_df = do.call (rbind, res_l)
 res_df$gene = hubs_obj$hubsCollapsed$gene[match(res_df$feature, hubs_obj$hubs_id)]
 
-top_hubs = 10
+top_hubs = 20
 res_df_top = res_df %>% group_by (group) %>%
   slice_head(n = top_hubs)
-
-hub = res_df_top$feature
+res_df_top$gene = hubs_obj$hubsCollapsed$gene[match(res_df_top$feature, hubs_obj$hubs_id)]
+hub = res_df_top$feature[10]
+hub = 'HUB1'
 #hub = hubs_obj$hubs_id[grep ('NFKB1', hubs_obj$hubsCollapsed$gene)]
 #sample_levels = c('Monocytes','cDCs','SPP1','TREM2','C1Q','IFN','IM')
 
-sample_levels = c('Monocytes','cDCs','SPP1','TREM2','C1Q','IFN','IM')
-metaGroupName = 'celltype2'
+metaGroupName = 'celltype_lv2'
+metaGroupName = 'inflamed'
+ccomp = as.data.frame (archp@cellColData)
+median_order = sort (unlist(lapply (split (ccomp$mod_2, ccomp$celltype_lv2), function(x) median(x))))
+cell_subsets_order2 = rev(names (median_order))
+palette_inflamed = c(inflamed = 'darkred',non_inflamed='grey22')
+
 pdf()
 #archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
 #metaGroupName = 'fetal_group'
 meso_markers <- plotBrowserTrack2 (
     ArchRProj = archp,#[!archp$Sample3 %in% c('P11_HOX')], 
-    sample_levels = sample_levels, 
+    #sample_levels = cell_subsets_order2, 
     hubs_regions = hubs_obj$hubsCollapsed,
     #ylim = c(0,0.30),
     groupBy = metaGroupName, 
@@ -1845,39 +1865,40 @@ meso_markers <- plotBrowserTrack2 (
     #pal = palette_fetal,
     threads=1,
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
-    region = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub[1], hubs_obj$hubs_id)]),10000,10000),
+    region = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub[1], hubs_obj$hubs_id)]),50000,10000),
     #upstream = 100000,
     #downstream = 100000,
     loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
-    pal = palette_myeloid,
+    #pal = palette_myeloid,
+    pal = palette_inflamed,
     #loops = getCoAccessibility (archp, corCutOff = 0.3,
     #  returnLoops = TRUE),
     useGroups= NULL
 )
 dev.off()
-plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=8, name =paste0('MPM_markers_inflamed_coveragePlots.pdf'),addDOC=F)
+plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=4, name =paste0(metaGroupName,'_MPM_markers_inflamed_coveragePlots.pdf'),addDOC=F)
 
 
-metaGroupName = 'shared_cnmf2_r_max'
-hub_gr = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub, hubs_obj$hubs_id)]),100000,100000)
-genes_in_region = unique(getPeakSet (archp)[subjectHits (findOverlaps (hub_gr, getPeakSet (archp)))]$nearestGene)
-genes_in_region = c(genes_in_region)
-genes_in_region = 'CD44'
-top_dah = data.frame (
-  gene = colMeans (srt@assays$RNA@data[rownames(srt) %in% genes_in_region,,drop=F]),
-  group = srt@meta.data[,metaGroupName])
-top_dah$group = factor (top_dah$group, levels = rev(sample_levels))
-top_dah = na.omit(top_dah)
-bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
-vlp + 
-bxpv + 
-scale_fill_manual (values = palette_myeloid) +
-#geom_point (position='identity', alpha=.3, color="grey44", size=1) +
-gtheme_no_rot
+# metaGroupName = 'shared_cnmf2_r_max'
+# hub_gr = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub, hubs_obj$hubs_id)]),10000,10000)
+# genes_in_region = unique(getPeakSet (archp)[subjectHits (findOverlaps (hub_gr, getPeakSet (archp)))]$nearestGene)
+# genes_in_region = c(genes_in_region)
+# genes_in_region = 'CD44'
+# top_dah = data.frame (
+#   gene = colMeans (srt@assays$RNA@data[rownames(srt) %in% genes_in_region,,drop=F]),
+#   group = srt@meta.data[,metaGroupName])
+# top_dah$group = factor (top_dah$group, levels = rev(sample_levels))
+# top_dah = na.omit(top_dah)
+# bp = ggplot (top_dah, aes (x = gene, y = group, fill = group)) + 
+# vlp + 
+# bxpv + 
+# scale_fill_manual (values = palette_myeloid) +
+# #geom_point (position='identity', alpha=.3, color="grey44", size=1) +
+# gtheme_no_rot
 
-pdf (file.path ('Plots', paste0('scrna_region_boxplots.pdf')), height=4, width=4)
-bp
-dev.off()
+# pdf (file.path ('Plots', paste0('scrna_region_boxplots.pdf')), height=4, width=4)
+# bp
+# dev.off()
 
 
 # Check footprint across celltypes ####
@@ -1945,7 +1966,7 @@ dev.off()
 
 
 # Export bigiwg files ####
-metaGroupName = 'celltype_lv2'
+metaGroupName = 'inflamed'
 exp_bigwig = TRUE
 if (exp_bigwig)
   {

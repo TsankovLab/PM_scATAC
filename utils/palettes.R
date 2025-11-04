@@ -53,7 +53,7 @@ palette_tnk_cells['NK_KLRC1'] = 'black'
 #palette_tnk_cells['CD4'] = '#F9ECE8FF'
 palette_myeloid = rev (paletteer::paletteer_d("trekcolors::dominion"))
 palette_myeloid = setNames (as.character(palette_myeloid),
-  c('Monocytes','IFN','C1Q','SPP1','cDCs','TREM2','IM'))
+  c('Mono_CD14','Mono_CD16','TAM_CXCLs','TAM_MARCO','TAM_TREM2','TAM_interstitial','cDCs'))
 palette_myeloid2 = c(palette_myeloid[c('Monocytes','cDCs')], TAMs = 'gray')
 palette_protein_expression = c(low="darkblue",mid= "white",high= "darkgreen") 
 palette_feature_RNA = c('lightgrey',"#5F1415FF")

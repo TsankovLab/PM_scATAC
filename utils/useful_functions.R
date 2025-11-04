@@ -397,7 +397,7 @@ NI.genes = function (all.genes = NULL, ni.goterms = NULL, ni.genes = NULL, org =
 ovmat = function (ovlist, df=FALSE, ov_threshold=0.5, compare_lists= NULL, palette=NULL)
   {
   if (!df) require (ComplexHeatmap)	
-  comp_mat = sapply (ovlist, function(x) sapply(ovlist, function (y) sum (unique(x) %in% unique(y)) / min(c(length(unique(x)),length(unique(y))))))
+  comp_mat = sapply (ovlist, function(x) sapply(ovlist, function (y) sum (unique(x) %in% unique(y)) / sum(c(length(unique(x)),length(unique(y))))))
   if (!is.null (compare_lists)) comp_mat = comp_mat[compare_lists[[1]],compare_lists[[2]]]
   if (df) 
   	{
@@ -669,62 +669,62 @@ mouseMan <- function (x, direction = 'MtH', use_db = NULL)
 
 # Build clustered dotplot with GSEA terms on y axes and clusters on x axes
 dotGSEA = function (
-	enrichmentsTest_list,
-	type = c('fgsea','enrich'),
-	top_pathways = NULL, 
-	padj_threshold = 0.05,
-	cluster_rows = T,
-	cluster_cols = T,
-	remove_ns_modules = TRUE)
-	{
-	require (tidyr)	
-	if (type == 'fgsea')
-		{
-		sig_terms = unique(unlist(sapply (enrichmentsTest_list, function(x) x[x$padj < padj_threshold,'pathway'])))
-		if (length(sig_terms) == 0) return (NULL)
-		if (!is.null(top_pathways)) sig_terms = unique(unlist(sapply (enrichmentsTest_list, function(x) 
-				{
-				x =	na.omit(x)
-				x = x[x$padj < padj_threshold,]
-				x_top = x[order(-x$NES),]
-				x_top = head(x_top[order(x_top$padj),'pathway'], top_pathways)
-				x_bot = x[order(x$NES),]
-				x_bot = head(x_bot[order(-x_bot$padj),'pathway'], top_pathways)
-				c(x_top,x_bot)
-				})))
-		if (length(sig_terms) == 1)
-			{
-			mat_pvalue = t(as.matrix (sapply (enrichmentsTest_list, function(x) x$pval[match(sig_terms, x$pathway)])))
-			mat_sizeLog = t(as.matrix (sapply (enrichmentsTest_list, function(x) x$NES[match(sig_terms, x$pathway)])))	
-			} else {
-			mat_pvalue = sapply (enrichmentsTest_list, function(x) x$pval[match(sig_terms, x$pathway)])
-			mat_sizeLog = sapply (enrichmentsTest_list, function(x) x$NES[match(sig_terms, x$pathway)])	
-			}
-		}
-	if (type == 'enrich')
-		{
-		sig_terms = na.omit(unique(unlist(sapply (enrichmentsTest_list, function(x) x[x$p.adjust < padj_threshold,'ID']))))
-		if (length(sig_terms) == 0) return (NULL)
-		if (!is.null(top_pathways)) sig_terms = unique(as.vector(unlist (sapply (enrichmentsTest_list, function(x) 
+  enrichmentsTest_list,
+  type = c('fgsea','enrich'),
+  top_pathways = NULL, 
+  padj_threshold = 0.05,
+  cluster_rows = T,
+  cluster_cols = T,
+  remove_ns_modules = TRUE)
+  {
+  require (tidyr) 
+  if (type == 'fgsea')
+    {
+    sig_terms = unique(unlist(sapply (enrichmentsTest_list, function(x) x[x$padj < padj_threshold,'pathway'])))
+    if (length(sig_terms) == 0) return (NULL)
+    if (!is.null(top_pathways)) sig_terms = unique(unlist(sapply (enrichmentsTest_list, function(x) 
+        {
+        x = na.omit(x)
+        x = x[x$padj < padj_threshold,]
+        x_top = x[order(-x$NES),]
+        x_top = head(x_top[order(x_top$padj),'pathway'], top_pathways)
+        x_bot = x[order(x$NES),]
+        x_bot = head(x_bot[order(-x_bot$padj),'pathway'], top_pathways)
+        c(x_top,x_bot)
+        })))
+    if (length(sig_terms) == 1)
+      {
+      mat_pvalue = t(as.matrix (sapply (enrichmentsTest_list, function(x) x$pval[match(sig_terms, x$pathway)])))
+      mat_sizeLog = t(as.matrix (sapply (enrichmentsTest_list, function(x) x$NES[match(sig_terms, x$pathway)])))  
+      } else {
+      mat_pvalue = sapply (enrichmentsTest_list, function(x) x$pval[match(sig_terms, x$pathway)])
+      mat_sizeLog = sapply (enrichmentsTest_list, function(x) x$NES[match(sig_terms, x$pathway)]) 
+      }
+    }
+  if (type == 'enrich')
+    {
+    sig_terms = na.omit(unique(unlist(sapply (enrichmentsTest_list, function(x) x[x$p.adjust < padj_threshold,'ID']))))
+    if (length(sig_terms) == 0) return (NULL)
+    if (!is.null(top_pathways)) sig_terms = unique(as.vector(unlist (sapply (enrichmentsTest_list, function(x) 
       {
        tmp = x[x$p.adjust < padj_threshold,'ID']
        tmp = tmp[order(tmp)]
        na.omit(head(tmp, top_pathways))
       }))))
 
-		if (length(sig_terms) == 1)
-			{
-			mat_pvalue = t(as.matrix(sapply (enrichmentsTest_list, function(x) x$p.adjust[match(sig_terms, x$ID)])))
-			mat_sizeLog = t(as.matrix(sapply (enrichmentsTest_list, function(x) x$Count[match(sig_terms, x$ID)])))	
-			} else {
-			mat_pvalue = sapply (enrichmentsTest_list, function(x) x$p.adjust[match(sig_terms, x$ID)])
-			mat_sizeLog = sapply (enrichmentsTest_list, function(x) x$Count[match(sig_terms, x$ID)])	
-			}
-		}
-	
-	mat_pvalue[is.na(mat_pvalue)] = 1
-	mat_sizeLog[is.na(mat_sizeLog)] = 0
-	
+    if (length(sig_terms) == 1)
+      {
+      mat_pvalue = t(as.matrix(sapply (enrichmentsTest_list, function(x) x$p.adjust[match(sig_terms, x$ID)])))
+      mat_sizeLog = t(as.matrix(sapply (enrichmentsTest_list, function(x) x$Count[match(sig_terms, x$ID)])))  
+      } else {
+      mat_pvalue = sapply (enrichmentsTest_list, function(x) x$p.adjust[match(sig_terms, x$ID)])
+      mat_sizeLog = sapply (enrichmentsTest_list, function(x) x$Count[match(sig_terms, x$ID)])  
+      }
+    }
+  
+  mat_pvalue[is.na(mat_pvalue)] = 1
+  mat_sizeLog[is.na(mat_sizeLog)] = 0
+  
 rownames (mat_pvalue) = sig_terms
 colnames (mat_pvalue) = names (enrichmentsTest_list)
 rownames (mat_sizeLog) = sig_terms
@@ -732,78 +732,79 @@ colnames (mat_sizeLog) = names (enrichmentsTest_list)
 mat_sizeLog = as.data.frame (mat_sizeLog)
 mat_pvalue = as.data.frame (mat_pvalue)
 
-	if(cluster_rows & min (dim(mat_sizeLog)[1]) >= 2) 
-		{
-		d_row = dist (mat_sizeLog)
-		d_row[is.na(d_row)] = max (d_row)	
-		hc1_row = hclust (d_row, method = "ward.D")
-		mat_sizeLog = mat_sizeLog[hc1_row$order,]
-		mat_pvalue = mat_pvalue[hc1_row$order,]
-		}
-	if(cluster_cols & min (dim(mat_sizeLog)[2]) >= 2) 
-		{
-		d_col = dist (t(mat_sizeLog))	
-		d_col[is.na(d_col)] = max (d_col)
-		hc1_col = hclust (d_col, method = "ward.D")
-		mat_sizeLog = mat_sizeLog[,hc1_col$order]
-		mat_pvalue = mat_pvalue[,hc1_col$order]
-		}
+  if(cluster_rows & min (dim(mat_sizeLog)[1]) >= 2) 
+    {
+    d_row = dist (mat_sizeLog)
+    d_row[is.na(d_row)] = max (d_row) 
+    hc1_row = hclust (d_row, method = "ward.D")
+    mat_sizeLog = mat_sizeLog[hc1_row$order,]
+    mat_pvalue = mat_pvalue[hc1_row$order,]
+    }
+  if(cluster_cols & min (dim(mat_sizeLog)[2]) >= 2) 
+    {
+    d_col = dist (t(mat_sizeLog)) 
+    d_col[is.na(d_col)] = max (d_col)
+    hc1_col = hclust (d_col, method = "ward.D")
+    mat_sizeLog = mat_sizeLog[,hc1_col$order]
+    mat_pvalue = mat_pvalue[,hc1_col$order]
+    }
 #mat_sizeLog = as.data.frame (mat_sizeLog)
-mat_sizeLog[mat_pvalue > padj_threshold] = NA			
+mat_sizeLog[mat_pvalue > padj_threshold] = NA     
 mat_pvalue[mat_pvalue > padj_threshold] = NA
-mat_pvalue = -log10(as.data.frame (mat_pvalue))	
+mat_pvalue = -log10(as.data.frame (mat_pvalue)) 
 #colnames (mat_pvalue) = names (enrichmentsTest_list)
 
 mat_pvalue$pathway = rownames (mat_pvalue)
 if (remove_ns_modules) # remove modules with no enriched pathways
-	{
-	keep_cols	= apply (mat_pvalue, 2, function(x) !all (is.na(x)))
-	mat_pvalue = mat_pvalue[, keep_cols, drop=F]
-	mat_sizeLog = mat_sizeLog[, colnames(mat_pvalue)[colnames(mat_pvalue)!='pathway'], drop=F]
-	}
+  {
+  keep_cols = apply (mat_pvalue, 2, function(x) !all (is.na(x)))
+  mat_pvalue = mat_pvalue[, keep_cols, drop=F]
+  mat_sizeLog = mat_sizeLog[, colnames(mat_pvalue)[colnames(mat_pvalue)!='pathway'], drop=F]
+  }
 if (type == 'fgsea')
-	{
-	gsea_df_pvalue = gather (mat_pvalue, cluster, nlogPvalue, colnames(mat_pvalue)[1]:colnames(mat_pvalue)[ncol(mat_pvalue)-1], factor_key=TRUE)
-	gsea_df_NES = gather (mat_sizeLog, cluster2, NES, colnames(mat_sizeLog)[1]:colnames(mat_sizeLog)[ncol(mat_sizeLog)], factor_key=TRUE)
-	gsea_df = cbind (gsea_df_NES, gsea_df_pvalue)
-	#gsea_df$cluster = factor (gsea_df$cluster, levels = unique(gsea_df$cluster))
-	gsea_df$pathway = factor (gsea_df$pathway, levels = unique(gsea_df$pathway))
-	p = ggplot (data = gsea_df, aes (x=cluster, y=pathway,
-	      fill= NES, size=nlogPvalue)) +
-	      geom_point (shape=21, color='black') +
-	      #scale_fill_gradient2 (low = 'blue',mid='white', high = 'red', midpoint=0) +
-	      scale_fill_gradient2(
-      	low = "#67A9CF", 
-      	mid = "#F7F7F7", 
-      	high = "#EF8A62", 
-      	midpoint = 0
-    		) +
-	      labs (x = 'cluster', y = '-log10(pvalue)') +
-	      theme_minimal() + 
-	      theme(text = element_text(size=11)) +
-	      theme(axis.text.y = element_text (angle = 0, vjust = 0.5, hjust=1)) +
-	      theme(axis.text.x = element_text (angle = 90, vjust = 0.5, hjust=1))
-	return (p)	
-	}
+  {
+  gsea_df_pvalue = gather (mat_pvalue, cluster, nlogPvalue, colnames(mat_pvalue)[1]:colnames(mat_pvalue)[ncol(mat_pvalue)-1], factor_key=TRUE)
+  gsea_df_NES = gather (mat_sizeLog, cluster2, NES, colnames(mat_sizeLog)[1]:colnames(mat_sizeLog)[ncol(mat_sizeLog)], factor_key=TRUE)
+  gsea_df = cbind (gsea_df_NES, gsea_df_pvalue)
+  #gsea_df$cluster = factor (gsea_df$cluster, levels = unique(gsea_df$cluster))
+  gsea_df$pathway = factor (gsea_df$pathway, levels = unique(gsea_df$pathway))
+  p = ggplot (data = gsea_df, aes (x=cluster, y=pathway,
+        fill= NES, size=nlogPvalue)) +
+        geom_point (shape=21, color='black') +
+        #scale_fill_gradient2 (low = 'blue',mid='white', high = 'red', midpoint=0) +
+        scale_fill_gradient2(
+        low = "#67A9CF", 
+        mid = "#F7F7F7", 
+        high = "#EF8A62", 
+        midpoint = 0
+        ) +
+        labs (x = 'cluster', y = '-log10(pvalue)') +
+        theme_minimal() + 
+        theme(text = element_text(size=11)) +
+        theme(axis.text.y = element_text (angle = 0, vjust = 0.5, hjust=1)) +
+        theme(axis.text.x = element_text (angle = 90, vjust = 0.5, hjust=1))
+  return (p)  
+  }
 if (type == 'enrich')
-	{	
-	enrich_df_pvalue = gather (mat_pvalue, cluster, nlogPvalue, colnames(mat_pvalue)[1]:colnames(mat_pvalue)[ncol(mat_pvalue)-1], factor_key=TRUE)
-	enrich_df_Count = gather (mat_sizeLog, cluster2, Count, colnames(mat_sizeLog)[1]:colnames(mat_sizeLog)[ncol(mat_sizeLog)], factor_key=TRUE)
-	enrich_df = cbind (enrich_df_Count, enrich_df_pvalue)
-	#gsea_df$cluster = factor (gsea_df$cluster, levels = unique(gsea_df$cluster))
-	enrich_df$pathway = factor (enrich_df$pathway, levels = unique(enrich_df$pathway))
-	p = ggplot (data = enrich_df, aes (x=cluster, y=pathway,
-	      fill= nlogPvalue, size=log2(Count+1))) +
-	      geom_point (shape=21, color='black') +
-	      scale_fill_distiller (palette = "Spectral") +
-	      labs (x = 'cluster', y = '-log10(pvalue)') +
-	      theme_minimal() + 
-	      theme(text = element_text(size=11)) +
-	      theme(axis.text.y = element_text (angle = 0, vjust = 0.5, hjust=1)) +
-	      theme(axis.text.x = element_text (angle = 90, vjust = 0.5, hjust=1))
-	return (p)		
-	}
-	}
+  { 
+  enrich_df_pvalue = gather (mat_pvalue, cluster, nlogPvalue, colnames(mat_pvalue)[1]:colnames(mat_pvalue)[ncol(mat_pvalue)-1], factor_key=TRUE)
+  enrich_df_Count = gather (mat_sizeLog, cluster2, Count, colnames(mat_sizeLog)[1]:colnames(mat_sizeLog)[ncol(mat_sizeLog)], factor_key=TRUE)
+  enrich_df = cbind (enrich_df_Count, enrich_df_pvalue)
+  #gsea_df$cluster = factor (gsea_df$cluster, levels = unique(gsea_df$cluster))
+  enrich_df$pathway = factor (enrich_df$pathway, levels = unique(enrich_df$pathway))
+  p = ggplot (data = enrich_df, aes (x=cluster, y=pathway,
+        fill= nlogPvalue, size=log2(Count+1))) +
+        geom_point (shape=21, color='black') +
+        scale_fill_distiller (palette = "Spectral") +
+        labs (x = 'cluster', y = '-log10(pvalue)') +
+        theme_minimal() + 
+        theme(text = element_text(size=11)) +
+        theme(axis.text.y = element_text (angle = 0, vjust = 0.5, hjust=1)) +
+        theme(axis.text.x = element_text (angle = 90, vjust = 0.5, hjust=1))
+  return (p)    
+  }
+  }
+
 
 
 # Make heatmap of the expression difference of between two conditions (e.g. KO vs WT) aggregated by cluster and top DEG across the clusters
