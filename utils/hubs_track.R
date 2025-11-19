@@ -1024,7 +1024,7 @@ plotBrowserTrack2 <- function(
   baseSize = 9, 
   loop_size = NULL,
   facetbaseSize = 9,
-  featureWidth = 2, 
+  featureWidth = .5, 
   borderWidth = 0.4, 
   hideX = FALSE, 
   hideY = FALSE,

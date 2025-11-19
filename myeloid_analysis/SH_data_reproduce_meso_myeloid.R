@@ -237,12 +237,30 @@ archp = archp[barcodes_atac %in% barcodes_rna]
 barcodes_atac = barcodes_atac[barcodes_atac %in% barcodes_rna]
 archp$celltype2 = srt$celltype2[match (barcodes_atac, srt$barcode)]
 
+
 # Subset for tumor cells
 compartment_selection = 'T'
 compartment_scrna <- regmatches(colnames(srt), regexpr("[TNP]", colnames(srt)))
 srt = srt[,compartment_scrna == compartment_selection]
 compartment_scatac <- regmatches(rownames(archp@cellColData), regexpr("[TNP]", rownames(archp@cellColData)))
 archp = archp [compartment_scatac == compartment_selection]
+
+
+
+
+
+
+
+# load objects 
+
+write.table (rownames (archp@cellColData), 'multiome_tumor_cells_scatac.txt')
+write.table (rownames (srt@meta.data), 'multiome_tumor_cells_scrna.txt')
+barcode_scatac = read.table ('multiome_tumor_cells_scatac.txt')[[1]]
+barcode_scrna = read.table ('multiome_tumor_cells_scrna.txt')[[1]]
+
+# Subset objects
+archp = archp[rownames(archp@cellColData) %in% barcode_scatac]
+srt = srt [, colnames (srt) %in% barcode_scrna]
 
 shared_cnmf_genes = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/shared_cnmf_myeloid.rds')
 remove_modules = c('Stress','CC','TAM_unkown','TAM_CXCLs')
@@ -267,37 +285,33 @@ source (file.path(scrna_pipeline_dir, 'SCENIC.R'))
 
 
 
-### Find cNMF shared between myeloid in each sample ####
-#### Run cNMF ####
-nfeat = 5000
-force=F
-k_list = c(10:20)
-k_selections = c(10:20)
-cores= 100
+# ### Find cNMF shared between myeloid in each sample ####
+# #### Run cNMF ####
+# nfeat = 5000
+# force=F
+# k_list = c(10:20)
+# k_selections = c(10:20)
+# cores= 100
 
-cnmf_name = paste0('monomac_programs_tumor')
-#cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
-#dir.create (file.path(cnmf_out,'Plots'), recursive=T)
-# repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
-scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline'
+# cnmf_name = paste0('monomac_programs_tumor')
+# #cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
+# #dir.create (file.path(cnmf_out,'Plots'), recursive=T)
+# # repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+# scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline'
   
-### RUN consensus NMF ####
-org='human'
-force=F
-source (file.path (scrna_pipeline_dir,'cnmf_prepare_inputs.R'))     
-srt
+# ### RUN consensus NMF ####
+# org='human'
+# force=F
+# source (file.path (scrna_pipeline_dir,'cnmf_prepare_inputs.R'))     
+# srt
 
-### Import and format spectra files ####
-k_selection = 10
-cnmf_name = paste0('myeloid')  
-source (file.path (scrna_pipeline_dir,'cnmf_format_spectra_files.R')) 
-#cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x,50))
+# ### Import and format spectra files ####
+# k_selection = 10
+# cnmf_name = paste0('myeloid')  
+# source (file.path (scrna_pipeline_dir,'cnmf_format_spectra_files.R')) 
+# #cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head(x,50))
 
 
-## Compare cnmf from meso myeloid scRNA to LUAD myeloid snRNA
-shared_cnmf_genes = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/shared_cnmf_myeloid.rds')
-remove_modules = c('Stress','TAM_unknown','CC')
-shared_cnmf_genes = shared_cnmf_genes[!names(shared_cnmf_genes) %in% remove_modules]
 # new_cnmf_names = c(
 #   cnmf.1 = 'TREM2', 
 #   cnmf.3 = 'Monocytes',

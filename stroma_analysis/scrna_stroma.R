@@ -20,10 +20,10 @@ set.seed(1234)
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/stroma/scrna'
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
-source ('../../git_repo/useful_functions.R')
-source ('../../git_repo/palettes.R')
-source ('../../git_repo/ggplot_aestetics.R')
-source ('../../git_repo/palettes.R')
+source ('../../git_repo/utils/useful_functions.R')
+source ('../../git_repo/utils/palettes.R')
+source ('../../git_repo/utils/ggplot_aestetics.R')
+source ('../../git_repo/utils/palettes.R')
 
 sample_names = c(
     'P1', # p786

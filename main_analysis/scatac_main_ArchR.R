@@ -530,110 +530,73 @@ if (run_chromVAR)
 
   # Find DAM ####
   metaGroupName = "celltype_lv1"
-  force = TRUE
-  if (!file.exists (paste0('DAM_',metaGroupName,'.rds')) | force)
-    {
-    DAM_list = getMarkerFeatures (
-      ArchRProj = archp, 
-      testMethod = "wilcoxon",
-            #useGroups = "ClusterA",
-            #bgdGroups = "Clusters1B",
-      binarize = FALSE,
-      useMatrix = "MotifMatrix",
-      groupBy = metaGroupName
-    #  useSeqnames="z"
-    )
-
-    listnames = colnames (DAM_list)
-    DAM_list = lapply (1:ncol (DAM_list), function(x) 
-      {
-      df = DAM_list[,x]  
-      df = do.call (cbind, (assays(df)))
-      colnames(df) = names (assays(DAM_list))
-      df$gene = rowData (DAM_list)$name
-      df
-      })
-    names (DAM_list) = listnames
-    saveRDS (DAM_list, paste0 ('DAM_',metaGroupName,'.rds'))    
-    } else {
-    DAM_list = readRDS (paste0('DAM_',metaGroupName,'.rds'))
-    DAM_list = lapply (DAM_list, function(x) {x$gene = gsub ('_.*','',x$gene); x})
-    DAM_list = lapply (DAM_list, function(x) {x$gene = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", x$gene); x})    
-    }
-  DAM_list = DAM_list[celltype_order]
-  # Filter by active genes as computed by correlation with gene score
-  # active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > -Inf]
-  # DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_genes,])
-
-  # Filter by genes minimally expressed from scRNA (in at least 1 celltype) ####
-  ps = log2(as.data.frame (AverageExpression (srt, 
-    features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
-    group.by = 'celltype_lv1')[[1]]) +1)
-  colnames (ps) = gsub ('-','_',colnames(ps))
-  min_exp = 0.1
-  DAM_list2 = lapply (names(DAM_list), function(x) DAM_list[[x]][DAM_list[[x]]$gene %in% rownames(ps)[ps[,x] > min_exp],])
-  #active_TFs = rownames(ps)[rowSums(ps) > 0]
-
-  #DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])
-
-  names (DAM_list2) = names (DAM_list)
-  FDR_threshold = 1e-3
-  meandiff_threshold = 0
-  top_genes = 5
-  DAM_top_list = DAM_list2[sapply (DAM_list2, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$MeanDiff) > meandiff_threshold,]) > 0)]
-  DAM_top_list = lapply (seq_along(DAM_top_list), function(x) {
-    res = DAM_top_list[[x]]
-    #res = na.omit (res)
-    res = res[res$FDR < FDR_threshold,]
-    res = res[order (res$FDR), ]
-    res = res[res$MeanDiff > meandiff_threshold,]
-    res$comparison = names(DAM_top_list)[x]
-    if (nrow(res) < top_genes) 
-      {
-      res
-      } else {
-      head (res,top_genes)
-      }
-    })
-  DAM_df = Reduce (rbind ,DAM_top_list)
-  
-
-  # # Get deviation matrix ####
   force = F
-  if (!exists ('mSE') | force) mSE = fetch_mat (archp, 'Motif')
-  mMat = assays (mSE)[[1]]
-  rownames (mMat) = rowData (mSE)$name
-  mMat_mg = mMat[DAM_df$gene, ]
-  mMat_mg = as.data.frame (t(mMat_mg))
-  mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
-  mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
-  rownames (mMat_mg) = mMat_mg[,1]
-  mMat_mg = mMat_mg[,-1]
-  mMat_mg = mMat_mg[names (DAM_list),]
-  mMat_mg = na.omit (mMat_mg)
-  #mMat_mg = mMat_mg[names(table (archp@cellColData[,metaGroupName])[table (archp@cellColData[,metaGroupName]) > 50]),]
-  DAM_hm = Heatmap (scale(mMat_mg), 
-          column_labels = colnames (mMat_mg),
+
+  top_genes = Inf
+  DAM_df = DAM (
+  ArchRProj = archp,
+  metaGroupName = metaGroupName,
+  FDR_threshold = 1e-2,
+  meandiff_threshold = 0,
+  top_genes=top_genes,
+  filter_by_scRNA=TRUE, # Make sure has same metaGroupName
+  seurat_obj = srt,
+  min_exp=.1,
+  force = force)
+
+# Save table for supplementary information
+write.csv (DAM_df, paste0('DAM_table_',metaGroupName, '.csv'))
+
+# Take only top five to show heatmap
+DAM_df <- DAM_df %>%
+  mutate(comparison = factor(comparison, levels = celltype_order)) %>%
+  group_by(comparison) %>%
+#  arrange(desc(Log2FC), .by_group = TRUE) %>%
+  slice_head(n = 5) %>%   # keep top 5 per celltype
+  ungroup() %>%
+  arrange(comparison)
+
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames(mMat) = rowData(mSE)$name
+
+mMat = mMat[unique (DAM_df$gene), ]
+
+#mMat_mg = mMat[active_DAM, ]
+mMat_mg = as.data.frame (t(mMat))
+mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
+mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
+rownames (mMat_mg) = mMat_mg[,1]
+mMat_mg = mMat_mg[,-1]
+mMat_mg = mMat_mg[celltype_order,]
+
+# Generate heatmap ####
+
+ DAM_hm = Heatmap (t(t(scale(mMat_mg))), 
+          row_labels = rownames (mMat_mg),
           column_title = paste('top',top_genes),
           clustering_distance_columns = 'euclidean',
           clustering_distance_rows = 'euclidean',
+          row_names_side = 'left',
           cluster_rows = F,
           #col = pals_heatmap[[5]],
           cluster_columns=F,#col = pals_heatmap[[1]],
           row_names_gp = gpar(fontsize = 8),
-          column_names_gp = gpar(fontsize = 7),
+          column_names_gp = gpar(fontsize = 8),
           column_names_rot = 45,
-          name = 'TF activity',
+          name = 'chromVAR',
           #rect_gp = gpar(col = "white", lwd = .5),
           border=TRUE,
-          col = palette_deviation_fun(scale(mMat_mg))
+          col = rev(palette_deviation)#,
+          #width = unit(2, "cm")
           #right_annotation = motif_ha
           )
 
 #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
-pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmaps2.pdf')), width = 8, height = 3)
+pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmaps2.pdf')), width = 10, height = 3)
 print(DAM_hm)
 dev.off()
+
 # ### Run TF correlation to identify TF modules across all cells #### 
 # if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 # mMat = assays (mSE)[[1]]
@@ -793,9 +756,12 @@ subsetArchRProject_light (ArchRProject = archp,
 #### Annotate barcode with level2  annotations in scATAC-seq ####
 tnk_ann = read.csv ('../../NKT_cells/scatac_ArchR/barcode_annotation.csv')
 mye_ann = read.csv ('../../myeloid_cells/scatac_ArchR/barcode_annotation.csv')
+mye_ann$celltype_lv2[mye_ann$celltype_lv2 == 'Mono_CXCLs'] = 'TAM_CXCLs'
 stro_ann = read.csv ('../../stroma/scatac_ArchR/barcode_annotation.csv')
 bcells_ann = read.csv ('../../B_cells/scatac_ArchR/barcode_annotation.csv')
-celltype_lv2_df = rbind (tnk_ann, mye_ann, stro_ann, bcells_ann)
+bcells_ann = bcells_ann[,c('X','celltype_lv2')]
+colnames (bcells_ann)[1] = 'barcode'
+celltype_lv2_df = rbind (tnk_ann[,2:3], mye_ann[,2:3], stro_ann[,2:3], bcells_ann)
 archp$celltype_lv2 = celltype_lv2_df$celltype_lv2[match(rownames(archp@cellColData), celltype_lv2_df$barcode)]
 archp$celltype_lv2[archp$celltype_lv1 == 'Malignant'] = 'Malignant'
 archp$celltype_lv2[archp$celltype_lv1 == 'pDCs'] = 'pDCs'
@@ -804,28 +770,6 @@ archp$celltype_lv2[archp$celltype_lv1 == 'Alveolar'] = 'Alveolar'
 # Save annotation in repo
 annotation_df = data.frame (barcode = rownames(archp@cellColData), celltype_lv1 = archp$celltype_lv1, celltype_lv2 = archp$celltype_lv2)
 write.csv (annotation_df, '../../git_repo/barcode_anntation.csv')
-
-
-
-#### Annotate barcode with level2 annotations in scRNA-seq ####
-srt_tnk = readRDS (file.path('..','..','NKT_cells','scrna','srt.rds'))
-tnk_ann = srt_tnk$celltype_lv2
-tnk_ann = tnk_ann[names(tnk_ann) %in% colnames(srt)]
-srt$celltype_lv2 = srt$celltype_lv1
-srt$celltype_lv2[match (names(tnk_ann), colnames(srt))] = tnk_ann
-
-mye_ann = read.csv ('../../myeloid_cells/scatac_ArchR/barcode_annotation.csv')
-stro_ann = read.csv ('../../stroma/scatac_ArchR/barcode_annotation.csv')
-bcells_ann = read.csv ('../../B_cells/scatac_ArchR/barcode_annotation.csv')
-celltype_lv2_df = rbind (tnk_ann, mye_ann, stro_ann, bcells_ann)
-archp$celltype_lv2 = celltype_lv2_df$celltype_lv2[match(rownames(archp@cellColData), celltype_lv2_df$barcode)]
-archp$celltype_lv2[archp$celltype_lv1 == 'Malignant'] = 'Malignant'
-archp$celltype_lv2[archp$celltype_lv1 == 'pDCs'] = 'pDCs'
-archp$celltype_lv2[archp$celltype_lv1 == 'Alveolar'] = 'Alveolar'
-
-# Save annotation in repo
-annotation_df = data.frame (barcode = rownames(archp@cellColData), celltype_lv1 = archp$celltype_lv1, celltype_lv2 = archp$celltype_lv2)
-write.csv (annotation_df, '../../git_repo/files/barcode_anntation.csv')
 
 
 # Show that enhancer linked to NR4A2 is only up in NK KLRC1 and CD8 exhausted across all cells ####
@@ -861,10 +805,10 @@ pmat_promoter_df$type = 'promoter'
 pmat_df = rbind (pmat_enhancer_df, pmat_promoter_df)
 pmat_df$type = factor (pmat_df$type, levels =c ('promoter','enhancer'))
 
-pdf (file.path ('Plots','eNR4F2_accessibility_barplot.pdf'), height=3, width=6)
+pdf (file.path ('Plots','eNR4A2_accessibility_barplot.pdf'), height=3, width=6)
 ep = ggplot (pmat_df, aes (x = celltype, y = region, fill = type)) + 
 geom_bar(stat = 'identity',position ='stack', color='grey22') + gtheme +
-scale_fill_manual (values = c(enhancer = '#C1D32FFF', promoter = 'grey'))
+scale_fill_manual (values = c(enhancer = 'darkred', promoter = 'grey'))
 #+ scale_fill_manual (values = c(palette_tnk_cells, palette_myeloid, palette_celltype_lv1))
 ep
 dev.off()
@@ -1665,5 +1609,15 @@ for (sam in names (fragments_l))
       export(fragments_l[[sam]], file.path(tmpdir, paste0(sam,'_fragments.bed')))
   }
     
+
+
+# Export barcode annotation and fragments for GEO submission ####
+if (!exists ('fragments_l')) fragments_l = getFragmentsFromProject (archp)
+library(rtracklayer)
+
+# Example GRanges object
+# Export to a BED file
+lapply (names(fragments_l), function(x) export (fragments_l[[x]], paste0(x,"_fragments.bed")))
+
 
 

@@ -1427,13 +1427,14 @@ DAM = function (
   meandiff_threshold = 0,
   top_genes=5,
   filter_by_scRNA=TRUE, # use 'srt' object
+  seurat_obj = NULL,
   min_exp=.1,
   force = FALSE) {
 
   if (!file.exists (paste0('DAM_',metaGroupName,'.rds')) | force)
     {
     DAM_list = getMarkerFeatures (
-      ArchRProj = archp, 
+      ArchRProj = ArchRProj, 
       testMethod = "wilcoxon",
             #useGroups = "ClusterA",
             #bgdGroups = "Clusters1B",
@@ -1466,38 +1467,44 @@ DAM = function (
        x
        })
   
+  DAM_list = lapply(DAM_list, function(res) {
+  res = res[res$FDR < FDR_threshold, ]
+  res = res[order(res$FDR), ]
+  res = res[res$MeanDiff > meandiff_threshold, , drop = FALSE]
+  if (nrow(res) == 0) return(NULL)
+  res
+  })
 
-  if (filter_by_scRNA)
-  {
-  #Get active genes from RNA
-  ps = log2(as.data.frame (AverageExpression (srt, 
-  features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
-  group.by = metaGroupName)[[1]]) +1)
-  ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
-  active_TFs = rownames(ps)
+if (filter_by_scRNA)
+    {
+    message ('filtering using scRNA')
+    ps = log2(as.data.frame (AverageExpression (seurat_obj, 
+    features = sapply (unique(unlist(lapply(DAM_list, function(x) x$gene))), function(x) unlist(strsplit (x, '_'))[1]), 
+    group.by = metaGroupName)[[1]]) +1)
+    colnames(ps) = gsub ('-','_',colnames(ps))
+
+    if (all(unique (ArchRProj@cellColData[,metaGroupName]) %in% names (table (seurat_obj@meta.data[,metaGroupName]))))
+    {
+    message ('filtering celltype-wise')
+    active_TFs = unique(unlist(lapply (names (DAM_list), function(x) DAM_list[[x]]$gene[DAM_list[[x]]$gene %in% rownames(ps)[ps[,x] > min_exp]])))
+    } else {
+    message ('filtering across all cells')
+    ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
+    active_TFs = rownames(ps)  
+    }
 
   #active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > 0.1]
   DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])    
   } else {
   DAM_list2 = DAM_list  
   }
-  names (DAM_list2) = names (DAM_list)
-  DAM_top_list = DAM_list2[sapply (DAM_list2, function(x) nrow (x[x$FDR < FDR_threshold & abs(x$MeanDiff) > meandiff_threshold,]) > 0)]
-  DAM_top_list = lapply (seq_along(DAM_top_list), function(x) {
-    res = DAM_top_list[[x]]
-    #res = na.omit (res)
-    res = res[res$FDR < FDR_threshold,]
-    res = res[order (res$FDR), ]
-#    res = res[order (-res$MeanDiff), ]
-    res = res[res$MeanDiff > meandiff_threshold,]
-    res$comparison = names(DAM_top_list)[x]
-    if (nrow(res) < top_genes) 
-      {
-      res
-      } else {
-      head (res,top_genes)
-      }
+  DAM_top_list = lapply (names(DAM_list2), function(x) 
+    {
+     res = DAM_list2[[x]] 
+     res$comparison = x
+    head (res, top_genes)
     })
+    DAM_top_list = DAM_top_list[unlist(sapply (  DAM_top_list, function(x) !is.null (dim(x))))]
   DAM_df = Reduce (rbind ,DAM_top_list)
 return (DAM_df)
 }  

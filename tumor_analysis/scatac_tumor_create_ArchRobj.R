@@ -102,7 +102,7 @@ archp = addIterativeLSI (ArchRProj = archp,
   useMatrix = "TileMatrix", name = "IterativeLSI",
   force=TRUE, LSIMethod=LSI_method,
   varFeatures = varfeat)
-archp = addClusters (input = archp, resolution = .7,
+archp = addClusters (input = archp, resolution = .6,
   reducedDims = "IterativeLSI", maxClusters = 100,
   force = TRUE)
 archp = addUMAP (ArchRProj = archp, 

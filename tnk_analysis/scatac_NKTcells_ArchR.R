@@ -29,7 +29,7 @@ addArchRGenome("hg38")
 archp = loadArchRProject (projdir)
 srt = readRDS (file.path ('..','scrna','srt.rds'))
 #srt_main = readRDS ('../../main/scrna/srt.rds')
-
+cell_subsets_order = c('CD4','Tregs','CD8','CD8_exhausted','FGFBP2_NK','KLRC1_NK')
 
 ## Reduce dimension and harmonize ####
 
@@ -109,8 +109,8 @@ dev.off()
 
 ### Annotate meso cells ####
 archp$celltype_lv2 = archp$Clusters_H
-archp$celltype_lv2[archp$celltype_lv2 %in% c('C7')] = 'NK_FGFBP2'
-archp$celltype_lv2[archp$celltype_lv2 %in% c('C8','C9')] = 'NK_KLRC1'
+archp$celltype_lv2[archp$celltype_lv2 %in% c('C7')] = 'FGFBP2_NK'
+archp$celltype_lv2[archp$celltype_lv2 %in% c('C8','C9')] = 'KLRC1_NK'
 archp$celltype_lv2[archp$celltype_lv2 %in% c('C16')] = 'Tregs'
 archp$celltype_lv2[archp$celltype_lv2 %in% c('C14','C20','C11','C17','C12','C13')] = 'CD4'
 archp$celltype_lv2[archp$celltype_lv2 %in% c('C1','C5','C6','C18','C15','C19','C10')] = 'CD8'
@@ -315,19 +315,34 @@ source (file.path ('..','..','git_repo','utils','chromVAR.R'))
 
 
 # Differential Accessed motifs ####
-metaGroupName = "celltype_lv2"
-top_genes=5
-force=FALSE
 
-DAM_df = DAM (
+  # Find DAM ####
+  metaGroupName = "celltype_lv2"  
+  force = F
+  top_genes = Inf
+  
+  DAM_df = DAM (
   ArchRProj = archp,
   metaGroupName = metaGroupName,
   FDR_threshold = 1e-2,
   meandiff_threshold = 0,
   top_genes=top_genes,
-  filter_by_scRNA=TRUE, # use 'srt' object. Make sure has same metaGroupName
+  filter_by_scRNA=TRUE, # Make sure has same metaGroupName
+  seurat_obj = srt,
   min_exp=.1,
   force = force)
+
+# Save table for supplementary information
+write.csv (DAM_df, paste0('DAM_table_',metaGroupName, '.csv'))
+
+# Take only top five to show heatmap
+DAM_df <- DAM_df %>%
+  mutate(comparison = factor(comparison, levels = cell_subsets_order)) %>%
+  group_by(comparison) %>%
+#  arrange(desc(Log2FC), .by_group = TRUE) %>%
+  slice_head(n = 5) %>%   # keep top 5 per celltype
+  ungroup() %>%
+  arrange(comparison)
 
 if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 mMat = assays (mSE)[[1]]
@@ -341,7 +356,7 @@ mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
 mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
 rownames (mMat_mg) = mMat_mg[,1]
 mMat_mg = mMat_mg[,-1]
-mMat_mg = mMat_mg[names (DAM_list),]
+mMat_mg = mMat_mg[cell_subsets_order,]
 
 # Generate heatmap ####
 
@@ -350,6 +365,7 @@ mMat_mg = mMat_mg[names (DAM_list),]
           column_title = paste('top',top_genes),
           clustering_distance_columns = 'euclidean',
           clustering_distance_rows = 'euclidean',
+          row_names_side = 'left',
           cluster_rows = F,
           #col = pals_heatmap[[5]],
           cluster_columns=F,#col = pals_heatmap[[1]],
@@ -364,46 +380,10 @@ mMat_mg = mMat_mg[names (DAM_list),]
           #right_annotation = motif_ha
           )
 
-# scaled_ps = t(scale(t(ps_tf)))
-# scaled_ps[is.na(scaled_ps)] = 0
-# TF_exp_selected_hm = Heatmap (scaled_ps,
-#         #right_annotation=tf_mark,
-#         #column_split = column_split_rna,
-#         cluster_rows = F, #km = 4, 
-#         name = 'expression (scaled)',
-#         column_gap = unit(.5, "mm"),
-#         row_gap = unit(.2, "mm"),
-#         clustering_distance_rows = 'euclidean',
-#         clustering_distance_columns = 'euclidean',
-#         cluster_columns=F, 
-#         col = palette_expression,
-#         row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
-#         column_names_gp = gpar(fontsize = 8),
-#           column_names_rot = 45,
-#         border=T,
-#         width = unit(2, "cm"))
-
-# TF_exp_selected_hm2 = Heatmap (ps_tf,
-#         #right_annotation=tf_mark,
-#         #column_split = column_split_rna,
-#         cluster_rows = F, #km = 4, 
-#         name = 'expression',
-#         column_gap = unit(.5, "mm"),
-#         row_gap = unit(.2, "mm"),
-#         clustering_distance_rows = 'euclidean',
-#         clustering_distance_columns = 'euclidean',
-#         cluster_columns=F, 
-#         col = palette_expression,
-#         row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
-#         column_names_gp = gpar(fontsize = 8),
-#           column_names_rot = 45,
-#         border=T,
-#         width = unit(2, "cm"))
-
-pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 3,height=4)
-draw (DAM_hm) # + TF_exp_selected_hm + TF_exp_selected_hm2)
+#DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmap.pdf')), width = 3, height = 4)
+print(DAM_hm)
 dev.off()
-   
 
 ### Co-expression of TFs across cells #### 
 
@@ -485,6 +465,7 @@ mMat_cor = cor (as.matrix(t(scale(mMat))), method = 'spearman')
 set.seed(1234)
 centers=3
 km = kmeans (mMat_cor, centers=centers)
+write.csv (patchvecs (split (names(km$cluster),km$cluster)), 'regTNK_modules.csv')
 
 pdf (file.path ('Plots','TF_modules_heatmap2.pdf'), width = 4,height=3)
 cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
@@ -663,8 +644,8 @@ pdf (file.path ('Plots','TFmodule_enrichments2.pdf'), width=4,height=3)
 bp
 dev.off()
 
-# Km 3 is enriched in CD8 exhausted peaks. Find which TF in it is mostly enriched ####
-ext_module = 3
+# Km 1 is enriched in CD8 exhausted peaks. Find which TF in it is mostly enriched ####
+ext_module = 1
 hyper_res_TF = lapply (names(km$cluster[km$cluster== ext_module]), function(mod) {
   module_peaks = rowRanges(mm)[which (rowSums (mmMat[,mod, drop=F]) > 0)]
   q = length (queryHits (findOverlaps (module_peaks, GRanges (rownames(DAP_res_sig)))))
@@ -787,6 +768,7 @@ dev.off()
 # tf_ext = res_l[['ext']]$feature[res_l[['ext']]$padj < 0.01]
 
 # Use TF in module instead
+ext_module = 1 
 tf_ext = names (km$cluster[km$cluster == ext_module])
 
 # # Take highest mean of NK KLRC1 + CD8 exhausted TFs ####
@@ -805,16 +787,18 @@ rownames (mMat_mg) = mMat_mg[,1]
 mMat_mg = mMat_mg[,-1]
 mMat_mg = t (mMat_mg)
 
-ext_vs_ctx_mean = rowMeans (mMat_mg[,c('CD8_exhausted','NK_KLRC1')])
+ext_vs_ctx_mean = rowMeans (mMat_mg[,c('CD8_exhausted','KLRC1_NK')])
 ext_vs_ctx_mean = ext_vs_ctx_mean[order (-ext_vs_ctx_mean)]
+write.csv (ext_vs_ctx_mean, 'regTNK1_module.csv')
+
 
 ps = log2(as.data.frame (AverageExpression (srt, features = rownames(mMat_mg), group.by = metaGroupName)[[1]]) +1)
 colnames (ps) = gsub ('-','_',colnames(ps))
 #ps = ps[, colnames(DAM_hm@matrix)]
-ps_tf = ps[tf_ext,c('CD8_exhausted','NK_KLRC1')]
+ps_tf = ps[tf_ext,c('CD8_exhausted','KLRC1_NK')]
 ps_tf_mean = rowMeans(ps_tf)
 top_exp_tf = head(names(ps_tf_mean)[order(-ps_tf_mean)],10)
-mMat_mg = mMat_mg[tf_ext,c('CD8_exhausted','NK_KLRC1')]
+mMat_mg = mMat_mg[tf_ext,c('CD8_exhausted','KLRC1_NK')]
 
 
 
@@ -832,7 +816,7 @@ cd8_bar = HeatmapAnnotation (mark = anno_mark(at = match(top_exp_tf,names(ext_vs
   simple_anno_size = unit(.2, "cm"))
 nk_bar = HeatmapAnnotation (
   #'' = nk_cd8_ext_cor[rownames(ps_tf), 'nk'],
-  ' ' = anno_barplot(-ps_tf[names(ext_vs_ctx_mean),c('NK_KLRC1')],
+  ' ' = anno_barplot(-ps_tf[names(ext_vs_ctx_mean),c('KLRC1_NK')],
     border=F,gp = gpar(color = "white")), 
   #which='row',
    col=list(' ' = palette_expression_cor_fun),
@@ -861,7 +845,7 @@ TF_hm = Heatmap (t(mMat_mg[names(ext_vs_ctx_mean),]),
           #right_annotation = motif_ha
           )
 
-pdf (file.path ('Plots','chromvar_rna_expression_NK_CD8_EXT_heatmaps3.pdf'), width = 5,height=2.5)
+pdf (file.path ('Plots','chromvar_rna_expression_KLRC1_NK_CD8_EX_heatmaps.pdf'), width = 5,height=2.5)
 draw (TF_hm)# + TF_exp_selected_hm2)
 dev.off()
    

@@ -495,19 +495,19 @@ dev.off()
 
 
 #### Compute P2G ####
-run_p2g_TF = TRUE
-
-    maxDist = 250000
-    archp = addPeak2GeneLinks(
-        ArchRProj = archp,
-        useMatrix = 'GeneScoreMatrix',
-        reducedDims = "IterativeLSI",
-        maxDist = maxDist
-    )
+maxDist = 250000
+archp = addPeak2GeneLinks(
+    ArchRProj = archp,
+    useMatrix = 'GeneScoreMatrix',
+    reducedDims = "IterativeLSI",
+    maxDist = maxDist
+)
   
 
 ### Show example of hub ####
 TF = 'WT1'
+celltype_order = c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Endothelial','Myeloid','T_cells','NK','B_cells','Plasma','pDCs')
+
 pdf()
 #archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
 #metaGroupName = 'fetal_group'
@@ -530,7 +530,7 @@ meso_markers <- plotBrowserTrack2 (
     #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
     #region = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub, hubs_obj$hubs_id)]),100000,100000),
     upstream = 150000,
-    downstream = 100000,
+    downstream = 150000,
     loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
     pal = palette_celltype_lv1,
     #loops = getCoAccessibility (archp, corCutOff = 0.3,
@@ -538,7 +538,7 @@ meso_markers <- plotBrowserTrack2 (
     useGroups= NULL
 )
 dev.off()
-plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('MPM_markers_coveragePlots.pdf'),addDOC=F)
+plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=6, name =paste0('PM_markers_coveragePlots.pdf'),addDOC=F)
 
 
 metaGroupName = 'celltype_lv1'

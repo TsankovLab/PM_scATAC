@@ -35,7 +35,8 @@ for (sam in samples)
   E14norm.binned[[sam]] <- normPerExpected (E14subset.binned, method="loess", stdev=TRUE)
   }
 
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR'
+projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/HiChIP'
+dir.create (file.path(projdir,'Plots'))
 
 #E14norm.binned = E14exp
 
@@ -48,16 +49,14 @@ dev.off()
 
 
 
-samples2 = c('SRR13961069','SRR13961074')
-for (sam in samples2)
-{
+samples2 = c('SRR13961072','SRR13961073')
 # Focus on chr2:156312347−156492348
 
 #chr2 156292347−156642348
-E14subset = extractRegion(hic[['SRR13961069']]$chr2chr2, c(1,2),
+E14subset = extractRegion(hic[[samples2[1]]]$chr2chr2, c(1,2),
 chr="chr2", from=156292347, to=156642348)
 
-E14subset2 = extractRegion(hic[['SRR13961074']]$chr2chr2, c(1,2),
+E14subset2 = extractRegion(hic[[samples2[2]]]$chr2chr2, c(1,2),
 chr="chr2", from=156292347, to=156642348)
 
 ## Binning of 5C interaction map

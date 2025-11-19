@@ -2053,7 +2053,7 @@ gdot_p2$data$x_axis = ifelse(gdot_p2$data$x_axis == 'NTC','control', 'guide')
 dp = DotPlot (srt, group.by = 'merged_call', features = c('SOX9'), scale =F)
 dp_data1 = dp$data[dp$data$id %in% c('NTC', 'SOX9'),]
 dp_data2 = gdot_p2$data[gdot_p2$data$y_axis %in% c('NTC', 'SOX9'),]
-pdf (file.path('Plots','guides_expression_dotplot.pdf'), height=2.5, width=2.5)
+pdf (file.path('Plots','guides_expression_dotplot2.pdf'), height=2.5, width=2.5)
 gdot_p2
 dev.off()
 

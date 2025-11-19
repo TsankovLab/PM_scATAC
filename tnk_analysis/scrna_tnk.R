@@ -42,86 +42,87 @@ sample_names = c(
 
 sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14')
 
-# # Load scRNA ####
-# if (!file.exists ('srt.rds'))
-# 	{
-# 	#srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/reproduction2/scRNA/GSE190597_srt_tumor.rds')
-# 	srt = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/srt.rds')
+# Load scRNA ####
+if (!file.exists ('srt.rds'))
+	{
+	#srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/reproduction2/scRNA/GSE190597_srt_tumor.rds')
+	srt = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/srt.rds')
 	
-# 	# Import P14
-# 	srt_p14 = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_p14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds')
-# 	srt_p14$celltype_simplified = srt_p14$celltype
-# 	srt = merge (srt, srt_p14)
-# 	srt$sampleID[srt$sampleID == 'MPM_naive_p14'] = 'P14'
-# 	srt = srt[, srt$celltype_simplified %in% c('T_cells','NK')]
-# 	srt = srt[, srt$sampleID %in% sample_names]
+	# Import P14
+	srt_p14 = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_p14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds')
+	srt_p14$celltype_simplified = srt_p14$celltype
+	srt = merge (srt, srt_p14)
+	srt$sampleID[srt$sampleID == 'MPM_naive_p14'] = 'P14'
+	srt = srt[, srt$celltype_simplified %in% c('T_cells','NK')]
+	srt = srt[, srt$sampleID %in% sample_names]
 	
-# 	srt = NormalizeData (srt)
-# 	sce = SingleCellExperiment (list(counts=srt@assays$RNA@counts, logcounts = srt@assays$RNA@data),
-# 	rowData=rownames(srt)) 
-# 	sce = modelGeneVar(sce)
-# 	# remove batchy genes
-# 	batchy_genes = c('RPL','RPS','MT-')
-# 	sce = sce[!apply(sapply(batchy_genes, function(x) grepl (x, rownames(sce))),1,any),]
-# 	nfeat = 5000
-# 	vf = getTopHVGs (sce, n=nfeat)
+	srt = NormalizeData (srt)
+	sce = SingleCellExperiment (list(counts=srt@assays$RNA@layers$counts, logcounts = srt@assays$RNA@layers$data),
+	rowData=rownames(srt)) 
+	rownames (sce) = rownames(srt)
+	sce = modelGeneVar(sce)
+	# remove batchy genes
+	batchy_genes = c('RPL','RPS','MT-')
+	sce = sce[!apply(sapply(batchy_genes, function(x) grepl (x, rownames(sce))),1,any),]
+	nfeat = 5000
+	vf = getTopHVGs (sce, n=nfeat)
 	
-# 	# remove ambient RNA genes
-# 	vf = vf[!grepl ('SFTP',vf)]
-# 	vf = vf[!grepl ('HB',vf)]
-# 	VariableFeatures (srt) = vf
-# 	srt <- ScaleData (srt)
-# 	srt <- RunPCA (srt)
+	# remove ambient RNA genes
+	vf = vf[!grepl ('SFTP',vf)]
+	vf = vf[!grepl ('HB',vf)]
+	VariableFeatures (srt) = vf
+	srt <- ScaleData (srt)
+	srt <- RunPCA (srt)
 	
-# 	batch = 'sampleID'
-# 	reductionSave = 'harmony'
-# 	srt = srt %>% 
-# 	RunHarmony (batch, plot_convergence = FALSE, reduction = 'pca', reduction.save= reductionSave) %>%
-# 	RunUMAP (reduction = reductionSave, dims = 1:15)
+	batch = 'sampleID'
+	reductionSave = 'harmony'
+	srt = srt %>% 
+	RunHarmony (batch, plot_convergence = FALSE, reduction = 'pca', reduction.save= reductionSave) %>%
+	RunUMAP (reduction = reductionSave, dims = 1:15)
 
-# 	srt = FindNeighbors (object = srt, reduction = reductionSave, dims = 1:15, k.param = 30,
-#                               verbose = TRUE)
-# 	srt = FindClusters (srt, resolution = 1, verbose = T, n.start = 100)
+	srt = FindNeighbors (object = srt, reduction = reductionSave, dims = 1:15, k.param = 30,
+                              verbose = TRUE)
+	srt = FindClusters (srt, resolution = 1.2, verbose = T, n.start = 100)
 
-# 	reductionName = 'umap'
-# 	fps = fp (srt, gene = c('CD3D','KLRC1','FGFBP2','CD8A','CD4','FOXP3','CXCL13','CTLA4','PDCD1','CXCR5','MKI67'))
-# 	dp = wrap_plots (DimPlot (srt, group.by = 'sampleID'), DimPlot (srt, group.by = 'seurat_clusters', label=T),
-# 		DimPlot (srt, group.by = 'celltype'))
-# 	pdf (file.path('Plots','markers_celltypes_umap.pdf'), width=12)
-# 	wrap_plots (fps)
-# 	dev.off()
-# 	pdf (file.path('Plots','celltypes_umap.pdf'),width=15)
-# 	wrap_plots (dp)
-# 	dev.off()
+	reductionName = 'umap'
+	fps = fp (srt, gene = c('CD3D','KLRC1','FGFBP2','CD8A','CD4','FOXP3','HAVCR2','TOX','CXCL13','CTLA4','PDCD1','CXCR5','MKI67'))
+	dp = wrap_plots (DimPlot (srt, group.by = 'sampleID'), DimPlot (srt, group.by = 'seurat_clusters', label=T),
+		DimPlot (srt, group.by = 'celltype_lv2'))
+	pdf (file.path('Plots','markers_celltypes_umap.pdf'), width=12)
+	wrap_plots (fps)
+	dev.off()
+	pdf (file.path('Plots','celltypes_umap.pdf'),width=15)
+	wrap_plots (dp)
+	dev.off()
 	
 
-# metaGroupName = 'seurat_clusters'
-# if (file.exists ('DEG.rds'))
-# 	{
-# 	DefaultAssay(srt) = 'RNA'
-# 	logfcThreshold=.5
-# 	pvalAdjTrheshold = .05
-# 	degClusters = FindAllMarkers (srt, max.cells.per.ident = 1000, min.pct = .1, logfc.threshold = logfcThreshold, verbose = T)
-# 	saveRDS (degClusters, 'DEG.rds')
-# 	write.csv (degClusters[degClusters$p_val_adj < pvalAdjTrheshold,], 'DEG.csv')
-# 	} else {
-# 	degClusters = readRDS ('DEG.rds')		
-# 	}
+metaGroupName = 'seurat_clusters'
+if (file.exists ('DEG.rds'))
+	{
+	DefaultAssay(srt) = 'RNA'
+	logfcThreshold=.5
+	pvalAdjTrheshold = .05
+	degClusters = FindAllMarkers (srt, max.cells.per.ident = 1000, min.pct = .1, logfc.threshold = logfcThreshold, verbose = T)
+	saveRDS (degClusters, 'DEG.rds')
+	write.csv (degClusters[degClusters$p_val_adj < pvalAdjTrheshold,], 'DEG.csv')
+	} else {
+	degClusters = readRDS ('DEG.rds')		
+	}
 
-# message ('Generate Heatmap of top genes') # does not produce image when there are too many genes to plot
-# degClusters = degClusters[degClusters$p_val_adj < pvalAdjTrheshold, ]
+message ('Generate Heatmap of top genes') # does not produce image when there are too many genes to plot
+degClusters = degClusters[degClusters$p_val_adj < pvalAdjTrheshold, ]
 
-# top_genes = 5
-# 	top_deg = degClusters[degClusters$avg_log2FC > 0,]
-# 	top_deg = degClusters %>% group_by (cluster) %>% top_n (top_genes, avg_log2FC)
-# 	#top_deg = top_deg %>% group_by (cluster) %>% top_n (top_genes, -p_val_adj)
+top_genes = 5
+	top_deg = degClusters[degClusters$avg_log2FC > 0,]
+	top_deg = degClusters %>% group_by (cluster) %>% top_n (top_genes, avg_log2FC)
+	#top_deg = top_deg %>% group_by (cluster) %>% top_n (top_genes, -p_val_adj)
 	
-# # if (!is.na(is.integer(as.integer(srt@meta.data[,metaGroupName][1]))))
-# #  	{
-# #  	srt@meta.data[,metaGroupName] = factor (srt@meta.data[,metaGroupName], levels =unique(srt@meta.data[,metaGroupName])[order(as.numeric(as.character(unique(srt@meta.data[,metaGroupName]))))])
-# #  	} else {
-# # 	srt@meta.data[,metaGroupName] = factor (srt@meta.data[,metaGroupName], levels = unique (srt@meta.data[,metaGroupName]))
-# #  	}
+# if (!is.na(is.integer(as.integer(srt@meta.data[,metaGroupName][1]))))
+#  	{
+#  	srt@meta.data[,metaGroupName] = factor (srt@meta.data[,metaGroupName], levels =unique(srt@meta.data[,metaGroupName])[order(as.numeric(as.character(unique(srt@meta.data[,metaGroupName]))))])
+#  	} else {
+# 	srt@meta.data[,metaGroupName] = factor (srt@meta.data[,metaGroupName], levels = unique (srt@meta.data[,metaGroupName]))
+#  	}
 
 
 # #top_deg = top_deg[order (-top_deg$avg_log2FC),]
@@ -172,14 +173,14 @@ sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14')
 
 
 # # Annotate cells ####
-# srt$celltype2 = 0
-# srt$celltype2[srt$RNA_snn_res.0.8 == 11] = 'Tregs'
-# srt$celltype2[srt$RNA_snn_res.0.8 == 12] = 'Proliferating'
-# srt$celltype2[srt$RNA_snn_res.0.8 == 8] = 'NK_KLRC1'
-# srt$celltype2[srt$RNA_snn_res.0.8 %in% c(2,9,7,6)] = 'CD8'
-# srt$celltype2[srt$RNA_snn_res.1 %in% c(6)] = 'CD8_exhausted'
-# srt$celltype2[srt$RNA_snn_res.0.8 %in% c(0,3,5,1,10)] = 'CD4'
-# srt$celltype2[srt$RNA_snn_res.0.8 %in% c(4)] = 'NK_FGFBP2'
+srt$celltype_lv2 = 0
+srt$celltype_lv2[srt$seurat_clusters == 8] = 'CD8_exhausted'
+srt$celltype_lv2[srt$seurat_clusters == 14] = 'Proliferating'
+srt$celltype_lv2[srt$seurat_clusters == 6] = 'KLRC1_NK'
+srt$celltype_lv2[srt$seurat_clusters %in% c(11,13)] = 'FGFBP2_NK'
+srt$celltype_lv2[srt$seurat_clusters %in% c(7,4,15,2,5)] = 'CD8'
+srt$celltype_lv2[srt$seurat_clusters %in% c(12)] = 'Tregs'
+srt$celltype_lv2[srt$seurat_clusters %in% c(0,1,2,3,9,10)] = 'CD4'
 
 # dp = DimPlot(srt, group.by = 'celltype2')
 # pdf (file.path('Plots',paste0('celltype_new_dimplot.pdf')))

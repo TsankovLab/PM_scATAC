@@ -48,6 +48,10 @@ sarc_order = rbind (data.frame (sampleID = 'normal_pleura', x = -1),sarc_order)
 # Subset ArchR project to remove normal sample ####
 archp_NN = archp[archp$Sample2 != 'normal1']
 
+archp_NN = addClusters (input = archp_NN, resolution = .6,
+  reducedDims = "IterativeLSI", maxClusters = 100,
+  force = TRUE)
+
 # Plot UMAP of samples and clusters ####
 metaGroupNames = c('Sample2','Clusters')
 pdf()
@@ -71,6 +75,7 @@ p <- plotEmbedding(
     ArchRProj = archp_NN, 
     colorBy = "cellColData", 
     name = metaGroupNames[2], 
+    labelMeans=FALSE,
     embedding = "UMAP"#,
 #    pal = palette_expression,
 #    imputeWeights = getImputeWeights(archp)
@@ -202,19 +207,86 @@ Clusters_sample = paste0(archp_NN$Clusters, '_',archp_NN$Sample2)
 remove_low_clusters = !Clusters_sample %in% names(table (Clusters_sample)[table (Clusters_sample) < 10])
 Clusters_sample = Clusters_sample[remove_low_clusters]
 archp_NN = archp_NN[remove_low_clusters]
-archp2 = archp # store whole archr object in secondary object to run script only for the subset
-archp = archp_NN
-metaGroupName = "Clusters_sample"
-force=TRUE
-source (file.path('..','..','git_repo','utils','DAM.R'))
-archp = archp2
+# archp2 = archp # store whole archr object in secondary object to run script only for the subset
+# archp = archp_NN
 
-ha = rowAnnotation (foo = anno_mark(at = match(head(DAM_df$gene[DAM_df$comparison=='C12_P11'],top_genes),colnames(mMat_mg)), 
-    labels = head(DAM_df$gene[DAM_df$comparison=='C12_P11'],top_genes), labels_gp = gpar(fontsize = 8, fontface = 'italic')))
+srt_NN$Clusters_sample = srt_NN$sampleID
+
+# Find DAM ####
+metaGroupName = "Clusters_sample"
+top_genes = Inf
+force=TRUE
+
+  top_genes = Inf
+  DAM_df = DAM (
+  ArchRProj = archp_NN,
+  metaGroupName = metaGroupName,
+  FDR_threshold = 1e-2,
+  meandiff_threshold = 0,
+  top_genes=top_genes,
+  filter_by_scRNA=TRUE, # Make sure has same metaGroupName
+  seurat_obj = srt_NN,
+  min_exp=.1,
+  force = force)
+
+# Save table for supplementary information
+write.csv (DAM_df, paste0('DAM_table_',metaGroupName, '.csv'))
+
+top_genes = 3
+
+DAM_df <- DAM_df %>%
+group_by (comparison) %>%
+slice_head(n = top_genes) %>%   # keep top 5 per celltype
+ungroup() %>%
+  mutate(
+    # extract second term after "_" e.g. "P12"
+    second_term = str_extract(comparison, "(?<=_)P\\d+"),
+    # extract numeric part (12)
+    second_num  = as.numeric(str_extract(second_term, "\\d+"))
+  ) %>%
+  arrange(second_num) %>%
+  select(-second_term, -second_num)
+
+
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames(mMat) = rowData(mSE)$name
+mMat = mMat[unique (DAM_df$gene), rownames(archp_NN@cellColData)]
+#mMat_mg = mMat[active_DAM, ]
+mMat_mg = as.data.frame (t(mMat))
+mMat_mg$metaGroup = as.character (archp_NN@cellColData[,metaGroupName])
+mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
+rownames (mMat_mg) = mMat_mg[,1]
+mMat_mg = mMat_mg[,-1]
+library(stringr)
+order_p <- as.numeric(str_extract(rownames(mMat_mg), "(?<=_P)\\d+"))
+mMat_mg <- mMat_mg[order(order_p), ]
+#mMat_mg = mMat_mg[celltype_order,]
+
+#tf_labels = c(head(DAM_df$gene[DAM_df$comparison=='C1_P11'],top_genes))
+ha = rowAnnotation (foo = anno_mark(at = match(head(DAM_df$gene[DAM_df$comparison=='C1_P11'],top_genes),colnames(mMat_mg)), 
+    labels = head(DAM_df$gene[DAM_df$comparison=='C1_P11'],top_genes), labels_gp = gpar(fontsize = 8, fontface = 'italic')))
 ha2 = HeatmapAnnotation (sample = sapply (rownames(mMat_mg), function(x) unlist(strsplit(x,'_'))[2]), col= list(sample = palette_sample))
+
+library(stringr)
+
+# extract second term: "P11", "P23", etc.
+split_raw <- sapply(rownames(mMat_mg), function(x) unlist(strsplit(x,"_"))[2])
+
+# extract numeric part
+p_nums <- as.numeric(str_extract(split_raw, "\\d+"))
+
+# get unique P groups in the correct numeric order
+unique_levels <- unique(split_raw[order(p_nums)])
+
+# make factor with ordered unique levels
+split_factor <- factor(split_raw, levels = unique_levels)
+
+
 DAM_hm = Heatmap (t(scale(mMat_mg)), 
           top_annotation = ha2,
-          column_split = sapply (rownames(mMat_mg), function(x) unlist(strsplit(x,'_'))[2]),
+          #column_split = sapply (rownames(mMat_mg), function(x) unlist(strsplit(x,'_'))[2]),
+          column_split = split_factor,
           right_annotation = ha,
           row_labels = colnames (mMat_mg),
           column_title = paste('top',top_genes),

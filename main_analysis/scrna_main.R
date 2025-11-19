@@ -60,16 +60,16 @@ sample_names = c(
 
 # Load RNA
 srt = readRDS ('../scrna/srt.rds')
-srt_p14 = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/P14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds')
-srt_p14 = subset(x = srt_p14, features = rownames(srt))
-srt2 = SplitObject (srt, split.by = 'sampleID')
-srt_p14$celltype_lv1 = srt_p14$celltype
-srt_p14$celltype_lv1[srt_p14$celltype_lv1 == 'LEC'] = 'Endothelial'
-srt_p14$celltype_lv1[srt_p14$celltype_lv1 == 'Smooth Muscle'] = 'SmoothMuscle'
-srt_p14 = srt_p14[,srt_p14$celltype_lv1 != 'NA']
-srt_p14 = srt_p14[,srt_p14$celltype_lv1 != 'doublets']
-srt = merge (x = srt_p14, y= srt2)
-srt[["RNA"]] = JoinLayers(srt[["RNA"]])
+# srt_p14 = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/P14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds')
+# srt_p14 = subset(x = srt_p14, features = rownames(srt))
+# srt2 = SplitObject (srt, split.by = 'sampleID')
+# srt_p14$celltype_lv1 = srt_p14$celltype
+# srt_p14$celltype_lv1[srt_p14$celltype_lv1 == 'LEC'] = 'Endothelial'
+# srt_p14$celltype_lv1[srt_p14$celltype_lv1 == 'Smooth Muscle'] = 'SmoothMuscle'
+# srt_p14 = srt_p14[,srt_p14$celltype_lv1 != 'NA']
+# srt_p14 = srt_p14[,srt_p14$celltype_lv1 != 'doublets']
+# srt = merge (x = srt_p14, y= srt2)
+# srt[["RNA"]] = JoinLayers(srt[["RNA"]])
 
 
 
@@ -93,7 +93,37 @@ source (file.path(scrna_pipeline_dir,'harmony_and_clustering.R'))
 
 srt_tnk = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/srt.rds')
 srt_stroma = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/stroma/scrna/srt.rds')
+srt_mye = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/srt.rds')
 srt_tumor = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/srt.rds')
+srt_B = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/B_cells/scrna/srt.rds')
+
+
+srt$celltype_lv2 = srt$celltype_lv1
+srt$celltype_lv2[match(colnames(srt_tnk), colnames(srt))] = srt_tnk$celltype_lv2
+srt$celltype_lv2[match(colnames(srt_stroma), colnames(srt))] = srt_stroma$celltype_lv2
+srt$celltype_lv2[match(colnames(srt_mye), colnames(srt))] = srt_mye$celltype_lv2
+srt$celltype_lv2[match(colnames(srt_B), colnames(srt))] = srt_B$celltype_lv2
+srt$celltype_lv2[match(colnames(srt_tumor), colnames(srt))] = 'Malignant'
+
+table (srt$celltype_lv1, useNA = 'always')
+table (srt$celltype_lv2, useNA = 'always')
+
+# Add normal samples but add tag to avoid using them in compartment subsets except for tumor analysis
+srt_normal = srt_tumor[,srt_tumor$sampleID %in% c('HU37','HU62')]
+srt_light = merge (x = srt_normal, y= srt)
+srt_light[["RNA"]] = JoinLayers(srt_light[["RNA"]])
+
+srt_light$celltype_lv1[is.na(srt_light$celltype_lv1)] = 'normal_mesothelium'
+srt_light$celltype_lv2[is.na(srt_light$celltype_lv2)] = 'normal_mesothelium'
+table (srt_light$celltype_lv1, useNA = 'always')
+table (srt_light$celltype_lv2, useNA = 'always')
+
+
+coldata_to_keep = c('sampleID','celltype_lv1','celltype_lv2')
+srt_light@meta.data = srt_light@meta.data[,coldata_to_keep]
+
+saveRDS (srt_light,'srt_light.rds')
+
 
 table (colnames (srt_tnk) %in% colnames (srt),srt_tnk$sampleID)
 table (colnames (srt_tumor[,!srt_tumor$sampleID %in% c('HU37','HU62')]) %in% colnames (srt))

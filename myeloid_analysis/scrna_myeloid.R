@@ -236,7 +236,7 @@ srt = ModScoreCor (
     cor_threshold = NULL,
     pos_threshold = NULL, # threshold for fetal_pval2
     listName = 'shared_cnmf', outdir = NULL)
-
+srt$celltype_lv3 = srt$shared_cnmf_r_max
 #remove_modules = c('CC','Stress','TAM_unknown') # remove monocyres cDC and CC modules. Consider re-inculding CC 
 #shared_cnmf_genes = shared_cnmf_genes[!names(shared_cnmf_genes) %in% remove_modules]
 # Plot cnmfs 

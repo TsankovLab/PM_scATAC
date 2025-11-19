@@ -215,10 +215,12 @@ source (file.path ('..','..','git_repo','utils','chromVAR.R'))
 shared_cnmf = readRDS (file.path('..','scrna','shared_cnmf_myeloid.rds'))
 shared_cnmf = lapply (shared_cnmf, function(x) x[x %in% getFeatures (archp)])
 shared_cnmf = lapply (shared_cnmf, function(x) head (x, 50))
+write.csv (patchvecs (shared_cnmf), 'cnmf_consensus_myeloid_modules.csv')
+
 remove_modules = c('Stress','TAM_unknown','CC')
 shared_cnmf = shared_cnmf[!names(shared_cnmf) %in% remove_modules]
 
-force = F
+force = T
 if (!all (names (shared_cnmf) %in% colnames (archp@cellColData)) | force)
   {
   archp@cellColData = archp@cellColData[,!colnames(archp@cellColData) %in% names(shared_cnmf)]
@@ -294,17 +296,18 @@ dev.off()
 # Re-Annotate based on cnmf clustering ####
 all (names(km_cnmf$cluster) == rownames(archp@cellColData))
 archp$cnmf_cluster = paste0('cnmf_cluster_',km_cnmf$cluster)
-archp$celltype_lv2 = archp$cnmf_cluster
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_1'] = 'Mono_CD16'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_2'] = 'TAM_MARCO'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_3'] = 'Mono_CD14'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_4'] = 'TAM_CXCLs'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_5'] = 'TAM_TREM2'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_6'] = 'TAM_interstitial'
-archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_7'] = 'cDCs'
+archp$celltype_lv3 = archp$cnmf_cluster
+archp$celltype_lv3[archp$celltype_lv3 == 'cnmf_cluster_1'] = 'Mono_CD16'
+archp$celltype_lv3[archp$celltype_lv3 == 'cnmf_cluster_2'] = 'TAM_MARCO'
+archp$celltype_lv3[archp$celltype_lv3 == 'cnmf_cluster_3'] = 'Mono_CD14'
+archp$celltype_lv3[archp$celltype_lv3 == 'cnmf_cluster_4'] = 'TAM_CXCLs'
+archp$celltype_lv3[archp$celltype_lv3 == 'cnmf_cluster_5'] = 'TAM_TREM2'
+archp$celltype_lv3[archp$celltype_lv3 == 'cnmf_cluster_6'] = 'TAM_interstitial'
+archp$celltype_lv3[archp$celltype_lv3 == 'cnmf_cluster_7'] = 'cDCs'
+archp$celltype_lv3[archp$celltype_lv2 == 'cDCs'] = 'cDCs'
 #archp$celltype_lv2[archp$celltype_lv2 == 'cnmf_cluster_6'] = 'TREM2'
 
-write.csv (data.frame (barcode = rownames(archp@cellColData), celltype_lv2 = archp$celltype_lv2), 'barcode_annotation.csv')
+write.csv (data.frame (barcode = rownames(archp@cellColData), celltype_lv2 = archp$celltype_lv3), 'barcode_annotation.csv')
 # Integrate MACs with myeloid annotation
 #archp$celltype2[match(rownames(archp_MAC@cellColData), rownames(archp@cellColData))] = archp_MAC$celltype_lv2
 
@@ -318,29 +321,39 @@ pdf (file.path('Plots','celltype_umap_TAM_annotated_umap2.pdf'),5,5)
 print (umap_p5)
 dev.off()
 
-force=T
-top_genes=5
-metaGroupName='celltype_lv2'
-DAM_df = DAM (
+  # Find DAM ####
+  metaGroupName = "celltype_lv3"
+  force = F
+  top_genes = Inf
+  
+  DAM_df = DAM (
   ArchRProj = archp,
   metaGroupName = metaGroupName,
   FDR_threshold = 1e-2,
   meandiff_threshold = 0,
   top_genes=top_genes,
-  filter_by_scRNA=TRUE, # use 'srt' object. Make sure has same metaGroupName
+  filter_by_scRNA=TRUE, # Make sure has same metaGroupName
+  seurat_obj = srt,
   min_exp=.1,
   force = force)
 
+# Save table for supplementary information
+write.csv (DAM_df, paste0('DAM_table_',metaGroupName, '.csv'))
 
-# Order the dataframe by that factor
-DAM_df$comparison <- factor(DAM_df$comparison, levels = cell_subsets_order)
-DAM_df <- DAM_df[order(DAM_df$comparison), ]
+# Take only top five to show heatmap
+DAM_df <- DAM_df %>%
+  mutate(comparison = factor(comparison, levels = cell_subsets_order)) %>%
+  group_by(comparison) %>%
+#  arrange(desc(Log2FC), .by_group = TRUE) %>%
+  slice_head(n = 5) %>%   # keep top 5 per celltype
+  ungroup() %>%
+  arrange(comparison)
 
 if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 mMat = assays (mSE)[[1]]
 rownames(mMat) = rowData(mSE)$name
 
-mMat = mMat[unique(DAM_df$gene), ]
+mMat = mMat[unique (DAM_df$gene), ]
 
 #mMat_mg = mMat[active_DAM, ]
 mMat_mg = as.data.frame (t(mMat))
@@ -348,17 +361,19 @@ mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
 mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
 rownames (mMat_mg) = mMat_mg[,1]
 mMat_mg = mMat_mg[,-1]
-mMat_mg = mMat_mg[levels (DAM_df$comparison),unique(DAM_df$gene)]
+mMat_mg = mMat_mg[cell_subsets_order,]
 
 # Generate heatmap ####
+
  DAM_hm = Heatmap (t(scale(mMat_mg)), 
           row_labels = colnames (mMat_mg),
           column_title = paste('top',top_genes),
           clustering_distance_columns = 'euclidean',
           clustering_distance_rows = 'euclidean',
+          row_names_side = 'left',
           cluster_rows = F,
           #col = pals_heatmap[[5]],
-          cluster_columns = F,#col = pals_heatmap[[1]],
+          cluster_columns=F,#col = pals_heatmap[[1]],
           row_names_gp = gpar(fontsize = 8),
           column_names_gp = gpar(fontsize = 8),
           column_names_rot = 45,
@@ -370,11 +385,11 @@ mMat_mg = mMat_mg[levels (DAM_df$comparison),unique(DAM_df$gene)]
           #right_annotation = motif_ha
           )
 
-
-pdf (file.path ('Plots','DAM_heatmaps.pdf'), width = 3,height=4)
-draw (DAM_hm) # + TF_exp_selected_hm + TF_exp_selected_hm2)
+#DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmap.pdf')), width = 3, height = 4)
+print(DAM_hm)
 dev.off()
-   
+
 
 # #### Identify TF regulators correlated to each scRNA cnmf #####
 # if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
@@ -509,7 +524,7 @@ set.seed(123)
 centers=2
 km = kmeans (mMat_cor, centers=centers)
 if (!file.exists ('TF_activity_modules.rds')) saveRDS (km, 'TF_activity_modules.rds')
-
+write.csv (patchvecs (split (names(km$cluster),km$cluster)), 'regMye_modules.csv')
 
 genes_highlight = c(
 'IKZF1

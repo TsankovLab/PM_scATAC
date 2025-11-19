@@ -40,8 +40,8 @@ echo $MODEL_H5
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
 motif_file=motif_footprints.txt
 
-chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
-celltype=NK_KLRC1
+chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet
+celltype=non_inflamed
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
 OUTPUT_PREFIX=${chromBPdir}/${celltype}/footprints
 

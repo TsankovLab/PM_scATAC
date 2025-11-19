@@ -71,9 +71,10 @@ srt = srt[,srt$sampleID %in% sample_names]
 srt = srt[, srt$sampleID %in% names (table (srt$sampleID)[table (srt$sampleID) > 20])]
 
 srt = NormalizeData (srt)
-sce = SingleCellExperiment (list(counts=srt@assays$RNA@counts, logcounts = srt@assays$RNA@data),
+sce = SingleCellExperiment (list(counts=srt@assays$RNA@layers$counts, logcounts = srt@assays$RNA@layers$data),
 rowData=rownames(srt)) 
-sce = modelGeneVar(sce)
+rownames(sce) = rownames(srt)
+sce = modelGeneVar (sce)
 # remove batchy genes
 batchy_genes = c('RPL','RPS','MT-')
 sce = sce[!apply(sapply(batchy_genes, function(x) grepl (x, rownames(sce))),1,any),]

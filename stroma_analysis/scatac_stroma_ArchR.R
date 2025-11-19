@@ -31,7 +31,7 @@ projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/s
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 archp = loadArchRProject (projdir)
-
+cell_subsets_order = c('Mesothelium','Fibroblasts','SmoothMuscle','Endothelial','LEC')
 
 # Load RNA
 srt = readRDS ('../scrna/srt.rds')
@@ -173,44 +173,60 @@ source (file.path ('..','..','git_repo','utils','chromVAR.R'))
 #     corGSM_MM = readRDS ('TF_activators_genescore.rds') 
 #   }
 
-# Run genescore DAG ####
-metaGroupName = "celltype_lv2"
-force = TRUE
-if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path('..','..','git_repo','utils','DAG.R'))
+  # Find DAM ####
+  metaGroupName = "celltype_lv2"  
+  force = T
+  top_genes = Inf
+  
+  DAM_df = DAM (
+  ArchRProj = archp,
+  metaGroupName = metaGroupName,
+  FDR_threshold = 1e-2,
+  meandiff_threshold = 0,
+  top_genes=top_genes,
+  filter_by_scRNA=TRUE, # Make sure has same metaGroupName
+  seurat_obj = srt,
+  min_exp=.1,
+  force = force)
 
-# Differential Accessed motifs ####
-metaGroupName = "celltype_lv2"
-force=FALSE
-source (file.path('..','..','git_repo','utils','DAM.R'))
+# Save table for supplementary information
+write.csv (DAM_df, paste0('DAM_table_',metaGroupName, '.csv'))
 
+# Take only top five to show heatmap
+DAM_df <- DAM_df %>%
+  mutate(comparison = factor(comparison, levels = cell_subsets_order)) %>%
+  group_by(comparison) %>%
+#  arrange(desc(Log2FC), .by_group = TRUE) %>%
+  slice_head(n = 5) %>%   # keep top 5 per celltype
+  ungroup() %>%
+  arrange(comparison)
+
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
 mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat_mg = mMat[active_DAM, ]
-mMat_mg = as.data.frame (t(mMat_mg))
+rownames(mMat) = rowData(mSE)$name
+
+mMat = mMat[unique (DAM_df$gene), ]
+
+#mMat_mg = mMat[active_DAM, ]
+mMat_mg = as.data.frame (t(mMat))
 mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
 mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
 rownames (mMat_mg) = mMat_mg[,1]
 mMat_mg = mMat_mg[,-1]
-mMat_mg = mMat_mg[names (DAM_list),]
+mMat_mg = mMat_mg[cell_subsets_order,]
 
-# Generate RNA pseudobulk of matching cell types ####
-metaGroupName = 'celltype_lv2'
-#selected_TF = c(rownames(DAM_hm@matrix), 'NR4A3','NR4A2','NR4A1')
-ps = log2(as.data.frame (AverageExpression (srt, features = active_DAM, group.by = metaGroupName)[[1]]) +1)
-colnames (ps) = gsub ('-','_',colnames(ps))
-ps = ps[, colnames(DAM_hm@matrix)]
-ps_tf = ps[active_DAM,]
+# Generate heatmap ####
 
-  
-DAM_hm = Heatmap (t(scale(mMat_mg)), 
+ DAM_hm = Heatmap (t(scale(mMat_mg)), 
           row_labels = colnames (mMat_mg),
           column_title = paste('top',top_genes),
           clustering_distance_columns = 'euclidean',
           clustering_distance_rows = 'euclidean',
+          row_names_side = 'left',
           cluster_rows = F,
           #col = pals_heatmap[[5]],
           cluster_columns=F,#col = pals_heatmap[[1]],
-          row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
+          row_names_gp = gpar(fontsize = 8),
           column_names_gp = gpar(fontsize = 8),
           column_names_rot = 45,
           name = 'chromVAR',
@@ -221,46 +237,11 @@ DAM_hm = Heatmap (t(scale(mMat_mg)),
           #right_annotation = motif_ha
           )
 
-scaled_ps = t(scale(t(ps_tf)))
-scaled_ps[is.na(scaled_ps)] = 0
-TF_exp_selected_hm = Heatmap (scaled_ps,
-        #right_annotation=tf_mark,
-        #column_split = column_split_rna,
-        cluster_rows = F, #km = 4, 
-        name = 'expression (scaled)',
-        column_gap = unit(.5, "mm"),
-        row_gap = unit(.2, "mm"),
-        clustering_distance_rows = 'euclidean',
-        clustering_distance_columns = 'euclidean',
-        cluster_columns=F, 
-        col = palette_expression,
-        row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
-        column_names_gp = gpar(fontsize = 8),
-          column_names_rot = 45,
-        border=T,
-        width = unit(2, "cm"))
-
-TF_exp_selected_hm2 = Heatmap (ps_tf,
-        #right_annotation=tf_mark,
-        #column_split = column_split_rna,
-        cluster_rows = F, #km = 4, 
-        name = 'expression',
-        column_gap = unit(.5, "mm"),
-        row_gap = unit(.2, "mm"),
-        clustering_distance_rows = 'euclidean',
-        clustering_distance_columns = 'euclidean',
-        cluster_columns=F, 
-        col = palette_expression,
-        row_names_gp = gpar(fontsize = 8, fontface = 'italic'),
-        column_names_gp = gpar(fontsize = 8),
-          column_names_rot = 45,
-        border=T,
-        width = unit(2, "cm"))
-
-pdf (file.path ('Plots','DAM_with_rna_expression_heatmaps.pdf'), width = 3,height=4)
-draw (DAM_hm )#+ TF_exp_selected_hm + TF_exp_selected_hm2)
+#DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmap.pdf')), width = 2.5, height = 4)
+print(DAM_hm)
 dev.off()
-   
+
 
 ### Co-expression of TFs across cells #### 
 
