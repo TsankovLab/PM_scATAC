@@ -576,6 +576,7 @@ dev.off()
 
 # Take only significant regions ####
 DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
+write.csv (DAP_res_sig, 'DAP_CD8_Ex.csv')
 saveRDS (GRanges(rownames(DAP_res_sig)), 'T_cell_exhaustion_peaks.rds')
 
 
