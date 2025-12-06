@@ -43,14 +43,30 @@ srt = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scata
 #write.table (rownames (archp@cellColData), 'multiome_tumor_cells_scatac.txt')
 #write.table (rownames (srt@meta.data), 'multiome_tumor_cells_scrna.txt')
 barcode_scatac = read.table ('multiome_tumor_cells_scatac.txt')[[1]]
+barcode_scatac2 = gsub ('fragments.tsv.gz#','',barcode_scatac)
 barcode_scrna = read.table ('multiome_tumor_cells_scrna.txt')[[1]]
+archp = archp[barcode_scatac]
+all (rownames(archp@cellColData) == barcode_scatac)
+archp@cellColData = cbind (archp@cellColData, srt@meta.data[match(barcode_scatac2,colnames(srt)),])
+
 
 # Subset objects
 archp = archp[rownames(archp@cellColData) %in% barcode_scatac]
 srt = srt [, colnames (srt) %in% barcode_scrna]
 
+pdf (file.path ('Plots','celltypes_umap.pdf'))
+DimPlot (srt, group.by = 'celltype_simplified')
+ plotEmbedding (
+    ArchRProj = archp, 
+    colorBy = "cellColData", 
+    name = 'celltype_simplified', 
+    embedding = "UMAP_H",
+    #pal = palette_expression,
+    imputeWeights = getImputeWeights(archp))
+dev.off()
+
 shared_cnmf_genes = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/shared_cnmf_myeloid.rds')
-remove_modules = c('Stress','CC','TAM_unkown','TAM_CXCLs')
+remove_modules = c('Stress','CC','TAM_unknown','TAM_CXCLs')
 shared_cnmf_genes = shared_cnmf_genes[!names (shared_cnmf_genes) %in% remove_modules]
 
 #### Run SCENIC ####
@@ -136,27 +152,28 @@ srt = ModScoreCor (
     pos_threshold = NULL, # threshold for fetal_pval2
     listName = 'shared_cnmf', outdir = NULL)
 
+archp@cellColData = cbind (archp@cellColData, srt@meta.data[match(barcode_scatac2,colnames(srt)),])
 
 #remove_modules = c('cnmf.3','cnmf.6','cnmf.7','cnmf.5') # remove monocyres cDC and CC modules. Consider re-inculding CC 
 #shared_cnmf_MAC = shared_cnmf_atac[!names(shared_cnmf_atac) %in% remove_modules]
 
-force = T
-if (!all (names (shared_cnmf_genes) %in% colnames (archp@cellColData)) | force)
-  {
-  archp@cellColData = archp@cellColData[,!colnames(archp@cellColData) %in% names (shared_cnmf_genes)]
-  archp = addModuleScore (
-      ArchRProj = archp,
-      useMatrix = 'GeneScoreMatrix',
-      name = '',
-      features = shared_cnmf_genes,
-      nBin = 25,
-      nBgd = 100,
-      seed = 1,
-      threads = getArchRThreads(),
-      logFile = createLogFile("addModuleScore")
-    )
-  colnames (archp@cellColData) = gsub ('^\\.','',colnames(archp@cellColData))
-  }
+# force = T
+# if (!all (names (shared_cnmf_genes) %in% colnames (archp@cellColData)) | force)
+#   {
+#   archp@cellColData = archp@cellColData[,!colnames(archp@cellColData) %in% names (shared_cnmf_genes)]
+#   archp = addModuleScore (
+#       ArchRProj = archp,
+#       useMatrix = 'GeneScoreMatrix',
+#       name = '',
+#       features = shared_cnmf_genes,
+#       nBin = 25,
+#       nBgd = 100,
+#       seed = 1,
+#       threads = getArchRThreads(),
+#       logFile = createLogFile("addModuleScore")
+#     )
+#   colnames (archp@cellColData) = gsub ('^\\.','',colnames(archp@cellColData))
+#   }
 
 
 ### Plot regulon score of TFs found in km2 along with km2 average score from atac #####
@@ -975,3 +992,443 @@ dev.off()
 # pdf (file.path ('Plots','cnmf_clusters_DAM_metacells_heatmap.pdf'), width = 3,height=4)
 # draw (DAM_hm)
 # dev.off()
+
+
+# # Try with PCA on mMat ####
+library (ggridges)
+library (ggplot2)
+library (viridis)
+library (tidyr)
+#library(hrbrthemes)
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+
+
+# # Filter by RNA expression ####
+metaGroupName = 'celltype_simplified'
+min_exp = .1
+active_TFs = exp_genes (srt, rownames(mMat), min_exp = min_exp, metaGroupName)
+mMat = t(scale (mMat[active_TFs, ]))
+library(uwot)
+library(ggplot2)
+library(patchwork)
+
+
+tail (rownames(archp@cellColData))
+tail (colnames(srt))
+
+#srt = srt[,gsub ('fragments.tsv.gz#','',rownames(archp@cellColData))]
+
+p <- prcomp(mMat, center = TRUE, scale. = TRUE)
+plot_df <- data.frame(p$x, celltype = archp$shared_cnmf_r_max)
+
+
+# df_sub <- plot_df[plot_df$celltype %in% 
+#                     c("Mye_Mac_TREM2","Mye_CD14 Mono","Mye_Mac_SPP1",
+#                       "Mye_Mac_IM"), ]
+
+
+df_sub <- plot_df[plot_df$celltype %in% 
+                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+                      "TAM_MARCO","TAM_CXCLs"), ]
+
+
+
+#df_sub = plot_df
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(PC1, PC2, color = celltype)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  geom_density_2d(size = 0.4) +
+  scale_color_manual(values = palette_myeloid) +
+  # scale_x_continuous(limits = x_range, expand = c(0,0)) +
+  # scale_y_continuous(limits = y_range, expand = c(0,0)) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+p_density_x <- ggplot(df_sub, aes(PC1, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) + gtheme_no_rot
+
+p_density_y <- ggplot(df_sub, aes(PC2, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots','scatac_cnmf_inflammation_module_ridge_plots.pdf'), width = 5,height=6)
+p_density_x + plot_spacer() + p_scatter + p_density_y + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
+    guides = "collect"      # <- collect legends into one
+  ) &
+  theme(
+    legend.position = "bottom",  # or "top"
+    legend.box = "vertical"
+  )
+
+dev.off()
+
+
+
+
+scenic_name = 'monomac_programs'
+auc_mtx = read.csv(file.path(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/NTP_multiome/SCENIC/vg_5000_mw_tss500bp/',scenic_name), 'auc_mtx.csv'), header=T)
+
+rownames (auc_mtx) = auc_mtx[,1]
+rownames(auc_mtx) = gsub ('\\.','-', rownames(auc_mtx))
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+auc_mtx = auc_mtx[colnames(srt),]
+p <- prcomp(auc_mtx, center = TRUE, scale. = TRUE)
+plot_df <- data.frame(p$x, celltype = srt$shared_cnmf_r_max)
+
+
+# df_sub <- plot_df[plot_df$celltype %in% 
+#                     c("Mye_Mac_TREM2","Mye_CD14 Mono","Mye_Mac_SPP1",
+#                       "Mye_Mac_IM"), ]
+
+
+df_sub <- plot_df[plot_df$celltype %in% 
+                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+                      "TAM_MARCO","TAM_CXCLs"), ]
+
+
+
+#df_sub = plot_df
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(PC1, PC2, color = celltype)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  geom_density_2d(size = 0.4) +
+  scale_color_manual(values = palette_myeloid) +
+  # scale_x_continuous(limits = x_range, expand = c(0,0)) +
+  # scale_y_continuous(limits = y_range, expand = c(0,0)) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+p_density_x <- ggplot(df_sub, aes(PC1, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) + gtheme_no_rot
+
+p_density_y <- ggplot(df_sub, aes(PC2, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots','scrna_momac_regulon_pca.pdf'), width = 5,height=6)
+p_density_x + plot_spacer() + p_scatter + p_density_y + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
+    guides = "collect"      # <- collect legends into one
+  ) &
+  theme(
+    legend.position = "bottom",  # or "top"
+    legend.box = "vertical"
+  )
+
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#-------------------------
+# 0. RUN UMAP
+#-------------------------
+set.seed(123)  # for reproducibility
+library(uwot)
+umap_res <- umap(
+  t(mMat),
+  n_neighbors = 30,
+  min_dist = 0.3,
+  metric = "cosine",
+  scale = TRUE
+)
+
+plot_df <- data.frame(
+  UMAP1 = umap_res[,1],
+  UMAP2 = umap_res[,2],
+  celltype = archp$shared_cnmf_r_max
+)
+
+df_sub <- plot_df[plot_df$celltype %in%
+                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+                      "TAM_MARCO","TAM_CXCLs"), ]
+
+
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(UMAP1, UMAP2, color = celltype)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  geom_density_2d(size = 0.4) +
+  scale_color_manual(values = palette_myeloid) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+#-------------------------
+# 2. TOP DENSITY (UMAP1)
+#-------------------------
+p_density_x <- ggplot(df_sub, aes(UMAP1, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 3. RIGHT DENSITY (UMAP2)
+#-------------------------
+p_density_y <- ggplot(df_sub, aes(UMAP2, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 4. SAVE PDF
+#-------------------------
+pdf(file.path("Plots","scatac_cnmf_inflammation_module_umap_ridge_plots.pdf"),
+    width = 5, height = 5)
+
+p_density_x + plot_spacer() + p_scatter + p_density_y +
+  plot_layout(
+    ncol = 2, nrow = 2,
+    widths  = c(4, 1),
+    heights = c(1, 4),
+    guides = "collect"
+  ) &
+  theme(
+    legend.position = "bottom",
+    legend.box = "horizontal"
+  )
+
+dev.off()
+
+
+
+umap_df <- data.frame(UMAP1 = umap_res[,1],
+                      UMAP2 = umap_res[,2])
+
+cors_UMAP1 <- apply(t(mMat), 2, function(x) cor(x, umap_df$UMAP1))
+cors_UMAP2 <- apply(t(mMat), 2, function(x) cor(x, umap_df$UMAP2))
+
+loadings_like <- data.frame(peak = colnames(mMat),
+                            cor_UMAP1 = cors_UMAP1,
+                            cor_UMAP2 = cors_UMAP2)
+
+
+
+#-------------------------
+# 0. RUN UMAP
+#-------------------------
+set.seed(123)  # for reproducibility
+library(uwot)
+umap_res <- umap(
+  auc_mtx,
+  n_neighbors = 30,
+  min_dist = 0.3,
+  metric = "cosine",
+  scale = TRUE
+)
+
+plot_df <- data.frame(
+  UMAP1 = umap_res[,1],
+  UMAP2 = umap_res[,2],
+  celltype = srt$shared_cnmf_r_max
+)
+
+df_sub <- plot_df[plot_df$celltype %in%
+                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+                      "TAM_MARCO","TAM_CXCLs"), ]
+
+
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(UMAP1, UMAP2, color = celltype)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  geom_density_2d(size = 0.4) +
+  scale_color_manual(values = palette_myeloid) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+#-------------------------
+# 2. TOP DENSITY (UMAP1)
+#-------------------------
+p_density_x <- ggplot(df_sub, aes(UMAP1, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 3. RIGHT DENSITY (UMAP2)
+#-------------------------
+p_density_y <- ggplot(df_sub, aes(UMAP2, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 4. SAVE PDF
+#-------------------------
+pdf(file.path("Plots","scrna_cnmf_inflammation_module_umap_ridge_plots.pdf"),
+    width = 5, height = 5)
+
+p_density_x + plot_spacer() + p_scatter + p_density_y +
+  plot_layout(
+    ncol = 2, nrow = 2,
+    widths  = c(4, 1),
+    heights = c(1, 4),
+    guides = "collect"
+  ) &
+  theme(
+    legend.position = "bottom",
+    legend.box = "horizontal"
+  )
+
+dev.off()
+
+
+
+
+### Filter TFs by genescore correlation ####
+seGroupMotif <- getGroupSE (ArchRProj = archp, useMatrix = "MotifMatrix", groupBy = "Clusters_H")
+seZ <- seGroupMotif[rowData(seGroupMotif)$seqnames=="z",]
+rowData(seZ)$maxDelta <- lapply(seq_len(ncol(seZ)), function(x){
+  rowMaxs(assay(seZ) - assay(seZ)[,x])
+}) %>% Reduce("cbind", .) %>% rowMaxs
+
+corGSM_MM <- correlateMatrices(
+    ArchRProj = archp,
+    useMatrix1 = "GeneScoreMatrix",
+    useMatrix2 = "MotifMatrix",
+    reducedDims = "IterativeLSI"
+)
+
+corGSM_MM$maxDelta <- rowData(seZ)[match(corGSM_MM$MotifMatrix_name, rowData(seZ)$name), "maxDelta"]
+#corGIM_MM$maxDelta <- rowData(seZ)[match(corGIM_MM$MotifMatrix_name, rowData(seZ)$name), "maxDelta"]
+
+corGSM_MM <- corGSM_MM[order(abs(corGSM_MM$cor), decreasing = TRUE), ]
+corGSM_MM <- corGSM_MM[which(!duplicated(gsub("\\-.*","",corGSM_MM[,"MotifMatrix_name"]))), ]
+corGSM_MM$TFRegulator <- "NO"
+corGSM_MM$TFRegulator[which(corGSM_MM$cor > 0.4 & corGSM_MM$padj < 0.05 & corGSM_MM$maxDelta > quantile(corGSM_MM$maxDelta, 0.75))] <- "YES"
+active_TF = sort(corGSM_MM[corGSM_MM$TFRegulator=="YES",1])
+corGSM_MM = corGSM_MM[corGSM_MM$GeneScoreMatrix_name %in% active_TFs,]
+corGSM_MM = data.frame(corGSM_MM)
+
+pdf ()
+p = ggplot(corGSM_MM, aes(cor, maxDelta, color = TFRegulator)) +
+  geom_point() + 
+  theme_ArchR() +
+  geom_vline(xintercept = 0, lty = "dashed") + 
+  scale_color_manual(values = c("NO"="darkgrey", "YES"="firebrick3")) +
+  xlab("Correlation To Gene Score") +
+  ylab("Max TF Motif Delta") +
+  scale_y_continuous(
+    expand = c(0,0), 
+    limits = c(0, max(corGSM_MM$maxDelta)*1.05)
+  )+
+  # Add labels for TFRegulator == YES
+  geom_text_repel(
+    data = subset(corGSM_MM, TFRegulator == "YES"),
+    aes(label = MotifMatrix_name),
+    size = 3,
+    max.overlaps = 20
+  )
+dev.off()
+
+pdf (file.path ('Plots','positive_expression_TFs.pdf'), width = 4,height=4)
+p
+dev.off()

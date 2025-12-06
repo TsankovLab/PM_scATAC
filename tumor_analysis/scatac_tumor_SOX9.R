@@ -107,18 +107,31 @@ if(!file.exists (paste0('DAG_',metaGroupName,'.rds')) | force) source (file.path
 
 archp = addImputeWeights (archp)
 celltype_markers = c('WT1','CALB2','RUNX2','TCF3','SOX9','VIM','AXL','SOX6','MESP1','HMGA1','TWIST1','SNAI2')
+uncommitted_markers = c('AR','CDCA7','DNMT3A','HHIP','HMGA2','KCNQ1OT1','MEST','NOS1','PAPLN','PRDM6')
 pdf()
-p <- plotEmbedding(
+p2 <- plotEmbedding(
     ArchRProj = archp, 
     colorBy = "GeneScoreMatrix", 
     name = celltype_markers, 
     embedding = "UMAP",
     pal = palette_expression,
-    imputeWeights = NULL
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "GeneScoreMatrix", 
+    name = uncommitted_markers, 
+    embedding = "UMAP",
+    pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
 )
 dev.off()
 pdf (file.path('Plots','marker_genes_feature_plots.pdf'), width = 20, height = 20)
-print (wrap_plots (p, ncol = 4))
+print (wrap_plots (p2, ncol = 4))
+print (wrap_plots (p, ncol= 4))
 dev.off()
 
 
@@ -727,15 +740,15 @@ dev.off()
   if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
   mMat = assays (mSE)[[1]]
   rownames (mMat) = rowData (mSE)$name
-  mMat = mMat[selected_TF,]
+  mMat = scale (mMat[selected_TF,])
 
   # Get genescore ####
   if (!exists('gsSE')) gsSE = fetch_mat (archp, 'GeneScore')
   gsMat = assays (gsSE)[[1]]
   rownames (gsMat) = rowData (gsSE)$name
-  gsMat = gsMat[selected_TF,]
+  gsMat = scale(gsMat[selected_TF,])
   
-  mMat = scale(t(mMat))
+  mMat = t(mMat)
   mMat = lapply (sams, function(x) mMat[archp_meta$Sample3 == x,])
   names (mMat) = sams
 
@@ -745,7 +758,7 @@ dev.off()
   cnmf_mat = lapply (sams, function(x) cnmf_mat[archp_meta$Sample3 == x, ])
   names (cnmf_mat) = sams
 
-  gsMat = scale(t(gsMat))
+  gsMat = t(gsMat)
   gsMat = lapply (sams, function(x) gsMat[archp_meta$Sample3 == x,])
   names (gsMat) = sams
 
@@ -803,7 +816,12 @@ dev.off()
     })
   gs_cor_df = do.call (rbind, gs_cor)
   gs_cor_df$type = 'genescore'
+  gs_cor_levels = gs_cor_df %>% group_by (TF) %>% summarise (median_value = median(score)) %>% arrange(-median_value)
 
+  combined_rank = data.frame (m_cor_levels[match(gs_cor_levels$TF,m_cor_levels$TF),], gs_cor_levels)
+  TF_rank = sapply (seq_along(m_cor_levels$TF), function(x) max (combined_rank[x,2],combined_rank[x,4]))
+  combined_rank = combined_rank[order(-TF_rank),]
+  
   # Combine and plot ####
   combined_df = rbind (m_cor_df, gs_cor_df)
   
@@ -819,7 +837,7 @@ dev.off()
 
   #lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
 
-top_sarc_TF = head(m_cor_levels$TF,20)
+top_sarc_TF = head(combined_rank$TF,20)
 saveRDS (top_sarc_TF, 'top_sarc_TF.rds')
 combined_df$TF = factor (combined_df$TF, levels = top_sarc_TF)
 combined_df = combined_df[combined_df$TF %in% top_sarc_TF, ]
@@ -848,81 +866,81 @@ bp = ggplot (combined_df, aes(x = TF, y = score, fill = TF, color = type)) +
   scale_color_manual(values = c(activity = '#AE123AFF', genescore = '#001260FF')) +
   geom_hline(yintercept = 0, color = 'red', linetype = 'dashed')
 
-  pdf (paste0 ('Plots/sarcomatoid_score_TF_activity_boxplots2.pdf'), width = 8,height=3)
+  pdf (paste0 ('Plots/sarcomatoid_score_TF_activity_boxplots.pdf'), width = 7,height=3)
   bp
   dev.off()
 
 # Compare with TF correlation to sarcomatoid in scRNA ####
-metacells = readRDS (file.path('..','scrna','metacells.rds'))
-metacells$sampleID = metacells$sampleID3
-nfeat=5000
-k=25
-cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
+# metacells = readRDS (file.path('..','scrna','metacells.rds'))
+# metacells$sampleID = metacells$sampleID3
+# nfeat=5000
+# k=25
+# cnmf_spectra_unique = readRDS (paste0('../scrna/cnmf_genelist_',k,'_nfeat_',nfeat,'.rds'))
 
-sams_rna = c('P1','P4','P5','P8','P11','P12')
+# sams_rna = c('P1','P4','P5','P8','P11','P12')
 
-if (!all (names(cnmf_spectra_unique) %in% colnames(metacells@meta.data)))
-{
-metacells = ModScoreCor (
-        seurat_obj = metacells, 
-        geneset_list = cnmf_spectra_unique, 
-        cor_threshold = NULL, 
-        pos_threshold = NULL, # threshold for fetal_pval2
-        listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
-}
-metacells_assay = metacells@assays$RNA@layers$data
-rownames (metacells_assay) = rownames (srt)
-metacells_assay = metacells_assay[selected_TF,]
+# if (!all (names(cnmf_spectra_unique) %in% colnames(metacells@meta.data)))
+# {
+# metacells = ModScoreCor (
+#         seurat_obj = metacells, 
+#         geneset_list = cnmf_spectra_unique, 
+#         cor_threshold = NULL, 
+#         pos_threshold = NULL, # threshold for fetal_pval2
+#         listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
+# }
+# metacells_assay = metacells@assays$RNA@layers$data
+# rownames (metacells_assay) = rownames (srt)
+# metacells_assay = metacells_assay[selected_TF,]
 
-rna_cor = lapply (sams_rna, function(sam)
-  {
-  tmp = cor(as.matrix(t(metacells_assay[,metacells$sampleID == sam])), as.matrix(metacells@meta.data[,sarc_module])[metacells$sampleID == sam,,drop=F], method='spearman')
-  tmp = as.data.frame (tmp)
-  tmp$sample = sam
-  tmp$TF = rownames(tmp)
-  colnames (tmp) = c('score','sample','TF')
-  tmp
-  })
+# rna_cor = lapply (sams_rna, function(sam)
+#   {
+#   tmp = cor(as.matrix(t(metacells_assay[,metacells$sampleID == sam])), as.matrix(metacells@meta.data[,sarc_module])[metacells$sampleID == sam,,drop=F], method='spearman')
+#   tmp = as.data.frame (tmp)
+#   tmp$sample = sam
+#   tmp$TF = rownames(tmp)
+#   colnames (tmp) = c('score','sample','TF')
+#   tmp
+#   })
 
-rna_tf_cor_df = do.call (rbind, rna_cor)
-rna_tf_cor_df$type = 'expression'
+# rna_tf_cor_df = do.call (rbind, rna_cor)
+# rna_tf_cor_df$type = 'expression'
 
 
-# Combine and plot ####
-combined_df_rna = rbind (m_cor_df, rna_tf_cor_df)
-combined_df_rna$TF = factor (combined_df_rna$TF, levels = m_cor_levels$TF)
-#lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
+# # Combine and plot ####
+# combined_df_rna = rbind (m_cor_df, rna_tf_cor_df)
+# combined_df_rna$TF = factor (combined_df_rna$TF, levels = m_cor_levels$TF)
+# #lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
 
-top_sarc_TF = head(m_cor_levels$TF,20)
-combined_df_rna = combined_df_rna[combined_df_rna$TF %in% top_sarc_TF, ]
-palette_expression_disc = paletteer::paletteer_c("grDevices::Purple-Blue", length(top_sarc_TF))
+# top_sarc_TF = head(m_cor_levels$TF,20)
+# combined_df_rna = combined_df_rna[combined_df_rna$TF %in% top_sarc_TF, ]
+# palette_expression_disc = paletteer::paletteer_c("grDevices::Purple-Blue", length(top_sarc_TF))
 
-bp = ggplot(combined_df_rna, aes(x = TF, y = score, fill = TF, color = type)) + 
-  geom_boxplot(
-    aes(group = interaction(TF, type)),  # Split by both TF and type
-    position = position_dodge(0.8),
-    #color = 'grey20',
-    linewidth = 0.4,
-    width = 0.7,
-    outlier.alpha = 0.2,
-    outlier.shape = NA,
-    size = 0.5,
-    alpha = 0.6
-  ) +
-  geom_point(
-    aes(group = interaction(TF, type), color = type),  # Align points with boxplots
-    position = position_dodge(0.8),  # Ensure same dodge width
-    alpha = 0.5,
-    size = 1
-  ) +
-  gtheme +
-  scale_fill_manual(values = palette_expression_disc) +
-  scale_color_manual (values = c(activity = '#AE123AFF', expression = 'darkgreen')) +
-  geom_hline(yintercept = 0, color = 'red', linetype = 'dashed')
+# bp = ggplot(combined_df_rna, aes(x = TF, y = score, fill = TF, color = type)) + 
+#   geom_boxplot(
+#     aes(group = interaction(TF, type)),  # Split by both TF and type
+#     position = position_dodge(0.8),
+#     #color = 'grey20',
+#     linewidth = 0.4,
+#     width = 0.7,
+#     outlier.alpha = 0.2,
+#     outlier.shape = NA,
+#     size = 0.5,
+#     alpha = 0.6
+#   ) +
+#   geom_point(
+#     aes(group = interaction(TF, type), color = type),  # Align points with boxplots
+#     position = position_dodge(0.8),  # Ensure same dodge width
+#     alpha = 0.5,
+#     size = 1
+#   ) +
+#   gtheme +
+#   scale_fill_manual(values = palette_expression_disc) +
+#   scale_color_manual (values = c(activity = '#AE123AFF', expression = 'darkgreen')) +
+#   geom_hline(yintercept = 0, color = 'red', linetype = 'dashed')
 
-  pdf (paste0 ('Plots/sarcomatoid_score_TF_expression_boxplots.pdf'), width = 8,height=3)
-  bp
-  dev.off()
+#   pdf (paste0 ('Plots/sarcomatoid_score_TF_expression_boxplots.pdf'), width = 8,height=3)
+#   bp
+#   dev.off()
 
 
 # Compute co-occurrence of sarcomatoid TFs ####
@@ -963,7 +981,7 @@ cooc_hm = Heatmap (
 rect_gp = gpar (col = "white", lwd = 1)
 )
 
-pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps3.pdf'), width = 6,height=5)
+pdf (file.path ('Plots','selected_TF_cooccurence_heatmaps.pdf'), width = 6,height=5)
 cooc_hm 
 dev.off()
 
@@ -996,10 +1014,12 @@ pos_in_peaks_tf1 = pos_in_peaks_tf1[match (tf_peaks, pos_in_peaks_tf1$peak)]
 pos_in_peaks_tf2 = pos_in_peaks_tf2[match (tf_peaks, pos_in_peaks_tf2$peak)]
 mid_tf1 = start(pos_in_peaks_tf1) + end(pos_in_peaks_tf1) / 2
 mid_tf2 = start(pos_in_peaks_tf2) + end(pos_in_peaks_tf2) / 2
-mid_tf1 - mid_tf2
+mi_diff = mid_tf1 - mid_tf2
+#mi_diff[mi_diff > 100] = 100
+#mi_diff[mi_diff < -100] = -100
 
-pdf (file.path ('Plots',paste0('distribution_distance_TF_pair_', paste0(tf_pair, collapse='_'),'hist.pdf')))
-x = hist (abs(mid_tf1 - mid_tf2), breaks=1000)
+pdf (file.path ('Plots',paste0('distribution_distance_TF_pair_', paste0(tf_pair, collapse='_'),'hist.pdf')), height=3, width=3)
+x = hist (mi_diff, breaks=200)
 dev.off()
 
 x$mid[which.max (x$counts)]
@@ -1429,10 +1449,20 @@ TF_p = plotEmbedding(
     imputeWeights = getImputeWeights(archp)
 )
 
+TF_p2 = plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "MotifMatrix", 
+    name = sort(markerMotifs), 
+    embedding = "UMAP",
+    pal = rev(palette_deviation),
+    imputeWeights = NULL
+)
+
 dev.off()
 
 pdf (file.path('Plots','sarcomatoid_score_feature_plots2.pdf'), width = 20, height = 20)
 print (wrap_plots (c(list(p), TF_p), ncol = 3))
+print (wrap_plots (TF_p2), ncol = 3)
 dev.off()
 
 # Plot the same but scaled ####
@@ -2104,6 +2134,250 @@ dev.off()
 
 
 
+### use TF activity to cluster P23 ####
+
+
+# # Try with PCA on mMat ####
+library (ggridges)
+library (ggplot2)
+library (viridis)
+library (tidyr)
+#library(hrbrthemes)
+
+
+# Add metacolumns of average TF modules activity ####
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = scale(mMat[,archp$Sample == 'P23'])
+#mMat = scale(as.matrix(mMat))#[selected_TF,])
+
+# # # Filter by RNA expression ####
+metaGroupName = 'sampleID'
+min_exp = .1
+active_TFs = exp_genes (srt, rownames(mMat), min_exp = min_exp, metaGroupName)
+mMat = t(scale (mMat[active_TFs, ]))
+library(uwot)
+library(ggplot2)
+library(patchwork)
+
+#-------------------------
+# 0. RUN PCA
+#-------------------------
+set.seed(123)  # for reproducibility
+p <- prcomp(t(mMat), center = TRUE, scale. = TRUE)
+plot_df <- data.frame(p$x, celltype = t(mMat[c('SOX9','SNAI2','RUNX2'),]))
+# df_sub <- plot_df[plot_df$celltype %in% 
+#                     c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+#                       "TAM_MARCO","TAM_CXCLs"), ]
+
+# plot_df <- data.frame(
+#   PC1 = p$x[,1],
+#   PC2 = p$x[,2],
+#   SOX9 = plot_df[,'celltype.SOX9'],
+#   SNAI2 = plot_df[,'celltype.SNAI2'],
+#   RUNX2 = plot_df[,'celltype.RUNX2']
+# )
+df_sub= plot_df
+# df_sub <- plot_df[plot_df$celltype %in%
+#                     c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+#                       "TAM_MARCO","TAM_CXCLs"), ]
+
+
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+library(viridis)
+which.max(abs (cor (df_sub$celltype.SOX9, p$x,method = 'pearson')))
+pca_cor[order(pca_cor),drop=F]
+p_scatter <- ggplot(df_sub, aes(PC1, PC2, color = celltype.SNAI2)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  #geom_density_2d(size = 0.4) +
+  scale_color_viridis_c(option = "viridis", direction = 1) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+p_scatter2 <- ggplot(df_sub, aes(PC1, PC2, color = celltype.RUNX2)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  #geom_density_2d(size = 0.4) +
+  scale_color_viridis_c(option = "viridis", direction = 1) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+  
+# Compute percentiles
+#q10 <- quantile(plot_df$celltype.SOX9, 0.20, na.rm = TRUE)
+#q90 <- quantile(plot_df$celltype.SOX9, 0.80, na.rm = TRUE)
+
+# Subset the dataframe
+#df_sub2 <- subset(plot_df, celltype.SOX9 >= q10 & celltype.SOX9 <= q90)
+
+p_scatter3 <- ggplot(df_sub, aes(PC1, PC2, color = celltype.SOX9)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  #geom_density_2d(size = 0.4) +
+  scale_color_viridis_c(option = "viridis", direction = 1) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+#-------------------------
+# 4. SAVE PDF
+#-------------------------
+pdf(file.path("Plots","TF_activity_pca.pdf"),
+    width = 8, height = 2)
+
+wrap_plots (p_scatter, p_scatter2, p_scatter3, ncol=3)
+dev.off()
+
+library(uwot)
+
+set.seed(123)
+
+# Transpose so cells are rows (required for UMAP)
+mat_t <- t(scale(mMat))
+
+# Run UMAP
+um <- umap(as.matrix(mat_t), n_neighbors = 30, min_dist = 0.3, metric = "euclidean",n_components=10)
+cor (um, mat_t[,'SOX9'], method='spearman')
+plot_df <- data.frame(um, celltype = t(mMat[c('SOX9','SNAI2','RUNX2'),]))
+
+
+p_scatter <- ggplot(plot_df, aes(X1, X2, color = celltype.SNAI2)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  #geom_density_2d(size = 0.4) +
+  scale_color_viridis_c(option = "viridis", direction = -1) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+p_scatter2 <- ggplot(plot_df, aes(X1, X2, color = celltype.RUNX2)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  #geom_density_2d(size = 0.4) +
+  scale_color_viridis_c(option = "viridis", direction = -1) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+# Compute percentiles
+q10 <- quantile(plot_df$celltype.SOX9, 0.10, na.rm = TRUE)
+q90 <- quantile(plot_df$celltype.SOX9, 0.90, na.rm = TRUE)
+
+# Subset the dataframe
+df_sub <- subset (plot_df, celltype.SOX9 >= q10 & celltype.SOX9 <= q90)
+
+# Plot
+p_scatter3 <- ggplot(df_sub, aes(X1, X2, color = celltype.SOX9)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  #geom_density_2d(size = 0.4) +
+  scale_color_viridis_c(option = "viridis", direction = -1) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+pdf(file.path ("Plots","TF_activity_umap.pdf"),
+    width = 10, height = 3)
+
+wrap_plots (p_scatter, p_scatter2, p_scatter3, ncol=3)
+dev.off()
 
 
 
+
+
+### Try to order cells by scS-score and then look for SOX9 expression / deviation and maybe use to re-run chromBPnet ####
+
+
+  # Get deviations ####
+  if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+  mMat = assays (mSE)[[1]]
+  rownames (mMat) = rowData (mSE)$name
+  mMat = scale (mMat[selected_TF,])
+
+  # Get genescore ####
+  if (!exists('gsSE')) gsSE = fetch_mat (archp, 'GeneScore')
+  gsMat = assays (gsSE)[[1]]
+  rownames (gsMat) = rowData (gsSE)$name
+  gsMat = scale(gsMat[selected_TF,])
+  
+  mMat = t(mMat)
+  mMat = lapply (sams, function(x) mMat[archp_meta$Sample3 == x,])
+  names (mMat) = sams
+
+  # Get cnmf modules ####
+  cnmf_mat = archp@cellColData[,grep ('cNMF',colnames(archp@cellColData))]
+  cnmf_mat = as.data.frame (t(scale (t(cnmf_mat))))
+  cnmf_mat = lapply (sams, function(x) cnmf_mat[archp_meta$Sample3 == x, ])
+  names (cnmf_mat) = sams
+
+  gsMat = scale(t(gsMat))
+  gsMat = lapply (sams, function(x) gsMat[archp_meta$Sample3 == x,])
+  names (gsMat) = sams
+
+  # Average mats along sarc module score ####
+  library(zoo)
+
+  bin_width <- 40   # Number of observations per bin
+  overlap <- 40    
+  mMat_ordered = lapply (sams, function(sam) mMat[[sam]][order(cnmf_mat[[sam]][,sarc_module]),])
+  names(mMat_ordered) = sams
+  mMat_ordered_avg = lapply (sams, function (sam) as.data.frame (lapply (as.data.frame (mMat_ordered[[sam]]), function(x) {
+    zoo::rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
+  })))
+  names (mMat_ordered_avg) = sams
+
+  gsMat_ordered = lapply (sams, function(sam) gsMat[[sam]][order(cnmf_mat[[sam]][,sarc_module]),])
+  names(gsMat_ordered) = sams
+  gsMat_ordered_avg = lapply (sams, function (sam) 
+    {
+    tmp_df = as.data.frame (lapply (as.data.frame (gsMat_ordered[[sam]]), function(x) {
+    zoo::rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
+    }))
+    tmp_df[is.na(tmp_df)] = 0 # HIC2 returns NaN for one or some samples
+    tmp_df
+    })
+
+  names (gsMat_ordered_avg) = sams
+
+  cnmfMat_ordered = lapply (sams, function(sam) cnmf_mat[[sam]][order(cnmf_mat[[sam]][,sarc_module]),])
+  names(cnmfMat_ordered) = sams
+  cnmfMat_ordered_avg = lapply (sams, function (sam) as.data.frame (lapply (as.data.frame (cnmfMat_ordered[[sam]]), function(x) {
+    zoo::rollapply(x, width = bin_width, FUN = mean, by = overlap, partial = TRUE, align = "left")
+  })))
+  names (cnmfMat_ordered_avg) = sams
+
+  m_cor = lapply (sams, function(sam) 
+    {
+    cor_tmp = as.data.frame (cor (mMat_ordered_avg[[sam]], cnmfMat_ordered_avg[[sam]][,sarc_module, drop=F], method = 'spearman'))
+    colnames(cor_tmp)[1] = 'score'
+    cor_tmp$sample = sam
+    cor_tmp$TF = rownames(cor_tmp)
+    cor_tmp
+    })
+  m_cor_df = do.call (rbind, m_cor)
+  m_cor_df$type = 'activity'
+  m_cor_levels = m_cor_df %>% group_by (TF) %>% summarise (median_value = median(score)) %>% arrange(-median_value)
+
+  gs_cor = lapply (sams, function(sam) 
+    {
+    cor_tmp = as.data.frame(cor (gsMat_ordered_avg[[sam]], cnmfMat_ordered_avg[[sam]][,sarc_module, drop=F], method = 'spearman'))
+    colnames(cor_tmp)[1] = 'score'
+    cor_tmp$sample = sam
+    cor_tmp$TF = rownames(cor_tmp)
+    cor_tmp
+    })
+  gs_cor_df = do.call (rbind, gs_cor)
+  gs_cor_df$type = 'genescore'

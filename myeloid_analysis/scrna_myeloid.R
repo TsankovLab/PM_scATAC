@@ -476,6 +476,435 @@ rp
 dev.off()
 
 
+#### Show regulon of TF in inflammation module ####
+
+auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+auc_mtx = auc_mtx[rownames(auc_mtx) %in% colnames(srt),]
+all (rownames (auc_mtx) == colnames (srt))
+auc_mtx$celltype = srt$celltype_lv3[match(rownames (auc_mtx), colnames (srt))]
+auc_mtx_agg = aggregate (.~ celltype, data = auc_mtx, FUN='mean')
+rownames (auc_mtx_agg) = auc_mtx_agg[,1]
+auc_mtx_agg = auc_mtx_agg[,-1]
+
+library(tidyverse)
+
+# Assuming your data frame is called df
+df <- auc_mtx_agg   # replace with actual name
+
+# Add rownames as a column
+df$celltype <- rownames(df)
+
+# Convert to long format
+df_long <- df %>%
+  pivot_longer(
+    cols = -celltype,
+    names_to = "gene",
+    values_to = "value"
+  )
+
+# Plot
+pl = ggplot(df_long, aes(x = celltype, y = value, color = gene, group = gene)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "right"
+  ) +
+  labs(
+    x = "Cell Type",
+    y = "Expression",
+    color = "Gene"
+  )
+
+pdf (file.path ('Plots','regulon_TFs_lineplot.pdf'))
+pl
+dev.off()
 
 
 
+# Check whether regulons recapitulate TF activity from scatac ####
+auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+auc_mtx_cor = cor (auc_mtx, method = 'spearman')
+set.seed(123)
+centers=2
+km = kmeans (auc_mtx_cor, centers=centers)
+
+genes_highlight = c(
+'IKZF1
+HIVEP3
+HIVEP1
+NFKB2
+RELB
+RELA
+NFKB1
+REL
+NFE2L2
+NFE2
+BATF
+JDP2
+FOSB
+SMARCC1
+JUND
+FOSL1
+BACH1
+JUNB
+FOSL2
+FOS
+JUN')
+
+genes_highlight2 = c(
+'NFE2L2
+NFE2
+BATF
+JDP2
+FOSB
+SMARCC1
+JUND
+FOSL1
+BACH1
+JUNB
+FOSL2
+FOS
+JUN')
+# saveRDS (genes_highlight,'inflammation_TFs.rds')
+
+genes_highlight = unlist(strsplit(genes_highlight,'\n'))
+genes_highlight2 = unlist(strsplit(genes_highlight2,'\n'))
+
+ha2 = rowAnnotation (foo = anno_mark(at = match(genes_highlight,colnames(auc_mtx_cor)), 
+    labels = genes_highlight, labels_gp = gpar(fontsize = 7)))
+
+pdf (file.path ('Plots','TF_modules_heatmap3.pdf'), width = 4,height=3)
+cor_mMat_hm = draw (Heatmap (auc_mtx_cor,# row_km=15,
+  right_annotation = ha2,
+  #left_annotation = ha,
+  #rect_gp = gpar(type = "none"),
+  clustering_distance_rows='euclidean' ,
+  clustering_distance_columns = 'euclidean', 
+  col=palette_deviation_cor_fun, 
+  row_split = km$cluster,
+  column_split = km$cluster,
+  #row_km=2, 
+  #column_km=2,
+#  right_annotation = ha,
+  border=T,
+#   ,
+  row_names_gp = gpar(fontsize = 0), 
+  column_names_gp = gpar(fontsize = 0)
+# cell_fun = function(j, i, x, y, w, h, fill) {# THIS DOESNT WORK NEED TO USE LAYER_FUN
+#         if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+#             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#         }}
+  ))
+  # ,
+  # cell_fun = function(j, i, x, y, w, h, fill) {
+  #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+  #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#        }}))
+dev.off()
+
+pdf (file.path ('Plots','TF_regulon_heatmap.pdf'), width = 4.6, height=3)
+cor_mMat_hm
+dev.off()
+
+
+auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+
+srt$mod_1 = rowMeans (auc_mtx[,names (km$cluster[km$cluster == 1])])
+srt$mod_2 = rowMeans (auc_mtx[,names (km$cluster[km$cluster == 2])])
+
+pdf (file.path ('Plots','gene_regulons_score_fplots.pdf'))
+reductionName = 'sampleID_harmony_umap'
+fp (srt, 'mod_1')
+fp (srt, 'mod_2')
+dev.off()
+
+
+# # Try with ridge plots ####
+library (ggridges)
+library (ggplot2)
+library (viridis)
+library (tidyr)
+#library(hrbrthemes)
+
+# Plot
+ccomp = srt@meta.data[,c('mod_1', 'mod_2','celltype_lv3')]
+#ccomp = ccomp[ccomp$celltype_lv2 %in% c('cDCs'),]
+#ccomp$celltype_lv2 = factor (ccomp$celltype_lv2, levels = rev(cell_subsets_order))
+#median_order = sort (unlist(lapply (split (ccomp$module, ccomp$celltype_lv3), function(x) median(x))))
+#ccomp$celltype_lv3 = factor (ccomp$celltype_lv3, levels = names (median_order))
+rp <- lapply (c('mod_1', 'mod_2'), function(x) ggplot(ccomp, aes_string(x = x, y = 'celltype_lv3', fill = '..x..')) +
+  geom_density_ridges_gradient(
+  scale = 3,
+  rel_min_height = 0.01,
+  linewidth = 0.4,
+  color='white',
+  alpha = 0.3
+) +
+
+  scale_fill_viridis_c(option = "C") +  # Optional: nice color gradient
+  theme_ridges() +                      # Optional: clean ridge plot theme
+  theme(legend.position = "right"))     # Adjust legend position
+#   theme_classic() + facet_wrap (~sample, ncol=5)
+pdf (file.path ('Plots','regulon_inflammation_module_ridge_plots.pdf'), width = 9,height=4)
+wrap_plots(rp)
+dev.off()
+
+
+# Try using PCA on regulons ####
+auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+p <- prcomp(auc_mtx, center = TRUE, scale. = TRUE)
+plot_df <- data.frame(p$x, celltype = srt$celltype_lv3[match(rownames (p$x), colnames(srt))])
+df_sub <- plot_df[plot_df$celltype %in% 
+                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+                      "TAM_MARCO","TAM_CXCLs"), ]
+
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(PC1, PC2, color = celltype)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  geom_density_2d(size = 0.4) +
+  scale_color_manual(values = palette_myeloid) +
+  #scale_x_continuous(limits = x_range, expand = c(0,0)) +
+  #scale_y_continuous(limits = y_range, expand = c(0,0)) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+p_density_x <- ggplot(df_sub, aes(PC1, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) + gtheme_no_rot
+
+p_density_y <- ggplot(df_sub, aes(PC2, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots','scrna_momac_regulon_pca.pdf'), width = 5,height=5)
+p_density_x + plot_spacer() + p_scatter + p_density_y + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
+    guides = "collect"      # <- collect legends into one
+  ) &
+  theme(
+    legend.position = "bottom",  # or "top"
+    legend.box = "horizontal"
+  )
+
+dev.off()
+
+
+### Ridge plot of PC1 ####
+df_sub$celltype = factor (df_sub$celltype, levels = rev(cell_subsets_order))
+p_ridge <- ggplot(df_sub, aes(x = PC1, y = celltype, fill = celltype)) +
+  geom_density_ridges(scale = 3, alpha = 0.7, color = NA) +
+  scale_fill_manual (values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.y  = element_text(size = 8),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  gtheme_no_rot
+
+pdf(file.path("Plots","momac_PC1_ridge_plots.pdf"),
+    width = 5, height = 3)
+p_ridge
+dev.off()
+
+saveRDS (p, 'PCA_regulons.rds')
+
+
+
+
+
+
+
+
+
+
+# Try using PCA on cells ####
+auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+p <- prcomp(t(auc_mtx), center = TRUE, scale. = TRUE)
+plot_df <- data.frame(p$x)#, celltype = srt$celltype_lv3[match(rownames (p$x), colnames(srt))])
+df_sub <- plot_df
+
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(PC1, PC3)) +
+  geom_point(alpha = 0.7, size = 2) +
+  geom_density_2d(size = 0.4) +
+  #scale_color_manual(values = palette_myeloid) +
+  #scale_x_continuous(limits = x_range, expand = c(0,0)) +
+  #scale_y_continuous(limits = y_range, expand = c(0,0)) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+p_density_x <- ggplot(df_sub, aes(PC1)) +
+  geom_density(alpha = 0.3, color = NA) +
+  #scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) + gtheme_no_rot
+
+p_density_y <- ggplot(df_sub, aes(PC3))+
+  geom_density(alpha = 0.3, color = NA) +
+  #scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots','scrna_momac_cells_pca.pdf'), width = 5,height=5)
+p_density_x + plot_spacer() + p_scatter + p_density_y + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
+    guides = "collect"      # <- collect legends into one
+  ) &
+  theme(
+    legend.position = "bottom",  # or "top"
+    legend.box = "horizontal"
+  )
+
+dev.off()
+
+### Try with UMAPs ####
+set.seed(123)  # for reproducibility
+library(uwot)
+umap_res <- umap(
+  auc_mtx,
+  n_neighbors = 30,
+  min_dist = 0.3,
+  metric = "cosine",
+  scale = TRUE
+)
+
+plot_df <- data.frame(
+  UMAP1 = umap_res[,1],
+  UMAP2 = umap_res[,2],
+  celltype = srt$celltype_lv3[match(rownames (umap_res), colnames(srt))]
+)
+
+df_sub <- plot_df[plot_df$celltype %in%
+                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+                      "TAM_MARCO","TAM_CXCLs"), ]
+
+
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(UMAP1, UMAP2, color = celltype)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  geom_density_2d(size = 0.4) +
+  scale_color_manual(values = palette_myeloid) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+#-------------------------
+# 2. TOP DENSITY (UMAP1)
+#-------------------------
+p_density_x <- ggplot(df_sub, aes(UMAP1, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 3. RIGHT DENSITY (UMAP2)
+#-------------------------
+p_density_y <- ggplot(df_sub, aes(UMAP2, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 4. SAVE PDF
+#-------------------------
+pdf(file.path("Plots","scrna_momac_regulon_umap.pdf"),
+    width = 5, height = 5)
+
+p_density_x + plot_spacer() + p_scatter + p_density_y +
+  plot_layout(
+    ncol = 2, nrow = 2,
+    widths  = c(4, 1),
+    heights = c(1, 4),
+    guides = "collect"
+  ) &
+  theme(
+    legend.position = "bottom",
+    legend.box = "horizontal"
+  )
+
+dev.off()

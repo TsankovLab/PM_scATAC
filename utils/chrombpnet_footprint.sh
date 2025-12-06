@@ -38,10 +38,15 @@ echo $MODEL_H5
 #MODEL_H5=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet/${celltype}/no_bias_model/fold_0/models/chrombpnet_nobias.h5
 #/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
+motif_file=motif_footprints2.txt
 motif_file=motif_footprints.txt
 
 chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet
+chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
+chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
 celltype=non_inflamed
+celltype=NK_KLRC1
+celltype=SOX9_high_P23
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
 OUTPUT_PREFIX=${chromBPdir}/${celltype}/footprints
 
@@ -63,5 +68,136 @@ for fold_number in {0..4}; do
         -pwm_f ../../${motif_file} # [-bs BATCH_SIZE] [--ylim YLIM]
 done
 
+export HDF5_PLUGIN_PATH=$CONDA_PREFIX/lib/hdf5/plugin
+
+export FOOTPRINT_GROUPS=$(awk '{print $1}' ../../${motif_file} \
+                         | sort -u \
+                         | paste -sd "," -),control
+
+echo "Using groups: $FOOTPRINT_GROUPS"
+
+python3 - <<'EOF'
+import h5py
+import numpy as np
+import glob
+import os
+
+# Files to average
+files = sorted(glob.glob("fold*_footprints.h5"))
+print("Found files:", files)
+
+# Read groups from environment variable
+groups = os.environ["FOOTPRINT_GROUPS"].split(",")
+print("Using groups:", groups)
+
+# Get datasets from the first file dynamically
+with h5py.File(files[0], "r") as f:
+    datasets = {grp: list(f[grp].keys()) for grp in groups}
+
+# Output file
+with h5py.File("average_footprints.h5", "w") as out:
+    for grp in groups:
+        print(f"Processing group: {grp}")
+        grp_out = out.create_group(grp)
+        for ds in datasets[grp]:
+            arrays = []
+            for fn in files:
+                with h5py.File(fn, "r") as f:
+                    arr = f[f"{grp}/{ds}"][:]
+                    arrays.append(arr)
+            mean_arr = np.mean(arrays, axis=0)
+            grp_out.create_dataset(ds, data=mean_arr)
+
+print("Saved average_footprints.h5")
+EOF
+
+python3 - <<'EOF'
+import deepdish as dd
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+# Load averaged footprints
+footprints = dd.io.load("average_footprints.h5")
+
+# Get groups from environment variable
+groups = os.environ["FOOTPRINT_GROUPS"].split(",")
+print("Using groups:", groups)
+
+plt.figure(figsize=(6,4))
+
+for grp in groups:
+    fp = footprints[grp]['i0']  # assuming 'i0' contains the footprint
+    center = fp.shape[0] // 2
+    plt.plot(range(200), fp[center-100:center+100], label=grp)
+
+plt.xlabel("200bp around motif")
+plt.ylabel("Probability")
+plt.xticks(ticks=[0,100,200], labels=[-100,0,100])
+plt.legend()
+plt.tight_layout()
+plt.savefig("average_footprints_plot.pdf")  # <-- PDF instead of PNG
+EOF
+
+### Now compare composite NKFBI from inflamed and non-inflamed
+
+#motif_file="motifs.tsv"
+
+# Build FOOTPRINT_GROUPS from first column + control
+export FOOTPRINT_GROUPS=$(awk '{print $1}' ../../${motif_file} | paste -sd "," -),control
+echo "Using groups: $FOOTPRINT_GROUPS"
 
 
+python3 - <<'EOF'
+import deepdish as dd
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+# Paths to average footprint files
+file1 = "average_footprints.h5"
+file2 = "../../SOX9_low_P23/footprints/average_footprints.h5"
+
+# Load footprints
+footprints1 = dd.io.load(file1)
+footprints2 = dd.io.load(file2)
+
+# Get groups from environment variable
+groups = os.environ["FOOTPRINT_GROUPS"].split(",")
+print("Using groups:", groups)
+
+plt.figure(figsize=(8,6))
+
+# Define a color palette
+colors = plt.cm.tab10.colors
+
+for grp_idx, grp in enumerate(groups):
+    fp_list = []
+    sources = [footprints1, footprints2]
+    
+    for file_idx, fp_data in enumerate(sources):
+        if grp in fp_data:
+            fp_list.append(fp_data[grp]['i0'])  # assuming 'i0' contains the footprint
+    
+    if not fp_list:
+        continue
+    
+    # Plot each instance separately
+    center = fp_list[0].shape[0] // 2
+    for inst_idx, fp in enumerate(fp_list):
+        plt.plot(
+            range(200),
+            fp[center-100:center+100],
+            label=f"{grp}_file{inst_idx+1}",
+            color=colors[grp_idx % len(colors)],
+            linestyle='-' if inst_idx==1 else '--',
+            alpha=0.8
+        )
+
+plt.xlabel("200bp around motif", fontsize=12)
+plt.ylabel("Probability", fontsize=12)
+plt.xticks(ticks=[0,100,200], labels=[-100,0,100])
+plt.legend(fontsize=8, ncol=2)
+plt.tight_layout()
+plt.savefig("average_footprints_combined_plot.pdf")
+EOF
