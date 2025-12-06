@@ -59,9 +59,8 @@ grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
 biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
 
 celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
-celltypes = 'SOX9_high_P23'
-celltypes = 'SOX9_low_P23'
-celltypes = 'SOX9_high_P1'
+celltypes = c('SOX9_low_P23','SOX9_high_P23')
+#celltypes = 'SOX9_high_P1'
 for (celltype in celltypes)
 	{
 	command <- paste ("bsub -J", paste0(celltype,'_CBPmaster'), 
@@ -71,7 +70,7 @@ for (celltype in celltypes)
 		file.path(repodir,'utils','chromBPnet_master.sh'))
 	args <- paste(chromBPdir, grefdir, repodir, celltype, biasdir) 
 	system (paste0('chmod +x ',file.path(repodir,'utils','chromBPnet_master.sh')), wait=FALSE)
-	
+
 	system (paste(command, args))
 	}
 

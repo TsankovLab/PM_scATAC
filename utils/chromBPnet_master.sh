@@ -49,7 +49,7 @@ cd $chromBPct_dir
 
 chmod +x ${repodir}/utils/chromBPnet_training.sh
 chmod +x ${repodir}/utils/chromBPnet_contribution_scores.sh
-chmod +x ${repodir}/utils/chromBPnet_average_CNT_scores.py
+chmod +x ${repodir}/utils/chromBPnet_average_CNT_scores2.py
 chmod +x ${repodir}/utils/TFmodisco_counts.sh
 chmod +x ${repodir}/utils/TFmodisco_profile.sh
 chmod +x ${repodir}/utils/finemo_motif_calls.sh
@@ -187,7 +187,7 @@ if [ "$all_exist_counts" = true ] && [ "$all_exist_profile" = true ]; then
     export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_PATH
     
     # Combine HDF5 scores
-    /sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores.py $chromBPct_dir $celltype
+    /sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores2.py $chromBPct_dir $celltype
     
     # Average bigwig files
     wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.counts_scores.bw \
