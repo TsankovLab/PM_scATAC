@@ -187,6 +187,7 @@ if [ "$all_exist_counts" = true ] && [ "$all_exist_profile" = true ]; then
     export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_PATH
     
     # Combine HDF5 scores
+    export HDF5_PLUGIN_PATH=""
     /sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores2.py $chromBPct_dir $celltype
     
     # Average bigwig files
