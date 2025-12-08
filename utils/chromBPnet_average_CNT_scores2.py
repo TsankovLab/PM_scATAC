@@ -50,12 +50,12 @@ def list_expected_files(chromBPct_dir, prefix="no_bias_model"):
 
 
 def check_files_exist(files):
-    missing = [str(f) for f in files if not f.exists()]
+    paths = [Path(f) for f in files]
+    missing = [str(p) for p in paths if not p.exists()]
     if missing:
         logging.error("Missing files:\n" + "\n".join(missing))
         return False
     return True
-
 
 def choose_chunk_size(shape, dtype, target_bytes=TARGET_BYTES_PER_CHUNK):
     """
@@ -129,7 +129,7 @@ def average_datasets(input_paths, group_key, dset_key, out_dset, out_dtype):
 
 
 def process_file_list(input_paths, output_path, out_dtype_str="float32", compress_level=6):
-    input_paths = [str(p) for p in input_paths]
+    input_paths = [Path(p) for p in input_paths]
     out_dtype = np.dtype(out_dtype_str)
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
