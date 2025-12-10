@@ -32,15 +32,16 @@ archp = loadArchRProject (projdir)
 archp2 = archp
 sams = c('P23')
 archp = archp[archp$Sample2 %in% sams]
-archp = archp[archp$sarc_score_cluster2 != '']
-archp$sarc_score_sample2 = paste0(archp$sarc_score_cluster2,'_', archp$Sample)
+archp$SOX9_cluster = ''
+archp$SOX9_cluster[archp$Clusters2 == 'C4'] = 'SOX9_low'
+archp$SOX9_cluster[archp$Clusters3 == 'C19'] = 'SOX9_high'
 #archp = archp[! grepl ('mid',archp$sarc_score_sample)]
-archp2$sarc_score_sample2 = ''
-archp2$sarc_score_sample2[match(rownames(archp), rownames(archp2))] = archp$sarc_score_sample2
+# archp2$sarc_score_sample2 = ''
+# archp2$sarc_score_sample2[match(rownames(archp), rownames(archp2))] = archp$sarc_score_sample2
 
 pdf (file.path ('Plots','SOX9_clusters_umap.pdf'))
-plotEmbedding (ArchRProj = archp2, labelMeans = F, 
-  colorBy = "cellColData", name = "sarc_score_sample2", 
+plotEmbedding (ArchRProj = archp, labelMeans = F, 
+  colorBy = "cellColData", name = "SOX9_cluster", 
   #pal = palette_sample,
    embedding = "UMAP")
 dev.off()

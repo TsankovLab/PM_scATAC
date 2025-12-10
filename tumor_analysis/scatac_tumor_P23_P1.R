@@ -7,7 +7,7 @@ archp = addClusters (input = archp, resolution = 1.5,
   maxClusters = 100,
   force = TRUE)
 
-archp = addClusters (input = archp, resolution = 5,
+archp = addClusters (input = archp, resolution = 20,
   reducedDims = "IterativeLSI", name = 'Clusters3',
   maxClusters = 100,
   force = TRUE)
@@ -887,14 +887,14 @@ TF_db = 'GeneScore'
 Vlnp <- plotGroups(ArchRProj = archp_P23, 
   groupBy = metaGroupName, 
   colorBy = paste0(TF_db,'Matrix'), 
-  name = top_sarc_TF,
+  name = c('SOX9','RUNX2','SOX6'),
   plotAs = "violin"#,
   #imputeWeights = getImputeWeights(archp_sub),
   #pal = paletteDiscrete(unique(archp_sub@cellColData[,metaGroupName]), set='rushmore', reverse=T)
 )
 dev.off()
 
-pdf (file.path ('Plots',paste0('sarcomatoid_score_TF_genescore_and_expression_', metaGroupName,'_P23_barplot.pdf')), width = 12,height=8)
+pdf (file.path ('Plots',paste0('TF_genescore_and_expression_', metaGroupName,'_P23_barplot.pdf')), width = 12,height=8)
 wrap_plots (Vlnp)
 dev.off()
 
