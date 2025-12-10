@@ -604,7 +604,7 @@ module_l = lapply (cnmf_spectra_unique, function(x) head(x,20))
 module_l = list(TCF3 = 'TCF3', PITX1 = 'PITX1', TEAD1 = 'TEAD1')
 selected_TFs = readRDS ('../tumor_compartment/scatac_ArchR/selected_TF.rds')
 module_l = split (selected_TFs, selected_TFs)
-
+module_l = list (SOX9 = 'SOX9', RUNX2 = 'RUNX2', SNAI2 = 'SNAI2')
 #### Check chromatin regulators and genetic drivers genes ####
 # chromatin_regulators = c('SETD5, ASH1L, CREBBP, PRDM2, KDM2B, KMT2D, EZH2, SETDB1')
 # chromatin_regulators = unlist(strsplit (chromatin_regulators, ', '))
@@ -632,7 +632,7 @@ meso_bulk_meta_l2 = lapply (seq_along(meso_bulk_l), function(x)
 names (meso_bulk_meta_l2) = c('bueno','tcga','mesomics')
 #survival_name = 'activeTFs'
 #survival_name = 'megahub'
-survival_name = 'oncoTFs'
+survival_name = 'plasticity'
 
 
 
@@ -655,7 +655,7 @@ for (study in studies)
         {
         meta_surv = meso_bulk_meta_l2[[study]]
         meta_surv = meta_surv[!is.na(meta_surv$census),]
-  
+        
         form = as.formula (paste('Surv(as.numeric(as.character(meta_surv[,"census"])),
                             status) ~', mod, '+ strata (subtype)'))
         # form = as.formula (paste('Surv(as.numeric(as.character(meta_surv[,"census"])),
@@ -808,6 +808,24 @@ hm = Heatmap (t(scale(t(exp_mat))), top_annotation = ha)
 pdf (file.path('Plots','HOX_signature_mesomics_heatmap.pdf'), width=15)
 hm
 dev.off()
+
+
+#### Most correlated genes to gene ####
+gene = 'AXL'
+
+cor_res = lapply(names (meso_bulk_l), function(x) 
+  {
+   tmp = cor(t(meso_bulk_l[[x]][gene, ,drop=F]), t(meso_bulk_l[[x]]), method = 'pearson')
+    tmp = as.data.frame (t(tmp))
+    tmp[rownames (meso_bulk_l[[1]]),, drop=F]
+  })
+cor_res_df = do.call (cbind, cor_res)
+colnames (cor_res_df) = names(meso_bulk_l)
+cor_res_df = cor_res_df[order(-cor_res_df[,1]),]
+
+cor_res_df = cbind (cor_res_df, cor_res_df2[rownames(cor_res_df), ])
+cor (cor_res_df, method= 'spearman', use = 'pairwise.complete.obs')
+write.csv (cor_res_df, paste0(gene, '_gene_correlations.csv'))
 
 
 

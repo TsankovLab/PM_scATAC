@@ -7,7 +7,7 @@ archp = addClusters (input = archp, resolution = 1.5,
   maxClusters = 100,
   force = TRUE)
 
-archp = addClusters (input = archp, resolution = 3,
+archp = addClusters (input = archp, resolution = 5,
   reducedDims = "IterativeLSI", name = 'Clusters3',
   maxClusters = 100,
   force = TRUE)
@@ -57,119 +57,16 @@ enrichMotifs <- peakAnnoEnrichment(
     seMarker = DAP_list,
     ArchRProj = archp,
     peakAnnotation = "Motif",
-    cutOff = "FDR <= 0.1"
+    cutOff = "FDR <= 0.01"
   )
-heatmapEM = plotEnrichHeatmap (enrichMotifs, n = 7, transpose = TRUE)
+heatmapEM = plotEnrichHeatmap (enrichMotifs, n = 40, transpose = TRUE)
 pdf (file.path ('Plots','enrich_P23_Clusters2_heatmap.pdf'))
 heatmapEM
 dev.off()
 
 
 
-archp_P23 = archp[archp$Clusters2 %in% c('C9','C4')]
-
-# # ## Add column on DAM heatmap showing if TF is pioneer or not from chrombpnet ####
-# # ## Show barplots of top TF occurrence using finemo chrombpnet outputs ####
-
-# # ### Compare TF expression from scRNA and inferred by chrombpnet per cell type ####
-# # library (httr)
-# # library (XML)
-# # library (igraph)
-# #BiocManager::install("universalmotif")
-# library ('universalmotif')
-
-# metaGroupName = 'Clusters2'
-# if (!any (ls() == 'mSE')) mSE = fetch_mat (archp_P23, 'Motif')
-# mMat = assays (mSE)[[1]]
-# rownames (mMat) = rowData(mSE)$name
-
-# chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
-# # metaGroupName = 'celltype_lv1'
-# # celltypes = unique (archp_P23@cellColData[,metaGroupName])
-
-# # tf_database = read_meme('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme', skip = 0, readsites = FALSE, readsites.meta = FALSE)
-# # tf_database = unique(unlist(lapply(tf_database, function(x) unlist(strsplit(x@name,'_'))[1])))
-
-# # list.files (file.path(chromBPdir, celltypes[3],'no_bias_model'))
-# chrombpnet_counts = list()
-# celltypes = c('SOX9_low_P23','SOX9_high_P23')
-# for (celltype in celltypes)
-#   {
-#   message (paste0('reading finemo output for ', celltype))  
-#   chrombpnet_counts[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
-#   }
-
-
-# ### Make barplots of most abundant TFs identified in inflamed and non-inflamed cells
-# bp_df = data.frame (
-#   Freq = c(proportions(head(table (chrombpnet_counts[[1]]$V4)[order (-table (chrombpnet_counts[[1]]$V4))],5)),
-# proportions(head (table (chrombpnet_counts[[2]]$V4)[order (-table (chrombpnet_counts[[2]]$V4))],5))),
-#   TF = names (c(head(table (chrombpnet_counts[[1]]$V4)[order (-table (chrombpnet_counts[[1]]$V4))],5),
-# head (table (chrombpnet_counts[[2]]$V4)[order (-table (chrombpnet_counts[[2]]$V4))],5))),
-#   type = c(rep(celltypes[[1]],5), rep(celltypes[[2]],5)))
-
-
-# library(dplyr)
-
-# df_ordered <- bp_df %>%
-#   group_by(type) %>%
-#   arrange(desc(Freq), .by_group = TRUE) %>%
-#   ungroup()
-  
-# P23_motif_palette = rev(paletteer::paletteer_d("palettetown::seadra") )
-
-
-# df_ordered$TF_type = paste0(df_ordered$TF, df_ordered$type)
-# df_ordered$TF_type = factor (df_ordered$TF_type, levels = unique (df_ordered$TF_type))
-# bp = ggplot (df_ordered, aes (x = type, y = Freq, fill = TF_type)) +
-#   geom_bar (stat = 'identity', position = 'stack') + 
-#   scale_fill_manual (values = P23_motif_palette) + gtheme
-
-# pdf (file.path ('Plots', 'TF_abundance_P23_barplot.pdf'),4,width=4.5)
-# bp
-# dev.off()
-
-
-# chrombpnet_profile = list()
-# celltypes = c('SOX9_low_P23','SOX9_high_P23')
-# for (celltype in celltypes)
-#   {
-#   message (paste0('reading finemo output for ', celltype))  
-#   chrombpnet_profile[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_profile_to_genome_browser.tsv')))
-#   }
-
-
-# ### Make barplots of most abundant TFs identified in inflamed and non-inflamed cells
-# bp_df = data.frame (
-#   Freq = c(proportions(head(table (chrombpnet_profile[[1]]$V4)[order (-table (chrombpnet_profile[[1]]$V4))],5)),
-# proportions(head (table (chrombpnet_profile[[2]]$V4)[order (-table (chrombpnet_profile[[2]]$V4))],5))),
-#   TF = names (c(head(table (chrombpnet_profile[[1]]$V4)[order (-table (chrombpnet_profile[[1]]$V4))],5),
-# head (table (chrombpnet_profile[[2]]$V4)[order (-table (chrombpnet_profile[[2]]$V4))],5))),
-#   type = c(rep(celltypes[[1]],5), rep(celltypes[[2]],5)))
-
-
-# library(dplyr)
-
-# df_ordered <- bp_df %>%
-#   group_by(type) %>%
-#   arrange(desc(Freq), .by_group = TRUE) %>%
-#   ungroup()
-  
-# P23_motif_palette = rev(paletteer::paletteer_d("palettetown::seadra") )
-
-
-# df_ordered$TF_type = paste0(df_ordered$TF, df_ordered$type)
-# df_ordered$TF_type = factor (df_ordered$TF_type, levels = unique (df_ordered$TF_type))
-# bp = ggplot (df_ordered, aes (x = type, y = Freq, fill = TF_type)) +
-#   geom_bar (stat = 'identity', position = 'stack') + 
-#   scale_fill_manual (values = P23_motif_palette) + gtheme
-
-# pdf (file.path ('Plots', 'TF_abundance_P23_profile_barplot.pdf'),4,width=4.5)
-# bp
-# dev.off()
-
-
-
+#archp_P23 = archp[archp$Clusters2 %in% c('C9','C4')]
 
 
 ### Check SOX9 in peaks in P23 ####
@@ -242,13 +139,18 @@ umap_p2 = plotEmbedding (ArchRProj = archp_P23, labelMeans = T,
   #pal = palette_sample,
    embedding = "UMAP")
 
+umap_p3 = plotEmbedding (ArchRProj = archp_P23, labelMeans = F, 
+  colorBy = "cellColData", name = "cNMF20", 
+  pal = rev(palette_genescore),
+  #pal = palette_sample,
+   embedding = "UMAP")
 dev.off()
 
 pdf (file.path('Plots','SOX9_dev_P23_fplot.pdf'), width = 14, height = 12)
 wrap_plots (TF_p)
 wrap_plots(TF_p2)
 wrap_plots (TF_p3)
-wrap_plots(umap_p1, umap_p2)
+wrap_plots (umap_p1, umap_p2, umap_p3)
 dev.off()
 
 
@@ -891,5 +793,108 @@ label = "p.adj.signif") + NoLegend()
 
 pdf (file.path ('Plots','Fuchs_SOX9_module_scores_boxplot.pdf'), width = 5, height=2.4)
 gp
+dev.off()
+
+
+
+
+# Check accessibility at peaks with SNAI2 motifs and compare between SOX9 high / low cells ####
+#archp_P1 = archp[archp$Clusters %in% c('C2') & archp$Sample == 'P1']
+library ('universalmotif')
+
+ps = getPeakSet (archp)
+
+chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet'
+
+chrombpnet_counts = list()
+celltypes = c('SOX9_low_P23','SOX9_high_P23')#,'SOX9_high_P1')
+#celltypes = c('SOX9_high_P1')
+for (celltype in celltypes)
+  {
+  message (paste0('reading finemo output for ', celltype))  
+  chrombpnet_counts[[celltype]] = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
+  gr = makeGRangesFromDataFrame (chrombpnet_counts[[celltype]], keep.extra.columns=T, seqnames.field = 'V1', start.field = 'V2', end.field = 'V3')
+  chrombpnet_counts[[celltype]]$peak_type = ps$peakType[findOverlaps(gr, ps, select='first')]
+  }
+
+table ()
+
+
+
+
+
+force=F
+metaGroupName = 'Clusters2'
+if (!file.exists (paste0('DAP_',metaGroupName,'.rds')) | force)
+  {
+  DAP_list = getMarkerFeatures (
+    ArchRProj = archp, 
+    testMethod = "wilcoxon",
+          useGroups = "C9",
+          bgdGroups = "C4",
+    k=100,
+    binarize = FALSE,
+    useMatrix = "PeakMatrix",
+    groupBy = metaGroupName
+  #  useSeqnames="z"
+  )
+  saveRDS (DAP_list, paste0('DAP_',metaGroupName,'.rds'))
+  } else {
+  DAP_list = readRDS (paste0('DAP_',metaGroupName,'.rds'))
+  }
+DAP_res = do.call (cbind, (assays(DAP_list)))
+colnames (DAP_res) = names(assays(DAP_list))
+DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
+rownames (DAP_res) = as.character(DAP_res_regions)
+
+
+### Check SNAI2 in peaks in P23 ####
+matches = getMatches (archp)
+matchesMat = assays(matches)[[1]]
+colnames (matchesMat) = gsub ('_.*','', colnames (matchesMat))
+colnames (matchesMat) = gsub ("(NKX\\d)(\\d{1})$","\\1-\\2", colnames (matchesMat))
+snai2_hits = rowRanges (matches[matchesMat[,'SNAI2'],])
+snai2_hits = makeGRangesFromDataFrame (chrombpnet_counts[[celltype]][,c(1:3)],seqnames.field = 'V1', start.field='V2', end.field = 'V3')
+snai2_hits_cdh = getPeakSet(archp)
+snai2_hits_cdh = snai2_hits_cdh[grep ('^CDH', snai2_hits_cdh$nearestGene),]
+snai2_hits_cdh = snai2_hits_cdh[unique(queryHits (findOverlaps (snai2_hits_cdh, snai2_hits)))]
+DAP_res_flt = DAP_res[DAP_res$Pval < 0.0001,]
+DAP_res_snai2 = DAP_res_flt[unique(queryHits(findOverlaps(GRanges (rownames(DAP_res_flt)), snai2_hits))),'Log2FC']
+#DAP_res_snai2 = DAP_res_flt[unique(queryHits(findOverlaps(GRanges (rownames(DAP_res_flt)), snai2_hits_cdh))),'Log2FC']
+
+idx = unique(queryHits(findOverlaps(GRanges (rownames(DAP_res)), snai2_hits)))
+DAP_res_snai2 = DAP_res[idx,'Log2FC']
+DAP_res_snai2n = DAP_res[-idx,'Log2FC']
+table (DAP_res_snai2 <= 0)
+table (DAP_res_snai2n <= 0)
+
+
+
+
+# Check overall genescore and RNA expression of TFs correlated with scS-score ####
+metaGroupName = 'Clusters3'
+gsmat = assays(gsSE)[[1]]
+gsmat = gsmat[, rownames(archp_P23@cellColData)]
+#gsmat = assays (gsgSE)[[1]]
+rownames (gsmat) = rowData (gsgSE)$name
+gsmat = gsmat[top_sarc_TF, ]
+gsmat = as.data.frame (gsmat)
+gsmat$TF = rownames (gsmat)
+gs_sarc_TF_df = gather (gsmat, barcode, score, 1:(ncol(gsmat)-1))
+
+pdf()
+TF_db = 'GeneScore'
+Vlnp <- plotGroups(ArchRProj = archp_P23, 
+  groupBy = metaGroupName, 
+  colorBy = paste0(TF_db,'Matrix'), 
+  name = top_sarc_TF,
+  plotAs = "violin"#,
+  #imputeWeights = getImputeWeights(archp_sub),
+  #pal = paletteDiscrete(unique(archp_sub@cellColData[,metaGroupName]), set='rushmore', reverse=T)
+)
+dev.off()
+
+pdf (file.path ('Plots',paste0('sarcomatoid_score_TF_genescore_and_expression_', metaGroupName,'_P23_barplot.pdf')), width = 12,height=8)
+wrap_plots (Vlnp)
 dev.off()
 
