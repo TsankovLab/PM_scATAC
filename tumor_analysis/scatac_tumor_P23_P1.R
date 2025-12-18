@@ -500,56 +500,56 @@ dev.off()
 
 
 
-### Check footprints #####
-clusters_to_keep = c('C10','C4','C5','C6','C7','C8','C9')
-archp_P23 = archp_P23[archp_P23$Clusters2 %in% clusters_to_keep]
-metaGroupName='Clusters2'
-# archp2 = archp
-# archp = archp[archp$sarc_score != 'mid']
-archp <- addGroupCoverages (ArchRProj = archp_P23, groupBy = metaGroupName)
-motifPositions <- getPositions (archp_P23)
+# ### Check footprints #####
+# clusters_to_keep = c('C10','C4','C5','C6','C7','C8','C9')
+# archp_P23 = archp_P23[archp_P23$Clusters2 %in% clusters_to_keep]
+# metaGroupName='Clusters2'
+# # archp2 = archp
+# # archp = archp[archp$sarc_score != 'mid']
+# archp <- addGroupCoverages (ArchRProj = archp_P23, groupBy = metaGroupName)
+# motifPositions <- getPositions (archp_P23)
 
-motifs <- c("SOX9", "SOX6",'RUNX2','SNAI2','FOS')
-markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
+# motifs <- c("SOX9", "SOX6",'RUNX2','SNAI2','FOS')
+# markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
 
-#markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"]
-#markerMotifs
+# #markerMotifs <- markerMotifs[markerMotifs %ni% "SREBF1_22"]
+# #markerMotifs
 
 
-archp_P23 = addGroupCoverages (
-  ArchRProj = archp_P23, 
-  groupBy = metaGroupName,  
-  force = TRUE,
-  minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
-  maxCells = 500,
-  minReplicates = 2,
-  sampleRatio = 0.8,
-  useLabels = TRUE)
+# archp_P23 = addGroupCoverages (
+#   ArchRProj = archp_P23, 
+#   groupBy = metaGroupName,  
+#   force = TRUE,
+#   minCells= 20, # I think this should be set corresponding to the smallest cluster in the group or lower
+#   maxCells = 500,
+#   minReplicates = 2,
+#   sampleRatio = 0.8,
+#   useLabels = TRUE)
 
-#sams = c('P10','P12',
-#sams = 'P23'#),'P4','P5')
+# #sams = c('P10','P12',
+# #sams = 'P23'#),'P4','P5')
 
-#for (sam in sams)
-#  {
-  #peaks_sample = readRDS (file.path ('PeakCalls',paste0(sam,'-reproduciblePeaks.gr.rds')))
-  #motifPositions_sample = lapply (motifPositions, function(x) x[queryHits(findOverlaps(x, peaks_sample))])  
-  seFoot <- getFootprints(
-    ArchRProj = archp_P23, 
-    flank = 1000,
-    #positions = motifPositions_sample[markerMotifs], 
-    positions = motifPositions[markerMotifs], 
-    groupBy = metaGroupName
-  )
+# #for (sam in sams)
+# #  {
+#   #peaks_sample = readRDS (file.path ('PeakCalls',paste0(sam,'-reproduciblePeaks.gr.rds')))
+#   #motifPositions_sample = lapply (motifPositions, function(x) x[queryHits(findOverlaps(x, peaks_sample))])  
+#   seFoot <- getFootprints(
+#     ArchRProj = archp_P23, 
+#     flank = 1000,
+#     #positions = motifPositions_sample[markerMotifs], 
+#     positions = motifPositions[markerMotifs], 
+#     groupBy = metaGroupName
+#   )
   
-plotFootprints(
-seFoot = seFoot[,c('C4._.Rep1','C9._.Rep1')],
-ArchRProj = archp_P23, 
-flank = 1000,
-normMethod = "Subtract",
-plotName = 'P23_SOX9_clusters_footprintes',
-addDOC = FALSE, height=4.5, width=3,
-smoothWindow = 25)
-  #}
+# plotFootprints(
+# seFoot = seFoot[,c('C4._.Rep1','C9._.Rep1')],
+# ArchRProj = archp_P23, 
+# flank = 1000,
+# normMethod = "Subtract",
+# plotName = 'P23_SOX9_clusters_footprintes',
+# addDOC = FALSE, height=4.5, width=3,
+# smoothWindow = 25)
+#   #}
 
 
 
@@ -867,8 +867,6 @@ DAP_res_snai2 = DAP_res[idx,'Log2FC']
 DAP_res_snai2n = DAP_res[-idx,'Log2FC']
 table (DAP_res_snai2 <= 0)
 table (DAP_res_snai2n <= 0)
-
-
 
 
 # Check overall genescore and RNA expression of TFs correlated with scS-score ####

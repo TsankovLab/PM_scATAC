@@ -19,6 +19,7 @@ set.seed(1234)
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/'
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
+scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline'
 source (file.path('..','..','git_repo','utils','useful_functions.R'))
 source (file.path('..','..','git_repo','utils','palettes.R'))
 source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
@@ -143,7 +144,7 @@ source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R'))
 ### Import and format spectra files ####
 k_selection = 25
 cnmf_name = 'scrna_tumor'
-source (file.path ('..','..','git_repo','utils','cnmf_format_spectra_files.R')) 
+source (file.path ('..','..','git_repo','utils','scrna_pipeline','cnmf_format_spectra_files.R')) 
 
 top_nmf_genes = 50
 cnmf_spectra_unique = lapply (cnmf_spectra_unique, function(x) head (x, top_nmf_genes))
@@ -1011,3 +1012,70 @@ print (deg_bar)
 dev.off()
 
   
+
+#### Run SCENIC ####
+force = FALSE
+org = 'human'
+motif_window = 'tss500bp'#'10kbp'
+scenic_name = 'tumor_programs'
+genes.keep = VariableFeatures (FindVariableFeatures (srt, nfeat=5000))
+source (file.path(scrna_pipeline_dir, 'SCENIC.R'))
+
+# Run SCENIC plots ####
+#srt$myeloid = 'myeloid'
+#motif_window = 'tss500bp'#'10kbp'
+#genes.keep = VariableFeatures (FindVariableFeatures (srt, nfeat=5000))
+metaGroupNames = c('sampleID','shared_cnmf2_r_max','myeloid')
+reductionName = 'sampleID_harmony_umap'
+source (file.path(scrna_pipeline_dir, 'SCENIC_plots.R'))
+
+auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/SCENIC/vg_5000_mw_tss500bp/tumor_programs', 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+srt@meta.data = cbind (srt@meta.data, auc_mtx[colnames (srt),])
+reductionName = 'umap'
+pdf (file.path ('Plots','SCENIC_regulons_fplots.pdf'),30,30)
+wrap_plots (fp (srt, gene = colnames (auc_mtx)))
+#fp (srt, gene = 'SOX9')
+dev.off()
+
+pdf (file.path ('Plots','SOX9_SCENIC_regulon_fplots.pdf'),10,10)
+DimPlot (srt, group.by = 'sampleID')
+fp (srt, gene = 'SOX9')
+dev.off()
+
+scenic_genes = read.csv (file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/SCENIC/vg_5000_mw_tss500bp/tumor_programs','motifs.csv'), header=T, skip=1)
+
+genes <- sapply(seq(nrow(scenic_genes)), function(x) unlist(regmatches(scenic_genes[x,9], gregexpr("(?<=\\(')[A-Za-z0-9_-]+", scenic_genes[x,9], perl = TRUE))))
+names (genes) = scenic_genes[,1]
+
+# gene_regulon = 'FOSL2'
+# ps = as.data.frame (log2(AverageExpression (srt, group.by = 'celltype_lv3', features = unique(unlist(genes[names(genes) %in% gene_regulon])))[[1]]+1))
+
+# srt = ModScoreCor (
+#     seurat_obj = srt, 
+#     geneset_list = list(gene_regulon = rownames(ps)), 
+#     cor_threshold = NULL, 
+#     pos_threshold = NULL, # threshold for fetal_pval2
+#     listName = 'TF_module', outdir = NULL)
+
+# ccomp = srt@meta.data[,c('gene_regulon','celltype_lv3')]
+# gp = ggplot(ccomp, aes(x = celltype_lv3, y = gene_regulon, fill = celltype_lv3)) +
+#   geom_boxplot() +
+#   theme_bw() +
+#   theme(
+#     axis.text.x = element_text(angle = 45, hjust = 1),
+#     legend.position = "none"
+#   ) +
+#   labs(x = "", y = "Expression", title = "Expression distribution per cell type")
+
+# pdf (file.path ('Plots','NFKB1_gene_regulons_score.pdf'))
+# gp
+# reductionName='sampleID_harmony_umap'
+# DimPlot (srt, group.by = 'celltype_lv3', reduction=reductionName)
+# fp (srt, 'gene_regulon')
+# dev.off()
+
+

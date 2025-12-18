@@ -323,7 +323,7 @@ dev.off()
 
   # Find DAM ####
   metaGroupName = "celltype_lv3"
-  force = T
+  force = F
   top_genes = Inf
   
   DAM_df = DAM (
@@ -387,6 +387,48 @@ mMat_mg = mMat_mg[cell_subsets_order,]
 
 #DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
 pdf (file.path ('Plots',paste0('DAM_clusters_',metaGroupName,'_heatmap.pdf')), width = 3, height = 4)
+print(DAM_hm)
+dev.off()
+
+### Show IRF TFs activity ####
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames(mMat) = rowData(mSE)$name
+mMat = as.data.frame(mMat)
+mMat = mMat[rownames(mMat)[grep('IRF',rownames(mMat))], ]
+
+#mMat_mg = mMat[active_DAM, ]
+mMat_mg = as.data.frame (t(mMat))
+mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
+mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
+rownames (mMat_mg) = mMat_mg[,1]
+mMat_mg = mMat_mg[,-1]
+mMat_mg = mMat_mg[cell_subsets_order,]
+
+# Generate heatmap ####
+
+ DAM_hm = Heatmap (t(scale(mMat_mg)), 
+          row_labels = colnames (mMat_mg),
+          column_title = paste('top',top_genes),
+          clustering_distance_columns = 'euclidean',
+          clustering_distance_rows = 'euclidean',
+          row_names_side = 'left',
+          cluster_rows = F,
+          #col = pals_heatmap[[5]],
+          cluster_columns=F,#col = pals_heatmap[[1]],
+          row_names_gp = gpar(fontsize = 8),
+          column_names_gp = gpar(fontsize = 8),
+          column_names_rot = 45,
+          name = 'chromVAR',
+          #rect_gp = gpar(col = "white", lwd = .5),
+          border=TRUE,
+          col = rev(palette_deviation)#,
+          #width = unit(2, "cm")
+          #right_annotation = motif_ha
+          )
+
+#DAG_grob = grid.grabExpr(draw(DAG_hm, column_title = 'DAG GeneScore2', column_title_gp = gpar(fontsize = 16)))
+pdf (file.path ('Plots',paste0('IRF_TFs_',metaGroupName,'_heatmap.pdf')), width = 3, height = 4)
 print(DAM_hm)
 dev.off()
 

@@ -811,7 +811,7 @@ dev.off()
 
 
 #### Most correlated genes to gene ####
-gene = 'AXL'
+gene = 'SOX9'
 
 cor_res = lapply(names (meso_bulk_l), function(x) 
   {

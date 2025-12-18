@@ -31,8 +31,8 @@ if (!file.exists ('Save-ArchR-Project.rds'))
  archp = loadArchRProject (projdir)   
   }
 
-archp$Sample3 = archp$Sample2
-archp$Sample3[archp$Clusters == 'C1'] = 'P11_HOX'
+#archp$Sample3 = archp$Sample2
+#archp$Sample3[archp$Clusters == 'C12'] = 'P11_HOX'
 #archp$Sample3[grep ('normal',archp$Sample3)] = 'normal'
 
 # Load RNA ####
@@ -69,10 +69,6 @@ print (wrap_plots (p2_l))
 dev.off()
 
 
-
-
-
-
 archp = addClusters (input = archp, resolution = 1.5,
   reducedDims = "IterativeLSI", name = 'Clusters2',
   maxClusters = 100,
@@ -81,7 +77,7 @@ archp_NN = archp[!archp$Sample3 %in% c('normal1','normal2','normal3')]
 
 pdf ()
 umap_p1 = plotEmbedding (ArchRProj = archp_NN, labelMeans = F, 
-  colorBy = "cellColData", name = "Sample2", 
+  colorBy = "cellColData", name = "Sample3", 
   pal = palette_sample,
    embedding = "UMAP")
 umap_p2 = plotEmbedding (ArchRProj = archp_NN, labelMeans = T, 
@@ -166,12 +162,82 @@ if (!all (names (cnmf_spectra_unique) %in% colnames (archp@cellColData)) | force
   }
 
 cnmf_mat = t(scale(t(as.data.frame (archp@cellColData[,names(cnmf_spectra_unique)]))))
-average_by_group <- as.data.frame(archp@cellColData) %>%
-  group_by(Sample3) %>%
-  summarise(Average = mean(cNMF20))
+archp_meta = as.data.frame (archp@cellColData)
+archp_meta = archp_meta[archp_meta$Sample3 %in% tumor_sams,]
+average_by_group <- as.data.frame(archp_meta) %>%
+  group_by (Sample3) %>%
+  summarise(Average = median(cNMF20))
 average_by_group = average_by_group[order(-average_by_group$Average),]
-sample_sarc_order = factor (archp$Sample3, levels = average_by_group$Sample3)
+sample_sarc_order = factor (archp_meta$Sample3, levels = average_by_group$Sample3)
 
+# ----------------------------
+# Define sample groups
+# ----------------------------
+archp_meta = as.data.frame (archp@cellColData)
+sams = as.character(unique(archp_meta$Sample3))
+tumor_sams = sams[!sams %in% c('normal1','P11_HOX')] # remove normal,low cell numbers and outlier samples
+
+sarc_module = 'cNMF20'
+p_l2=list()
+for (sam in tumor_sams)
+  {
+  archp_sub = archp[archp$Sample3 == sam]
+  varfeat = 25000
+  LSI_method=2
+  archp_sub = addIterativeLSI (ArchRProj = archp_sub, 
+    useMatrix = "TileMatrix", name = "IterativeLSI",
+    force=TRUE, LSIMethod=LSI_method,
+    varFeatures = varfeat)
+  archp_sub = addUMAP (ArchRProj = archp_sub, 
+    reducedDims = "IterativeLSI", seed = 2,
+    force = TRUE)
+  archp_sub = addImputeWeights (archp_sub)
+  # Dimensionality reduction and clustering
+  varfeat = 25000
+  LSI_method=2
+  pdf()
+  p_l2[[sam]] <- plotEmbedding(
+      ArchRProj = archp_sub, 
+      colorBy = "cellColData", 
+      name = sarc_module, rastr=F,
+      embedding = "UMAP",
+      pal = palette_expression,
+      imputeWeights = getImputeWeights(archp_sub),
+      plotAs='points'
+  )
+  dev.off()
+  }
+
+pdf (file.path('Plots','sarcomatoid_score_feature_plots.pdf'), width = 12, height = 15)
+print (wrap_plots (p_l2), ncol = 5)
+dev.off()
+
+# Make violin + boxplot aof sarcomatoid scores and barplot of cell numbers in samples 
+ccomp_df = as.data.frame (archp@cellColData)
+ccomp_df = ccomp_df[ccomp_df$Sample3 %in% tumor_sams,]
+ccomp_df$Sample3 = factor (ccomp_df$Sample3, levels = levels (sample_sarc_order))
+box = ggplot (ccomp_df, aes_string (x= 'Sample3', y= 'cNMF20')) +
+  geom_violin (trim=TRUE, aes_string (fill = 'Sample3'),size=2,
+    width=1,
+    scale='width',
+    linewidth = .2, alpha=0.7) +
+  geom_boxplot (aes_string(fill = 'Sample3'),
+    linewidth = .2,
+    width=0.2,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+    outlier.shape = NA,
+     size=0.3, alpha=0.7
+     ) + ylim (c(-0.4,.8))+
+  gtheme +
+  scale_fill_manual (values= palette_sample) +
+  NoLegend()
+  
+pdf(paste0('Plots/Sarcomatoid_signatures_boxplot.pdf'),width=3,2) #width = 10, height = 11,
+print (box)
+dev.off()
+
+# barplot cell abundances
 
 
 ### Run peak calling ####
@@ -318,49 +384,6 @@ dev.off()
 # #### Generate heatmap of significant Cox proportion hazards from bulk-RNA ####
 # coxht = readRDS (file.path('..','..','bulkRNA_meso','oncoTF_sig_cox_bulkRNA.rds'))
 
-
-
-# ### Show sarcomatoid score per sample regenerating UMAPs ####
-# ----------------------------
-# Define sample groups
-# ----------------------------
-sams = as.character(unique(archp_meta$Sample3))
-tumor_sams = sams[!sams %in% c('normal1','P3','P13','P11_HOX')] # remove normal,low cell numbers and outlier samples
-
-sarc_module = 'cNMF20'
-p_l2=list()
-for (sam in tumor_sams)
-  {
-  archp_sub = archp[archp$Sample3 == sam]
-  varfeat = 25000
-  LSI_method=2
-  archp_sub = addIterativeLSI (ArchRProj = archp_sub, 
-    useMatrix = "TileMatrix", name = "IterativeLSI",
-    force=TRUE, LSIMethod=LSI_method,
-    varFeatures = varfeat)
-  archp_sub = addUMAP (ArchRProj = archp_sub, 
-    reducedDims = "IterativeLSI", seed = 2,
-    force = TRUE)
-  archp_sub = addImputeWeights (archp_sub)
-  # Dimensionality reduction and clustering
-  varfeat = 25000
-  LSI_method=2
-  pdf()
-  p_l2[[sam]] <- plotEmbedding(
-      ArchRProj = archp_sub, 
-      colorBy = "cellColData", 
-      name = sarc_module, rastr=F,
-      embedding = "UMAP",
-      pal = palette_expression,
-      imputeWeights = getImputeWeights(archp_sub),
-      plotAs='points'
-  )
-  dev.off()
-  }
-
-pdf (file.path('Plots','sarcomatoid_score_feature_plots.pdf'), width = 12, height = 15)
-print (wrap_plots (p_l2), ncol = 5)
-dev.off()
 
 
 ### Discover epigenomic features correlated with sarcomatoid score ####
@@ -1804,3 +1827,126 @@ dev.off()
     })
   gs_cor_df = do.call (rbind, gs_cor)
   gs_cor_df$type = 'genescore'
+
+
+
+
+
+### Make module score of SOX9 co-expressed genes from bulk ####
+sox9_module = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/bulkRNA_meso/SOX9_gene_correlations.csv')
+markerMotifs = getFeatures (archp, useMatrix = "GeneScoreMatrix")
+sox9_module = sox9_module[order(-sox9_module$bueno),]  
+sox9_module = sox9_module[sox9_module[,1] %in% markerMotifs,]  
+sox9_module = list (SOX9 = head(sox9_module$X, 100))
+  archp = addModuleScore (
+      ArchRProj = archp,
+      useMatrix = 'GeneScoreMatrix',
+      name = '',
+      features = sox9_module,
+      nBin = 25,
+      nBgd = 100,
+      seed = 1,
+      threads = getArchRThreads(),
+      logFile = createLogFile("addModuleScore")
+    )
+colnames (archp@cellColData) = gsub ('^\\.','',colnames(archp@cellColData))
+  
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "cellColData", 
+    name = 'SOX9', 
+    embedding = "UMAP",
+    pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+pdf (file.path('Plots','bulkRNA_SOX9_module_feature_plots.pdf'), width = 20, height = 20)
+#print (wrap_plots (p2, ncol = 4))
+print (wrap_plots (p, ncol= 4))
+dev.off()
+
+# Try with SOX9 regulon from scRNA ####
+scenic_genes = read.csv (file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scrna/SCENIC/vg_5000_mw_tss500bp/tumor_programs','motifs.csv'), header=T, skip=1)
+genes <- sapply(seq(nrow(scenic_genes)), function(x) unlist(regmatches(scenic_genes[x,9], gregexpr("(?<=\\(')[A-Za-z0-9_-]+", scenic_genes[x,9], perl = TRUE))))
+names (genes) = scenic_genes[,1]
+names (genes) = paste0('SCENIC_',names(genes))
+archp = addModuleScore (
+      ArchRProj = archp,
+      useMatrix = 'GeneScoreMatrix',
+      name = '',
+      features = genes['SCENIC_SOX9'],
+      nBin = 25,
+      nBgd = 100,
+      seed = 1,
+      threads = getArchRThreads(),
+      logFile = createLogFile("addModuleScore")
+    )
+colnames (archp@cellColData) = gsub ('^\\.','',colnames(archp@cellColData))
+  
+pdf()
+p <- plotEmbedding(
+    ArchRProj = archp, 
+    colorBy = "cellColData", 
+    name = 'SCENIC_SOX9', 
+    embedding = "UMAP",
+    pal = palette_expression,
+    imputeWeights = getImputeWeights(archp)
+)
+dev.off()
+
+pdf (file.path('Plots','SCENIC_SOX9_module_feature_plots.pdf'), width = 20, height = 20)
+#print (wrap_plots (p2, ncol = 4))
+print (wrap_plots (p, ncol= 4))
+dev.off()
+
+### Ridge plot of SOX9 regulon ####
+library(ggridges)
+ccomp = archp@cellColData[,c('SCENIC_SOX9','Sample3')]
+p_ridge <- ggplot(ccomp, aes(x = SCENIC_SOX9, y = Sample3, fill = Sample3)) +
+  geom_density_ridges(scale = 3, alpha = 0.7, color = NA) +
+  scale_fill_manual (values = palette_sample) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.y  = element_text(size = 8),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  gtheme_no_rot
+
+pdf(file.path("Plots","SCENIC_SOX9_ridge_plots.pdf"),
+    width = 7, height = 2)
+p_ridge
+dev.off()
+
+ccomp_P23 = ccomp[ccomp$Sample3 == 'P23',]
+hp = ggplot (ccomp_P23, aes (x = SCENIC_SOX9)) + geom_histogram()
+pdf(file.path("Plots","SCENIC_SOX9_histogram.pdf"),
+    width = 7, height = 2)
+hp
+dev.off()
+
+alpha <- 0.05  # total tail probability
+lower <- quantile(ccomp_P23$SCENIC_SOX9, alpha / 2, na.rm = TRUE)
+upper <- quantile(ccomp_P23$SCENIC_SOX9, 1 - alpha / 2, na.rm = TRUE)
+ccomp_P23$breaks = 'not_selected'
+ccomp_P23$breaks[ccomp_P23$SCENIC_SOX9 <= lower] = 'SOX9_regulon_low'
+ccomp_P23$breaks[ccomp_P23$SCENIC_SOX9 >= upper] = 'SOX9_regulon_high'
+
+bp = ggplot(ccomp_P23, aes(x = SCENIC_SOX9, fill = breaks)) +
+  geom_histogram(bins = 30, color = "black")
+pdf(file.path("Plots","SCENIC_SOX9_histogram.pdf"),
+    width = 7, height = 2)
+bp
+dev.off()
+
+
+
+
+
+cor (archp$SCENIC_SOX9, archp$SOX9)
+
+

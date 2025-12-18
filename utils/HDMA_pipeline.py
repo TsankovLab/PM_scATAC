@@ -3,13 +3,32 @@ conda activate chrombpnet
 cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
 #output_dir=/sc/arion/scratch/giottb01/chromBPnet
 chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
-chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
+chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet
+#chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
 
 model_head=profile
+
+# Make models profile paths file 
+chrombpnet_models_paths="modisco_${model_head}_h5_paths.tsv"
+base=$chromBPdir
+
+# Specify celltypes where chrombpnet runs are
+types=(
+inflamed
+non_inflamed
+)
+
+: > $chromBPdir/$chrombpnet_models_paths  # empty the file
+
+for t in "${types[@]}"; do
+    echo -e "${t}\t${chromBPdir}/${t}/no_bias_model/modisco_profile/modisco_results_${model_head}.h5" >> "$chromBPdir/$chrombpnet_models_paths"
+done
+
+
 mkdir ${chromBPdir}/modisco_merged_${model_head}
 
 python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
-  -c ${chromBPdir}/chrombpnet_models_${model_head}_paths.tsv \
+  -c ${chromBPdir}/$chrombpnet_models_paths \
   -o ${chromBPdir}/modisco_merged_${model_head}/pfms_pos.txt \
   -p pos_patterns \
   -t 0.3 \
@@ -17,7 +36,7 @@ python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
 
 
 python code/03-chrombpnet/02-compendium/01-modisco_to_pfm.py \
-  -c ${chromBPdir}/chrombpnet_models_${model_head}_paths.tsv \
+  -c ${chromBPdir}/$chrombpnet_models_paths \
   -o ${chromBPdir}/modisco_merged_${model_head}/pfms_neg.txt \
   -p neg_patterns \
   -t 0.3 \
@@ -101,7 +120,8 @@ python ../git_repo/utils/04a-compile_modisco_obj.py \
 conda activate chrombpnet
 
 compiled_h5=${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.h5
-motif_db=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
+#motif_db=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
+motif_db=/sc/arion/work/giottb01/conda/envs/chrombpnet/lib/python3.8/site-packages/chrombpnet/data/motifs.meme.txt
 tomtom_dir=${chromBPdir}/modisco_merged_${model_head}/compiled_tomtom
 mkdir $tomtom_dir
 python -u code/03-chrombpnet/02-compendium/04b-get_tomtom_matches.py --modisco-h5 $compiled_h5 \
@@ -113,18 +133,16 @@ python -u code/03-chrombpnet/02-compendium/04b-get_tomtom_matches.py --modisco-h
 
 ### Run Fi-Nemo on averaged motifs 
 chmod +x ../git_repo/utils/finemo_motif_calls_on_merged.sh
-chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
+#chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
 #output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/finemo_on_merged_${model_head}
 #finemo_counts_file=no_bias_model/finemo_out_counts/hits.bed
 #if [ -f "${modisco_counts_file}" ] && [ -f "${modisco_profile_file}" ] && [ ! -f "$finemo_counts_file" ]; then
-celltypes=("Myeloid" "Malignant" "Fibroblasts" "Endothelial" "B_cells" \
-           "Mesothelium" "SmoothMuscle" "T_cells" "NK" "Plasma" \
-           "pDCs" "Alveolar")
+echo $types
 
 # celltypes=("NK" "Plasma" \
 #            "pDCs" "Alveolar")
 
-for celltype in ${celltypes[@]}; do
+for celltype in ${types[@]}; do
 
     echo "=== Submit finemo job ==="
     bsub -J ${celltype}_finemo \

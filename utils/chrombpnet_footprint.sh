@@ -39,12 +39,12 @@ echo $MODEL_H5
 #/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
 motif_file=motif_footprints2.txt
-motif_file=motif_footprints.txt
+motif_file=motif_footprints_IRF.txt
 
 chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet
-chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
-chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
-celltype=non_inflamed
+#chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
+#chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
+celltype=inflamed
 celltype=NK_KLRC1
 celltype=SOX9_high_P23
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
@@ -156,7 +156,7 @@ import os
 
 # Paths to average footprint files
 file1 = "average_footprints.h5"
-file2 = "../../SOX9_low_P23/footprints/average_footprints.h5"
+file2 = "../../inflamed/footprints/average_footprints.h5"
 
 # Load footprints
 footprints1 = dd.io.load(file1)
