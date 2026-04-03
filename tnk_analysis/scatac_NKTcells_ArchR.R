@@ -87,7 +87,7 @@ tnk_markers = c('CD4','CD8A',
   'FGFBP2','KLRC1','CTLA4','GZMK',
   'CXCL13','CCR7','TCF7','TOX','IFNG',
   'CX3CR1','TBX21','ASCL2','IL7R',
-  'CXCR4','NR4A2','TIGIT','ICOS','ENTPD1')
+  'CXCR4','NR4A2','TIGIT','ICOS','ENTPD1','LAG3','TNFRSF9','CD28')
 archp = addImputeWeights (archp)
 pdf()
 p <- plotEmbedding(

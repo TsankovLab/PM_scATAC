@@ -197,10 +197,11 @@ hubsCell_mat = as.data.frame (hubsCell_mat)
 
 # Compute differential hub accessibility DHA ####
 library (presto)
-archp$monomac_vs_resident = ifelse (archp$cnmf_celltypes %in% 'IM', 'resident','monomac')
-metaGroupName = 'monomac_vs_resident'
+# archp$monomac_vs_resident = ifelse (archp$cnmf_celltypes %in% 'IM', 'resident','monomac')
+# metaGroupName = 'monomac_vs_resident'
+metaGroupName='momac'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
-compare_groups = c('monomac','resident')
+compare_groups = c('momac','resident')
 res = wilcoxauc (log2(hubsCell_mat[,as.character (archp@cellColData[,metaGroupName]) %in% compare_groups]+1), 
   as.character (archp@cellColData[,metaGroupName][as.character (archp@cellColData[,metaGroupName]) %in% compare_groups]))
 
@@ -213,7 +214,7 @@ res = wilcoxauc (log2(hubsCell_mat[,as.character (archp@cellColData[,metaGroupNa
 # res$gene = hubs_obj$hubsCollapsed$gene[match (res$feature, hubs_obj$hubs_id)]
 # head (res,50)
 
-res = res[res$group == 'monomac',]
+res = res[res$group == 'momac',]
 res$gene = hubs_obj$hubsCollapsed$gene[match (res$feature, hubs_obj$hubs_id)]
 
 DAH_df = data.frame (Log2FC = res$logFC, 
@@ -229,17 +230,18 @@ logFCthreshold = 0.5
 pValThreshold = 1e-5
 DAH_df$color = 'ns'
 DAH_df$label = ''
-DAH_df$label[abs (DAH_df$Log2FC) > logFCthreshold & DAH_df$FDR < pValThreshold] = rownames(DAH_df)[abs (DAH_df$Log2FC) > logFCthreshold & DAH_df$FDR < pValThreshold]
+#DAH_df$label[abs (DAH_df$Log2FC) > logFCthreshold & DAH_df$FDR < pValThreshold] = rownames(DAH_df)[abs (DAH_df$Log2FC) > logFCthreshold & DAH_df$FDR < pValThreshold]
+DAH_df$label[DAH_df$feature == 'HUB427'] = 'HUB427'
 
 # Make volcano plots of DAM per each comparison
 jitter = position_jitter (width = 0.01, height = 0.01)
-vol_p = ggplot(DAH_df, aes(x = Log2FC, y = -log10(FDR), label = feature)) +
+vol_p = ggplot(DAH_df, aes(x = Log2FC, y = -log10(FDR), label = label)) +
   geom_point(aes(color = Log2FC), size = 0.2, alpha = 0.5, position = jitter) +
   geom_text_repel(
     min.segment.length = 0.2,
     box.padding = 0.2,
     size = 2,
-    max.overlaps = 10
+    max.overlaps = 10000
   ) +
   ggtitle("DAH moMac vs IM") +
   xlab("LFC") + 

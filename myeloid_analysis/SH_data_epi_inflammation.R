@@ -478,94 +478,119 @@ km = readRDS ("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_
 
 
 
-# #### Identify TF regulators correlated to each scRNA cnmf #####
-# if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-# mMat = assays (mSE)[[1]]
-# rownames (mMat) = rowData (mSE)$name
+
+### Run TF correlation to identify TF modules across TNK cells ####
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+#mMat = scale(as.matrix(mMat))#[selected_TF,])
 
 # # Filter by RNA expression ####
-# metaGroupName = 'celltype_SM'
-# active_TFs = exp_genes (srt, rownames(mMat), min_exp = 0.1, metaGroupName)
-# mMat = t(scale (mMat[active_TFs, ]))
-# if (!file.exists ('mMat_scaled_active.rds')) saveRDS (mMat, 'mMat_scaled_active.rds')
+metaGroupName = 'celltype_SM'
+min_exp = .1
+active_TFs = exp_genes (srt, rownames(mMat), min_exp = min_exp, metaGroupName)
+mMat = t(scale (mMat[active_TFs, ]))
+mMat_cor = cor (as.matrix(mMat), method = 'spearman')
 
-# #mMat = scale(as.matrix(mMat))#[selected_TF,])
-# mMat = readRDS ('mMat_scaled_active.rds')
-# mMat_cor = cor (as.matrix(mMat), method = 'spearman')
+set.seed(123)
+centers=2
+km = kmeans (mMat_cor, centers=centers)
+if (!file.exists ('TF_activity_modules.rds')) saveRDS (km, 'TF_activity_modules.rds')
+write.csv (patchvecs (split (names(km$cluster),km$cluster)), 'regMye_modules.csv')
 
-# set.seed(1234)
-# centers=2
-# km = kmeans (mMat_cor, centers=centers)
-# if (!file.exists ('TF_activity_modules.rds')) saveRDS (km, 'TF_activity_modules.rds')
+genes_highlight = c(
+'IKZF1
+HIVEP3
+HIVEP1
+NFKB2
+RELB
+RELA
+NFKB1
+REL
+NFE2L2
+NFE2
+BATF
+JDP2
+FOSB
+SMARCC1
+JUND
+FOSL1
+BACH1
+JUNB
+FOSL2
+FOS
+JUN')
 
-# AP1 = c('JUNB',
-# 'FOSL2',
-# 'JUN',
-# 'SMARCC1',
-# 'FOSL1',
-# 'JUND',
-# 'FOS',
-# 'JDP2',
-# 'BACH1',
-# 'FOSB',
-# 'BATF',
-# 'NFE2',
-# 'NFE2L2')
-# ha2 = rowAnnotation (foo = anno_mark(at = match(AP1,colnames(mMat_cor)), 
-#     labels = AP1, labels_gp = gpar(fontsize = 7)))
+genes_highlight2 = c(
+'NFE2L2
+NFE2
+BATF
+JDP2
+FOSB
+SMARCC1
+JUND
+FOSL1
+BACH1
+JUNB
+FOSL2
+FOS
+JUN')
 
-# pdf (file.path ('Plots','TF_modules_heatmap3.pdf'), width = 4,height=3)
-# cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
-#   right_annotation = ha2,
-#   #left_annotation = ha,
-#   #rect_gp = gpar(type = "none"),
-#   clustering_distance_rows='euclidean' ,
-#   clustering_distance_columns = 'euclidean', 
-#   col=palette_deviation_cor_fun, 
-#   row_split = km$cluster,
-#   column_split = km$cluster,
-#   #row_km=2, 
-#   #column_km=2,
-# #  right_annotation = ha,
-#   border=T,
-# #   ,
-#   row_names_gp = gpar(fontsize = 0), 
-#   column_names_gp = gpar(fontsize = 0)
-# # cell_fun = function(j, i, x, y, w, h, fill) {# THIS DOESNT WORK NEED TO USE LAYER_FUN
-# #         if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
-# #             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
-# #         }}
-#   ))
-#   # ,
-#   # cell_fun = function(j, i, x, y, w, h, fill) {
-#   #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
-#   #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
-# #        }}))
-# dev.off()
+genes_highlight2 = c(
+'FOSL1
+FOSL2
+BACH1
+PPARG
+NFKB2
+KLF12
+HIVEP3
+SMAD1
+NFKB1
+REL
+RUNX1
+SNAI1
+RUNX2
+NFAT5')
+# saveRDS (genes_highlight,'inflammation_TFs.rds')
 
-# pdf (file.path ('Plots','TF_modules_heatmap3.pdf'), width = 4.6, height=3)
-# cor_mMat_hm
-# dev.off()
+#genes_highlight2 = unlist(strsplit(genes_highlight2,'\n'))
+genes_highlight = unlist(strsplit(genes_highlight2,'\n'))
 
-# #km = readRDS ("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/TF_activity_modules.rds")
+ha2 = rowAnnotation (foo = anno_mark(at = match(genes_highlight,colnames(mMat_cor)), 
+    labels = genes_highlight, labels_gp = gpar(fontsize = 7)))
 
-# #AP1 = names (km$cluster[km$cluster == 2])
-# AP1 = c('JUNB',
-# 'FOSL2',
-# 'JUN',
-# 'SMARCC1',
-# 'FOSL1',
-# 'JUND',
-# 'FOS',
-# 'JDP2',
-# 'BACH1',
-# 'FOSB',
-# 'BATF',
-# 'NFE2',
-# 'NFE2L2')
+pdf (file.path ('Plots','TF_modules_heatmap3.pdf'), width = 4,height=3)
+cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
+  right_annotation = ha2,
+  #left_annotation = ha,
+  #rect_gp = gpar(type = "none"),
+  clustering_distance_rows='euclidean' ,
+  clustering_distance_columns = 'euclidean', 
+  col=palette_deviation_cor_fun, 
+  row_split = km$cluster,
+  column_split = km$cluster,
+  #row_km=2, 
+  #column_km=2,
+#  right_annotation = ha,
+  border=T,
+#   ,
+  row_names_gp = gpar(fontsize = 0), 
+  column_names_gp = gpar(fontsize = 0)
+# cell_fun = function(j, i, x, y, w, h, fill) {# THIS DOESNT WORK NEED TO USE LAYER_FUN
+#         if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+#             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#         }}
+  ))
+  # ,
+  # cell_fun = function(j, i, x, y, w, h, fill) {
+  #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
+  #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
+#        }}))
+dev.off()
 
-# all (rownames(archp@cellColData) == rownames(mMat))
-# archp$mod_2 = rowMeans (mMat[,AP1])
+pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4, height=3)
+cor_mMat_hm
+dev.off()
 
 # ### Plot UMAP using chromvar TF ####
 # mMat = readRDS ('mMat_scaled_active.rds')
@@ -1075,7 +1100,7 @@ p_density_y <- ggplot(df_sub, aes(PC2, fill = celltype)) +
     axis.ticks.y = element_blank()
   ) + gtheme_no_rot
 
-pdf (file.path ('Plots','scatac_cnmf_inflammation_module_ridge_plots.pdf'), width = 5,height=6)
+pdf (file.path ('Plots','scrna_momac_deviation_pca.pdf'), width = 5,height=6)
 p_density_x + plot_spacer() + p_scatter + p_density_y + 
   plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
     guides = "collect"      # <- collect legends into one
@@ -1098,9 +1123,9 @@ rownames(auc_mtx) = gsub ('\\.','-', rownames(auc_mtx))
 auc_mtx = auc_mtx[,-1]
 colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
 
-auc_mtx = auc_mtx[colnames(srt),]
+auc_mtx = auc_mtx[rownames(auc_mtx) %in% colnames(srt),]
 p <- prcomp(auc_mtx, center = TRUE, scale. = TRUE)
-plot_df <- data.frame(p$x, celltype = srt$shared_cnmf_r_max)
+plot_df <- data.frame(p$x, celltype = srt$shared_cnmf_r_max[rownames(auc_mtx)])
 
 
 # df_sub <- plot_df[plot_df$celltype %in% 
@@ -1171,50 +1196,23 @@ dev.off()
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 #-------------------------
-# 0. RUN UMAP
+# 1. MAIN SCATTER use only NFKB1 and JUNB
 #-------------------------
-set.seed(123)  # for reproducibility
-library(uwot)
-umap_res <- umap(
-  t(mMat),
-  n_neighbors = 30,
-  min_dist = 0.3,
-  metric = "cosine",
-  scale = TRUE
-)
 
-plot_df <- data.frame(
-  UMAP1 = umap_res[,1],
-  UMAP2 = umap_res[,2],
-  celltype = archp$shared_cnmf_r_max
-)
+plot_df <- data.frame(auc_mtx, celltype = srt$shared_cnmf_r_max[rownames(auc_mtx)])
 
-df_sub <- plot_df[plot_df$celltype %in%
+df_sub <- plot_df[plot_df$celltype %in% 
                     c("Mono_CD14","TAM_interstitial","TAM_TREM2",
                       "TAM_MARCO","TAM_CXCLs"), ]
 
 
-#-------------------------
-# 1. MAIN SCATTER
-#-------------------------
-p_scatter <- ggplot(df_sub, aes(UMAP1, UMAP2, color = celltype)) +
+p_scatter <- ggplot(df_sub, aes(NFKB1, JUNB, color = celltype)) +
   geom_point(alpha = 0.4, size = 0.1) +
   geom_density_2d(size = 0.4) +
   scale_color_manual(values = palette_myeloid) +
+  # scale_x_continuous(limits = x_range, expand = c(0,0)) +
+  # scale_y_continuous(limits = y_range, expand = c(0,0)) +
   gtheme_no_rot +
   theme(
     legend.position = "right",
@@ -1222,10 +1220,7 @@ p_scatter <- ggplot(df_sub, aes(UMAP1, UMAP2, color = celltype)) +
   )
 
 
-#-------------------------
-# 2. TOP DENSITY (UMAP1)
-#-------------------------
-p_density_x <- ggplot(df_sub, aes(UMAP1, fill = celltype)) +
+p_density_x <- ggplot(df_sub, aes(NFKB1, fill = celltype)) +
   geom_density(alpha = 0.3, color = NA) +
   scale_fill_manual(values = palette_myeloid) +
   theme_classic() +
@@ -1234,14 +1229,9 @@ p_density_x <- ggplot(df_sub, aes(UMAP1, fill = celltype)) +
     axis.title.x = element_blank(),
     axis.text.x  = element_blank(),
     axis.ticks.x = element_blank()
-  ) +
-  gtheme_no_rot
+  ) + gtheme_no_rot
 
-
-#-------------------------
-# 3. RIGHT DENSITY (UMAP2)
-#-------------------------
-p_density_y <- ggplot(df_sub, aes(UMAP2, fill = celltype)) +
+p_density_y <- ggplot(df_sub, aes(JUNB, fill = celltype)) +
   geom_density(alpha = 0.3, color = NA) +
   scale_fill_manual(values = palette_myeloid) +
   coord_flip() +
@@ -1251,75 +1241,42 @@ p_density_y <- ggplot(df_sub, aes(UMAP2, fill = celltype)) +
     axis.title.y = element_blank(),
     axis.text.y  = element_blank(),
     axis.ticks.y = element_blank()
-  ) +
-  gtheme_no_rot
+  ) + gtheme_no_rot
 
-
-#-------------------------
-# 4. SAVE PDF
-#-------------------------
-pdf(file.path("Plots","scatac_cnmf_inflammation_module_umap_ridge_plots.pdf"),
-    width = 5, height = 5)
-
-p_density_x + plot_spacer() + p_scatter + p_density_y +
-  plot_layout(
-    ncol = 2, nrow = 2,
-    widths  = c(4, 1),
-    heights = c(1, 4),
-    guides = "collect"
+pdf (file.path ('Plots','scrna_momac_regulon_NFKB1_JUNB_scatter.pdf'), width = 5,height=6)
+p_density_x + plot_spacer() + p_scatter + p_density_y + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
+    guides = "collect"      # <- collect legends into one
   ) &
   theme(
-    legend.position = "bottom",
-    legend.box = "horizontal"
+    legend.position = "bottom",  # or "top"
+    legend.box = "vertical"
   )
 
 dev.off()
 
 
 
-umap_df <- data.frame(UMAP1 = umap_res[,1],
-                      UMAP2 = umap_res[,2])
-
-cors_UMAP1 <- apply(t(mMat), 2, function(x) cor(x, umap_df$UMAP1))
-cors_UMAP2 <- apply(t(mMat), 2, function(x) cor(x, umap_df$UMAP2))
-
-loadings_like <- data.frame(peak = colnames(mMat),
-                            cor_UMAP1 = cors_UMAP1,
-                            cor_UMAP2 = cors_UMAP2)
 
 
 
 #-------------------------
-# 0. RUN UMAP
+# 1. MAIN SCATTER use only NFKB1 and JUNB
 #-------------------------
-set.seed(123)  # for reproducibility
-library(uwot)
-umap_res <- umap(
-  auc_mtx,
-  n_neighbors = 30,
-  min_dist = 0.3,
-  metric = "cosine",
-  scale = TRUE
-)
 
-plot_df <- data.frame(
-  UMAP1 = umap_res[,1],
-  UMAP2 = umap_res[,2],
-  celltype = srt$shared_cnmf_r_max
-)
+plot_df <- data.frame(auc_mtx, celltype = srt$celltype_simplified[rownames(auc_mtx)])
 
-df_sub <- plot_df[plot_df$celltype %in%
-                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
-                      "TAM_MARCO","TAM_CXCLs"), ]
+select_cells = c('Mye_CD14 Mono','Mye_CD14 Mono_activated','Mye_Mac_IM','Mye_Mac_HIF1A','Mye_Mac_SPP1','Mye_Mac_TRM','Mye_Mac_transition','Mye_Mac_TREM2')
+df_sub <- plot_df[plot_df$celltype %in% 
+                    select_cells, ]
 
 
-#-------------------------
-# 1. MAIN SCATTER
-#-------------------------
-p_scatter <- ggplot(df_sub, aes(UMAP1, UMAP2, color = celltype)) +
+p_scatter <- ggplot(df_sub, aes(NFKB1, JUNB, color = celltype)) +
   geom_point(alpha = 0.4, size = 0.1) +
   geom_density_2d(size = 0.4) +
-  scale_color_manual(values = palette_myeloid) +
+  #scale_color_manual(values = palette_myeloid) +
+  # scale_x_continuous(limits = x_range, expand = c(0,0)) +
+  # scale_y_continuous(limits = y_range, expand = c(0,0)) +
   gtheme_no_rot +
   theme(
     legend.position = "right",
@@ -1327,28 +1284,20 @@ p_scatter <- ggplot(df_sub, aes(UMAP1, UMAP2, color = celltype)) +
   )
 
 
-#-------------------------
-# 2. TOP DENSITY (UMAP1)
-#-------------------------
-p_density_x <- ggplot(df_sub, aes(UMAP1, fill = celltype)) +
+p_density_x <- ggplot(df_sub, aes(NFKB1, fill = celltype)) +
   geom_density(alpha = 0.3, color = NA) +
-  scale_fill_manual(values = palette_myeloid) +
+  #scale_fill_manual(values = palette_myeloid) +
   theme_classic() +
   theme(
     legend.position = "none",
     axis.title.x = element_blank(),
     axis.text.x  = element_blank(),
     axis.ticks.x = element_blank()
-  ) +
-  gtheme_no_rot
+  ) + gtheme_no_rot
 
-
-#-------------------------
-# 3. RIGHT DENSITY (UMAP2)
-#-------------------------
-p_density_y <- ggplot(df_sub, aes(UMAP2, fill = celltype)) +
+p_density_y <- ggplot(df_sub, aes(JUNB, fill = celltype)) +
   geom_density(alpha = 0.3, color = NA) +
-  scale_fill_manual(values = palette_myeloid) +
+  #scale_fill_manual(values = palette_myeloid) +
   coord_flip() +
   theme_classic() +
   theme(
@@ -1356,29 +1305,222 @@ p_density_y <- ggplot(df_sub, aes(UMAP2, fill = celltype)) +
     axis.title.y = element_blank(),
     axis.text.y  = element_blank(),
     axis.ticks.y = element_blank()
-  ) +
-  gtheme_no_rot
+  ) + gtheme_no_rot
 
-
-#-------------------------
-# 4. SAVE PDF
-#-------------------------
-pdf(file.path("Plots","scrna_cnmf_inflammation_module_umap_ridge_plots.pdf"),
-    width = 5, height = 5)
-
-p_density_x + plot_spacer() + p_scatter + p_density_y +
-  plot_layout(
-    ncol = 2, nrow = 2,
-    widths  = c(4, 1),
-    heights = c(1, 4),
-    guides = "collect"
+pdf (file.path ('Plots','scrna_momac_regulon_NFKB1_JUNB_samarth_anno_scatter.pdf'), width = 8,height=8)
+p_density_x + plot_spacer() + p_scatter + p_density_y + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
+    guides = "collect"      # <- collect legends into one
   ) &
   theme(
-    legend.position = "bottom",
-    legend.box = "horizontal"
+    legend.position = "bottom",  # or "top"
+    legend.box = "vertical"
   )
 
 dev.off()
+
+
+
+
+
+
+
+
+# #-------------------------
+# # 0. RUN UMAP
+# #-------------------------
+# set.seed(123)  # for reproducibility
+# library(uwot)
+# umap_res <- umap(
+#   t(mMat),
+#   n_neighbors = 30,
+#   min_dist = 0.3,
+#   metric = "cosine",
+#   scale = TRUE
+# )
+
+# plot_df <- data.frame(
+#   UMAP1 = umap_res[,1],
+#   UMAP2 = umap_res[,2],
+#   celltype = archp$shared_cnmf_r_max
+# )
+
+# df_sub <- plot_df[plot_df$celltype %in%
+#                     c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+#                       "TAM_MARCO","TAM_CXCLs"), ]
+
+
+# #-------------------------
+# # 1. MAIN SCATTER
+# #-------------------------
+# p_scatter <- ggplot(df_sub, aes(UMAP1, UMAP2, color = celltype)) +
+#   geom_point(alpha = 0.4, size = 0.1) +
+#   geom_density_2d(size = 0.4) +
+#   scale_color_manual(values = palette_myeloid) +
+#   gtheme_no_rot +
+#   theme(
+#     legend.position = "right",
+#     plot.margin = margin(0,0,0,0)
+#   )
+
+
+# #-------------------------
+# # 2. TOP DENSITY (UMAP1)
+# #-------------------------
+# p_density_x <- ggplot(df_sub, aes(UMAP1, fill = celltype)) +
+#   geom_density(alpha = 0.3, color = NA) +
+#   scale_fill_manual(values = palette_myeloid) +
+#   theme_classic() +
+#   theme(
+#     legend.position = "none",
+#     axis.title.x = element_blank(),
+#     axis.text.x  = element_blank(),
+#     axis.ticks.x = element_blank()
+#   ) +
+#   gtheme_no_rot
+
+
+# #-------------------------
+# # 3. RIGHT DENSITY (UMAP2)
+# #-------------------------
+# p_density_y <- ggplot(df_sub, aes(UMAP2, fill = celltype)) +
+#   geom_density(alpha = 0.3, color = NA) +
+#   scale_fill_manual(values = palette_myeloid) +
+#   coord_flip() +
+#   theme_classic() +
+#   theme(
+#     legend.position = "none",
+#     axis.title.y = element_blank(),
+#     axis.text.y  = element_blank(),
+#     axis.ticks.y = element_blank()
+#   ) +
+#   gtheme_no_rot
+
+
+# #-------------------------
+# # 4. SAVE PDF
+# #-------------------------
+# pdf(file.path("Plots","scatac_cnmf_inflammation_module_umap_ridge_plots.pdf"),
+#     width = 5, height = 5)
+
+# p_density_x + plot_spacer() + p_scatter + p_density_y +
+#   plot_layout(
+#     ncol = 2, nrow = 2,
+#     widths  = c(4, 1),
+#     heights = c(1, 4),
+#     guides = "collect"
+#   ) &
+#   theme(
+#     legend.position = "bottom",
+#     legend.box = "horizontal"
+#   )
+
+# dev.off()
+
+
+
+# umap_df <- data.frame(UMAP1 = umap_res[,1],
+#                       UMAP2 = umap_res[,2])
+
+# cors_UMAP1 <- apply(t(mMat), 2, function(x) cor(x, umap_df$UMAP1))
+# cors_UMAP2 <- apply(t(mMat), 2, function(x) cor(x, umap_df$UMAP2))
+
+# loadings_like <- data.frame(peak = colnames(mMat),
+#                             cor_UMAP1 = cors_UMAP1,
+#                             cor_UMAP2 = cors_UMAP2)
+
+
+
+# #-------------------------
+# # 0. RUN UMAP
+# #-------------------------
+# set.seed(123)  # for reproducibility
+# library(uwot)
+# umap_res <- umap(
+#   auc_mtx,
+#   n_neighbors = 30,
+#   min_dist = 0.3,
+#   metric = "cosine",
+#   scale = TRUE
+# )
+
+# plot_df <- data.frame(
+#   UMAP1 = umap_res[,1],
+#   UMAP2 = umap_res[,2],
+#   celltype = srt$shared_cnmf_r_max
+# )
+
+# df_sub <- plot_df[plot_df$celltype %in%
+#                     c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+#                       "TAM_MARCO","TAM_CXCLs"), ]
+
+
+# #-------------------------
+# # 1. MAIN SCATTER
+# #-------------------------
+# p_scatter <- ggplot(df_sub, aes(UMAP1, UMAP2, color = celltype)) +
+#   geom_point(alpha = 0.4, size = 0.1) +
+#   geom_density_2d(size = 0.4) +
+#   scale_color_manual(values = palette_myeloid) +
+#   gtheme_no_rot +
+#   theme(
+#     legend.position = "right",
+#     plot.margin = margin(0,0,0,0)
+#   )
+
+
+# #-------------------------
+# # 2. TOP DENSITY (UMAP1)
+# #-------------------------
+# p_density_x <- ggplot(df_sub, aes(UMAP1, fill = celltype)) +
+#   geom_density(alpha = 0.3, color = NA) +
+#   scale_fill_manual(values = palette_myeloid) +
+#   theme_classic() +
+#   theme(
+#     legend.position = "none",
+#     axis.title.x = element_blank(),
+#     axis.text.x  = element_blank(),
+#     axis.ticks.x = element_blank()
+#   ) +
+#   gtheme_no_rot
+
+
+# #-------------------------
+# # 3. RIGHT DENSITY (UMAP2)
+# #-------------------------
+# p_density_y <- ggplot(df_sub, aes(UMAP2, fill = celltype)) +
+#   geom_density(alpha = 0.3, color = NA) +
+#   scale_fill_manual(values = palette_myeloid) +
+#   coord_flip() +
+#   theme_classic() +
+#   theme(
+#     legend.position = "none",
+#     axis.title.y = element_blank(),
+#     axis.text.y  = element_blank(),
+#     axis.ticks.y = element_blank()
+#   ) +
+#   gtheme_no_rot
+
+
+# #-------------------------
+# # 4. SAVE PDF
+# #-------------------------
+# pdf(file.path("Plots","scrna_cnmf_inflammation_module_umap_ridge_plots.pdf"),
+#     width = 5, height = 5)
+
+# p_density_x + plot_spacer() + p_scatter + p_density_y +
+#   plot_layout(
+#     ncol = 2, nrow = 2,
+#     widths  = c(4, 1),
+#     heights = c(1, 4),
+#     guides = "collect"
+#   ) &
+#   theme(
+#     legend.position = "bottom",
+#     legend.box = "horizontal"
+#   )
+
+# dev.off()
 
 
 
@@ -1432,3 +1574,1260 @@ dev.off()
 pdf (file.path ('Plots','positive_expression_TFs.pdf'), width = 4,height=4)
 p
 dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Compare MDM score between deviation and genescore ####
+mdm_sig = c('FOSL1','FOSL2','BACH1','PPARG','NFKB2','KLF12','HIVEP3','SMAD1','NFKB1','REL','RUNX1','SNAI1','RUNX2','NFAT5')
+mdm_sig2 = c('FOSL1','FOSL2','BACH1','NFKB2','NFKB1','REL')
+myeloid_order = c('Mye_CD14 Mono_activated','Mye_CD14 Mono','Mye_Mac_TREM2','Mye_Mac_SPP1','Mye_Mac_IM','Mye_Mac_TRM')
+myeloid_order = c('Mono_CD14','TAM_CXCLs','TAM_TREM2','TAM_MARCO','TAM_interstitial')
+
+# Add metacolumns of average TF modules activity ####
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = scale(assays (mSE)[[1]])
+rownames (mMat) = rowData (mSE)$name
+#mMat = as.data.frame (t(scale(as.matrix(mMat)[mdm_sig,])))
+mMat = as.data.frame (t(as.matrix(mMat)[mdm_sig2,]))
+mMat = aggregate (mMat, by = list(celltype_lv3 = archp$shared_cnmf_r_max), mean)
+rownames (mMat) = mMat[,1]
+mMat = mMat[,-1]
+mMat = as.data.frame (scale(mMat[myeloid_order,]))
+pdf (file.path ('Plots','MDM_score_activity_heatmap.pdf'),2.5, 2.5)
+Heatmap (t(mMat), 
+  col = rev(palette_deviation), 
+  cluster_columns=F,
+  row_names_gp = gpar(fontsize = 7),
+  column_names_gp = gpar(fontsize = 7),
+  column_names_rot = 45,
+  border=T)
+dev.off()
+
+#mMat = as.data.frame (scale (mMat))
+mMat$celltype = rownames (mMat)
+mMat = gather (mMat, TF, expression, 1:(ncol(mMat)-1))
+mMat$type = 'deviation'
+
+# Get genescore ####
+if (!exists('gsSE')) gsSE = fetch_mat (archp, 'GeneScore')
+gsMat = scale(assays (gsSE)[[1]])
+rownames (gsMat) = rowData (gsSE)$name
+#gsMat = scale(gsMat[rownames (gsMat) %in% mdm_sig,])
+gsMat = gsMat[rownames (gsMat) %in% mdm_sig2,]
+gsMat = t(gsMat)
+gsMat = as.data.frame (gsMat)
+gsMat = aggregate (gsMat, by = list(celltype_lv3 = archp$shared_cnmf_r_max), mean)
+rownames (gsMat) = gsMat[,1]
+gsMat = gsMat[,-1]
+gsMat = as.data.frame (scale(gsMat[myeloid_order,]))
+pdf (file.path ('Plots','MDM_score_genescore_heatmap.pdf'),2.5,2.5)
+Heatmap (t(gsMat), 
+  col = rev(palette_deviation), 
+  cluster_columns=F,
+  row_names_gp = gpar(fontsize = 7),
+  column_names_gp = gpar(fontsize = 7),
+  column_names_rot = 45,
+  border=T)
+dev.off()
+
+#gsMat = as.data.frame (scale (gsMat))
+gsMat$celltype = rownames (gsMat)
+gsMat = gather (gsMat, TF, expression, 1:(ncol(gsMat)-1))
+gsMat$type = 'genescore'
+
+
+### Use scRNA ####
+#gsMat = gather (gsMat, TF, expression, 2:ncol(gsMat))
+ps = log2(as.data.frame (AverageExpression (srt, features = mdm_sig2, group.by = 'shared_cnmf_r_max')[[1]]) +1)
+colnames (ps) = gsub ('-','_',colnames(ps))
+ps = as.data.frame (scale(t(ps)))
+ps$celltype = rownames(ps)
+ps = gather (ps, TF, expression, 1:(ncol(ps)-1))
+ps$type = 'expression'
+
+combined = rbind (mMat, gsMat, ps)
+
+
+df = combined
+df$celltype <- factor(df$celltype, levels = unique(df$celltype))
+#df$TF = paste0(df$TF, df$type)
+df = df[df$celltype %in% myeloid_order,]
+df$celltype = factor (df$celltype,myeloid_order)
+
+p <- list()
+
+for (g in mdm_sig2) {
+  p[[g]] <- ggplot(
+    df[df$TF == g, ],
+    aes(
+      x = celltype,
+      y = expression,
+      group = type,          # ← key change
+      color = type
+    )
+  ) +
+    geom_line(linewidth = 1) +
+    geom_point(size = 2) +
+    ggtitle(g) + gtheme + facet_wrap (~type, scales = 'free_y')
+}
+
+pdf (file.path ('Plots','deviation_vs_genescore_MDM_sig_linePlot.pdf'), width=14,height=7)
+wrap_plots (p)
+dev.off()
+
+
+library(dplyr)
+df = combined
+#df = df[df$TF %in% c('FOSL1','FOSL2','BACH1','PPARG','NFKB2','NFKB1'),]
+df = df[df$celltype %in% myeloid_order,]
+df$celltype = factor (df$celltype,myeloid_order)
+
+sum_df <- df %>%
+  group_by(celltype, type) %>%
+  summarise(
+    median_expr = median(expression, na.rm = TRUE),
+    mean_expr   = mean(expression, na.rm = TRUE),
+    q25         = quantile(expression, 0.25, na.rm = TRUE),
+    q75         = quantile(expression, 0.75, na.rm = TRUE),
+    sd          = sd(expression, na.rm = TRUE),
+    n           = n(),
+    sem         = sd / sqrt(n),
+    .groups = "drop"
+  )
+p =ggplot(
+  sum_df,
+  aes(
+    x = celltype,
+    y = mean_expr,
+    group = type,
+    color = type,
+    fill  = type
+  )
+) +
+  geom_ribbon(
+    aes(ymin = q25, ymax = q75),
+    alpha = 0.25,
+    color = NA
+  ) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2) +
+  labs(
+    y = "Mean TF expression",
+    x = "Cell type"
+  ) + facet_wrap (~type, scales = 'free_y') + gtheme
+
+pdf (file.path ('Plots','deviation_vs_genescore_MDM_sig_mean_linePlot.pdf'), width = 5,height=3)
+p
+dev.off()
+
+
+
+
+
+
+
+### Make trajectory of metacells based on NFKB deviation and compare with genescore and expression ####
+
+library(dplyr)
+library(zoo)
+library(ggplot2)
+
+###---------------------------------------------------------
+### 1. Load inputs and define samples
+###---------------------------------------------------------
+
+selected_TF <- c('FOSL1','FOSL2','BACH1','NFKB2','NFKB1','REL')
+select_cells = c('Mye_CD14 Mono','Mye_CD14 Mono_activated','Mye_Mac_IM','Mye_Mac_HIF1A','Mye_Mac_SPP1','Mye_Mac_TRM','Mye_Mac_transition','Mye_Mac_TREM2')
+#sarc_module <- "cNMF20"
+
+archp_meta <- as.data.frame(archp@cellColData)
+archp_meta = archp_meta[archp_meta$celltype_simplified %in% select_cells,]
+
+# Filter samples: remove normal lung, low-cell samples, and outliers
+sams <- unique(archp_meta$Sample)
+#sams <- sams[!sams %in% c("normal1","normal2","normal3","normal4","P3","P13","P11_HOX")]
+
+
+###---------------------------------------------------------
+### 2. Extract and scale motif deviations (TF activity)
+###---------------------------------------------------------
+
+# Fetch motif matrix only if not already loaded
+if (!exists ('mSE')) mSE <- fetch_mat(archp, "Motif")
+mMat <- scale (assays(mSE)[[1]])
+rownames(mMat) <- rowData(mSE)$name
+
+# Keep only selected TFs and z-score normalize
+#mMat <- scale(mMat[selected_TF,])
+mMat <- mMat[selected_TF,rownames(archp_meta)]
+mMat <- t(mMat)
+
+# Split by sample
+mMat <- lapply(sams, function(s) mMat[archp_meta$Sample == s,])
+names(mMat) <- sams
+
+
+###---------------------------------------------------------
+### 3. Extract and scale GeneScore matrix
+###---------------------------------------------------------
+
+if (!exists ('gsSE')) gsSE <- fetch_mat(archp, "GeneScore")
+gsMat <- scale(assays(gsSE)[[1]])
+rownames(gsMat) <- rowData(gsSE)$name
+
+# Keep only selected TFs and z-score normalize
+gsMat <- gsMat[selected_TF,rownames(archp_meta)]
+gsMat <- t(gsMat)
+
+# Split by sample
+gsMat <- lapply(sams, function(s) gsMat[archp_meta$Sample == s,])
+names(gsMat) <- sams
+
+
+
+
+###---------------------------------------------------------
+### 3. Extract and scale Expression matrix
+###---------------------------------------------------------
+
+eMat <- srt@assays$RNA@data
+#eMat <- scale(eSE)
+archp_meta2 = archp_meta
+rownames (archp_meta2) = gsub ('fragments.tsv.gz#','',rownames(archp_meta2))
+# Keep only selected TFs and z-score normalize
+eMat <- eMat[selected_TF,rownames(archp_meta2)]
+eMat <- t(eMat)
+
+# Split by sample
+eMat <- lapply(sams, function(s) eMat[archp_meta2$Sample == s,])
+names(eMat) <- sams
+
+### Take also regulon scores 
+scenic_name = 'monomac_programs'
+auc_mtx = read.csv(file.path(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/NTP_multiome/SCENIC/vg_5000_mw_tss500bp/',scenic_name), 'auc_mtx.csv'), header=T)
+
+rownames (auc_mtx) = auc_mtx[,1]
+rownames(auc_mtx) = gsub ('\\.','-', rownames(auc_mtx))
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+auc_mtx = auc_mtx[rownames(archp_meta2),colnames(auc_mtx) %in% selected_TF]
+# Split by sample
+auc_mtx <- lapply(sams, function(s) auc_mtx[archp_meta2$Sample == s,])
+names(auc_mtx) <- sams
+
+###---------------------------------------------------------
+### 5. Order cells by sarcomatoid module + smooth (rolling mean)
+###---------------------------------------------------------
+
+bin_width <- 10   # Window size
+overlap   <- 10   # Step size
+sarc_module = 'NFKB1'
+# Helper function: ordered → rolling average
+rollavg_df <- function(mat, order_by, bin_width, overlap) {
+  mat_ordered <- mat[order(-order_by),]
+  as.data.frame(lapply(as.data.frame(mat_ordered), function(col)
+    zoo::rollapply(
+      col, 
+      width = bin_width, 
+      FUN = mean, 
+      by = overlap, 
+      partial = TRUE, 
+      align = "left"
+    )
+  ))
+}
+
+# TF activity (motif)
+mMat_ordered_avg <- lapply(sams, function(s)
+  rollavg_df(mMat[[s]], mMat[[s]][,sarc_module], bin_width, overlap)
+)
+names (mMat_ordered_avg) = sams
+# GeneScores
+gsMat_ordered_avg <- lapply(sams, function(s) {
+  df <- rollavg_df(gsMat[[s]], mMat[[s]][,sarc_module], bin_width, overlap)
+#  df[is.na(df)] <- 0  # Handle NaNs (e.g. HIC2 issues)
+  df
+})
+names (gsMat_ordered_avg) = sams
+
+eMat_ordered_avg <- lapply(sams, function(s) {
+  df <- rollavg_df(eMat[[s]], mMat[[s]][,sarc_module], bin_width, overlap)
+#  df[is.na(df)] <- 0  # Handle NaNs (e.g. HIC2 issues)
+  df
+})
+names (eMat_ordered_avg) = sams
+
+regMat_ordered_avg <- lapply(sams, function(s) {
+  df <- rollavg_df(auc_mtx[[s]], mMat[[s]][,sarc_module], bin_width, overlap)
+#  df[is.na(df)] <- 0  # Handle NaNs (e.g. HIC2 issues)
+  df
+})
+names (regMat_ordered_avg) = sams
+
+library(ggplot2)
+
+gene = 'NFKB1'
+plot_nfkb1 <- function(mat_list, gene) {
+  p <- list()
+
+  for (nm in names(mat_list)) {
+    df_long <- data.frame(
+      x = seq_len(nrow(mat_list[[nm]])),
+      NFKB1 = mat_list[[nm]][, gene]
+    )
+
+    p[[nm]] <- ggplot(df_long, aes(x = x, y = NFKB1)) +
+      geom_line(linewidth = 1.2) +
+      geom_point(size = 2) +
+      theme_bw() +
+      labs(
+        title = nm,
+        x = "Row index",
+        y = gene
+      )
+  }
+  p
+}
+
+p_mMat <- plot_nfkb1(mMat_ordered_avg,gene)
+p_gsMat <- plot_nfkb1(gsMat_ordered_avg,gene)
+p_eMat <- plot_nfkb1(eMat_ordered_avg,gene)
+p_regMat <- plot_nfkb1(regMat_ordered_avg,gene)
+
+pdf (file.path('Plots',paste0(gene,'_pseudotime_lineplot.pdf')))
+wrap_plots(p_mMat)
+wrap_plots(p_gsMat)
+wrap_plots(p_eMat)
+wrap_plots(p_regMat)
+dev.off()
+
+
+
+
+
+
+
+
+
+
+### Take also regulon scores 
+scenic_name = 'monomac_programs'
+auc_mtx = read.csv(file.path(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/NTP_multiome/SCENIC/vg_5000_mw_tss500bp/',scenic_name), 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+rownames(auc_mtx) = gsub ('\\.','-', rownames(auc_mtx))
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+auc_mtx = auc_mtx[rownames(archp_meta2),colnames(auc_mtx) %in% selected_TF]
+
+
+# Fetch motif matrix only if not already loaded
+if (!exists ('mSE')) mSE <- fetch_mat(archp, "Motif")
+mMat <- scale (assays(mSE)[[1]])
+rownames(mMat) <- rowData(mSE)$name
+
+# Keep only selected TFs and z-score normalize
+#mMat <- scale(mMat[selected_TF,])
+mMat <- mMat[selected_TF,rownames(archp_meta)]
+mMat <- t(mMat)
+
+cor_mat = cor (mMat, auc_mtx)
+
+pdf (file.path ('Plots','regulon_deviation_heatmap.pdf'))
+Heatmap (cor_mat, col = palette_deviation_fun (cor_mat))
+dev.off()
+
+mMat2 = mMat
+rownames(mMat2) = gsub ('fragments.tsv.gz#','',rownames(mMat2))
+srt$NFKB1_dev = mMat2[,'NFKB1']
+srt$NFKB1_regulon = auc_mtx[,'NFKB1'][match(colnames(srt), rownames(auc_mtx))]
+srt$FOSL1_dev = mMat2[,'FOSL1']
+srt$FOSL1_regulon = auc_mtx[,'FOSL1'][match(colnames(srt), rownames(auc_mtx))]
+srt$FOSL2_dev = mMat2[,'FOSL2']
+srt$FOSL2_regulon = auc_mtx[,'FOSL2'][match(colnames(srt), rownames(auc_mtx))]
+
+pdf (file.path ('Plots','regulon_deviation_heatmap.pdf'),4,width=6)
+reductionName = 'sampleID_harmony_umap'
+wrap_plots (fp (srt, gene = c('NFKB1_regulon','NFKB1_dev','NFKB1')))
+wrap_plots (fp (srt, gene = c('FOSL1_regulon','FOSL1_dev','FOSL1')))
+wrap_plots (fp (srt, gene = c('FOSL2_regulon','FOSL2_dev','FOSL2','TREM2')))
+DimPlot (srt, group.by = 'celltype_simplified')
+DimPlot (srt, group.by = 'shared_cnmf_r_max')
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ### Plot meta cnmf coexpression ####
+#mono_mac_cnmfs = c('TREM2','Monocytes','SPP1','IL1B','IFN','IM','C1Q')
+### Take also regulon scores 
+scenic_name = 'monomac_programs'
+auc_mtx = read.csv(file.path(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/NTP_multiome/SCENIC/vg_5000_mw_tss500bp/',scenic_name), 'auc_mtx.csv'), header=T)
+
+rownames (auc_mtx) = auc_mtx[,1]
+rownames(auc_mtx) = gsub ('\\.','-', rownames(auc_mtx))
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+library (hdWGCNA)
+force = F
+# table (srt$sampleID)
+# srt$sampleID
+#srt_tam = srt[,srt$celltype2 == 'TAMs']
+select_cells = c('Mye_CD14 Mono','Mye_CD14 Mono_activated','Mye_Mac_IM','Mye_Mac_HIF1A','Mye_Mac_SPP1','Mye_Mac_TRM','Mye_Mac_transition','Mye_Mac_TREM2')
+if (!file.exists ('metacells.rds') | force)
+  {
+  srt_sub = srt[,srt$celltype_simplified %in% select_cells]
+  srt_sub = srt_sub[,srt_sub$sampleID %in% c('Lu952T')]
+
+reductionName = 'umap'
+reductionSave = 'pca'
+reductionGraphKnn = 'RNA_knn'
+reductionGraphSnn = 'RNA_snn' 
+sigPCs=30
+srt_sub  = RunUMAP (object = srt_sub , reduction = reductionSave, dims = 1:sigPCs)
+  
+pdf (file.path ('Plots','Lu952T_umap.pdf'))
+DimPlot (srt_sub, reduction = 'umap', group.by = 'celltype_simplified')
+dev.off()
+
+  srt_sub
+  srt_sub <- SetupForWGCNA(
+    srt_sub,
+    gene_select = "fraction", # the gene selection approach
+    fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
+    wgcna_name = "metacells" # the name of the hdWGCNA experiment
+  )
+  # construct metacells  in each group
+  srt_sub <- MetacellsByGroups(
+    seurat_obj = srt_sub,
+    group.by = c("shared_cnmf_r_max"), # specify the columns in seurat_obj@meta.data to group by
+    reduction = 'umap', # select the dimensionality reduction to perform KNN on
+    k = 10, # nearest-neighbors parameter
+    max_shared = 7, # maximum number of shared cells between two metacells
+    ident.group = 'shared_cnmf_r_max' # set the Idents of the metacell seurat object
+  )
+  
+  # normalize metacell expression matrix:
+  srt_sub <- NormalizeMetacells (srt_sub)
+  metacells = GetMetacellObject (srt_sub)
+  saveRDS (metacells, 'metacells.rds')
+  } else {
+  metacells = readRDS ('metacells.rds') 
+  }
+
+auc_mtx_meta = lapply (metacells$cells_merged, function(x) {
+  tmp = unlist(strsplit(x, ','))
+  colMeans (auc_mtx[tmp,])})
+auc_mtx_meta = as.data.frame(do.call (cbind, auc_mtx_meta))
+
+
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = scale(assays (mSE)[[1]])
+rownames (mMat) = rowData (mSE)$name
+mMat2 = t(mMat)
+rownames(mMat2) = gsub ('fragments.tsv.gz#','',rownames(mMat2))
+mMat_meta = lapply (metacells$cells_merged, function(x) {
+  tmp = unlist(strsplit(x, ','))
+  colMeans (mMat2[tmp,])})
+mMat_meta = as.data.frame(do.call (cbind, mMat_meta))
+head (mMat_meta)
+
+all (colnames (auc_mtx_meta) == colnames(mMat_meta))
+
+metacells_mat = metacells@assays$RNA@layers$data
+rownames (metacells_mat) = rownames(metacells)
+colnames (metacells_mat) = colnames (metacells)
+auc_mtx_meta2 = auc_mtx_meta[rownames(auc_mtx_meta) %in% selected_TF,]
+mMat_meta2 = mMat_meta[selected_TF, ]
+metacells_mat = metacells_mat[c('FOSL1','FOSL2','NFKB1','NFKB2','REL','TREM2','SPP1','C1QA','C3','MAF','CCL2','EREG','VCAN','IL1B'),]
+colnames(metacells_mat) == colnames (mMat_meta2)
+hm = Heatmap (t(scale(t(auc_mtx_meta2))), name = 'regulon')
+hm2 = Heatmap (t(scale(t(mMat_meta2))), name = 'motif')
+hm3 = Heatmap ((t(scale(t(metacells_mat)))), name = 'expression')
+
+pdf (file.path ('Plots','metacells_regulons_heatmap.pdf'), width=12,height=7)
+hm %v% hm3 %v% hm2
+dev.off()
+
+metacells_mat2 = as.data.frame (metacells_mat)
+mMat_meta2 = as.data.frame (mMat_meta2)
+mMat_meta2$type = 'deviation'
+mMat_meta2$TF = rownames (mMat_meta2)
+metacells_mat2$type = 'expression'
+metacells_mat2$TF = rownames (metacells_mat2)
+auc_mtx_meta2 = as.data.frame (auc_mtx_meta2)
+auc_mtx_meta2$type = 'regulon'
+auc_mtx_meta2$TF = rownames (auc_mtx_meta2)
+metacells_comb = rbind (auc_mtx_meta2, mMat_meta2, metacells_mat2)
+#metacells_comb = gather (metacells_comb, metacell, score, 1:(ncol(metacells_comb)-2))
+
+library(dplyr)
+library(tidyr)
+
+gene = 'FOSL2'
+tf_long <- metacells_comb %>%
+  #rownames_to_column("TF") %>%
+  pivot_longer(
+    cols = colnames (metacells_mat),
+    names_to = "cell",
+    values_to = "value"
+  )
+nfkb1_regulon <- tf_long %>%
+  filter(TF == gene, type == "regulon") %>%
+  select(cell, nfkb1_regulon = value)
+
+nfkb1_deviation <- tf_long %>%
+  filter(TF == gene, type == "deviation") %>%
+  select(cell, nfkb1_deviation = value)
+
+trem2_df <- as.data.frame (t(metacells_mat))
+trem2_df$cell = rownames(trem2_df)
+
+
+plot_df <- trem2_df %>%
+  left_join(nfkb1_regulon,  by = "cell") %>%
+  left_join(nfkb1_deviation, by = "cell")
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "IL1B"
+)
+rp <- ggplot(
+  plot_df,
+  aes(
+    x = nfkb1_deviation,
+    y = nfkb1_regulon
+  )
+) +
+  geom_point(aes(color = IL1B), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste0(gene," deviation score"),
+    y = paste0(gene," regulon"),
+    title = paste0(gene," deviation vs regulon on IL1B (Mono)")
+  ) + gtheme
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "MAF"
+)
+dp <- ggplot(
+  plot_df,
+  aes(
+    x = nfkb1_deviation,
+    y = nfkb1_regulon
+  )
+) +
+  geom_point(aes(color = MAF), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste0(gene,"  deviation score"),
+    y = paste0(gene," regulon"),
+    title = paste0(gene," deviation vs regulon on MAF (IM)")
+  ) + gtheme
+
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "TREM2"
+)
+
+p_main <- ggplot(
+  plot_df,
+  aes(
+    x = nfkb1_deviation,
+    y = nfkb1_regulon,
+    color = TREM2
+  )
+) +
+  geom_point(alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste0(gene," deviation score"),
+    y = paste0(gene," regulon")#,
+    #title = "NFKB1 deviation vs regulon colored by TREM2"
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots',paste0(gene,'regulon_deviation_scatter.pdf')), width=7, height=3.5)
+wrap_plots (rp, dp, p_main)
+dev.off()
+
+
+
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "IL1B"
+)
+rp <- ggplot(
+  plot_df,
+  aes_string(
+    x = 'nfkb1_deviation',
+    y = gene
+  )
+) +
+  geom_point(aes(color = IL1B), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste0(gene," deviation score"),
+    y = paste0(gene," expression"),
+    title = paste0(gene," deviation vs regulon on IL1B (Mono)")
+  ) + gtheme
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "MAF"
+)
+dp <- ggplot(
+  plot_df,
+  aes_string(
+    x = 'nfkb1_deviation',
+    y = gene
+  )
+) +
+  geom_point(aes(color = MAF), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste0(gene," deviation score"),
+    y = paste0(gene," expression"),
+    title = paste0(gene," deviation vs regulon on MAF (IM)")
+  ) + gtheme
+
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "TREM2"
+)
+
+p_main <- ggplot(
+  plot_df,
+  aes_string(
+    x = 'nfkb1_deviation',
+    y = gene,
+    color = 'TREM2'
+  )
+) +
+  geom_point(alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste0(gene," deviation score"),
+    y = paste0(gene," expression")#,
+    #title = "NFKB1 deviation vs regulon colored by TREM2"
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots',paste0(gene,'_expression_deviation_scatter.pdf')), width=7, height=3.5)
+wrap_plots (rp, dp, p_main)
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+library(dplyr)
+library(tidyr)
+for (m in mdm_sig2)
+{
+
+tf_long <- metacells_comb %>%
+  #rownames_to_column("TF") %>%
+  pivot_longer(
+    cols = starts_with("Lu952T_"),
+    names_to = "cell",
+    values_to = "value"
+  )
+nfkb1_regulon <- tf_long %>%
+  filter(TF == m, type == "regulon") %>%
+  select(cell, nfkb1_regulon = value)
+
+nfkb1_deviation <- tf_long %>%
+  filter(TF == m, type == "deviation") %>%
+  select(cell, nfkb1_deviation = value)
+
+trem2_df <- as.data.frame (t(metacells_mat))
+trem2_df$cell = rownames(trem2_df)
+
+
+plot_df <- trem2_df %>%
+  left_join(nfkb1_regulon,  by = "cell") %>%
+  left_join(nfkb1_deviation, by = "cell")
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "IL1B"
+)
+rp <- ggplot(
+  plot_df,
+  aes(
+    x = nfkb1_deviation,
+    y = nfkb1_regulon
+  )
+) +
+  geom_point(aes(color = IL1B), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste(m,"deviation score"),
+    y = paste(m,"regulon"),
+    title = paste(m,"deviation vs regulon on IL1B (Mono)")
+  ) + gtheme
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "MAF"
+)
+dp <- ggplot(
+  plot_df,
+  aes(
+    x = nfkb1_deviation,
+    y = nfkb1_regulon
+  )
+) +
+  geom_point(aes(color = MAF), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste(m,"deviation score"),
+    y = paste(m,"regulon"),
+    title = paste(m,"deviation vs regulon on MAF (IM)")
+  ) + gtheme
+
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "TREM2"
+)
+
+p_main <- ggplot(
+  plot_df,
+  aes(
+    x = nfkb1_deviation,
+    y = nfkb1_regulon,
+    color = TREM2
+  )
+) +
+  geom_point(alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste(m,"deviation score"),
+    y = paste(m,"regulon")#,
+    #title = "NFKB1 deviation vs regulon colored by TREM2"
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots',paste(m,'regulon_deviation_TREM2_scatter.pdf')), width=7, height=3.5)
+print(wrap_plots (rp, dp, p_main))
+dev.off()
+}
+
+
+library(dplyr)
+library(tidyr)
+for (m in mdm_sig2)
+{
+
+tf_long <- metacells_comb %>%
+  #rownames_to_column("TF") %>%
+  pivot_longer(
+    cols = starts_with("Lu952T_"),
+    names_to = "cell",
+    values_to = "value"
+  )
+nfkb1_regulon <- tf_long %>%
+  filter(TF == m, type == "expression") %>%
+  select(cell, nfkb1_regulon = value)
+
+nfkb1_deviation <- tf_long %>%
+  filter(TF == m, type == "deviation") %>%
+  select(cell, nfkb1_deviation = value)
+
+trem2_df <- as.data.frame (t(metacells_mat))
+trem2_df$cell = rownames(trem2_df)
+
+
+plot_df <- trem2_df %>%
+  left_join(nfkb1_regulon,  by = "cell") %>%
+  left_join(nfkb1_deviation, by = "cell")
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "IL1B"
+)
+rp <- ggplot(
+  plot_df,
+  aes(
+    x = nfkb1_deviation,
+    y = nfkb1_regulon
+  )
+) +
+  geom_point(aes(color = IL1B), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste(m,"deviation score"),
+    y = paste(m,"expression"),
+    title = paste(m,"deviation vs expression on IL1B (Mono)")
+  ) + gtheme
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "MAF"
+)
+dp <- ggplot(
+  plot_df,
+  aes(
+    x = nfkb1_deviation,
+    y = nfkb1_regulon
+  )
+) +
+  geom_point(aes(color = MAF), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste(m,"deviation score"),
+    y = paste(m,"expression"),
+    title = paste(m,"deviation vs expression on MAF (IM)")
+  ) + gtheme
+
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "TREM2"
+)
+
+p_main <- ggplot(
+  plot_df,
+  aes(
+    x = nfkb1_deviation,
+    y = nfkb1_regulon,
+    color = TREM2
+  )
+) +
+  geom_point(alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste(m,"deviation score"),
+    y = paste(m,"expression")#,
+    #title = "NFKB1 deviation vs regulon colored by TREM2"
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots',paste(m,'expression_deviation_TREM2_scatter.pdf')), width=7, height=3.5)
+print(wrap_plots (rp, dp, p_main))
+dev.off()
+}
+
+
+
+
+# # Try with PCA on mMat ####
+library (ggridges)
+library (ggplot2)
+library (viridis)
+library (tidyr)
+#library(hrbrthemes)
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+
+
+# # Filter by RNA expression ####
+metaGroupName = 'celltype_simplified'
+min_exp = .1
+active_TFs = exp_genes (srt, rownames(mMat), min_exp = min_exp, metaGroupName)
+mMat = t(scale (mMat[active_TFs, ]))
+library(uwot)
+library(ggplot2)
+library(patchwork)
+
+
+metacells_mat = metacells@assays$RNA@layers$data
+rownames (metacells_mat) = rownames(metacells)
+colnames (metacells_mat) = colnames (metacells)
+metacells_mat = metacells_mat[active_TFs, ]
+#srt = srt[,gsub ('fragments.tsv.gz#','',rownames(archp@cellColData))]
+srt_sub = srt@assays$RNA@data[active_TFs,]
+srt_sub = srt_sub[rowSums(srt_sub) > 0,]
+#srt_sub = srt@assays$RNA@data[active_TFs,]
+p <- prcomp(t(srt_sub), center = TRUE, scale. = TRUE)
+plot_df <- data.frame(p$x, celltype = srt$shared_cnmf_r_max, sampleID=srt$sampleID)
+
+
+# df_sub <- plot_df[plot_df$celltype %in% 
+#                     c("Mye_Mac_TREM2","Mye_CD14 Mono","Mye_Mac_SPP1",
+#                       "Mye_Mac_IM"), ]
+
+
+df_sub <- plot_df[plot_df$celltype %in% 
+                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+                      "TAM_MARCO","TAM_CXCLs"), ]
+
+
+
+#df_sub = plot_df
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(PC1, PC2, color = celltype)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  geom_density_2d(size = 0.4) +
+  scale_color_manual(values = palette_myeloid) +
+  # scale_x_continuous(limits = x_range, expand = c(0,0)) +
+  # scale_y_continuous(limits = y_range, expand = c(0,0)) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+p_density_x <- ggplot(df_sub, aes(PC1, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+ scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) + gtheme_no_rot
+
+p_density_y <- ggplot(df_sub, aes(PC2, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots','scrna_TF_expression_pca.pdf'), width = 5,height=6)
+p_density_x + plot_spacer() + p_scatter + p_density_y + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
+    guides = "collect"      # <- collect legends into one
+  ) &
+  theme(
+    legend.position = "bottom",  # or "top"
+    legend.box = "vertical"
+  )
+
+dev.off()
+
+a = p$rotation[,1]
+a[order(-a)]
+
+
+
+
+all (rownames (mMat) == rownames (archp@cellColData))
+p <- prcomp(mMat, center = TRUE, scale. = TRUE)
+p <- prcomp(mMat, center = TRUE, scale. = TRUE)
+plot_df <- data.frame(p$x, celltype = archp$shared_cnmf_r_max)
+
+
+# df_sub <- plot_df[plot_df$celltype %in% 
+#                     c("Mye_Mac_TREM2","Mye_CD14 Mono","Mye_Mac_SPP1",
+#                       "Mye_Mac_IM"), ]
+
+
+df_sub <- plot_df[plot_df$celltype %in% 
+                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+                      "TAM_MARCO","TAM_CXCLs"), ]
+
+
+
+#df_sub = plot_df
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(PC1, PC2, color = celltype)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  geom_density_2d(size = 0.4) +
+  scale_color_manual(values = palette_myeloid) +
+  # scale_x_continuous(limits = x_range, expand = c(0,0)) +
+  # scale_y_continuous(limits = y_range, expand = c(0,0)) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+p_density_x <- ggplot(df_sub, aes(PC1, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) + gtheme_no_rot
+
+p_density_y <- ggplot(df_sub, aes(PC2, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots','dev_momac_pca.pdf'), width = 5,height=6)
+p_density_x + plot_spacer() + p_scatter + p_density_y + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
+    guides = "collect"      # <- collect legends into one
+  ) &
+  theme(
+    legend.position = "bottom",  # or "top"
+    legend.box = "vertical"
+  )
+
+dev.off()
+
+a = p$rotation[,1]
+a[order(-a)]
+
+
+
+
+
+# Check activity of NFKB1 regulon ####
+srt = srt[, srt$sampleID %in% c('Lu952T','Lu979T')]
+scenic_name = 'monomac_programs'
+auc_mtx = read.csv(file.path(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/NTP_multiome/SCENIC/vg_5000_mw_tss500bp/',scenic_name), 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+rownames(auc_mtx) = gsub ('\\.','-', rownames(auc_mtx))
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+#auc_mtx = auc_mtx['NFKB1',]
+
+auc_mtx = aggregate (auc_mtx, by = list(
+  celltype = srt$shared_cnmf_r_max[match(rownames(auc_mtx), colnames(srt))],
+  sample = srt$sampleID[match(rownames(auc_mtx), colnames(srt))]), FUN = mean)
+auc_mtx = gather (auc_mtx, TF, score, 3:(ncol(auc_mtx)))
+
+gene = 'FOSL2'
+cell_subsets_order = c("TAM_interstitial","TAM_MARCO","TAM_TREM2","TAM_CXCLs","Mono_CD14")
+auc_mtx_sub = auc_mtx[auc_mtx$TF == gene,]
+auc_mtx_sub = auc_mtx_sub[auc_mtx_sub$celltype %in% cell_subsets_order, ]
+auc_mtx_sub$celltype = factor (auc_mtx_sub$celltype, levels = rev(cell_subsets_order))
+
+bp = ggplot (auc_mtx_sub, 
+  aes(x = celltype, y = score, fill = celltype)) + 
+  #vlp +
+  geom_boxplot (
+    linewidth = .2,
+    width=.5,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.6, alpha=0.9
+     ) +
+  scale_fill_manual (values = palette_myeloid) + 
+  gtheme
+
+pdf (file.path ('Plots',paste0(gene,'_regulon_boxplots_celltypes.pdf')), width = 4, height=4)
+bp
+dev.off()
+
+# Check activity of NFKB1 expression ####
+pb = as.data.frame (log2 (AverageExpression (srt, feature = gene, group.by = c('shared_cnmf_r_max','sampleID'))[[1]]+1))
+pb$TF = gene
+pb = gather (pb, celltype, score, 1:((ncol(pb)-1)))
+pb$sample = sapply (pb$celltype, function(x) unlist(strsplit(x, '_'))[2])
+pb$celltype = sapply (pb$celltype, function(x) unlist(strsplit(x, '_'))[1])
+pb$celltype = gsub ('-','_',pb$celltype)
+pb = pb[pb$celltype %in% cell_subsets_order,]
+pb$celltype = factor (pb$celltype, levels = rev(cell_subsets_order))
+
+bp = ggplot (pb, 
+  aes(x = celltype, y = score, fill = celltype)) + 
+  #vlp +
+  geom_boxplot (
+    linewidth = .2,
+    width=.5,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.6, alpha=0.9
+     ) +
+  scale_fill_manual (values = palette_myeloid) + 
+  gtheme
+
+pdf (file.path ('Plots',paste0(gene, '_expression_boxplots_celltypes.pdf')), width = 4, height=4)
+bp
+dev.off()
+
+
+# Check activity of NFKB1 deviation ####
+cell_subsets_order = c("TAM_interstitial","TAM_MARCO","TAM_TREM2","TAM_CXCLs","Mono_CD14")
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames (mMat) = rowData (mSE)$name
+mMat = mMat[rownames (mMat) %in% gene,,drop=F]
+mMat = t(mMat)
+mMat = as.data.frame (mMat)
+mMat = aggregate (mMat, by = list(celltype = archp$shared_cnmf_r_max,
+  sample = archp$Sample), mean)
+mMat = mMat[mMat$celltype %in% cell_subsets_order,]
+mMat$celltype = factor (mMat$celltype, levels = rev(cell_subsets_order))
+bp = ggplot (mMat, 
+  aes_string(x = 'celltype', y = gene, fill = 'celltype')) + 
+  #vlp +
+  geom_boxplot (
+    linewidth = .2,
+    width=.5,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.6, alpha=0.9
+     ) +
+  scale_fill_manual (values = palette_myeloid) + 
+  gtheme
+
+pdf (file.path ('Plots',paste0(gene,'_deviation_boxplots_celltypes.pdf')), width = 4, height=4)
+bp
+dev.off()
+
+
+# Check activity of NFKB1 genescore ####
+if (!exists('gsSE')) gsSE = fetch_mat (archp, 'GeneScore')
+gsMat = scale(assays (gsSE)[[1]])
+rownames (gsMat) = rowData (gsSE)$name
+#gsMat = scale(gsMat[rownames (gsMat) %in% mdm_sig,])
+gsMat = gsMat[rownames (gsMat) %in% gene,,drop=F]
+gsMat = t(gsMat)
+gsMat = as.data.frame (gsMat)
+gsMat = aggregate (gsMat, by = list(celltype = archp$shared_cnmf_r_max,
+  sample = archp$Sample), mean)
+gsMat = gsMat[gsMat$celltype %in% cell_subsets_order,]
+gsMat$celltype = factor (gsMat$celltype, levels = rev(cell_subsets_order))
+
+bp = ggplot (gsMat, 
+  aes_string(x = 'celltype', y = gene, fill = 'celltype')) + 
+  #vlp +
+  geom_boxplot (
+    linewidth = .2,
+    width=.5,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.6, alpha=0.9
+     ) +
+  scale_fill_manual (values = palette_myeloid) + 
+  gtheme
+
+pdf (file.path ('Plots',paste0(gene,'_genescore_boxplots_celltypes.pdf')), width = 4, height=4)
+bp
+dev.off()
+
+
+
+

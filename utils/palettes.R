@@ -52,9 +52,12 @@ palette_tnk_cells =setNames (as.character(paletteer::paletteer_d("tvthemes::Star
 palette_tnk_cells['NK_KLRC1'] = 'black'
 #palette_tnk_cells['CD4'] = '#F9ECE8FF'
 palette_myeloid = rev (paletteer::paletteer_d("trekcolors::dominion"))
+palette_myeloid = paletteer::paletteer_d("MetBrewer::Homer1")[1:8]
+palette_myeloid = rev(paletteer::paletteer_d("MoMAColors::VanGogh"))
 palette_myeloid = setNames (as.character(palette_myeloid),
-  c('Mono_CD14','Mono_CD16','TAM_CXCLs','TAM_MARCO','TAM_TREM2','TAM_interstitial','cDCs'))
-palette_myeloid2 = c(palette_myeloid[c('Monocytes','cDCs')], TAMs = 'gray')
+  c('Mono_CD14','TAM_CXCLs','TAM_MARCO','TAM_TREM2','cDCs','Mono_CD16','TAM_interstitial'))
+palette_myeloid2 = c(palette_myeloid[c('Mono_CD14','cDCs')], TAMs = 'gray')
+names(palette_myeloid2)[names(palette_myeloid2) == 'Mono_CD14'] = 'Monocytes'
 palette_protein_expression = c(low="darkblue",mid= "white",high= "darkgreen") 
 palette_feature_RNA = c('lightgrey',"#5F1415FF")
 palette_feature_protein = c("lightgrey", "darkgreen")

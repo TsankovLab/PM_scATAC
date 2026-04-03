@@ -34,14 +34,8 @@ archp$celltype_revised_sample = paste0(archp$celltype_lv1, '_', archp$Sample)
 #metaGroupName = 'celltype_lv1'
 metaGroupName = 'celltype_lv1'
 celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
-#celltypes='B_cells'
-
-#celltypes_remove = c('Fibroblasts','Malignant','Mesothelium')
-#celltypes = celltypes[!celltypes %in% celltypes_remove]
-#archp = archp[archp$celltype_lv1 %in% c('Fibroblasts','Malignant','Mesothelium')]
 archp = archp[archp$celltype_lv1 %in% celltypes]
-archp = archp[archp$celltype_revised_sample %in% c('Mesothelium_P1','Fibroblasts_P1')]
-metaGroupName = 'celltype_revised_sample'
+metaGroupName = 'celltype_lv1'
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 # Run no bias chromBPnet model for each NKT cell subtype ####

@@ -1357,9 +1357,6 @@ cCNV_score = function (x)
   }
 
 
-
-
-
 subsetArchRProject_light = function(
   ArchRProject = NULL, 
   cells = NULL,

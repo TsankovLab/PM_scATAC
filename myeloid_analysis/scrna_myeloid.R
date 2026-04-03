@@ -241,176 +241,21 @@ srt$celltype_lv3 = srt$shared_cnmf_r_max
 #shared_cnmf_genes = shared_cnmf_genes[!names(shared_cnmf_genes) %in% remove_modules]
 # Plot cnmfs 
 reductionName = 'sampleID_harmony_umap'
+
+pdf (file.path ('Plots','cnmf_umap.pdf'),10,10)
+DimPlot (srt, group.by = 'celltype_lv3', reduction=reductionName)
+DimPlot (srt, group.by = 'seurat_clusters', reduction=reductionName, label=T)
+dev.off()
+srt_cleaned = srt[,!srt$seurat_clusters %in% c('9','19','2','8','14')]
+
 pdf (file.path ('Plots','cnmf_featplots.pdf'),10,10)
+DimPlot (srt, group.by = 'sampleID', reduction=reductionName)
 wrap_plots (fp (srt, names (shared_cnmf_genes)))
-wrap_plots (fp (srt, c('TREM2','SPP1','C3','VCAN','NFKB1')))
+wrap_plots (fp (srt, c('TREM2','SPP1','C3','CSF1R','C1QA','MAF','VCAN','NFKB1','MKI67')))
 dev.off()
 
-# ### Annotate based on cnmfs ####
-# set.seed (123)
-# cnmf_scrna = srt@meta.data[, names(shared_cnmf_genes)]
 
-# km_cnmf = kmeans (scale(cnmf_scrna), centers=6) # double scale modules and cluster using k-means
-# #ha = HeatmapAnnotation (sample = srt$sampleID[, col=list(sample = palette_sample[sams]))
-# hm = Heatmap (t(scale(cnmf_scrna)), 
-#   col = palette_genescore_fun(cnmf_scrna), 
-# #  top_annotation = ha,
-#   clustering_distance_columns = 'pearson',
-#   clustering_distance_rows = 'pearson',
-#   show_column_dend = F,
-#   column_split = km_cnmf$cluster,
-#   #column_km=3,
-#   row_names_gp = gpar (fontsize = 8),
-#   column_names_gp = gpar (fontsize = 0),
-#   border=T)
-
-# pdf (file.path ('Plots','cnmf_scrna_scaled_heatmap.pdf'), height=1.5)
-# hm
-# dev.off()
-
-# ### Annotate based on cnmfs ####
-# shared_cnmf_genes2 = shared_cnmf_genes
-
-# srt = ModScoreCor (
-#     seurat_obj = srt, 
-#     geneset_list = shared_cnmf_genes2, 
-#     cor_threshold = NULL, 
-#     pos_threshold = NULL, # threshold for fetal_pval2
-#     listName = 'shared_cnmf2', outdir = NULL)
-
-# pdf (file.path ('Plots','cnmf_named_umap.pdf'))
-# DimPlot (srt, group.by = 'shared_cnmf2_r_max', reduction='umap')
-# dev.off()
-
-# sv()
-
-# ### Plot meta cnmf coexpression ####
-# #mono_mac_cnmfs = c('TREM2','Monocytes','SPP1','IL1B','IFN','IM','C1Q')
-# ccomp_df = srt@meta.data[,names (shared_cnmf_genes)]
-# ccomp_df_cor = cor (ccomp_df, method = 'spearman')
-
-# pdf (file.path ('Plots','scRNA_meta_cnmf_coexpression_heatmap2.pdf'),4,width=5)
-# Heatmap (ccomp_df_cor, col = palette_expression_cor_fun (ccomp_df_cor), border=T)
-# dev.off()
-
-
-# library (hdWGCNA)
-# force = F
-# # table (srt$sampleID)
-# # srt$sampleID
-# #srt_tam = srt[,srt$celltype2 == 'TAMs']
-# if (!file.exists ('metacells.rds') | force)
-# 	{
-# 	srt <- SetupForWGCNA(
-# 	  srt,
-# 	  gene_select = "fraction", # the gene selection approach
-# 	  fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
-# 	  wgcna_name = "metacells" # the name of the hdWGCNA experiment
-# 	)
-# 	# construct metacells  in each group
-# 	srt <- MetacellsByGroups(
-# 	  seurat_obj = srt,
-# 	  group.by = c("sampleID"), # specify the columns in seurat_obj@meta.data to group by
-# 	  reduction = 'umap', # select the dimensionality reduction to perform KNN on
-# 	  k = 100, # nearest-neighbors parameter
-# 	  max_shared = 50, # maximum number of shared cells between two metacells
-# 	  ident.group = 'sampleID' # set the Idents of the metacell seurat object
-# 	)
-	
-# 	# normalize metacell expression matrix:
-# 	srt <- NormalizeMetacells (srt)
-# 	metacells = GetMetacellObject (srt)
-# 	saveRDS (metacells, 'metacells.rds')
-# 	} else {
-# 	metacells = readRDS ('metacells.rds')	
-# 	}
-
-# # install.packages
-# # Correlate genes with cNMFs on metacells ####
-# vf = VariableFeatures (FindVariableFeatures (metacells, nfeat=20000))
-# metacells_assay = metacells@assays$RNA@layers$data
-# rownames (metacells_assay) = rownames (srt)
-# metacells_assay = metacells_assay[unique(c(vf)),]
-
-# metacells = ModScoreCor (
-#         seurat_obj = metacells, 
-#         geneset_list = shared_cnmf_genes, 
-#         cor_threshold = NULL, 
-#         pos_threshold = NULL, # threshold for fetal_pval2
-#         listName = 'cNMF_', outdir = paste0(projdir,'Plots/'))
-
-# ccomp_df = metacells@meta.data[,c(names(shared_cnmf_genes))]
-
-# tc_cor = lapply (unique(metacells$sampleID), function(x)
-# 	{
-# 	metacells_assay_sample = t(metacells_assay[vf,metacells$sampleID == x])
-# 	ccomp_df_sample = ccomp_df[metacells$sampleID == x,]
-# 	res = cor (metacells_assay_sample, ccomp_df_sample, method = 'spearman')
-# 	#rownames (res) = colnames (ccomp_df_sample)
-# 	res
-# 	})	
-# names (tc_cor) = unique(metacells$sampleID)
-# trem2_mod = tc_cor[[1]][,6]
-# trem2_mod = trem2_mod[order(-trem2_mod)]
-# genes = c('TREM2','SPP1','BACH2',
-# 	'JUN','FOS','C1QA',
-# 	'C1QB','STAT2','C3',
-# 	'PRDM1','IRF1','CEBPZ','NFYC','SP2','IRF3',
-# 	'PBX3','SP2','SMARCC1','JUNB','JDP2','NFEL2L2')
-# trem2_mod[genes]
-# #lapply (tc_cor, function(x) {x = x['cNMF19',]; head(x[order(-x)],10)})
-
-# # Check expression of ELK1 and other TFs from chromvar / chrombpnet predictions  ####
-# TF = 'ELK3'
-# #srt = srt[,srt$celltype2 == 'TAMs']
-
-# pdf (file.path ('Plots',paste0(TF,'expression_dotplot.pdf')))
-# DotPlot (srt, features = TF, group.by = 'celltype2')
-# dev.off()
-
-# module = 'cnmf.4'
-# scrna_cnmf = srt@meta.data[, names(shared_cnmf_genes)]
-# scrna_cnmf_sample = lapply (unique (srt$sampleID), function(x) scrna_cnmf[srt$sampleID == x,module,drop=F])
-# scrna_cnmf_sample = lapply (scrna_cnmf_sample, function(x) head(rownames(x)[order(-x[,1])],20))
-# srt$SPP1_high = ifelse (colnames(srt) %in% unlist (scrna_cnmf_sample), 'SPP1_high','SPP1_low')
-
-# TF = c('ELK1','ELK3','KLF12','NFKB1','CTCF','CEBPA','NFYB','IRF1','NFIC','IRF8','ZNF76','ZEB1','MAF','SNAI1','ZN143')
-# # pdf (file.path ('Plots',paste0(TF,'expression_dotplot.pdf')),width=12, height=8)
-# # DotPlot (srt_tam, features = TF, group.by = 'SPP1_high')
-# # VlnPlot (srt_tam, features = TF, group.by = 'SPP1_high',pt.size=0)
-# # dev.off()	
-
-# mod_sample_df = data.frame (
-# 	module = srt$SPP1_high, 
-# 	score = srt@meta.data[,module],
-# 	sample = srt$sampleID)
-# mod_sample_df = cbind(mod_sample_df)
-# mod_sample_df = aggregate (
-# 	t(srt@assays$RNA@data[rownames(srt) %in% TF,]),
-# 	by = list(sampleID= mod_sample_df$sample,
-# 		module = mod_sample_df$module), mean)
-
-# mod_sample_df = gather (mod_sample_df, TF, expression, 3:ncol(mod_sample_df))
-# bp = ggplot (mod_sample_df, aes (x = TF, y = expression, fill = module)) + 
-# geom_boxplot() + gtheme
-
-# pdf (file.path ('Plots','module_sample_boxplot.pdf'))
-# bp
-# dev.off()
-
-# active_TFs = read.csv ('../scatac_ArchR/active_TFs.csv')
-
-# reductionName = 'umap'
-# fps = fp (srt, gene = c('TREM2','JUN','C1QA','C3','MAF','NFATC2','VCAN','APOE','SPP1','A2M'))
-# fps = fp (srt, gene = active_TFs[[2]])
-# pdf (file.path('Plots','markers_celltypes_umap.pdf'), width=52, height=50)
-# wrap_plots (DimPlot (srt, group.by = 'sampleID', reduction=reductionName),DimPlot (srt, group.by = 'celltype2', reduction=reductionName))
-# wrap_plots (fps)
-# dev.off()
-
-# pdf (file.path('Plots','modules_umap.pdf'), width=10, height=10)
-# wrap_plots (fp (srt, gene = names(shared_cnmf_genes)))
-# dev.off()
+pdf (file.path ('Plots',''))
 
 
 #### Run SCENIC ####
@@ -678,7 +523,7 @@ df_sub <- plot_df[plot_df$celltype %in%
 #-------------------------
 # 1. MAIN SCATTER
 #-------------------------
-p_scatter <- ggplot(df_sub, aes(PC1, PC2, color = celltype)) +
+p_scatter <- ggplot(df_sub, aes(PC1, PC3, color = celltype)) +
   geom_point(alpha = 0.4, size = 0.1) +
   geom_density_2d(size = 0.4) +
   scale_color_manual(values = palette_myeloid) +
@@ -702,7 +547,7 @@ p_density_x <- ggplot(df_sub, aes(PC1, fill = celltype)) +
     axis.ticks.x = element_blank()
   ) + gtheme_no_rot
 
-p_density_y <- ggplot(df_sub, aes(PC2, fill = celltype)) +
+p_density_y <- ggplot(df_sub, aes(PC3, fill = celltype)) +
   geom_density(alpha = 0.3, color = NA) +
   scale_fill_manual(values = palette_myeloid) +
   coord_flip() +
@@ -714,7 +559,7 @@ p_density_y <- ggplot(df_sub, aes(PC2, fill = celltype)) +
     axis.ticks.y = element_blank()
   ) + gtheme_no_rot
 
-pdf (file.path ('Plots','scrna_momac_regulon_pca.pdf'), width = 5,height=5)
+pdf (file.path ('Plots','scrna_momac_PC1_PC3_regulon_pca.pdf'), width = 5,height=5)
 p_density_x + plot_spacer() + p_scatter + p_density_y + 
   plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
     guides = "collect"      # <- collect legends into one
@@ -908,3 +753,308 @@ p_density_x + plot_spacer() + p_scatter + p_density_y +
   )
 
 dev.off()
+
+
+
+
+
+# Check activity of NFKB1 regulon ####
+auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+auc_mtx = aggregate (auc_mtx, by = list(
+	celltype = srt$celltype_lv3[match(rownames(auc_mtx), colnames(srt))],
+	sample = srt$sampleID[match(rownames(auc_mtx), colnames(srt))]), FUN = mean)
+auc_mtx = gather (auc_mtx, TF, score, 3:(ncol(auc_mtx)))
+
+cell_subsets_order = c("TAM_interstitial","TAM_MARCO","TAM_TREM2","TAM_CXCLs","Mono_CD14")
+auc_mtx_sub = auc_mtx[auc_mtx$TF == 'NFKB1',]
+auc_mtx_sub = auc_mtx_sub[auc_mtx_sub$celltype %in% cell_subsets_order, ]
+auc_mtx_sub$celltype = factor (auc_mtx_sub$celltype, levels = rev(cell_subsets_order))
+
+bp = ggplot (auc_mtx_sub, 
+	aes(x = celltype, y = score, fill = celltype)) + 
+	#vlp +
+	geom_boxplot (
+    linewidth = .2,
+    width=.5,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.6, alpha=0.9
+     ) +
+	scale_fill_manual (values = palette_myeloid) + 
+	gtheme
+
+pdf (file.path ('Plots','NFKB1_regulon_boxplots_celltypes.pdf'), width = 4, height=4)
+bp
+dev.off()
+
+# Check activity of NFKB1 expression ####
+pb = as.data.frame (log2 (AverageExpression (srt, feature = 'NFKB1', group.by = c('celltype_lv3','sampleID'))[[1]]+1))
+pb$TF = 'NFKB1'
+pb = gather (pb, celltype, score, 1:((ncol(pb)-1)))
+pb$sample = sapply (pb$celltype, function(x) unlist(strsplit(x, '_'))[2])
+pb$celltype = sapply (pb$celltype, function(x) unlist(strsplit(x, '_'))[1])
+pb$celltype = gsub ('-','_',pb$celltype)
+pb = pb[pb$celltype %in% cell_subsets_order,]
+pb$celltype = factor (pb$celltype, levels = rev(cell_subsets_order))
+
+bp = ggplot (pb, 
+	aes(x = celltype, y = score, fill = celltype)) + 
+	#vlp +
+	geom_boxplot (
+    linewidth = .2,
+    width=.5,
+    outlier.alpha = 0.2,
+    outlier.size = 1,
+     size=0.6, alpha=0.9
+     ) +
+	scale_fill_manual (values = palette_myeloid) + 
+	gtheme
+
+pdf (file.path ('Plots','NFKB1_expression_boxplots_celltypes.pdf'), width = 4, height=4)
+bp
+dev.off()
+
+
+
+
+
+
+
+
+### Plot meta cnmf coexpression ####
+#mono_mac_cnmfs = c('TREM2','Monocytes','SPP1','IL1B','IFN','IM','C1Q')
+### Take also regulon scores 
+scenic_name = 'monomac_programs'
+auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
+rownames (auc_mtx) = auc_mtx[,1]
+auc_mtx = auc_mtx[,-1]
+colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
+
+library (hdWGCNA)
+force = F
+# table (srt$sampleID)
+# srt$sampleID
+#srt_tam = srt[,srt$celltype2 == 'TAMs']
+select_cells = c('Mono_CD14','TAM_CXCLs','TAM_TREM2','TAM_MARCO','TAM_interstitial')
+if (!file.exists ('metacells.rds') | force)
+  {
+  srt_sub = srt[,srt$celltype2 %in% c('Mono_CD14','TAMs')]
+  srt_sub = srt_sub[,srt_sub$celltype_lv3 %in% select_cells]
+  srt_sub = srt_sub[,srt_sub$sampleID %in% c('P1','P10','P11','P12','P13','P14','P4','P5')]
+
+reductionName = 'umap'
+reductionSave = 'pca'
+reductionGraphKnn = 'RNA_knn'
+reductionGraphSnn = 'RNA_snn' 
+sigPCs=30
+srt_sub  = RunUMAP (object = srt_sub , reduction = reductionSave, dims = 1:sigPCs)
+  
+pdf (file.path ('Plots','selected_samples_umap.pdf'))
+DimPlot (srt_sub, reduction = 'sampleID_harmony_umap', group.by = 'celltype_simplified')
+dev.off()
+
+  srt_sub
+  srt_sub <- SetupForWGCNA(
+    srt_sub,
+    gene_select = "fraction", # the gene selection approach
+    fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
+    wgcna_name = "metacells" # the name of the hdWGCNA experiment
+  )
+  # construct metacells  in each group
+  srt_sub <- MetacellsByGroups(
+    seurat_obj = srt_sub,
+    group.by = c("sampleID"), # specify the columns in seurat_obj@meta.data to group by
+    reduction = 'sampleID_harmony_umap', # select the dimensionality reduction to perform KNN on
+    k = 20, # nearest-neighbors parameter
+    max_shared = 12, # maximum number of shared cells between two metacells
+    ident.group = 'sampleID' # set the Idents of the metacell seurat object
+  )
+  
+  # normalize metacell expression matrix:
+  srt_sub <- NormalizeMetacells (srt_sub)
+  metacells = GetMetacellObject (srt_sub)
+  saveRDS (metacells, 'metacells.rds')
+  } else {
+  metacells = readRDS ('metacells.rds') 
+  }
+
+auc_mtx_meta = lapply (metacells$cells_merged, function(x) {
+  tmp = unlist(strsplit(x, ','))
+  colMeans (auc_mtx[tmp,])})
+auc_mtx_meta = as.data.frame(do.call (cbind, auc_mtx_meta))
+
+
+selected_TF = c('FOSL1','FOSL2','NFKB1','NFKB2','REL','TREM2','SPP1','C1QA','C3','MAF','CCL2','EREG','VCAN','IL1B')
+metacells_mat = metacells@assays$RNA@layers$data
+rownames (metacells_mat) = rownames(metacells)
+colnames (metacells_mat) = colnames (metacells)
+auc_mtx_meta2 = auc_mtx_meta[rownames(auc_mtx_meta) %in% selected_TF,]
+#mMat_meta2 = mMat_meta[selected_TF, ]
+metacells_mat = metacells_mat[selected_TF,]
+#colnames(metacells_mat) == colnames (mMat_meta2)
+hm = Heatmap (t(scale(t(auc_mtx_meta2))), name = 'regulon')
+#hm2 = Heatmap (t(scale(t(mMat_meta2))), name = 'motif')
+hm3 = Heatmap ((t(scale(t(metacells_mat)))), name = 'expression')
+
+pdf (file.path ('Plots','metacells_regulons_heatmap.pdf'), width=12,height=7)
+hm %v% hm3
+dev.off()
+
+metacells_mat2 = as.data.frame (metacells_mat)
+metacells_mat2$type = 'expression'
+metacells_mat2$TF = rownames (metacells_mat2)
+auc_mtx_meta2 = as.data.frame (auc_mtx_meta2)
+auc_mtx_meta2$type = 'regulon'
+auc_mtx_meta2$TF = rownames (auc_mtx_meta2)
+metacells_comb = rbind (auc_mtx_meta2, metacells_mat2)
+#metacells_comb = gather (metacells_comb, metacell, score, 1:(ncol(metacells_comb)-2))
+
+library(dplyr)
+library(tidyr)
+
+gene = 'FOSL2'
+tf_long <- metacells_comb %>%
+  #rownames_to_column("TF") %>%
+  pivot_longer(
+    cols = colnames (metacells_mat),
+    names_to = "cell",
+    values_to = "value"
+  )
+nfkb1_regulon <- tf_long %>%
+  filter(TF == gene, type == "regulon") %>%
+  select(cell, nfkb1_regulon = value)
+
+# nfkb1_deviation <- tf_long %>%
+#   filter(TF == gene, type == "deviation") %>%
+#   select(cell, nfkb1_deviation = value)
+
+trem2_df <- as.data.frame (t(metacells_mat))
+trem2_df$cell = rownames(trem2_df)
+plot_df = trem2_df
+plot_df$sample = sapply (trem2_df$cell, function(x) unlist(strsplit(x,'_'))[1])
+
+# plot_df <- trem2_df %>%
+#   left_join(nfkb1_regulon,  by = "cell") %>%
+#   left_join(nfkb1_deviation, by = "cell")
+
+library(dplyr)
+
+df_scaled <- plot_df %>%
+  group_by(sample) %>%
+  mutate(
+    across(
+      where(is.numeric),
+      ~ as.numeric(scale(.))
+    )
+  ) %>%
+  ungroup()
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "IL1B"
+)
+rp <- ggplot(
+  df_scaled,
+  aes(
+    x = FOSL2,
+    y = NFKB1
+  )
+) +
+  geom_point(aes(color = IL1B), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  #) +
+  #labs(
+    #x = paste0(gene," deviation score"),
+    #y = paste0(gene," regulon"),
+    #title = paste0(gene," deviation vs regulon on IL1B (Mono)")
+  ) + facet_wrap (~sample) + gtheme
+
+pdf (file.path ('Plots','regulon_deviation_scatter.pdf'), width=7, height=5.5)
+rp
+dev.off()
+
+
+
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "IL1B"
+)
+rp <- ggplot(
+  plot_df,
+  aes_string(
+    x = 'nfkb1_deviation',
+    y = gene
+  )
+) +
+  geom_point(aes(color = IL1B), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste0(gene," deviation score"),
+    y = paste0(gene," expression"),
+    title = paste0(gene," deviation vs regulon on IL1B (Mono)")
+  ) + gtheme
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "MAF"
+)
+dp <- ggplot(
+  plot_df,
+  aes_string(
+    x = 'nfkb1_deviation',
+    y = gene
+  )
+) +
+  geom_point(aes(color = MAF), alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste0(gene," deviation score"),
+    y = paste0(gene," expression"),
+    title = paste0(gene," deviation vs regulon on MAF (IM)")
+  ) + gtheme
+
+
+
+grad_scale <- scale_color_gradientn(
+  colours = rev(palette_genescore),
+  name = "TREM2"
+)
+
+p_main <- ggplot(
+  plot_df,
+  aes_string(
+    x = 'nfkb1_deviation',
+    y = gene,
+    color = 'TREM2'
+  )
+) +
+  geom_point(alpha = 0.6, size = 2) +
+  grad_scale +
+  theme(
+    legend.position = "bottom"
+  ) +
+  labs(
+    x = paste0(gene," deviation score"),
+    y = paste0(gene," expression")#,
+    #title = "NFKB1 deviation vs regulon colored by TREM2"
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots',paste0(gene,'_expression_deviation_scatter.pdf')), width=7, height=3.5)
+wrap_plots (rp, dp, p_main)
+dev.off()
+
+

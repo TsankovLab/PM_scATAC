@@ -144,7 +144,7 @@ msm_meta2 = msm_meta2[, 1:96]
 
 ### Make list including all the bulk data ####
 meso_bulk_l = list (
-  bueno = log2(bueno_mat[,rownames(bueno_meta)] + 1),
+  bueno = log2 (bueno_mat[,rownames(bueno_meta)] + 1),
   tcga = log2 (tcga_mat + 1),
   mesomics = log2 (msm_mat+1))
 
