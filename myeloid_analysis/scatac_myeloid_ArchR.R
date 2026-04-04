@@ -5,7 +5,7 @@ R
 set.seed(1234)
 
 ####### ANALYSIS of Myeloid compartment #######
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR'
+projdir = 'myeloid_cells'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
@@ -334,16 +334,7 @@ cor_mMat_hm = draw (Heatmap (mMat_cor,# row_km=15,
 #   ,
   row_names_gp = gpar(fontsize = 0), 
   column_names_gp = gpar(fontsize = 0)
-# cell_fun = function(j, i, x, y, w, h, fill) {# THIS DOESNT WORK NEED TO USE LAYER_FUN
-#         if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
-#             grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
-#         }}
   ))
-  # ,
-  # cell_fun = function(j, i, x, y, w, h, fill) {
-  #       if(as.numeric(x) <= 1 - as.numeric(y) + 1e-6) {
-  #           grid.rect(x, y, w, h, gp = gpar(fill = fill, col = fill))
-#        }}))
 dev.off()
 
 pdf (file.path ('Plots','TF_modules_heatmap.pdf'), width = 4.6, height=3)
@@ -390,7 +381,6 @@ dev.off()
 pdf (file.path ('Plots','TF_modules_fplots.pdf'), width = 20,height=16)
 wrap_plots (TF_p, ncol=5)
 dev.off()
-
 
 
 # Generate same heatmap but using metacells on scrna ####
@@ -644,6 +634,14 @@ pdf(file.path("Plots","momac_PC1_ridge_plots.pdf"),
     width = 7, height = 2)
 p_ridge
 dev.off()
+
+### Use SCENIC regulon to identify scrna programs in PCA space ####
+
+
+
+
+
+
 
 ### Correlate PCs of TF activity with scRNA-seq derived PCs of TF regulons ####
 regulons_PCs = readRDS (file.path('..','..','git_repo','files','PCA_regulons.rds')) 
