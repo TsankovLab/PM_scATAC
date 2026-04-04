@@ -114,9 +114,40 @@ if (!all(file.exists(file.path('Annotations',
     'Motif-In-Peaks-Summary.rds')))) | force)
 source (file.path ('..','..','git_repo','utils','chromVAR.R'))
   
+### Plot heatmap of gene overlaps of cnmfs identified from scrna per sample in myeloids ####
+cnmf_spectra_unique_l = readRDS (file.path('..','..','git_repo','files','cnmf_myeloid_per_sample.rds'))
+force=FALSE
+
+cnmf_spectra_unique_l = unlist(cnmf_spectra_unique_l, recursive=F)
+set.seed (123)
+ov_mat = ovmat (cnmf_spectra_unique_l, ov_threshold = 0.2, df=T) 
+km = kmeans (ov_mat, centers=10)
+ho = Heatmap (ov_mat,
+column_split = km$cluster , 
+row_split = km$cluster, 
+row_names_gp = gpar(fontsize = 2),
+column_names_gp = gpar(fontsize = 2),
+  col = RColorBrewer::brewer.pal(9,'Blues'))
+pdf (file.path ('Plots','shared_cNMF_overlap.pdf'),width = 5, height=4)
+print (ho)
+dev.off()
+  
+shared_cnmf = split (rownames(ov_mat), km$cluster)
+#remove_metamodule = 1 # remove metamodule include non-overlapping modules
+#shared_cnmf = shared_cnmf[names (shared_cnmf) != as.character(remove_metamodule)]
+overlap_cutoff = 2
+shared_cnmf_genes = lapply (shared_cnmf, function(x) 
+  {
+  ranked_genes = table (unlist(cnmf_spectra_unique_l[x]))
+  ranked_genes = ranked_genes[order(-ranked_genes)]
+  names (ranked_genes[ranked_genes > overlap_cutoff])
+  })
+shared_cnmf_genes = shared_cnmf_genes[sapply(shared_cnmf_genes, function(x) length(x) > 0)]
+names (shared_cnmf_genes) = paste0('cnmf.',names(shared_cnmf_genes))
+  
 
 # Add cNMF modules from scRNA-seq ####
-shared_cnmf = readRDS (file.path('..','..','gi_repo','files','reproducible_cnmfs_myeloid.rds'))
+shared_cnmf = shared_cnmf_genes
 shared_cnmf = lapply (shared_cnmf, function(x) x[x %in% getFeatures (archp)])
 shared_cnmf = lapply (shared_cnmf, function(x) head (x, 50))
 write.csv (patchvecs (shared_cnmf), 'cnmf_consensus_myeloid_modules.csv')
@@ -890,12 +921,11 @@ ps = getPeakSet (archp)
 
 gmt_annotations = c(
 'h.all.v7.4.symbol.gmt',#,
-'c5.bp.v7.1.symbol.gmt',
-'c3.tft.v7.1.symbol.gmt'
+'c5.bp.v7.1.symbol.gmt'
 )
 
-gmt.file = paste0 ('../../git_repo/files/h.all.v7.4.symbols.gmt')
-gmt.file = paste0 ('../../git_repo/files/c5.bp.v7.1.symbol.gmt')
+gmt.file = paste0 (file.path ('..','..','git_repo','files','h.all.v7.4.symbols.gmt'))
+gmt.file = paste0 (file.path ('..','..','git_repo','files','c5.bp.v7.1.symbol.gmt'))
 pathways = clusterProfiler::read.gmt (gmt.file)
 pathways = split(pathways$gene, pathways$term)
 DAG_list = readRDS ('DAG_inflamed_pairwise.rds')
@@ -937,99 +967,6 @@ pdf (file.path ('Plots','fgsea_dotplot2.pdf'), width=8, height=4)
 fgseaResAll_dp
 dev.off()
 
-
-pdf (file.path ('Plots','GO_Inflammatory_enrichment_plot.pdf'), width=5, height=3)
-plotEnrichment(pathways[["GO_INFLAMMATORY_RESPONSE"]],
-               ranked_genes) + labs(title="GO_INFLAMMATORY_RESPONSE")
-dev.off()
-
-
-
-
-# Try using PCA on regulons ####
-regulons_PCs = readRDS (file.path('..','..','git_repo','files','PCA_regulons.rds')) 
-rownames (auc_mtx) = auc_mtx[,1]
-auc_mtx = auc_mtx[,-1]
-colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
-
-p <- prcomp(auc_mtx, center = TRUE, scale. = TRUE)
-plot_df <- data.frame(p$x, celltype = srt$celltype_lv3[match(rownames (p$x), colnames(srt))])
-df_sub <- plot_df[plot_df$celltype %in% 
-                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
-                      "TAM_MARCO","TAM_CXCLs"), ]
-
-#-------------------------
-# 1. MAIN SCATTER
-#-------------------------
-p_scatter <- ggplot(df_sub, aes(PC1, PC3, color = celltype)) +
-  geom_point(alpha = 0.4, size = 0.1) +
-  geom_density_2d(size = 0.4) +
-  scale_color_manual(values = palette_myeloid) +
-  #scale_x_continuous(limits = x_range, expand = c(0,0)) +
-  #scale_y_continuous(limits = y_range, expand = c(0,0)) +
-  gtheme_no_rot +
-  theme(
-    legend.position = "right",
-    plot.margin = margin(0,0,0,0)
-  )
-
-
-p_density_x <- ggplot(df_sub, aes(PC1, fill = celltype)) +
-  geom_density(alpha = 0.3, color = NA) +
-  scale_fill_manual(values = palette_myeloid) +
-  theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.x = element_blank(),
-    axis.text.x  = element_blank(),
-    axis.ticks.x = element_blank()
-  ) + gtheme_no_rot
-
-p_density_y <- ggplot(df_sub, aes(PC3, fill = celltype)) +
-  geom_density(alpha = 0.3, color = NA) +
-  scale_fill_manual(values = palette_myeloid) +
-  coord_flip() +
-  theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.y = element_blank(),
-    axis.text.y  = element_blank(),
-    axis.ticks.y = element_blank()
-  ) + gtheme_no_rot
-
-pdf (file.path ('Plots','scrna_momac_PC1_PC3_regulon_pca.pdf'), width = 5,height=5)
-p_density_x + plot_spacer() + p_scatter + p_density_y + 
-  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
-    guides = "collect"      # <- collect legends into one
-  ) &
-  theme(
-    legend.position = "bottom",  # or "top"
-    legend.box = "horizontal"
-  )
-
-dev.off()
-
-
-### Ridge plot of PC1 ####
-df_sub$celltype = factor (df_sub$celltype, levels = rev(cell_subsets_order))
-p_ridge <- ggplot(df_sub, aes(x = PC1, y = celltype, fill = celltype)) +
-  geom_density_ridges(scale = 3, alpha = 0.7, color = NA) +
-  scale_fill_manual (values = palette_myeloid) +
-  theme_classic() +
-  theme(
-    legend.position = "none",
-    axis.title.y = element_blank(),
-    axis.title.x = element_blank(),
-    axis.text.y  = element_text(size = 8),
-    axis.text.x  = element_blank(),
-    axis.ticks.x = element_blank()
-  ) +
-  gtheme_no_rot
-
-pdf(file.path("Plots","momac_PC1_ridge_plots.pdf"),
-    width = 5, height = 3)
-p_ridge
-dev.off()
 
 
 
@@ -1086,7 +1023,7 @@ run_p2g = F
 
 # Import hubs from myeloid analysis ####
 metaGroupName = "Clusters_H"
-cor_cutoff = 0.3
+cor_cutoff = 0.2
 #max_dist = 12500
 max_dist = 12500
 min_peaks = 5
@@ -1096,7 +1033,7 @@ hubs_obj = readRDS (file.path(hubs_dir,'global_hubs_obj.rds'))
 
 
 # Generate matrix of fragment counts of hubs x barcodes ####
-force=F
+force=T
 if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))) | force)
   {
   if (!exists ('fragments')) fragments = unlist (getFragmentsFromProject (
@@ -1121,23 +1058,6 @@ if (!file.exists(file.path (hubs_dir, paste0('hubs_cells_mat.rds'))) | force)
 hubsCell_mat = as.data.frame (hubsCell_mat)
 
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
-#ha = HeatmapAnnotation (fetal = archp$fetal, which='row')
-# hm = Heatmap (
-#   scale (t(hubsCell_mat)), 
-#  # left_annotation = ha, 
-#   column_names_gp = gpar(fontsize = 3),
-#   row_names_gp = gpar(fontsize = 0),
-#   show_column_dend = T,
-#   #column_km = 5,
-#   #row_dend_width = unit(5,'mm'),
-#   row_dend_side = 'left',
-#   col = rev(palette_hubs_accessibility),
-#   border=T,
-#   name = 'Hubs')
-# pdf (file.path (hubs_dir,'Plots',paste0('hubs_cells_',metaGroupName,'_heatmap.pdf')), height=2.2, width = 5)
-# hm
-# dev.off()
-
 
 
 ### Compute differential hub analysis 
@@ -1209,66 +1129,115 @@ hm = Heatmap (dah_hm,
   column_names_rot=45,
   border=T)
 
-pdf (file.path ('Plots','top_DAH_celltype_lv2_heatmap2.pdf'), width=5, height=5)
+pdf (file.path ('Plots','top_DAH_celltype_lv2_heatmap.pdf'), width=5, height=5)
 hm
 dev.off()
 
 
-#TF = 'SNAI1'
-# TF = sapply (unique(res_df_top$gene), function(x) unlist(strsplit(x, '-'))[1])
-# metaGroupName = 'celltype_lv2'
-
-# Compare momacs vs resident ####
+# Compute differential hub accessibility DHA ####
 library (presto)
-#archp$inflamed = ifelse (archp$mod_2 > 0, 'inflamed','non_inflamed')
-metaGroupName = 'momac'
+# archp$monomac_vs_resident = ifelse (archp$cnmf_celltypes %in% 'IM', 'resident','monomac')
+# metaGroupName = 'monomac_vs_resident'
+metaGroupName='momac'
 all (colnames(hubsCell_mat) == rownames(archp@cellColData))
-metagroup = as.character (archp@cellColData[,metaGroupName])
-res = wilcoxauc (log2(hubsCell_mat+1), metagroup)
+compare_groups = c('momac','resident')
+res = wilcoxauc (log2(hubsCell_mat[,as.character (archp@cellColData[,metaGroupName]) %in% compare_groups]+1), 
+  as.character (archp@cellColData[,metaGroupName][as.character (archp@cellColData[,metaGroupName]) %in% compare_groups]))
+
+# res_l = lapply (split (res, res$group), function(x){
+#   tmp = x[x$logFC > 0,]
+#   tmp = tmp[order (tmp$pval),]
+#   tmp
+# })
+# res = res_l[[1]]
+# res$gene = hubs_obj$hubsCollapsed$gene[match (res$feature, hubs_obj$hubs_id)]
+# head (res,50)
+
 res = res[res$group == 'momac',]
-res = res[res$logFC > 0,]
-res_df = res[order(res$padj), ]
-#res_df = res_df[res_df$logFC > 0.2,]
-res_df = head (res_df, 10)
-res_df$gene = hubs_obj$hubsCollapsed$gene[match(res_df$feature, hubs_obj$hubs_id)]
+res$gene = hubs_obj$hubsCollapsed$gene[match (res$feature, hubs_obj$hubs_id)]
 
-hubsSample_mat = hubsSample_mat[,cell_subsets_order]
-dah_hm = t(scale(t(log2(hubsSample_mat[res_df$feature,]))))
+DAH_df = data.frame (Log2FC = res$logFC, 
+                    #Mean = res$Mean[,1],
+                    FDR = res$padj,
+                    #Pval = res$Pval[,1],
+                    #MeanDiff = res$MeanDiff[,1],
+                    #AUC = res$AUC[,1],
+                    #MeanBGD = res$MeanBGD[,1],
+                    feature = res$feature)
 
-hm = Heatmap (dah_hm,
-  cluster_rows=F,
-#  top_annotation = ha,
-  cluster_columns=F,
-  row_labels = res_df$gene,
-  col = rev(palette_hubs_accessibility),
-  column_names_gp= gpar (fontsize=11),
-  row_names_gp= gpar (fontsize=4),
-  column_names_rot=45,
-  border=T)
+logFCthreshold = 0.5
+pValThreshold = 1e-5
+DAH_df$color = 'ns'
+DAH_df$label = ''
+#DAH_df$label[abs (DAH_df$Log2FC) > logFCthreshold & DAH_df$FDR < pValThreshold] = rownames(DAH_df)[abs (DAH_df$Log2FC) > logFCthreshold & DAH_df$FDR < pValThreshold]
+DAH_df$label[DAH_df$feature == 'HUB427'] = 'HUB427'
 
-pdf (file.path ('Plots','DAH_inflamed_celltype_lv2_heatmap.pdf'), width=5, height=10)
-hm
+# Make volcano plots of DAM per each comparison
+jitter = position_jitter (width = 0.01, height = 0.01)
+vol_p = ggplot(DAH_df, aes(x = Log2FC, y = -log10(FDR), label = label)) +
+  geom_point(aes(color = Log2FC), size = 0.2, alpha = 0.5, position = jitter) +
+  geom_text_repel(
+    min.segment.length = 0.2,
+    box.padding = 0.2,
+    size = 2,
+    max.overlaps = 10000
+  ) +
+  ggtitle("DAH moMac vs IM") +
+  xlab("LFC") + 
+  ylab("-log10 adjusted p-value") +
+  scale_color_gradientn(colors = rev(palette_hubs_accessibility)) +
+  geom_hline(yintercept = -log10(pValThreshold), linetype = "dashed", color = "black", size = 0.2) +
+  geom_vline(xintercept = -logFCthreshold, linetype = "dashed", color = "black", size = 0.2) +
+  geom_vline(xintercept =  logFCthreshold, linetype = "dashed", color = "black", size = 0.2) +
+  gtheme_no_rot
+
+pdf (file.path('Plots','DAH_volcano.pdf'),width=4,height=3)
+print (vol_p)
 dev.off()
+#palette_hubs_accessibility
 
 
 
-top_hubs = 20
-res_df_top = res_df %>% group_by (group) %>%
-  slice_head(n = top_hubs)
-res_df_top$gene = hubs_obj$hubsCollapsed$gene[match(res_df_top$feature, hubs_obj$hubs_id)]
-hub = res_df_top$feature[10]
-TF = 'REL'
-hub = res_df[grep (TF, res_df$gene),][1,]$feature
-hub = 'HUB417'
-#hub = hubs_obj$hubs_id[grep ('NFKB1', hubs_obj$hubsCollapsed$gene)]
-#sample_levels = c('Monocytes','cDCs','SPP1','TREM2','C1Q','IFN','IM')
+hub = 'HUB427'
 
-metaGroupName = 'celltype_lv3'
 metaGroupName = 'inflamed'
 ccomp = as.data.frame (archp@cellColData)
 median_order = sort (unlist(lapply (split (ccomp$mod_2, ccomp$celltype_lv2), function(x) median(x))))
 cell_subsets_order2 = rev(names (median_order))
 palette_inflamed = c(inflamed = 'darkred',non_inflamed='grey22')
+pdf()
+#archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
+#metaGroupName = 'fetal_group'
+meso_markers <- plotBrowserTrack2 (
+    ArchRProj = archp,#[!archp$Sample3 %in% c('P11_HOX')], 
+    #sample_levels = cell_subsets_order, 
+    hubs_regions = hubs_obj$hubsCollapsed,
+    #ylim = c(0,0.30),
+    groupBy = metaGroupName, 
+    #sample_levels = sample_sarc_order,
+    minCells = 10,
+    #geneSymbol = TF,
+    plotSummary = c("bulkTrack", "featureTrack", 
+        "loopTrack","geneTrack", 
+        "hubTrack",'hubregiontrack'),
+    #pal = palette_sample,
+    #pal = palette_fetal,
+    threads=1,
+    #pal = DiscretePalette (length (unique(sgn2@meta.data[,metaGroupName])), palette = 'stepped'), 
+    region = ext_range (GRanges (hubs_obj$hubsCollapsed[match(hub[1], hubs_obj$hubs_id)]),50000,50000),
+    upstream = 50000,
+    downstream = 50000,
+    loops = getPeak2GeneLinks (archp, corCutOff = 0.2),
+    pal = palette_myeloid,
+    #pal = palette_inflamed,
+    #loops = getCoAccessibility (archp, corCutOff = 0.3,
+    #  returnLoops = TRUE),
+    useGroups= NULL
+)
+dev.off()
+plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=4, name =paste0(metaGroupName,'_MPM_markers_inflamed_coveragePlots.pdf'),addDOC=F)
+
+metaGroupName = 'celltype_lv3'
 pdf()
 #archp$fetal_sample = paste0(archp$Sample, archp$fetal_group)
 #metaGroupName = 'fetal_group'
@@ -1299,66 +1268,7 @@ meso_markers <- plotBrowserTrack2 (
     useGroups= NULL
 )
 dev.off()
-plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=4, name =paste0(metaGroupName,'_MPM_markers_inflamed_coveragePlots.pdf'),addDOC=F)
-
-
-
-### Compare expression of genes in inflammation peaks vs rest ####
-tf_match = getMatches (archp)
-bg_peaks = getPeakSet (archp)
-colnames (tf_match) = sapply (colnames (tf_match), function(x) unlist(strsplit(x,'_'))[1])
-#ap1_complex = c('JUN','FOSB','FOS','BACH1','SMARCC1','FOSL2','JUND','JDP2','BATF')
-km1 = names (km$cluster[km$cluster == 1])
-km2 = names (km$cluster[km$cluster == 2])
-tf_match2 = tf_match[,km2] 
-tf_match2 = tf_match2[rowSums(assay(tf_match2)) > 0,]
-tf_match1 = tf_match[,km1]
-tf_match1 = tf_match1[rowSums(assay(tf_match1)) > 0,]
-
-peakSet1 = rowRanges(tf_match1)[queryHits(findOverlaps(tf_match1, bg_peaks))] 
-peakSet2 = rowRanges(tf_match2)[queryHits(findOverlaps(tf_match2, bg_peaks))] 
-identical (peakSet1, peakSet2)
-#hub_regions = hubs_obj$hubsCollapsed[which(hubs_obj$hubs_id %in% x)]
-hub_regions_peaks = bg_peakSet[queryHits(findOverlaps(bg_peakSet, hub_regions))]
-
-metaGroupName = 'celltype2'
-pMats = getGroupSE(
-  ArchRProj = archp,
-  useMatrix = 'PeakMatrix',
-  groupBy = metaGroupName,
-  divideN = TRUE,
-  scaleTo = NULL,
-  threads = getArchRThreads(),
-  verbose = TRUE,
-  logFile = createLogFile("getGroupSE")
-)
-
-# is_sequential = function(x) {
-#   length(x) > 1 && all(diff(x) == 1)
-# }
-peakset = getPeakSet(archp)
-pmat_peakset = makeGRangesFromDataFrame(rowData(pMats))
-pmat_peakset$nearestGene = peakset$nearestGene
-#is_sequential(queryHits (findOverlaps (pmat_peakset, peakset)))
-
-metaGroupName = 'shared_cnmf2_r_max'
-
-for (tf in km2)
-  {
-  tf_peaks = rowRanges(tf_match[,tf][rowSums(assay(tf_match[,tf]))>0,])
-  tf_peaks_fragments = pMats[queryHits (findOverlaps (pmat_peakset, tf_peaks)),]
-  pmat_peakset_sub = pmat_peakset[queryHits (findOverlaps (pmat_peakset, tf_peaks)),]
-  #tf_peaks = tf_peaks[queryHits (findOverlaps (tf_peaks, makeGRangesFromDataFrame(rowData(pMats))))]
-  tf_peaks_fragments = as.data.frame(assay(tf_peaks_fragments))
-  
-  ps = log2(as.data.frame (AverageExpression (srt, 
-  features = unique(pmat_peakset_sub$nearestGene), 
-  group.by = metaGroupName)[[1]]) +1)
-
-  sapply (rownames(ps), function(x) cor(ps[x,], 
-    na.omit(tf_peaks_fragments[unname(pmat_peakset_sub$nearestGene) == x,]))
-  }
-min_exp = .1
+plotPDF (meso_markers, ArchRProj = archp,height=3.5, width=4, name =paste0(metaGroupName,'_MPM_markers_celltype_coveragePlots.pdf'),addDOC=F)
 
 
 
@@ -1367,20 +1277,6 @@ min_exp = .1
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-# ## Add column on DAM heatmap showing if TF is pioneer or not from chrombpnet ####
-# ## Show barplots of top TF occurrence using finemo chrombpnet outputs ####
 
 # ### Compare TF expression from scRNA and inferred by chrombpnet per cell type ####
 # library (httr)
@@ -1393,38 +1289,8 @@ metaGroupName = 'inflamed'
 if (!any (ls() == 'mSE')) mSE = fetch_mat (archp, 'Motif')
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData(mSE)$name
-#mMat_mg = mMat[DAM_df$gene, ]
-# mMat_mg = as.data.frame (t(mMat))
-# mMat_mg$metaGroup = as.character (archp@cellColData[,metaGroupName])
-# mMat_mg = aggregate (.~ metaGroup, mMat_mg, mean)
-# rownames (mMat_mg) = mMat_mg[,1]
-# mMat_mg = mMat_mg[,-1]
 
-
-# #Get active genes from RNA
-# metaGroupName = 'celltype_simplified2'
-# ps = log2(as.data.frame (AverageExpression (srt, 
-# features = colnames(mMat_mg),
-# group.by = metaGroupName)[[1]]) +1)
-# min_exp = .1
-# #ps = ps[apply(ps, 1, function(x) any (x > min_exp)),]
-# #active_TFs = rownames(ps)[rowSums(ps) > 0]
-
-# #active_genes = corGSM_MM$MotifMatrix_name[corGSM_MM$cor > 0.1]
-# #DAM_list2 = lapply (DAM_list, function(x) x[x$gene %in% active_TFs,])    
-# mMat_l = as.list (as.data.frame (t(mMat_mg)))
-# mMat_l = lapply (mMat_l, function(x) data.frame (dev = x, row.names = colnames(mMat_mg)))
-# #mMat_l = lapply (mMat_l, function(x) x[rownames(x) %in% active_TFs,,drop=F])
-
-# metaGroupName = 'celltype_lv1'
 chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet'
-# metaGroupName = 'celltype_lv1'
-# celltypes = unique (archp@cellColData[,metaGroupName])
-
-# tf_database = read_meme('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme', skip = 0, readsites = FALSE, readsites.meta = FALSE)
-# tf_database = unique(unlist(lapply(tf_database, function(x) unlist(strsplit(x@name,'_'))[1])))
-
-# list.files (file.path(chromBPdir, celltypes[3],'no_bias_model'))
 chrombpnet_counts = list()
 metaGroupName = 'inflamed'
 celltypes = unique (archp@cellColData[,metaGroupName])
@@ -2296,20 +2162,6 @@ pdf (file.path ('Plots','regulon_inflammation_module_ridge_plots.pdf'), width = 
 wrap_plots(rp)
 dev.off()
 
-### Check genes around AP1:NFKB1 composite motif  ####
-motif = 'pos_patterns.pattern_42'
-finemo_hits = read.table(file.path(chromBPdir,celltype,'no_bias_model','finemo_out_counts','hits.tsv'), sep='\t', header=T)
-ps = getPeakSet(archp)
-composite_hits = finemo_hits[finemo_hits$motif_name == motif,]
-composite_hits_gr = makeGRangesFromDataFrame (composite_hits)
-composite_hits$gene = unname(ps$nearestGene[findOverlaps(composite_hits_gr, ps, select = 'first')])
-
-composite_hits[queryHits (findOverlaps (composite_hits_gr, hubs_obj$hubsCollapsed)),]
-as.character(composite_hits_gr[which(composite_hits$gene == 'LMO1')])
-hubs_obj$hubs_id[queryHits (findOverlaps (hubs_obj$hubsCollapsed, makeGRangesFromDataFrame (composite_hits[which(composite_hits$gene == 'CD274'),])))]
-
-
-
 
 ### Get genes for regulons associated to inflammatory module ####
 scenic_genes = read.csv (file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs','motifs.csv'), header=T, skip=1)
@@ -2539,211 +2391,6 @@ table (finemo_res$V6)[order(table (finemo_res$V6))]
 head (finemo_res$V4[finemo_res$V6 == 'pos_patterns.pattern_33'],1)
 
 
-
-
-
-# Compare MDM score between deviation and genescore ####
-mdm_sig = c('FOSL1','FOSL2','BACH1','PPARG','NFKB2','KLF12','HIVEP3','SMAD1','NFKB1','REL','RUNX1','SNAI1','RUNX2','NFAT5')
-mdm_sig2 = c('FOSL1','FOSL2','BACH1','NFKB2','NFKB1','REL')
-myeloid_order = c('Mono_CD14','TAM_CXCLs','TAM_TREM2','TAM_MARCO','TAM_interstitial')
-# Add metacolumns of average TF modules activity ####
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = scale(assays (mSE)[[1]])
-rownames (mMat) = rowData (mSE)$name
-#mMat = as.data.frame (t(scale(as.matrix(mMat)[mdm_sig,])))
-mMat = as.data.frame (t(as.matrix(mMat)[mdm_sig2,]))
-mMat = aggregate (mMat, by = list(celltype_lv3 = archp$celltype_lv3), mean)
-rownames (mMat) = mMat[,1]
-mMat = mMat[,-1]
-mMat = as.data.frame (scale(mMat[myeloid_order,]))
-pdf (file.path ('Plots','MDM_score_activity_heatmap.pdf'),2.5, 2.5)
-Heatmap (t(mMat), 
-  col = rev(palette_deviation), 
-  cluster_columns=F,
-  row_names_gp = gpar(fontsize = 7),
-  column_names_gp = gpar(fontsize = 7),
-  column_names_rot = 45,
-  border=T)
-dev.off()
-
-#mMat = as.data.frame (scale (mMat))
-mMat$celltype = rownames (mMat)
-mMat = gather (mMat, TF, expression, 1:(ncol(mMat)-1))
-mMat$type = 'deviation'
-
-# Get genescore ####
-if (!exists('gsSE')) gsSE = fetch_mat (archp, 'GeneScore')
-gsMat = scale(assays (gsSE)[[1]])
-rownames (gsMat) = rowData (gsSE)$name
-#gsMat = scale(gsMat[rownames (gsMat) %in% mdm_sig,])
-gsMat = gsMat[rownames (gsMat) %in% mdm_sig2,]
-gsMat = t(gsMat)
-gsMat = as.data.frame (gsMat)
-gsMat = aggregate (gsMat, by = list(celltype_lv3 = archp$celltype_lv3), mean)
-rownames (gsMat) = gsMat[,1]
-gsMat = gsMat[,-1]
-gsMat = as.data.frame (scale(gsMat[myeloid_order,]))
-pdf (file.path ('Plots','MDM_score_genescore_heatmap.pdf'),2.5,2.5)
-Heatmap (t(gsMat), 
-  col = rev(palette_deviation), 
-  cluster_columns=F,
-  row_names_gp = gpar(fontsize = 7),
-  column_names_gp = gpar(fontsize = 7),
-  column_names_rot = 45,
-  border=T)
-dev.off()
-
-#gsMat = as.data.frame (scale (gsMat))
-gsMat$celltype = rownames (gsMat)
-gsMat = gather (gsMat, TF, expression, 1:(ncol(gsMat)-1))
-gsMat$type = 'genescore'
-
-
-### Use scRNA ####
-#gsMat = gather (gsMat, TF, expression, 2:ncol(gsMat))
-ps = log2(as.data.frame (AverageExpression (srt, features = mdm_sig2, group.by = 'celltype_lv3')[[1]]) +1)
-colnames (ps) = gsub ('-','_',colnames(ps))
-ps = as.data.frame (scale(t(ps)))
-ps$celltype = rownames(ps)
-ps = gather (ps, TF, expression, 1:(ncol(ps)-1))
-ps$type = 'expression'
-
-combined = rbind (mMat, gsMat, ps)
-
-
-df = combined
-df$celltype <- factor(df$celltype, levels = unique(df$celltype))
-#df$TF = paste0(df$TF, df$type)
-df = df[df$celltype %in% myeloid_order,]
-df$celltype = factor (df$celltype,myeloid_order)
-
-p <- list()
-
-for (g in mdm_sig2) {
-  p[[g]] <- ggplot(
-    df[df$TF == g, ],
-    aes(
-      x = celltype,
-      y = expression,
-      group = type,          # ← key change
-      color = type
-    )
-  ) +
-    geom_line(linewidth = 1) +
-    geom_point(size = 2) +
-    ggtitle(g) + gtheme #+ facet_wrap (~type, scales = 'free_y')
-}
-
-pdf (file.path ('Plots','deviation_vs_genescore_MDM_sig_linePlot.pdf'), 7,height=7)
-wrap_plots (p)
-dev.off()
-
-
-library(dplyr)
-df = combined
-#df = df[df$TF %in% c('FOSL1','FOSL2','BACH1','PPARG','NFKB2','NFKB1'),]
-df = df[df$celltype %in% myeloid_order,]
-df$celltype = factor (df$celltype,myeloid_order)
-
-sum_df <- df %>%
-  group_by(celltype, type) %>%
-  summarise(
-    median_expr = median(expression, na.rm = TRUE),
-    mean_expr   = mean(expression, na.rm = TRUE),
-    q25         = quantile(expression, 0.25, na.rm = TRUE),
-    q75         = quantile(expression, 0.75, na.rm = TRUE),
-    sd          = sd(expression, na.rm = TRUE),
-    n           = n(),
-    sem         = sd / sqrt(n),
-    .groups = "drop"
-  )
-p =ggplot(
-  sum_df,
-  aes(
-    x = celltype,
-    y = mean_expr,
-    group = type,
-    color = type,
-    fill  = type
-  )
-) +
-  geom_ribbon(
-    aes(ymin = q25, ymax = q75),
-    alpha = 0.25,
-    color = NA
-  ) +
-  geom_line(linewidth = 1.2) +
-  geom_point(size = 2) +
-  labs(
-    y = "Mean TF expression",
-    x = "Cell type"
-  ) + facet_wrap (~type, scales = 'free_y') + gtheme
-
-pdf (file.path ('Plots','deviation_vs_genescore_MDM_sig_mean_linePlot.pdf'), width = 5,height=3)
-p
-dev.off()
-
-
-
-
-cell_subsets_order = c("TAM_interstitial","TAM_MARCO","TAM_TREM2","TAM_CXCLs","Mono_CD14")
-if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
-mMat = assays (mSE)[[1]]
-rownames (mMat) = rowData (mSE)$name
-mMat = mMat[rownames (mMat) %in% 'NFKB1',,drop=F]
-mMat = t(mMat)
-mMat = as.data.frame (mMat)
-mMat = aggregate (mMat, by = list(celltype = archp$celltype_lv3,
-  sample = archp$Sample), mean)
-mMat = mMat[mMat$celltype %in% cell_subsets_order,]
-mMat$celltype = factor (mMat$celltype, levels = rev(cell_subsets_order))
-bp = ggplot (mMat, 
-  aes(x = celltype, y = NFKB1, fill = celltype)) + 
-  #vlp +
-  geom_boxplot (
-    linewidth = .2,
-    width=.5,
-    outlier.alpha = 0.2,
-    outlier.size = 1,
-     size=0.6, alpha=0.9
-     ) +
-  scale_fill_manual (values = palette_myeloid) + 
-  gtheme
-
-pdf (file.path ('Plots','NFKB1_deviation_boxplots_celltypes.pdf'), width = 4, height=4)
-bp
-dev.off()
-
-
-
-if (!exists('gsSE')) gsSE = fetch_mat (archp, 'GeneScore')
-gsMat = scale(assays (gsSE)[[1]])
-rownames (gsMat) = rowData (gsSE)$name
-#gsMat = scale(gsMat[rownames (gsMat) %in% mdm_sig,])
-gsMat = gsMat[rownames (gsMat) %in% 'NFKB1',,drop=F]
-gsMat = t(gsMat)
-gsMat = as.data.frame (gsMat)
-gsMat = aggregate (gsMat, by = list(celltype = archp$celltype_lv3,
-  sample = archp$Sample), mean)
-gsMat = gsMat[gsMat$celltype %in% cell_subsets_order,]
-gsMat$celltype = factor (gsMat$celltype, levels = rev(cell_subsets_order))
-
-bp = ggplot (gsMat, 
-  aes(x = celltype, y = NFKB1, fill = celltype)) + 
-  #vlp +
-  geom_boxplot (
-    linewidth = .2,
-    width=.5,
-    outlier.alpha = 0.2,
-    outlier.size = 1,
-     size=0.6, alpha=0.9
-     ) +
-  scale_fill_manual (values = palette_myeloid) + 
-  gtheme
-
-pdf (file.path ('Plots','NFKB1_genescore_boxplots_celltypes.pdf'), width = 4, height=4)
-bp
-dev.off()
 
 
 
