@@ -636,6 +636,86 @@ p_ridge
 dev.off()
 
 ### Use SCENIC regulon to identify scrna programs in PCA space ####
+# Try using PCA on regulons ####
+auc_mtx = readRDS (file.path('..','..','git_repo', 'files','SCENIC_regulons.rds'))
+p <- prcomp(auc_mtx, center = TRUE, scale. = TRUE)
+plot_df <- data.frame(p$x, celltype = srt$celltype_lv3[match(rownames (p$x), colnames(srt))])
+df_sub <- plot_df[plot_df$celltype %in% 
+                    c("Mono_CD14","TAM_interstitial","TAM_TREM2",
+                      "TAM_MARCO","TAM_CXCLs"), ]
+
+#-------------------------
+# 1. MAIN SCATTER
+#-------------------------
+p_scatter <- ggplot(df_sub, aes(PC1, PC3, color = celltype)) +
+  geom_point(alpha = 0.4, size = 0.1) +
+  geom_density_2d(size = 0.4) +
+  scale_color_manual(values = palette_myeloid) +
+  #scale_x_continuous(limits = x_range, expand = c(0,0)) +
+  #scale_y_continuous(limits = y_range, expand = c(0,0)) +
+  gtheme_no_rot +
+  theme(
+    legend.position = "right",
+    plot.margin = margin(0,0,0,0)
+  )
+
+
+p_density_x <- ggplot(df_sub, aes(PC1, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) + gtheme_no_rot
+
+p_density_y <- ggplot(df_sub, aes(PC3, fill = celltype)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) + gtheme_no_rot
+
+pdf (file.path ('Plots','scrna_momac_PC1_PC3_regulon_pca.pdf'), width = 5,height=5)
+p_density_x + plot_spacer() + p_scatter + p_density_y + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4),
+    guides = "collect"      # <- collect legends into one
+  ) &
+  theme(
+    legend.position = "bottom",  # or "top"
+    legend.box = "horizontal"
+  )
+
+dev.off()
+
+
+### Ridge plot of PC1 ####
+df_sub$celltype = factor (df_sub$celltype, levels = rev(cell_subsets_order))
+p_ridge <- ggplot(df_sub, aes(x = PC1, y = celltype, fill = celltype)) +
+  geom_density_ridges(scale = 3, alpha = 0.7, color = NA) +
+  scale_fill_manual (values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.y  = element_text(size = 8),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  gtheme_no_rot
+
+pdf(file.path("Plots","momac_PC1_ridge_plots.pdf"),
+    width = 5, height = 3)
+p_ridge
+dev.off()
 
 
 
@@ -644,7 +724,7 @@ dev.off()
 
 
 ### Correlate PCs of TF activity with scRNA-seq derived PCs of TF regulons ####
-regulons_PCs = readRDS (file.path('..','..','git_repo','files','PCA_regulons.rds')) 
+regulons_PCs = p
 momac_axis_rot = p$rotation[,1]
 regulons_rotations = regulons_PCs$rotation
 pc_var <- regulons_PCs$sdev^2
