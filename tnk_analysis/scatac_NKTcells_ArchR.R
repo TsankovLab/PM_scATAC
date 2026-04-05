@@ -4,23 +4,22 @@ R
 set.seed(1234)
 
 ####### ANALYSIS of NKT compartment #######
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR'
+projdir = 'NKT_cells'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
-source (file.path('..','..','git_repo','utils','load_packages.R'))
-source (file.path('..','..','git_repo','utils','useful_functions.R'))
-source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
-source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
-source (file.path('..','..','git_repo','utils','palettes.R'))
+source (file.path('..','git_repo','utils','load_packages.R'))
+source (file.path('..','git_repo','utils','useful_functions.R'))
+source (file.path('..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','git_repo','utils','palettes.R'))
 
 # Load functions for hub detection ####
-source (file.path('..','..','git_repo','utils','knnGen.R'))
-source (file.path('..','..','git_repo','utils','addCoax.R'))
-source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
-source (file.path('..','..','git_repo','utils','hubs_track.R'))
-#source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
+source (file.path(,'..','git_repo','utils','knnGen.R'))
+source (file.path(,'..','git_repo','utils','addCoax.R'))
+source (file.path(,'..','git_repo','utils','Hubs_finder.R'))
+source (file.path(,'..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
 addArchRThreads(threads = 1) 
@@ -155,7 +154,7 @@ metaGroupName = 'celltype_lv2'
 force=FALSE
 peak_reproducibility=2
 if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds'))) | force) 
-source (file.path('..','..','git_repo','utils','callPeaks.R'))
+source (file.path('..','git_repo','utils','callPeaks.R'))
 
 ### chromVAR analysis ####
 force=TRUE
@@ -344,7 +343,7 @@ saveRDS (GRanges(rownames(DAP_res_sig)), 'T_cell_exhaustion_peaks.rds')
 library (fgsea)    
 options(warn = 0)
 ps = getPeakSet (archp)
-csv.file = file.path('..','..','git_repo','files','Tcell_exhaustion_genes_PMID37091230')
+csv.file = file.path('..','git_repo','files','Tcell_exhaustion_genes_PMID37091230')
 pathways = read.csv (csv.file)
 pathways = list(Tcell_exhaustion_genes_PMID37091230 = pathways[,1])
 #pathways = gmtPathways (gmt.file)

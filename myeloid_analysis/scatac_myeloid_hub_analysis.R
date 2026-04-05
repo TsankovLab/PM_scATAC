@@ -1,8 +1,8 @@
 # Load functions for hub detection ####
-source (file.path('..','..','git_repo','utils','knnGen.R'))
-source (file.path('..','..','git_repo','utils','addCoax.R'))
-source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
-source (file.path('..','..','git_repo','utils','hubs_track.R'))
+source (file.path('..','git_repo','utils','knnGen.R'))
+source (file.path('..','git_repo','utils','addCoax.R'))
+source (file.path('..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','git_repo','utils','hubs_track.R'))
 
 
 
@@ -839,46 +839,6 @@ vp = ggplot (res, aes(x=logFC, y=-log10(padj))) +
 pdf (file.path (hubs_dir, 'Plots', 'DAH_volcano.pdf'),width = 14,height = 4)
 print (vp)
 dev.off()  
-
-
-
-# check hubs that are up across all normal vs tumor ####
-wlc_res_pos = lapply (wlc_res, function(x) x[x$logFC > 0,])
-wlc_res_pos = do.call (rbind, wlc_res_pos)
-head (table (wlc_res_pos$feature)[order(-table (wlc_res_pos$feature))])
-
-wlc_res_neg = lapply (wlc_res, function(x) x[x$logFC < 0,])
-wlc_res_neg = do.call (rbind, wlc_res_neg)
-head (table (wlc_res_neg$feature)[order(-table (wlc_res_neg$feature))])
-
-wlc_res_t = wlc_res[['T_cells']]
-head (wlc_res_t[order(wlc_res_t$logFC),],20)
-
-
-
-
-
-p2 <- plotGroups(
-    ArchRProj = archp, 
-    groupBy = metaGroupName2, 
-    colorBy = "cellColData", 
-    name = "TSSEnrichment",
-    plotAs = "violin",
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-p1 <- plotGroups(
-    ArchRProj = archp, 
-    groupBy = metaGroupName2, 
-    colorBy = "cellColData", 
-    name = "nFrags",
-    plotAs = "violin",
-    alpha = 0.4,
-    addBoxPlot = TRUE
-   )
-pdf (file.path ('Plots','QC-Sample-Statistics.pdf'), height=5)
-wrap_plots (p1, p2)
-dev.off()
 
 
 

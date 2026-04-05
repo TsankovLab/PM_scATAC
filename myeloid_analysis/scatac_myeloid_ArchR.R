@@ -10,17 +10,17 @@ dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
-source (file.path('..','..','git_repo','utils','load_packages.R'))
-source (file.path('..','..','git_repo','utils','useful_functions.R'))
-source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
-source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
-source (file.path('..','..','git_repo','utils','palettes.R'))
+source (file.path('..','git_repo','utils','load_packages.R'))
+source (file.path('..','git_repo','utils','useful_functions.R'))
+source (file.path('..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','git_repo','utils','palettes.R'))
 
 # Load functions for hub detection ####
-source (file.path('..','..','git_repo','utils','knnGen.R'))
-source (file.path('..','..','git_repo','utils','addCoax.R'))
-source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
-source (file.path('..','..','git_repo','utils','hubs_track.R'))
+source (file.path('..','git_repo','utils','knnGen.R'))
+source (file.path('..','git_repo','utils','addCoax.R'))
+source (file.path('..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
 addArchRThreads(threads = 1) 
@@ -103,7 +103,7 @@ metaGroupName = 'Clusters_H'
 force=FALSE
 peak_reproducibility=2
 if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds'))) | force) 
-source (file.path('..','..','git_repo','utils','callPeaks.R'))
+source (file.path('..','git_repo','utils','callPeaks.R'))
 dev.off()
 
 ### chromVAR analysis ####
@@ -112,10 +112,10 @@ if (!all(file.exists(file.path('Annotations',
   c('Motif-Matches-In-Peaks.rds',
     'Motif-Positions-In-Peaks.rds',
     'Motif-In-Peaks-Summary.rds')))) | force)
-source (file.path ('..','..','git_repo','utils','chromVAR.R'))
+source (file.path ('..','git_repo','utils','chromVAR.R'))
   
 ### Plot heatmap of gene overlaps of cnmfs identified from scrna per sample in myeloids ####
-cnmf_spectra_unique_l = readRDS (file.path('..','..','git_repo','files','cnmf_myeloid_per_sample.rds'))
+cnmf_spectra_unique_l = readRDS (file.path('..','git_repo','files','cnmf_myeloid_per_sample.rds'))
 force=FALSE
 
 cnmf_spectra_unique_l = unlist(cnmf_spectra_unique_l, recursive=F)
@@ -668,7 +668,7 @@ dev.off()
 
 ### Use SCENIC regulon to identify scrna programs in PCA space ####
 # Try using PCA on regulons ####
-auc_mtx = readRDS (file.path('..','..','git_repo', 'files','SCENIC_regulons.rds'))
+auc_mtx = readRDS (file.path('..','git_repo', 'files','SCENIC_regulons.rds'))
 p <- prcomp(auc_mtx, center = TRUE, scale. = TRUE)
 plot_df <- data.frame(p$x, celltype = srt$celltype_lv3[match(rownames (p$x), colnames(srt))])
 df_sub <- plot_df[plot_df$celltype %in% 
@@ -924,8 +924,8 @@ gmt_annotations = c(
 'c5.bp.v7.1.symbol.gmt'
 )
 
-gmt.file = paste0 (file.path ('..','..','git_repo','files','h.all.v7.4.symbols.gmt'))
-gmt.file = paste0 (file.path ('..','..','git_repo','files','c5.bp.v7.1.symbol.gmt'))
+gmt.file = paste0 (file.path ('..','git_repo','files','h.all.v7.4.symbols.gmt'))
+gmt.file = paste0 (file.path ('..','git_repo','files','c5.bp.v7.1.symbol.gmt'))
 pathways = clusterProfiler::read.gmt (gmt.file)
 pathways = split(pathways$gene, pathways$term)
 DAG_list = readRDS ('DAG_inflamed_pairwise.rds')
@@ -1290,7 +1290,7 @@ if (!any (ls() == 'mSE')) mSE = fetch_mat (archp, 'Motif')
 mMat = assays (mSE)[[1]]
 rownames (mMat) = rowData(mSE)$name
 
-chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet'
+chromBPdir = 'chromBPnet'
 chrombpnet_counts = list()
 metaGroupName = 'inflamed'
 celltypes = unique (archp@cellColData[,metaGroupName])
@@ -1588,7 +1588,7 @@ library ('universalmotif')
 
 ps = getPeakSet (archp)
 
-chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet'
+chromBPdir = 'chromBPnet'
 
 chrombpnet_counts = list()
 celltypes = c('inflamed','non_inflamed')
@@ -1742,55 +1742,6 @@ pdf (file.path ('Plots', 'TF_abundance_profile_barplot.pdf'),6,width=6.5)
 bp
 dev.off()
 
-
-
-
-### Compare TF regulon expression with inflammation regulatory module to identify which TF might be driving ####
-auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
-rownames (auc_mtx) = auc_mtx[,1]
-auc_mtx = auc_mtx[,-1]
-colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
-
-km = readRDS (file.path ('..','scatac_ArchR','TF_activity_modules.rds'))
-#genes_highlight = readRDS (file.path ('..','scatac_ArchR','inflammation_TFs.rds'))
-regulon_TFs_in_modules = list(
-  km1 = colnames(auc_mtx)[colnames(auc_mtx) %in% names(km$cluster[km$cluster == 1])],
-  km2 = colnames(auc_mtx)[colnames(auc_mtx) %in% names(km$cluster[km$cluster == 2])]
-  )
-auc_mtx = auc_mtx[, colnames(auc_mtx) %in% regulon_TFs_in_modules$km2]
-
-srt$mod_2 = unname(rowMeans (auc_mtx))
-
-# # Try with ridge plots ####
-library (ggridges)
-library (ggplot2)
-library (viridis)
-library (tidyr)
-#library(hrbrthemes)
-
-# Plot
-ccomp = as.data.frame (srt@meta.data)
-#ccomp = ccomp[ccomp$cnmf_celltypes %in% c('cDCs'),]
-cell_subsets_order = c("TAM_interstitial","TAM_MARCO","cDCs","TAM_TREM2","TAM_CXCLs","Mono_CD16","Mono_CD14")
-ccomp$cnmf_celltypes = factor (ccomp$shared_cnmf_r_max, levels = cell_subsets_order)
-ccomp$module = srt$mod_2
-#ccomp = ccomp[!is.na(ccomp$cnmf_celltypes),]
-rp <- ggplot(ccomp, aes(x = module, y = cnmf_celltypes, fill = ..x..)) +
-  geom_density_ridges_gradient(
-  scale = 3,
-  rel_min_height = 0.01,
-  linewidth = 0.4,
-  color='white',
-  alpha = 0.3
-) +
-
-  scale_fill_gradientn (colors = palette_expression) +  # Optional: nice color gradient
-  theme_ridges() +                      # Optional: clean ridge plot theme
-  theme(legend.position = "right")     # Adjust legend position
-#   theme_classic() + facet_wrap (~sample, ncol=5)
-pdf (file.path ('Plots','cnmf_inflammation_module_ridge_plots.pdf'), width = 5,height=3)
-rp
-dev.off()
 
 
 
@@ -1994,45 +1945,6 @@ dev.off()
 
 
 
-### Compare TF regulon expression with inflammation regulatory module to identify which TF might be driving ####
-auc_mtx <- read.csv(file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs', 'auc_mtx.csv'), header=T)
-rownames (auc_mtx) = auc_mtx[,1]
-auc_mtx = auc_mtx[,-1]
-colnames (auc_mtx) = sub ('\\.\\.\\.','', colnames(auc_mtx))
-auc_mtx = auc_mtx[, colnames(auc_mtx) %in% active_TF]
-
-srt$mod_2 = unname(rowMeans (auc_mtx))
-
-# # Try with ridge plots regulons ####
-library (ggridges)
-library (ggplot2)
-library (viridis)
-library (tidyr)
-#library(hrbrthemes)
-
-# Plot
-ccomp = as.data.frame (srt@meta.data)
-#ccomp = ccomp[ccomp$cnmf_celltypes %in% c('cDCs'),]
-cell_subsets_order = c("TAM_interstitial","TAM_MARCO","cDCs","TAM_TREM2","TAM_CXCLs","Mono_CD16","Mono_CD14")
-ccomp$cnmf_celltypes = factor (ccomp$shared_cnmf_r_max, levels = cell_subsets_order)
-ccomp$module = srt$mod_2
-#ccomp = ccomp[!is.na(ccomp$cnmf_celltypes),]
-rp <- ggplot(ccomp, aes(x = module, y = cnmf_celltypes, fill = ..x..)) +
-  geom_density_ridges_gradient(
-  scale = 3,
-  rel_min_height = 0.01,
-  linewidth = 0.4,
-  color='white',
-  alpha = 0.3
-) +
-
-  scale_fill_gradientn (colors = palette_expression) +  # Optional: nice color gradient
-  theme_ridges() +                      # Optional: clean ridge plot theme
-  theme(legend.position = "right")     # Adjust legend position
-#   theme_classic() + facet_wrap (~sample, ncol=5)
-pdf (file.path ('Plots','cnmf_inflammation_module_filtererd_ridge_plots.pdf'), width = 5,height=3)
-rp
-dev.off()
 
 
 
@@ -2163,38 +2075,6 @@ wrap_plots(rp)
 dev.off()
 
 
-### Get genes for regulons associated to inflammatory module ####
-scenic_genes = read.csv (file.path('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scrna/SCENIC/vg_5000_mw_tss500bp/monomac_programs','motifs.csv'), header=T, skip=1)
-
-genes <- sapply(seq(nrow(scenic_genes)), function(x) unlist(regmatches(scenic_genes[x,9], gregexpr("(?<=\\(')[A-Za-z0-9_-]+", scenic_genes[x,9], perl = TRUE))))
-names (genes) = scenic_genes[,1]
-
-gene_regulon = 'FOSL2'
-ps = as.data.frame (log2(AverageExpression (srt, group.by = 'celltype_lv3', features = unique(unlist(genes[names(genes) %in% gene_regulon])))[[1]]+1))
-
-srt = ModScoreCor (
-    seurat_obj = srt, 
-    geneset_list = list(gene_regulon = rownames(ps)), 
-    cor_threshold = NULL, 
-    pos_threshold = NULL, # threshold for fetal_pval2
-    listName = 'TF_module', outdir = NULL)
-
-ccomp = srt@meta.data[,c('gene_regulon','celltype_lv3')]
-gp = ggplot(ccomp, aes(x = celltype_lv3, y = gene_regulon, fill = celltype_lv3)) +
-  geom_boxplot() +
-  theme_bw() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "none"
-  ) +
-  labs(x = "", y = "Expression", title = "Expression distribution per cell type")
-
-pdf (file.path ('Plots','NFKB1_gene_regulons_score.pdf'))
-gp
-reductionName='sampleID_harmony_umap'
-DimPlot (srt, group.by = 'celltype_lv3', reduction=reductionName)
-fp (srt, 'gene_regulon')
-dev.off()
 
 
 ### Check Genescore of relative regulon ####
@@ -2384,7 +2264,7 @@ dev.off()
 
 
 ## Find most abundant composites 
-chromBPdir='/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet'
+chromBPdir='chromBPnet'
 celltype='inflamed'
 finemo_res = read.table (file.path (chromBPdir, celltype,'no_bias_model',paste0(celltype, '_finemo_counts_to_genome_browser.tsv')))
 table (finemo_res$V6)[order(table (finemo_res$V6))]

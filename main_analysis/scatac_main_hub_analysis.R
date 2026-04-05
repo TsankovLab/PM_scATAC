@@ -1,8 +1,8 @@
 # Load functions for hub detection
-source (file.path('..','..','git_repo','utils','knnGen.R'))
-source (file.path('..','..','git_repo','utils','addCoax.R'))
-source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
-source (file.path('..','..','git_repo','utils','hubs_track.R'))
+source (file.path('..','git_repo','utils','knnGen.R'))
+source (file.path('..','git_repo','utils','addCoax.R'))
+source (file.path('..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','git_repo','utils','hubs_track.R'))
 
 
 # Export bigiwg files ####
@@ -432,7 +432,7 @@ library ('universalmotif')
 # if (!any (ls() == 'mSE')) mSE = fetch_mat (archp_P1, 'Motif')
 # mMat = assays (mSE)[[1]]
 # rownames (mMat) = rowData(mSE)$name
-chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
+chromBPdir = 'chromBPnet'
 # metaGroupName = 'celltype_lv1'
 
 

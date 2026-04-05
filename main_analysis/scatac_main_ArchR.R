@@ -27,24 +27,24 @@ packages = c(
 lapply(packages, require, character.only = TRUE)
 
 ####### ANALYSIS of main data #######
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR'
+projdir = 'main'
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 
 #devtools::install_github("immunogenomics/presto") #needed for DAA
-source (file.path('..','..','git_repo','utils','useful_functions.R'))
-source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
-source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
-source (file.path('..','..','git_repo','utils','palettes.R'))
-source (file.path('..','..','git_repo','utils','hubs_track.R'))
+source (file.path('..','git_repo','utils','useful_functions.R'))
+source (file.path('..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','git_repo','utils','palettes.R'))
+source (file.path('..','git_repo','utils','hubs_track.R'))
 
 set.seed (1234)
 addArchRThreads (threads = 1) 
 addArchRGenome ("Hg38")
 
 # Load RNA
-srt = readRDS ('../scrna/srt.rds')
+srt = readRDS ('srt.rds')
 srt$celltype_simplified2[srt$celltype_simplified2 == 'pDC'] = 'pDCs'
 
 archp = loadArchRProject (projdir)
@@ -522,8 +522,7 @@ library ('universalmotif')
 
 ps = getPeakSet (archp)
 
-chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet'
-chromBPdir = '/sc/arion/scratch/giottb01/chromBPnet'
+chromBPdir = 'chromBPnet'
 
 chrombpnet_counts = list()
 celltypes = unique (archp$celltype_lv1)

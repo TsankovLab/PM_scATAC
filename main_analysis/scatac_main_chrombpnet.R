@@ -9,17 +9,17 @@ dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
 # Load utils functions palettes and packages ####
-source (file.path('..','..','git_repo','utils','load_packages.R'))
-source (file.path('..','..','git_repo','utils','useful_functions.R'))
-source (file.path('..','..','git_repo','utils','ggplot_aestetics.R'))
-source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
-source (file.path('..','..','git_repo','utils','palettes.R'))
+source (file.path('..','git_repo','utils','load_packages.R'))
+source (file.path('..','git_repo','utils','useful_functions.R'))
+source (file.path('..','git_repo','utils','ggplot_aestetics.R'))
+source (file.path('..','git_repo','utils','scATAC_functions.R'))
+source (file.path('..','git_repo','utils','palettes.R'))
 
 # Load functions for hub detection ####
-source (file.path('..','..','git_repo','utils','knnGen.R'))
-source (file.path('..','..','git_repo','utils','addCoax.R'))
-source (file.path('..','..','git_repo','utils','Hubs_finder.R'))
-source (file.path('..','..','git_repo','utils','hubs_track.R'))
+source (file.path('..','git_repo','utils','knnGen.R'))
+source (file.path('..','git_repo','utils','addCoax.R'))
+source (file.path('..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','git_repo','utils','hubs_track.R'))
 #source (file.path('..','..','git_repo','utils','scATAC_functions.R'))
 
 # Set # of threads and genome reference ####
