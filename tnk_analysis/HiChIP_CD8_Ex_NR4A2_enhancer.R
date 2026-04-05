@@ -8,9 +8,9 @@ samples = c('SRR13961069','SRR13961070','SRR13961071','SRR13961072','SRR13961073
 hic = list()
 for (sam in samples)
   {
-  matrix_files = paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/HiC_Texhaustion_GSE168881_hg38/hic_results/matrix/',sam,'/raw/10000/',sam,'_10000.matrix') # raw
+  matrix_files = paste0('HiC_Texhaustion_GSE168881_hg38/hic_results/matrix/',sam,'/raw/10000/',sam,'_10000.matrix') # raw
   #matrix_files = paste0('/sc/arion/scratch/giottb01/HiCPro_matrices/hic_results/matrix/',sam,'/iced/10000/',sam,'_10000_iced.matrix') # iced normalized
-  bed_files = paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/HiC_Texhaustion_GSE168881_hg38/hic_results/matrix/',sam,'/raw/10000/',sam,'_10000_abs.bed')
+  bed_files = paste0('HiC_Texhaustion_GSE168881_hg38/hic_results/matrix/',sam,'/raw/10000/',sam,'_10000_abs.bed')
   bed = read.table (bed_files)
   
   hic[[sam]]<-importC(matrix_files,
@@ -35,7 +35,7 @@ for (sam in samples)
   E14norm.binned[[sam]] <- normPerExpected (E14subset.binned, method="loess", stdev=TRUE)
   }
 
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/HiChIP'
+projdir = 'HiChIP'
 dir.create (file.path(projdir,'Plots'))
 setwd(projdir)
 
@@ -85,22 +85,6 @@ E14subset_HA_avg.binned@intdata = (E14subset_HA_1.binned@intdata + E14subset_HA_
 
 
 
-
-
-
-# E14subset2 = extractRegion(hic[[samples2]$chr2chr2, c(1,2),
-# chr="chr2", from=156292347, to=156642348)
-
-# # ## Binning of 5C interaction map
-# E14subset.binned <- binningC (E14subset, binsize=10000, method="median", step=3)
-# E14subset2.binned <- binningC (E14subset2, binsize=10000, method="median", step=3)
-
-# E14norm.binned <- normPerExpected (E14subset.binned, method="loess", stdev=TRUE)
-# E14norm2.binned <- normPerExpected (E14subset2.binned, method="loess", stdev=TRUE)
-
-# E14norm3.binned = E14norm.binned
-# E14norm.binned@intdata[is.na(E14norm.binned@intdata)] = 0
-# E14norm2.binned@intdata[is.na(E14norm2.binned@intdata)] = 0
 E14subset_subtracted = E14subset_HA_avg.binned
 E14subset_subtracted@intdata = E14subset_HA_avg.binned@intdata - E14subset_CD19_avg.binned@intdata
 E14subset_subtracted2 = E14subset_subtracted

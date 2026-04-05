@@ -48,8 +48,8 @@ palette_bulk = setNames (as.character(paletteer::paletteer_d("rcartocolor::ArmyR
 # palette_t_cells = setNames (as.character (paletteer::paletteer_d("fishualize::Bodianus_rufus",5)), c('CD8','CD4','Tregs','TFH','CD8_exhausted'))
 # palette_nk_cells = setNames (c("#D3E3CAFF", "#92A587FF", "#2F3525FF"), c('NK_FGFBP2','NK_KLRC1','NKlike_Tcells'))
 # palette_tnk_cells = c(palette_t_cells, palette_nk_cells)
-palette_tnk_cells =setNames (as.character(paletteer::paletteer_d("tvthemes::Stark",n=6)), c('CD8','CD4','Tregs','NK_KLRC1','NK_FGFBP2','CD8_exhausted'))
-palette_tnk_cells['NK_KLRC1'] = 'black'
+palette_tnk_cells =setNames (as.character(paletteer::paletteer_d("tvthemes::Stark",n=6)), c('CD8','CD4','Tregs','KLRC1_NK','FGFBP2_NK','CD8_exhausted'))
+palette_tnk_cells['KLRC1_NK'] = 'black'
 #palette_tnk_cells['CD4'] = '#F9ECE8FF'
 palette_myeloid = rev (paletteer::paletteer_d("trekcolors::dominion"))
 palette_myeloid = paletteer::paletteer_d("MetBrewer::Homer1")[1:8]
