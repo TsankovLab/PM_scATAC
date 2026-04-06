@@ -119,10 +119,10 @@ dependencies:
 ---
 # Additional conda environments used in this project:
 #
-#   pyscenic  — pySCENIC (v0.12.1), arboreto/GRNBoost2, ctxcore, loompy; Python 3.7
-#   cnmf      — cNMF (v1.4.1); Python 3.7
-#   cpdb      — CellPhoneDB (v5.0.1); Python 3.8
+#   cpdb       — CellPhoneDB (v5.0.1); Python 3.8
 #   chrombpnet — ChromBPNet (v0.1.7), TF-MoDISco-lite (v2.0.7); Python 3.8 [UNDER CONSTRUCTION]
-#   finemo    — FiNeMo (v0.25); Python 3.10
+#   finemo     — FiNeMo (v0.25); Python 3.10 [UNDER CONSTRUCTION]
+#
+# Note: cNMF and pySCENIC outputs are provided as precomputed .rds files in files/
 #
 # See software_used.csv for full version details of all environments.

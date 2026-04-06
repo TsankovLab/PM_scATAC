@@ -68,15 +68,6 @@ git_repo/
 │   ├── addCoax.R                   # Co-accessibility utilities
 │   ├── callPeaks.R                 # Peak calling helpers
 │   ├── DEG_standard.R              # Differential expression wrapper
-│   ├── HVG.R                       # Highly variable gene selection
-│   ├── cnmf_prepare_inputs.R       # cNMF: export count matrices and launch LSF job
-│   ├── cnmf_format_spectra_files.R # cNMF: import and format spectra output
-│   ├── cnmf_master.sh              # cNMF: LSF master submission script
-│   ├── cnmf_factorization_parallel.sh  # cNMF: parallel factorization array job
-│   ├── SCENIC.R                    # pySCENIC: R orchestration (export matrix, submit job)
-│   ├── SCENIC.sh                   # pySCENIC: LSF submission script
-│   ├── SCENIC.py                   # pySCENIC: GRNBoost2 + SCENIC Python runner
-│   ├── SCENIC_plots.R              # pySCENIC: regulon activity visualization
 │   ├── HDMA_pipeline.py            # HDMA pipeline
 │   ├── HIC_processing.sh / HiC_Pro.sh  # HiC data processing
 │   ├── chromBPnet_*.sh / *.py / *.R    # ChromBPNet pipeline [UNDER CONSTRUCTION]
@@ -148,13 +139,13 @@ BiocManager::install(c("JASPAR2020", "EnhancedVolcano", "karyoploteR",
 
 ### 2. Additional conda environments
 
-| Environment   | Purpose                                                    | Python |
-|---------------|------------------------------------------------------------|--------|
-| `pyscenic`    | pySCENIC regulon inference (GRNBoost2 + SCENIC)            | 3.7    |
-| `cnmf`        | Consensus NMF factorization                                | 3.7    |
-| `cpdb`        | CellPhoneDB ligand-receptor analysis                       | 3.8    |
-| `chrombpnet`  | ChromBPNet deep learning footprinting (**under construction**) | 3.8 |
-| `finemo`      | FiNeMo motif calling (**under construction**)              | 3.10   |
+| Environment   | Purpose                                                        | Python |
+|---------------|----------------------------------------------------------------|--------|
+| `cpdb`        | CellPhoneDB ligand-receptor analysis                           | 3.8    |
+| `chrombpnet`  | ChromBPNet deep learning footprinting (**under construction**) | 3.8    |
+| `finemo`      | FiNeMo motif calling (**under construction**)                  | 3.10   |
+
+> cNMF and pySCENIC outputs are provided as precomputed `.rds` files in `files/` and do not need to be re-run.
 
 See `software_used.csv` for full version details of every package in every environment.
 
@@ -188,32 +179,6 @@ R
 source('git_repo/tnk_analysis/scrna_tnk.R')
 source('git_repo/stroma_analysis/scrna_stroma.R')
 source('git_repo/B_cells_analysis/scrna_BCells.R')
-```
-
-### Consensus NMF (cNMF) — runs on HPC via LSF
-
-```r
-# 1. Prepare count matrices and submit factorization job
-nfeat              <- 5000          # number of highly variable features
-k_list             <- c(5:30)       # K values to test
-cnmf_name          <- 'malignant'
-cnmf_out           <- 'path/to/cnmf_output'
-scrna_pipeline_dir <- 'path/to/git_repo/utils'   # points to utils/
-source(file.path(scrna_pipeline_dir, 'cnmf_prepare_inputs.R'))
-```
-
-```r
-# 2. Import and format spectra files after job completes
-k_selection <- 25   # chosen after inspecting error/stability plot
-source(file.path(scrna_pipeline_dir, 'cnmf_format_spectra_files.R'))
-```
-
-### pySCENIC regulon inference
-
-```r
-# Set path then source SCENIC.R to export the expression matrix and submit the LSF job
-scrna_pipeline_dir <- 'path/to/git_repo/utils'
-source(file.path(scrna_pipeline_dir, 'SCENIC.R'))
 ```
 
 ---
