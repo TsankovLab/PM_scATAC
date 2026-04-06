@@ -46,6 +46,8 @@ if (length(unique (degClusters$cluster)) > 2)
 	top_deg = head (top_deg, top_genes)
 	}
 
+top_deg$cluster = factor (top_deg$cluster, levels = names(table (srt@meta.data[,metaGroupName])[order(-table (srt@meta.data[,metaGroupName]))]))
+top_deg = top_deg[order(top_deg$cluster),]
 # if (!is.na(is.integer(as.integer(srt@meta.data[,metaGroupName][1]))))
 #  	{
 #  	srt@meta.data[,metaGroupName] = factor (srt@meta.data[,metaGroupName], levels =unique(srt@meta.data[,metaGroupName])[order(as.numeric(as.character(unique(srt@meta.data[,metaGroupName]))))])
@@ -61,15 +63,20 @@ srt2 = ScaleData (srt, features = unique(top_deg$gene))
 #srt2 = srt[, !is.na(srt@meta.data[,metaGroupName])]
 #if (is.na(as.integer(levels(srt@meta.data[,metaGroupName])))) Idents(srt2) = factor (srt2@meta.data[,metaGroupName], levels =unique(srt2@meta.data[,metaGroupName])[order(as.numeric(as.character(unique(srt2@meta.data[,metaGroupName]))))])
 #if (!is.na(is.integer(as.integer(srt@meta.data[,metaGroupName][1])))) Idents(srt2) = factor (srt2@meta.data[,metaGroupName], levels =unique(srt2@meta.data[,metaGroupName])[order(as.numeric(as.character(unique(srt2@meta.data[,metaGroupName]))))])
+Idents(srt2) = factor (srt@meta.data[,metaGroupName], levels = names(table (srt@meta.data[,metaGroupName])[order(-table (srt@meta.data[,metaGroupName]))]))
 heat_p = DoHeatmap (srt2, features = unique(top_deg$gene))
-png (file.path(projdir_DEG, 'Plots',paste0('top_',top_genes,'_heatmap.png')), height=15500, width=3300, res=400)
+png (file.path(projdir_DEG, 'Plots',paste0('top_',top_genes,'_heatmap.png')), height=6000, width=16300, res=400)
 print (heat_p)
 dev.off()
+pdf (file.path(projdir_DEG, 'Plots',paste0('top_',top_genes,'_heatmap.pdf')), height=6, width=5)
+print (heat_p)
+dev.off()
+
 rm (srt2)
 
 #### Generate Feature plots and dotplots of top genes ####
 message ('Generate Feature plots of top genes')
-top_deg = degClusters %>% arrange(-avg_log2FC) %>% group_by (cluster)  %>% slice(1:top_genes)
+top_deg = degClusters %>% arrange(-avg_log2FC) %>% group_by (cluster) %>% slice_head (n = top_genes)
 #top_deg = top_deg[order (-top_deg$avg_log2FC),]
 
 feat_p = lapply (seq_along(top_deg$gene), function(x) FeaturePlot (srt, features = top_deg$gene[x], keep.scale = 'all', order=F,
@@ -84,13 +91,18 @@ png (file.path(projdir_DEG,'Plots',paste0('top_',top_genes,'_fplots.png')), ((le
 print (wrap_plots (feat_p))
 dev.off()
 
+top_deg = degClusters %>% arrange(-avg_log2FC) %>% group_by (cluster) %>% slice_head (n = top_genes)
+
 dp = DotPlot(object = srt, features = rev(unique(top_deg$gene)), scale = T, group.by = metaGroupName) +
   	theme(axis.text.x = element_text(angle = 45, hjust=1), panel.border = element_rect(colour = "black", fill=NA, size=1), panel.grid.major = element_line(colour = "gainsboro")) + 
     scale_color_gradientn(colours = rev(brewer.pal(11,"Spectral"))) +
     geom_point(aes(size=pct.exp), shape = 21, colour="black", stroke=0.5)
-
+dp$data$id = factor (dp$data$id, levels = levels (top_deg$cluster))
 png (file.path(projdir_DEG, 'Plots',paste0('top_',top_genes,'_dotplot.png')), ((length(unique(top_deg$gene))*90) + 500), ((length(unique (srt@meta.data[,metaGroupName]))*102) + 250), res=300)
-dp
+print (dp)
+dev.off()
+pdf (file.path(projdir_DEG, 'Plots',paste0('top_',top_genes,'_dotplot.pdf')), width=38, height=14)
+print (dp)
 dev.off()
 
 #### Run GSEA enrichment on each cluster DE markers ####

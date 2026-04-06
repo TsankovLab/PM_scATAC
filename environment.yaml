@@ -1,0 +1,128 @@
+name: meso_scatac
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  # Language
+  - r-base=4.3.3
+  - python=3.8
+
+  # CLI tools
+  - samtools=1.21
+  - macs2=2.2.9.1
+  - bowtie2=2.5.4
+  - htslib=1.21          # bgzip + tabix
+  - bedtools=2.31.1
+  - meme=5.5.7            # TOMTOM motif comparison
+  - gimmemotifs=0.18.0   # gimme cluster
+
+  # R system dependencies
+  - r-devtools
+  - r-hdf5r
+  - cairo
+  - r-rstatix=0.7.2
+
+  # Bioconductor (via bioconda)
+  - bioconductor-chromvar=1.24.0
+  - bioconductor-dirichletmultinomial
+  - bioconductor-scran=1.30.0
+  - bioconductor-infercnv=1.20.0
+  - bioconductor-regioneer=1.34.0
+  - bioconductor-rgreat=2.4.0
+  - bioconductor-biovizbase=1.50.0
+  - bioconductor-rtracklayer=1.62.0
+  - bioconductor-genomicranges=1.54.1
+  - bioconductor-genomicfeatures=1.54.4
+  - bioconductor-genomicalignments
+  - bioconductor-plyranges
+  - bioconductor-rsamtools
+  - bioconductor-genomeinfodb
+  - bioconductor-bsgenome.hsapiens.ucsc.hg38=1.4.5
+  - bioconductor-bsgenome.hsapiens.ucsc.hg19=1.4.3
+  - bioconductor-ensdb.hsapiens.v86=2.99.0
+  - bioconductor-txdb.hsapiens.ucsc.hg38.knowngene=3.18.0
+  - bioconductor-txdb.hsapiens.ucsc.hg19.knowngene=3.2.2
+  - bioconductor-tfbstools=1.40.0
+  - bioconductor-complexheatmap=2.18.0
+  - bioconductor-fgsea=1.28.0
+  - bioconductor-clusterprofiler=4.10.1
+  - bioconductor-enrichplot=1.22.0
+  - bioconductor-dose=3.28.2
+  - bioconductor-topgo=2.54.0
+  - bioconductor-org.hs.eg.db=3.18.0
+  - bioconductor-org.mm.eg.db=3.18.0
+  - bioconductor-go.db=3.18.0
+  - bioconductor-biomart=2.58.2
+  - bioconductor-scuttle=1.12.0
+  - bioconductor-singlecellexperiment=1.24.0
+  - bioconductor-summarizedexperiment=1.32.0
+  - bioconductor-biocparallel=1.36.0
+  - bioconductor-limma=3.58.1
+  - bioconductor-edger=4.0.16
+  - bioconductor-ucell=2.6.2
+  - bioconductor-ggtree=3.10.1
+  - bioconductor-wgcna=1.73
+  - bioconductor-destiny=3.14.0
+  - bioconductor-liftover
+
+  # CRAN packages
+  - r-seurat=5.2.1
+  - r-signac=1.14.0
+  - r-harmony=1.2.3
+  - r-sctransform=0.4.1
+  - r-ggplot2=3.5.1
+  - r-tidyverse=2.0.0
+  - r-patchwork=1.3.0
+  - r-cowplot=1.1.3
+  - r-ggpubr=0.6.0
+  - r-ggrepel=0.9.6
+  - r-ggridges=0.5.6
+  - r-viridis=0.6.5
+  - r-rcolorbrewer=1.1_3
+  - r-circlize=0.4.16
+  - r-corrplot=0.94
+  - r-igraph=2.0.3
+  - r-paletteer=1.6.0
+  - r-survival=3.7_0
+  - r-survminer=0.4.9
+  - r-gsa=1.03.3
+  - r-ape
+  - r-dendextend
+  - r-scales
+  - r-zoo
+  - r-data.table
+  - r-matrix
+  - r-gplots
+  - r-gdata
+  - r-plotly
+  - r-ggextra
+  - r-stringr
+  - r-pheatmap=1.0.12
+  - r-factoextra
+
+  # GitHub-only R packages (install via R after env creation):
+  # devtools::install_github("GreenleafLab/ArchR", ref="master", repos=BiocManager::repositories())
+  # devtools::install_github("GreenleafLab/chromVARmotifs")
+  # devtools::install_github("crazyhottommy/scATACutils")
+  # devtools::install_github("colomemaria/epiAneufinder")
+  # devtools::install_github("immunogenomics/presto")
+  # devtools::install_github("smorabit/hdWGCNA", ref="dev")
+  # install.packages("scCustomize")
+  # BiocManager::install("JASPAR2020")
+  # BiocManager::install("EnhancedVolcano")
+  # BiocManager::install("karyoploteR")
+  # BiocManager::install("DropletUtils")
+  # BiocManager::install("SCENT")
+
+---
+# Additional conda environments used in this project:
+#
+#   pyscenic  — pySCENIC (v0.12.1), arboreto/GRNBoost2, ctxcore, loompy; Python 3.7
+#   cnmf      — cNMF (v1.4.1); Python 3.7
+#   cpdb      — CellPhoneDB (v5.0.1); Python 3.8
+#   chrombpnet — ChromBPNet (v0.1.7), TF-MoDISco-lite (v2.0.7); Python 3.8 [UNDER CONSTRUCTION]
+#   finemo    — FiNeMo (v0.25); Python 3.10
+#
+# See software_used.csv for full version details of all environments.

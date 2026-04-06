@@ -1,0 +1,109 @@
+Category,Software/Package,Type,Version,Conda Environment,Notes
+Sequencing Data Processing,Cell Ranger,CLI,not found in envs,—,10x Genomics; FASTQ processing + alignment to hg38
+Sequencing Data Processing,SAMtools,CLI,1.21,meso_scatac / chrombpnet,BAM file manipulation
+Sequencing Data Processing,MACS2,CLI,2.2.9.1,meso_scatac,Chromatin accessibility peak calling
+Sequencing Data Processing,Bowtie2,CLI,2.5.4,meso_scatac,Read alignment
+Sequencing Data Processing,BEDTools,CLI,2.31.1,chrombpnet,Genomic interval operations (blacklist filtering)
+Sequencing Data Processing,HTSlib,CLI,1.21,meso_scatac / chrombpnet,Fragment file compression and indexing (bgzip/tabix)
+scATAC-seq Analysis,ArchR,R,1.0.2,meso_scatac,Primary framework: dimensionality reduction / clustering / peak calling / motif enrichment
+scATAC-seq Analysis,Signac,R,1.14.0,meso_scatac,Supplementary scATAC-seq processing and QC
+scATAC-seq Analysis,chromVAR,R,1.24.0,meso_scatac,Transcription factor accessibility variability
+scATAC-seq Analysis,chromVARmotifs,R,0.2.0,meso_scatac,Curated motif set for chromVAR
+scATAC-seq Analysis,BSgenome.Hsapiens.UCSC.hg38,R,1.4.5,meso_scatac,hg38 genome reference
+scATAC-seq Analysis,BSgenome.Hsapiens.UCSC.hg19,R,1.4.3,meso_scatac,hg19 genome reference
+scATAC-seq Analysis,EnsDb.Hsapiens.v86,R,2.99.0,meso_scatac,Ensembl v86 gene annotation
+scATAC-seq Analysis,TxDb.Hsapiens.UCSC.hg38.knownGene,R,3.18.0,meso_scatac,UCSC hg38 transcript database
+scATAC-seq Analysis,TxDb.Hsapiens.UCSC.hg19.knownGene,R,3.2.2,meso_scatac,UCSC hg19 transcript database
+scATAC-seq Analysis,GenomicRanges,R,1.54.1,meso_scatac,Genomic interval manipulation
+scATAC-seq Analysis,GenomicFeatures,R,1.54.4,meso_scatac,Genomic interval manipulation
+scATAC-seq Analysis,TFBSTools,R,1.40.0,meso_scatac,Transcription factor binding site scanning
+scATAC-seq Analysis,JASPAR2020,R,not found in current envs,—,Transcription factor motif database (referenced in scripts)
+scATAC-seq Analysis,epiAneufinder,R,not found in current envs,—,Copy number variation inference from scATAC-seq (referenced in scripts)
+scATAC-seq Analysis,regioneR,R,1.34.0,meso_scatac,Genomic region permutation testing
+scATAC-seq Analysis,rGREAT,R,2.4.0,meso_scatac,Genomic region enrichment of annotations
+scATAC-seq Analysis,biovizBase,R,1.50.0,meso_scatac,Visualization base for genomic data
+scATAC-seq Analysis,rtracklayer,R,1.62.0,meso_scatac,Reading genomic file formats (BED/BigWig)
+scRNA-seq Analysis,Seurat,R,5.2.1 (meso_scatac) / 5.1.0 (scrnatools),meso_scatac / scrnatools,scRNA-seq preprocessing / normalization / clustering / annotation
+scRNA-seq Analysis,SeuratObject,R,5.0.2,meso_scatac,Seurat data container
+scRNA-seq Analysis,scran,R,1.30.0,meso_scatac / scrnatools,Normalization and QC
+scRNA-seq Analysis,scater,R,1.30.1,scrnatools,Single-cell QC toolkit
+scRNA-seq Analysis,scuttle,R,1.12.0,meso_scatac,Low-level single-cell utility functions
+scRNA-seq Analysis,SingleCellExperiment,R,1.24.0,meso_scatac / scrnatools,Bioconductor single-cell data container
+scRNA-seq Analysis,SummarizedExperiment,R,1.32.0,meso_scatac,Bioconductor data container base
+scRNA-seq Analysis,BiocParallel,R,1.36.0,meso_scatac / scrnatools,Parallel computation framework
+scRNA-seq Analysis,harmony,R,1.2.3,meso_scatac / scrnatools,Batch correction and integration
+scRNA-seq Analysis,destiny,R,3.14.0,meso_scatac,Diffusion map pseudotime analysis
+scRNA-seq Analysis,hdWGCNA,R,0.4.00,meso_scatac,Weighted gene co-expression network analysis
+scRNA-seq Analysis,WGCNA,R,1.73,meso_scatac,Weighted gene co-expression network analysis (base)
+scRNA-seq Analysis,SCENT,R,1.0.3,meso_scatac,Single-cell entropy
+scRNA-seq Analysis,UCell,R,2.6.2,meso_scatac,Gene signature scoring for single-cell data
+scRNA-seq Analysis,inferCNV,R,1.20.0,meso_scatac / scrnatools,Copy number variation inference from scRNA-seq
+scRNA-seq Analysis,limma,R,3.58.1,meso_scatac / scrnatools,Differential accessibility/expression testing
+scRNA-seq Analysis,edgeR,R,4.0.16,meso_scatac,Differential expression testing
+scRNA-seq Analysis,DESeq2,R,1.42.0,scrnatools,Differential expression testing
+scRNA-seq Analysis,presto,R,1.0.0,scrnatools,Fast Wilcoxon-based marker gene detection
+scRNA-seq Analysis,DropletUtils,R,not found in current envs,—,Cell calling utilities (referenced in scripts)
+scRNA-seq Analysis,sctransform,R,0.4.1,meso_scatac,Variance-stabilizing normalization
+Pathway Analysis,fgsea,R,1.28.0,meso_scatac / scrnatools,Fast gene set enrichment analysis
+Pathway Analysis,clusterProfiler,R,4.10.1,meso_scatac,Gene ontology and pathway enrichment
+Pathway Analysis,enrichplot,R,1.22.0,meso_scatac,Visualization for clusterProfiler
+Pathway Analysis,DOSE,R,3.28.2,meso_scatac,Disease ontology enrichment
+Pathway Analysis,GSA,R,1.03.3,meso_scatac,Gene set analysis
+Pathway Analysis,topGO,R,2.54.0,meso_scatac,Gene ontology analysis
+Pathway Analysis,org.Hs.eg.db,R,3.18.0,meso_scatac,Homo sapiens gene annotation
+Pathway Analysis,org.Mm.eg.db,R,3.18.0,meso_scatac,Mus musculus gene annotation
+Pathway Analysis,GO.db,R,3.18.0,meso_scatac,Gene Ontology database
+Survival Analysis,survival,R,3.7-0,meso_scatac,Survival analysis
+Survival Analysis,survminer,R,0.4.9,meso_scatac,Survival analysis visualization
+Cell-Cell Communication,CellPhoneDB,Python,5.0.1,cpdb,Ligand-receptor interaction analysis
+Gene Regulatory Networks,pySCENIC,Python,0.12.1,pyscenic,Transcription factor regulon inference
+Gene Regulatory Networks,arboreto (GRNBoost2),Python,0.1.6,pyscenic,Gene regulatory network inference backbone
+Gene Regulatory Networks,ctxcore,Python,0.2.0,pyscenic,Motif ranking database utilities for SCENIC
+Gene Regulatory Networks,loompy,Python,3.0.8,pyscenic,Loom file format support
+Consensus NMF,cNMF,Python,1.4.1,cnmf,Consensus non-negative matrix factorization
+Deep Learning / TF Footprinting,ChromBPNet,Python,0.1.7,chrombpnet,Deep learning model for chromatin accessibility and TF binding
+Deep Learning / TF Footprinting,TF-MoDISco (legacy),Python,0.5.16.0,chrombpnet,TF motif discovery from contribution scores (legacy)
+Deep Learning / TF Footprinting,TF-MoDISco-lite,Python,2.0.7,chrombpnet,TF motif discovery from contribution scores (current)
+Deep Learning / TF Footprinting,TensorFlow,Python,2.8.0,chrombpnet,Deep learning backend
+Deep Learning / TF Footprinting,Keras,Python,2.8.0,chrombpnet,Deep learning API
+Deep Learning / TF Footprinting,MEME Suite (TOMTOM),CLI,5.5.7,meso_scatac,Motif comparison vs HOCOMOCO v11 and JASPAR
+Deep Learning / TF Footprinting,GimmeMotifs,CLI,0.18.0,meso_scatac,Motif clustering (gimme cluster)
+Deep Learning / TF Footprinting,FiNeMo,Python,0.25,finemo,Fine-grained motif instance identification
+Deep Learning / TF Footprinting,logomaker,Python,0.8,chrombpnet,Sequence logo visualization
+Visualization (R),ggplot2,R,3.5.1,meso_scatac / scrnatools,Grammar of graphics plotting
+Visualization (R),tidyverse,R,2.0.0,meso_scatac / scrnatools,Data science metapackage
+Visualization (R),ComplexHeatmap,R,2.18.0,meso_scatac / scrnatools,Complex heatmap visualization
+Visualization (R),pheatmap,R,1.0.12,scrnatools,Pretty heatmaps
+Visualization (R),patchwork,R,1.3.0,meso_scatac / scrnatools,Plot composition
+Visualization (R),cowplot,R,1.1.3,meso_scatac / scrnatools,Plot themes and composition
+Visualization (R),ggpubr,R,0.6.0,meso_scatac / scrnatools,Publication-ready plots
+Visualization (R),ggrepel,R,0.9.6,meso_scatac / scrnatools,Repelling text labels
+Visualization (R),ggridges,R,0.5.6,meso_scatac,Ridge / joy plots
+Visualization (R),EnhancedVolcano,R,not found in current envs,—,Volcano plots (referenced in scripts)
+Visualization (R),karyoploteR,R,not found in current envs,—,Karyotype visualization (referenced in scripts)
+Visualization (R),ggtree,R,3.10.1,meso_scatac,Phylogenetic tree visualization
+Visualization (R),viridis,R,0.6.5,meso_scatac / scrnatools,Perceptually uniform color scales
+Visualization (R),RColorBrewer,R,1.1-3,meso_scatac / scrnatools,Color palettes
+Visualization (R),paletteer,R,1.6.0,scrnatools,Color palette collection
+Visualization (R),circlize,R,0.4.16,meso_scatac / scrnatools,Circular layout visualization
+Visualization (R),corrplot,R,0.94,meso_scatac,Correlation matrix visualization
+Visualization (R),igraph,R,2.0.3,meso_scatac,Network analysis and visualization
+Visualization (R),biomaRt,R,2.58.2,meso_scatac / scrnatools,Bioconductor interface to Ensembl BioMart
+Visualization (R),scCustomize,R,not found in current envs,—,Single-cell plot customizations (referenced in scripts)
+Python Scientific Stack,Python,Language,3.8.20 (chrombpnet/cpdb) / 3.7.12 (pyscenic/cnmf) / 3.10.15 (finemo),multiple,Version varies by conda environment
+Python Scientific Stack,NumPy,Python,1.23.4 (chrombpnet) / 1.21.6 (pyscenic/cnmf) / 1.24.4 (cpdb) / 1.26.0 (finemo),multiple,Array computing
+Python Scientific Stack,pandas,Python,2.0.3 (chrombpnet) / 1.3.5 (pyscenic/cnmf),multiple,Data manipulation
+Python Scientific Stack,scipy,Python,1.10.1 (chrombpnet) / 1.7.3 (pyscenic/cnmf) / 1.11.3 (finemo),multiple,Scientific computing
+Python Scientific Stack,scikit-learn,Python,1.3.2 (chrombpnet) / 1.0.2 (pyscenic),multiple,Machine learning utilities
+Python Scientific Stack,h5py,Python,3.11.0 (chrombpnet) / 3.8.0 (pyscenic) / 3.10.0 (finemo),multiple,HDF5 file I/O
+Python Scientific Stack,hdf5plugin,Python,5.0.0 (chrombpnet) / 4.2.0 (finemo),multiple,HDF5 compression plugins
+Python Scientific Stack,Dask,Python,2022.2.0,pyscenic,Distributed parallel computation
+Python Scientific Stack,matplotlib,Python,3.7.5 (chrombpnet) / 3.5.3 (pyscenic),multiple,Data visualization
+Python Scientific Stack,seaborn,Python,0.13.2 (chrombpnet) / 0.12.2 (pyscenic),multiple,Statistical data visualization
+Python Scientific Stack,PyTorch,Python,2.1.0,finemo,Deep learning framework (FiNeMo backend)
+Compute Infrastructure,R,Language,4.3.3 (meso_scatac) / 4.3.1 (scrnatools),meso_scatac / scrnatools,Statistical computing language
+Compute Infrastructure,Bioconductor,Framework,3.18.1,meso_scatac / scrnatools,Bioinformatics package repository
+Compute Infrastructure,CUDA,System,11.8 (finemo) / 12.4 (chrombpnet),multiple,GPU acceleration for deep learning
+Compute Infrastructure,conda,CLI,Anaconda 2022.10 (base),—,Environment management
+Compute Infrastructure,GNU Parallel,CLI,not pinned,—,Shell-level parallelization
+Compute Infrastructure,LSF (bsub),CLI,not pinned,—,HPC job scheduling (Minerva HPC)

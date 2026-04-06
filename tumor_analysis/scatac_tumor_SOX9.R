@@ -74,12 +74,12 @@ saveArchRProject (archp)
 setwd (projdir)
 
 ### Similarly, create srt_norm seurat object from Shah et al, PRJNA1044083 (use only HU37 and HU62 samples) to merge with PM tumor scRNA-seq ####
-normal_mesothelium_scrna_barcodes = read.csv (file.path ('..','..','git_repo','files','normal_mesothelium_scrna_barcodes.csv'))
+normal_mesothelium_scrna_barcodes = read.csv (file.path ('..','..','git_repo','files','normal_lung_mesothelium_scrna_barcodes.csv'))
 srt_NN = readRDS ('GSM9326197_scRNAseq_srt.rds')
 srt_NN$sampleID3 = srt_NN$sampleID
 
 srt_norm = readRDS ('path/to/seurat_distal_normal_lung.rds')
-srt_norm = srt_norm[, colnmaes(srt_norm) %in% normal_mesothelium_scrna_barcodes$x]  # Subset for only normal mesothelial cells
+srt_norm = srt_norm[, colnames(srt_norm) %in% normal_mesothelium_scrna_barcodes$x]  # Subset for only normal mesothelial cells
 srt_norm$sampleID3 = 'normal_pleura'
 srt = merge (srt_NN, srt_norm)
 

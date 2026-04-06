@@ -30,7 +30,7 @@ lapply(packages, require, character.only = TRUE)
 
 ####### ANALYSIS of TUMOR compartment #######
 projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/B_cells/scrna'
-scrna_pipeline_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/scrna_pipeline'
+scrna_pipeline_dir = file.path('..','..','git_repo','utils')
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 

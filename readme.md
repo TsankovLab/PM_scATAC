@@ -1,93 +1,244 @@
-# Set up conda environment # 
-conda install r-essentials  
-conda install conda-forge::r-hdf5r  
-conda install r-devtools  
-conda install bioconda::bioconductor-dirichletmultinomial  
-conda install bioconda::bioconductor-chromvar  
-conda install bioconda::bioconductor-scran  
-conda install bioconda::bioconductor-infercnv  
-conda install bioconda::macs2  
-conda install samtools  
-conda install conda-forge::r-rstatix  
-conda install conda-forge::cairo  
+# Mesothelioma scATAC-seq & scRNA-seq Analysis
 
+Computational analysis accompanying the pleural mesothelioma single-cell chromatin accessibility and transcriptomics study. The pipeline covers joint scATAC/scRNA-seq processing, cell-type-specific subclustering, transcription factor (TF) footprinting, regulatory hub detection, and tumor biology analyses.
 
-# Install SCENIC+ in the same conda environment
-git clone https://github.com/aertslab/scenicplus
-cd scenicplus
-pip install -e .
+---
 
-# In R install:
-install.packages("BiocManager")  
-install.packages("paletteer")  
-setRepositories(ind=1:3) # needed to automatically install Bioconductor dependencies
-install.packages ("Signac")  
-install.packages ('remotes'). 
-remotes::install_github("stuart-lab/signac", ref="develop"). 
-install.packages ('Seurat')  
-devtools::install_github("crazyhottommy/scATACutils")  
-BiocManager::install ('ComplexHeatmap')  
-BiocManager::install ('regioneR')  
-BiocManager::instlall ('BSgenome.Hsapiens.UCSC.hg38')  
-devtools::install_github("GreenleafLab/ArchR", ref="master", repos = BiocManager::repositories())  
-BiocManager::install ('TxDb.Hsapiens.UCSC.hg38.knownGene') 
- install.packages(c("ggdendro"))  
-BiocManager::install(c("GenomicAlignments", "plyranges", "Rsamtools", "GenomeInfoDb", "BSgenome.Hsapiens.UCSC.hg38", "GenomicRanges", "Biostrings", "BiocGenerics", "S4Vectors", "GenomicFeatures"))  
-devtools::install_github("colomemaria/epiAneufinder")  
-devtools::install_github('immunogenomics/presto')  
-devtools::install_github("GreenleafLab/chromVARmotifs")  
-BiocManager::install("fgsea")  
-BiocManager::install("clusterProfiler")  
-BiocManager::install(c("WGCNA", "igraph", "devtools", "GeneOverlap", "ggrepel", "UCell"))
-install.packages ('ape')
-install.packages('dendextend')
-conda install conda-forge::r-factoextra
-BiocManager::install ('org.Hs.eg.db')
-install.packages ('RColorBrewer')  
-install.packages ('survminer')
-#devtools::install_github("ricardo-bion/ggradar")
-BiocManager::install("RTCGA")
-BiocManager::install("liftOver")  
-install.packages("scCustomize")  
-install.packages("ggpubr")  
-BiocManager::install("liftOver")
-install.packages ('GSA')
+## Repository Structure
+
+```
+git_repo/
+├── main_analysis/                  # Whole-cohort scATAC-seq analysis
+│   ├── scatac_main_ArchR.R         # ArchR project setup, QC, clustering, peak calling
+│   ├── scatac_main_hub_analysis.R  # Regulatory hub detection across all cell types
+│   ├── scatac_main_chrombpnet.R    # ChromBPNet TF footprinting [UNDER CONSTRUCTION]
+│   └── export_fragments_for_GEO.R # Fragment file export for GEO submission
+│
+├── tumor_analysis/                 # Malignant cell compartment
+│   ├── scatac_tumor_SOX9.R         # SOX9-driven chromatin programs
+│   ├── scatac_tumor_SOX9_chromBPnet.R  # [UNDER CONSTRUCTION]
+│   ├── scatac_tumor_P23.R          # Patient P23-specific differential peaks
+│   ├── discover_oncogenic_TFs.R    # chromVAR + gene score TF ranking
+│   ├── enrichment_cnmfs.R          # Pathway enrichment of cNMF tumor modules
+│   ├── epigenomic_features_correlated_to_scS_score.R  # Sarcomatoid score correlations
+│   ├── bulkRNA_analysis.R          # Bulk RNA-seq survival and subtype analysis
+│   ├── CCLE_cell_lines_RNAseq.R    # DepMap/CCLE cell line RNA + CNV analysis
+│   └── CRISPR_cropseq.R            # CRISPRi CROPseq analysis
+│
+├── tnk_analysis/                   # T cell / NK cell compartment
+│   ├── scatac_NKTcells_ArchR.R     # NKT scATAC subclustering
+│   ├── scatac_NKT_cells_hub_analysis.R  # Hub analysis in NKT cells
+│   ├── scatac_NKT_cells_chromBPnet.R    # [UNDER CONSTRUCTION]
+│   ├── scrna_tnk.R                 # T/NK scRNA-seq analysis + hdWGCNA
+│   └── HiChIP_CD8_Ex_NR4A2_enhancer.R  # HiChIP validation of NR4A2 enhancer
+│
+├── myeloid_analysis/               # Myeloid compartment
+│   ├── scatac_myeloid_ArchR.R      # Myeloid scATAC subclustering
+│   ├── scatac_myeloid_hub_analysis.R  # Hub analysis in myeloid cells
+│   └── scatac_myeloid_chromBPnet.R    # [UNDER CONSTRUCTION]
+│
+├── stroma_analysis/                # Stromal compartment (fibroblasts, endothelial, smooth muscle)
+│   ├── scatac_stroma_ArchR.R       # Stroma scATAC subclustering
+│   ├── scatac_stroma_hub_analysis.R
+│   ├── scatac_stroma_lineage_analysis.R
+│   ├── scatac_endothelial_ArchR.R
+│   ├── scatac_endothelial_hub_analysis.R
+│   ├── scatac_endothelial_chromBPnet.R  # [UNDER CONSTRUCTION]
+│   ├── scrna_stroma.R
+│   └── scrna_endothelial.R
+│
+├── B_cells_analysis/               # B cell / plasma cell compartment
+│   ├── scatac_Bcells_ArchR.R
+│   └── scrna_BCells.R
+│
+├── utils/                          # Shared utility scripts
+│   ├── load_packages.R             # Load all standard R packages
+│   ├── useful_functions.R          # General helper functions
+│   ├── scATAC_functions.R          # ArchR/scATAC helper functions
+│   ├── ggplot_aestetics.R          # ggplot2 themes
+│   ├── palettes.R                  # Color palettes
+│   ├── DAG.R                       # Differential accessibility (DAG wrapper)
+│   ├── DEG_standard.R              # Differential expression wrapper
+│   ├── chromVAR.R                  # chromVAR deviation scoring
+│   ├── activeTFs.R                 # Active TF identification
+│   ├── fGSEA_enrichment.R          # Gene set enrichment wrapper
+│   ├── Hubs_finder.R               # Regulatory hub detection algorithm
+│   ├── hubs_track.R                # Hub visualization tracks
+│   ├── knnGen.R                    # KNN graph generation
+│   ├── addCoax.R                   # Co-accessibility utilities
+│   ├── callPeaks.R                 # Peak calling helpers
+│   ├── DEG_standard.R              # Differential expression wrapper
+│   ├── HVG.R                       # Highly variable gene selection
+│   ├── cnmf_prepare_inputs.R       # cNMF: export count matrices and launch LSF job
+│   ├── cnmf_format_spectra_files.R # cNMF: import and format spectra output
+│   ├── cnmf_master.sh              # cNMF: LSF master submission script
+│   ├── cnmf_factorization_parallel.sh  # cNMF: parallel factorization array job
+│   ├── SCENIC.R                    # pySCENIC: R orchestration (export matrix, submit job)
+│   ├── SCENIC.sh                   # pySCENIC: LSF submission script
+│   ├── SCENIC.py                   # pySCENIC: GRNBoost2 + SCENIC Python runner
+│   ├── SCENIC_plots.R              # pySCENIC: regulon activity visualization
+│   ├── HDMA_pipeline.py            # HDMA pipeline
+│   ├── HIC_processing.sh / HiC_Pro.sh  # HiC data processing
+│   ├── chromBPnet_*.sh / *.py / *.R    # ChromBPNet pipeline [UNDER CONSTRUCTION]
+│   ├── TFmodisco_*.sh              # TF-MoDISco motif discovery [UNDER CONSTRUCTION]
+│   └── finemo_*.sh                 # FiNeMo motif calling [UNDER CONSTRUCTION]
+│
+├── files/                          # Reference files and precomputed objects
+│   ├── barcode_annotation.csv      # Cell barcode → cell type mapping (all cells)
+│   ├── normal_lung_mesothelium_barcodes.csv     # Normal mesothelium barcodes (combined)
+│   ├── normal_lung_mesothelium_scrna_barcodes.csv  # Normal mesothelium scRNA barcodes
+│   ├── normal_lung_mesothelium_scatac_barcodes.csv # Normal mesothelium scATAC barcodes
+│   ├── normal_lung_peaks.rds       # Peak set from normal lung reference
+│   ├── SCENIC_regulons.rds         # pySCENIC output regulons
+│   ├── PCA_regulons.rds            # PCA of regulon activity
+│   ├── scRNA_PM_modules.rds        # cNMF gene modules (scRNA)
+│   ├── cnmf_myeloid_per_sample.rds # Myeloid cNMF modules
+│   ├── malignant_cnmf_genelist_25_nfeat_5000.rds  # Tumor cNMF gene lists
+│   ├── SE_regions_SE_database.rds  # Super-enhancer database regions
+│   ├── Yang_Sox9_genelist.rds      # SOX9 target gene list (Yang et al.)
+│   ├── Blum_et_al_SE_score.csv     # Super-enhancer scores from Blum et al.
+│   ├── Riegel_CD8ex_DAP.csv        # CD8 exhaustion DAPs from Riegel et al.
+│   ├── Tcell_exhaustion_genes_PMID37091230.csv
+│   ├── hg38-blacklist.v2.bed       # ENCODE hg38 blacklist regions
+│   ├── h.all.v7.4.symbols.gmt      # MSigDB Hallmark gene sets
+│   ├── c5.bp.v7.1.symbol.gmt       # MSigDB GO biological process gene sets
+│   └── ENCODE_query.txt            # ENCODE API query used for data retrieval
+│
+├── environment.yaml                # Conda environment spec (meso_scatac)
+├── software_used.csv               # Full software inventory with versions and environments
+└── readme.md                       # This file
+```
+
+---
+
+## Setup
+
+### 1. Create the main conda environment
+
+```bash
+conda env create -f environment.yaml
+conda activate meso_scatac
+```
+
+Then install GitHub-only R packages from within R:
+
+```r
+# ArchR (primary scATAC framework)
+devtools::install_github("GreenleafLab/ArchR", ref="master", repos=BiocManager::repositories())
+
+# chromVAR motif set
 devtools::install_github("GreenleafLab/chromVARmotifs")
-BiocManager::install("compEpiTools")
-install.packages("harmony")  
-install.packages("zoo")
-devtools::install_github('smorabit/hdWGCNA', ref='dev')  
 
+# scATAC utility functions
+devtools::install_github("crazyhottommy/scATACutils")
 
-### Run cNMF scripts on LSF batch submission ###   
-Scripts to run cNMF are in utils and include:  
-cnmf_prepare_inputs.R  
-cnmf_master.sh  
-cnmf_factorization_parallel.sh  
-cnmf_format_spectra_files.R  
+# Copy number from scATAC
+devtools::install_github("colomemaria/epiAneufinder")
 
-#### Run cNMF ####  
-nfeat = 5000  # specify number of features to use  
-force=F # force re-running when output already present  
-k_list = c(5:30) # number of K to compute  
-k_selections = c(5:30) # number of K to compute  
-cores= 100 # specify number of cores for array job  
-cnmf_name = 'CD8_exhausted' # specify name of cnmf run  
-cnmf_out = path/to/output # path to cnmf output  
-git_repo = path/to/git_repo # path to git repo  
+# Fast Wilcoxon for marker detection
+devtools::install_github("immunogenomics/presto")
 
-### RUN consensus NMF from R ####  
-source (file.path ('git_repo','utils','cnmf_prepare_inputs.R')) #  source cNMF to prepare count matrices and run cnmf algorithm  
+# hdWGCNA (co-expression networks from single-cell data)
+devtools::install_github("smorabit/hdWGCNA", ref="dev")
 
-### Import and format spectra files in R ####
-k_selection = 30   # select a K after examining error / performance cNMF plot
-source (file.path ('git_repo','utils','cnmf_format_spectra_files.R'))
+# Additional Bioconductor packages
+BiocManager::install(c("JASPAR2020", "EnhancedVolcano", "karyoploteR",
+                       "DropletUtils", "SCENT", "scCustomize"))
+```
 
-### Install conda env for averaging h5 files from chromBPnet
-conda create -n h5py python=3.8
-conda install conda-forge/label/cf202003::hdf5plugin
-conda install bioconda::wiggletools
-conda install bioconda::ucsc-wigtobigwig
+### 2. Additional conda environments
 
+| Environment   | Purpose                                                    | Python |
+|---------------|------------------------------------------------------------|--------|
+| `pyscenic`    | pySCENIC regulon inference (GRNBoost2 + SCENIC)            | 3.7    |
+| `cnmf`        | Consensus NMF factorization                                | 3.7    |
+| `cpdb`        | CellPhoneDB ligand-receptor analysis                       | 3.8    |
+| `chrombpnet`  | ChromBPNet deep learning footprinting (**under construction**) | 3.8 |
+| `finemo`      | FiNeMo motif calling (**under construction**)              | 3.10   |
 
+See `software_used.csv` for full version details of every package in every environment.
 
+---
+
+## Running the analysis
+
+All analysis scripts expect to be run from the project directory (one level above `git_repo/`). Each script sources shared utilities from `git_repo/utils/` using relative paths.
+
+### scATAC-seq (ArchR)
+
+```r
+conda activate meso_scatac
+R
+# Main cohort
+source('git_repo/main_analysis/scatac_main_ArchR.R')
+
+# Cell-type-specific subclustering (run independently)
+source('git_repo/tumor_analysis/scatac_tumor_SOX9.R')
+source('git_repo/tnk_analysis/scatac_NKTcells_ArchR.R')
+source('git_repo/myeloid_analysis/scatac_myeloid_ArchR.R')
+source('git_repo/stroma_analysis/scatac_stroma_ArchR.R')
+source('git_repo/B_cells_analysis/scatac_Bcells_ArchR.R')
+```
+
+### scRNA-seq
+
+```r
+conda activate meso_scatac
+R
+source('git_repo/tnk_analysis/scrna_tnk.R')
+source('git_repo/stroma_analysis/scrna_stroma.R')
+source('git_repo/B_cells_analysis/scrna_BCells.R')
+```
+
+### Consensus NMF (cNMF) — runs on HPC via LSF
+
+```r
+# 1. Prepare count matrices and submit factorization job
+nfeat              <- 5000          # number of highly variable features
+k_list             <- c(5:30)       # K values to test
+cnmf_name          <- 'malignant'
+cnmf_out           <- 'path/to/cnmf_output'
+scrna_pipeline_dir <- 'path/to/git_repo/utils'   # points to utils/
+source(file.path(scrna_pipeline_dir, 'cnmf_prepare_inputs.R'))
+```
+
+```r
+# 2. Import and format spectra files after job completes
+k_selection <- 25   # chosen after inspecting error/stability plot
+source(file.path(scrna_pipeline_dir, 'cnmf_format_spectra_files.R'))
+```
+
+### pySCENIC regulon inference
+
+```r
+# Set path then source SCENIC.R to export the expression matrix and submit the LSF job
+scrna_pipeline_dir <- 'path/to/git_repo/utils'
+source(file.path(scrna_pipeline_dir, 'SCENIC.R'))
+```
+
+---
+
+## Key R packages
+
+The table below lists the main R packages. For complete version pinning see `software_used.csv`; for the conda spec see `environment.yaml`.
+
+| Category              | Package(s)                                                                 |
+|-----------------------|----------------------------------------------------------------------------|
+| scATAC-seq            | ArchR, Signac, chromVAR, chromVARmotifs, epiAneufinder                    |
+| Genome annotation     | BSgenome.Hsapiens.UCSC.hg38/hg19, EnsDb.Hsapiens.v86, TxDb.*.hg38/hg19, TFBSTools, JASPAR2020 |
+| Genomic ranges        | GenomicRanges, GenomicFeatures, regioneR, rtracklayer, rGREAT              |
+| scRNA-seq             | Seurat, Signac, scran, scuttle, SingleCellExperiment, sctransform          |
+| Batch correction      | harmony                                                                    |
+| Differential analysis | limma, edgeR, DESeq2, presto, fgsea, clusterProfiler, DOSE, topGO, GSA    |
+| Gene signatures       | UCell, SCENT, hdWGCNA, WGCNA, destiny                                     |
+| CNV inference         | inferCNV, epiAneufinder                                                    |
+| Survival              | survival, survminer, RTCGA                                                 |
+| Visualization         | ggplot2, ComplexHeatmap, patchwork, cowplot, ggpubr, ggrepel, ggridges, circlize, viridis, RColorBrewer, paletteer, ggtree, corrplot, EnhancedVolcano, scCustomize |
+| Annotation            | org.Hs.eg.db, org.Mm.eg.db, biomaRt                                       |
+
+---
+
+## Notes
+
+- Scripts with `[UNDER CONSTRUCTION]` in the tree above (ChromBPNet, TF-MoDISco, FiNeMo pipeline) are incomplete and should not be run as-is.
+- HPC job submission uses LSF (`bsub`). All batch scripts assume the Minerva cluster.

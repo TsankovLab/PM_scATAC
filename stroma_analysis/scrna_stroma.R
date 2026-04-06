@@ -23,7 +23,6 @@ setwd (projdir)
 source ('../../git_repo/utils/useful_functions.R')
 source ('../../git_repo/utils/palettes.R')
 source ('../../git_repo/utils/ggplot_aestetics.R')
-source ('../../git_repo/utils/palettes.R')
 
 sample_names = c(
     'P1', # p786

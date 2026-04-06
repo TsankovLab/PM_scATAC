@@ -14,8 +14,8 @@ srt = readRDS ('GSM9326198_CROPseq_srt.rds')
 ### INFERCNV ####
 library (infercnv)
 ref = readRDS ('seurat_distal_normal_lung.rds')
-normal_mesothelium_scrna_barcodes = read.csv (file.path ('..','..','git_repo','files','normal_mesothelium_scrna_barcodes.csv'))
-ref = ref[, colnmaes(ref) %in% normal_mesothelium_scrna_barcodes$x]  # Subset for only normal mesothelial cells
+normal_mesothelium_scrna_barcodes = read.csv (file.path ('..','..','git_repo','files','normal_lung_mesothelium_scrna_barcodes.csv'))
+ref = ref[, colnames(ref) %in% normal_mesothelium_scrna_barcodes$x]  # Subset for only normal mesothelial cells
 
 projdir_out = 'infercnv_CROPSEQ' # output folder 
 dir.create (projdir_out, showWarnings = FALSE)

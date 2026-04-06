@@ -16,10 +16,10 @@ source (file.path('..','git_repo','utils','scATAC_functions.R'))
 source (file.path('..','git_repo','utils','palettes.R'))
 
 # Load functions for hub detection ####
-source (file.path(,'..','git_repo','utils','knnGen.R'))
-source (file.path(,'..','git_repo','utils','addCoax.R'))
-source (file.path(,'..','git_repo','utils','Hubs_finder.R'))
-source (file.path(,'..','git_repo','utils','hubs_track.R'))
+source (file.path('..','git_repo','utils','knnGen.R'))
+source (file.path('..','git_repo','utils','addCoax.R'))
+source (file.path('..','git_repo','utils','Hubs_finder.R'))
+source (file.path('..','git_repo','utils','hubs_track.R'))
 
 # Set # of threads and genome reference ####
 addArchRThreads(threads = 1) 
