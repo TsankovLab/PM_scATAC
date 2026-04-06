@@ -55,7 +55,6 @@ Pathway Analysis,org.Mm.eg.db,R,3.18.0,meso_scatac,Mus musculus gene annotation
 Pathway Analysis,GO.db,R,3.18.0,meso_scatac,Gene Ontology database
 Survival Analysis,survival,R,3.7-0,meso_scatac,Survival analysis
 Survival Analysis,survminer,R,0.4.9,meso_scatac,Survival analysis visualization
-Cell-Cell Communication,CellPhoneDB,Python,5.0.1,cpdb,Ligand-receptor interaction analysis
 Gene Regulatory Networks,pySCENIC,Python,0.12.1,pyscenic,Transcription factor regulon inference
 Gene Regulatory Networks,arboreto (GRNBoost2),Python,0.1.6,pyscenic,Gene regulatory network inference backbone
 Gene Regulatory Networks,ctxcore,Python,0.2.0,pyscenic,Motif ranking database utilities for SCENIC
@@ -90,8 +89,8 @@ Visualization (R),corrplot,R,0.94,meso_scatac,Correlation matrix visualization
 Visualization (R),igraph,R,2.0.3,meso_scatac,Network analysis and visualization
 Visualization (R),biomaRt,R,2.58.2,meso_scatac / scrnatools,Bioconductor interface to Ensembl BioMart
 Visualization (R),scCustomize,R,not found in current envs,—,Single-cell plot customizations (referenced in scripts)
-Python Scientific Stack,Python,Language,3.8.20 (chrombpnet/cpdb) / 3.7.12 (pyscenic/cnmf) / 3.10.15 (finemo),multiple,Version varies by conda environment
-Python Scientific Stack,NumPy,Python,1.23.4 (chrombpnet) / 1.21.6 (pyscenic/cnmf) / 1.24.4 (cpdb) / 1.26.0 (finemo),multiple,Array computing
+Python Scientific Stack,Python,Language,3.8.20 (chrombpnet) / 3.7.12 (pyscenic/cnmf) / 3.10.15 (finemo),multiple,Version varies by conda environment
+Python Scientific Stack,NumPy,Python,1.23.4 (chrombpnet) / 1.21.6 (pyscenic/cnmf) / 1.26.0 (finemo),multiple,Array computing
 Python Scientific Stack,pandas,Python,2.0.3 (chrombpnet) / 1.3.5 (pyscenic/cnmf),multiple,Data manipulation
 Python Scientific Stack,scipy,Python,1.10.1 (chrombpnet) / 1.7.3 (pyscenic/cnmf) / 1.11.3 (finemo),multiple,Scientific computing
 Python Scientific Stack,scikit-learn,Python,1.3.2 (chrombpnet) / 1.0.2 (pyscenic),multiple,Machine learning utilities

@@ -141,7 +141,6 @@ BiocManager::install(c("JASPAR2020", "EnhancedVolcano", "karyoploteR",
 
 | Environment   | Purpose                                                        | Python |
 |---------------|----------------------------------------------------------------|--------|
-| `cpdb`        | CellPhoneDB ligand-receptor analysis                           | 3.8    |
 | `chrombpnet`  | ChromBPNet deep learning footprinting (**under construction**) | 3.8    |
 | `finemo`      | FiNeMo motif calling (**under construction**)                  | 3.10   |
 

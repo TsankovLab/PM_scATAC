@@ -119,7 +119,6 @@ dependencies:
 ---
 # Additional conda environments used in this project:
 #
-#   cpdb       — CellPhoneDB (v5.0.1); Python 3.8
 #   chrombpnet — ChromBPNet (v0.1.7), TF-MoDISco-lite (v2.0.7); Python 3.8 [UNDER CONSTRUCTION]
 #   finemo     — FiNeMo (v0.25); Python 3.10 [UNDER CONSTRUCTION]
 #
