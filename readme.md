@@ -2,6 +2,10 @@
 
 Computational analysis accompanying the pleural mesothelioma single-cell chromatin accessibility and transcriptomics study. The pipeline covers joint scATAC/scRNA-seq processing, cell-type-specific subclustering, transcription factor (TF) footprinting, regulatory hub detection, and tumor biology analyses.
 
+## Data Availability
+
+Fragment files and Seurat objects are available on GEO under series **GSE311510**.
+
 ---
 
 ## Repository Structure
