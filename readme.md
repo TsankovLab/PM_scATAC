@@ -6,6 +6,10 @@ Computational analysis accompanying the pleural mesothelioma single-cell chromat
 
 Fragment files and Seurat objects are available on GEO under series **GSE311510**.
 
+## Acknowledgements
+
+Several utility scripts in `utils/` were adapted from the [GreenleafLab/HDMA](https://github.com/GreenleafLab/HDMA) repository.
+
 ---
 
 ## Repository Structure
