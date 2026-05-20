@@ -2275,3 +2275,341 @@ head (finemo_res$V4[finemo_res$V6 == 'pos_patterns.pattern_33'],1)
 
 
 
+
+#### Compare PC1 MDM - TRM with TF activity of blood monocytes (Hegde data) ####
+blood_tf = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/NTP_multiome/average_TF_activity_PBMC2.csv')
+blood_tf = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/pbmc_myeloid/average_TF_activity_PBMC.csv')
+blood_tf = blood_tf[1:870,]
+rownames(blood_tf) = blood_tf[,1]
+blood_tf = blood_tf[,-1]
+blood_tf_cd14 = head(blood_tf[order (-blood_tf$Mye_CD14.Mono),],300)
+blood_tf_cd16 = head(blood_tf[order (-blood_tf$Mye_CD16.Mono),],300)
+
+if (!exists('mSE')) mSE = fetch_mat (archp, 'Motif')
+mMat = assays (mSE)[[1]]
+rownames(mMat) = rowData(mSE)$name
+mMat_cor_cd14 = mMat[rownames(blood_tf_cd14), ]
+mMat_cor_cd14 = mMat_cor_cd14[, archp$celltype_lv3 %in% c('Mono_CD14','TAM_interstitial','TAM_CXCLs','TAM_MARCO','TAM_TREM2')]
+mMat_cor_cd14 = as.data.frame (cor (mMat_cor_cd14, blood_tf_cd14, method = 'spearman'))
+ccomp =  as.data.frame (archp@cellColData[,c('mod_2','mod_1','Sample','celltype_lv2','celltype_lv3')])
+mMat_cor_cd14 = cbind (mMat_cor_cd14 , ccomp[rownames(mMat_cor_cd14),])
+
+mMat_cor_cd16 = mMat[rownames(blood_tf_cd16), ]
+mMat_cor_cd16 = mMat_cor_cd16[, archp$celltype_lv3 %in% c('Mono_CD14','TAM_interstitial','TAM_CXCLs','TAM_MARCO','TAM_TREM2')]
+mMat_cor_cd16 = as.data.frame (cor (mMat_cor_cd16, blood_tf_cd16, method = 'spearman'))
+ccomp =  as.data.frame (archp@cellColData[,c('mod_2','mod_1','Sample','celltype_lv2','celltype_lv3')])
+mMat_cor_cd16 = cbind (mMat_cor_cd16 , ccomp[rownames(mMat_cor_cd16),])
+
+
+pd2 <- ggplot(mMat_cor_cd14, aes(x = Mye_CD14.Mono, y = mod_2, color = celltype_lv3)) +
+  geom_point(size = 1, alpha = 0.7) +
+  geom_density_2d(linewidth = 0.4) +
+  #geom_smooth(method = "lm", se = FALSE, color = "black", linewidth = 1) +
+  stat_cor(
+    aes(label = paste(..r.label.., ..p.label.., sep = "~`,`~")),
+    method = "pearson",
+    color = "black"
+  ) +
+  theme_classic() +
+  scale_color_manual(values = palette_myeloid) +
+  labs(
+    x = "Corr to CD14 Mono TFs",
+    y = "mod_2",
+    title = "CD14 vs mod_2"
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 2. TOP DENSITY (PC1)
+#-------------------------
+p_density_x <- ggplot(mMat_cor_cd14, aes(Mye_CD14.Mono, fill = celltype_lv3)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 3. RIGHT DENSITY (PC2)
+#-------------------------
+p_density_y <- ggplot(mMat_cor_cd14, aes(Mye_CD14.Mono, fill = celltype_lv3)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+
+pd3 <- ggplot(mMat_cor_cd16, aes(x = Mye_CD16.Mono, y = mod_2, color = celltype_lv3)) +
+  geom_point(size = 1, alpha = 0.7) +
+  geom_density_2d(linewidth = 0.4) +
+  #geom_smooth(method = "lm", se = FALSE, color = "black", linewidth = 1) +
+  stat_cor(
+    aes(label = paste(..r.label.., ..p.label.., sep = "~`,`~")),
+    method = "pearson",
+    color = "black"
+  ) +
+  theme_classic() +
+  scale_color_manual(values = palette_myeloid) +
+  labs(
+    x = "Corr to CD16 Mono TFs",
+    y = "mod_2",
+    title = "CD16 vs mod_2"
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 2. TOP DENSITY (PC1)
+#-------------------------
+p_density_x2 <- ggplot(mMat_cor_cd16, aes(Mye_CD16.Mono, fill = celltype_lv3)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.x = element_blank(),
+    axis.text.x  = element_blank(),
+    axis.ticks.x = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 3. RIGHT DENSITY (PC2)
+#-------------------------
+p_density_y2 <- ggplot(mMat_cor_cd16, aes(Mye_CD16.Mono, fill = celltype_lv3)) +
+  geom_density(alpha = 0.3, color = NA) +
+  scale_fill_manual(values = palette_myeloid) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  ) +
+  gtheme_no_rot
+
+
+#-------------------------
+# 4. SAVE PDF
+#-------------------------
+pdf (file.path ('Plots','blood_TF_activity_multiome_PBMC_scatac_scatterplot.pdf'), width=7)
+p_density_x + plot_spacer() + pd2 + p_density_y +
+  plot_layout(
+    ncol = 2, nrow = 2,
+    widths  = c(4, 1),
+    heights = c(1, 4),
+    guides = "collect"
+  ) &
+  theme(
+    legend.position = "bottom",
+    legend.box = "horizontal"
+  )
+p_density_x2 + plot_spacer() + pd3 + p_density_y2 +
+  plot_layout(
+    ncol = 2, nrow = 2,
+    widths  = c(4, 1),
+    heights = c(1, 4),
+    guides = "collect"
+  ) &
+  theme(
+    legend.position = "bottom",
+    legend.box = "horizontal"
+  )
+dev.off()
+
+
+mMat_cor2 = as.data.frame (cor (t(mMat), method = 'spearman'))
+pdf (file.path ('Plots','TF_activity_blood_coexp_heatmap.pdf'), height = 11, width=11)
+Heatmap(mMat_cor2, column_names_gp = gpar(fontsize = 5), row_names_gp = gpar(fontsize = 5))
+dev.off()
+
+
+
+# # Check TF deviations
+TF = 'CEBPA'
+TF = getFeatures (archp, 'MotifMatrix')[grep (TF, getFeatures (archp, 'MotifMatrix'))]
+TF1 = c('z:JUN_143','z:FOS_137','z:NFKB1_719','z:FOXM1_352','z:TFDP1_310','z:E2F3_313')
+
+pdf ()
+TF_p = plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "MotifMatrix",
+    name = TF, 
+    useSeqnames='z',
+    pal = rev (palette_deviation),    
+    embedding = "UMAP_H",
+    imputeWeights = NULL
+    )
+dev.off()
+
+pdf(file.path('Plots',paste0(TF,'_deviation_fplot.pdf')),7,7)
+TF_p
+#wrap_plots(umap_p1)
+#wrap_plots (umap_p0,umap_p2)#,umap_p3)
+dev.off()
+
+
+
+
+
+
+
+MDM_TFs = c('FOSL1','FOSL2','BACH1','PPARG','NFKB2','KLF12','HIVEP3','SMAD1','NFKB1','REL','RUNX1','SNAI1','RUNX2','NFAT5')
+
+
+# # Check TF deviations
+TF = 'FOS'
+TF = getFeatures (archp, 'MotifMatrix')[unlist(sapply (MDM_TFs, function(x) grep (x, getFeatures (archp, 'MotifMatrix'))))]
+TF = TF[grep ('z:',TF)]
+#TF1 = c('z:JUN_143','z:FOS_137','z:NFKB1_719')
+
+pdf ()
+TF_p = plotEmbedding (
+    ArchRProj = archp,
+    colorBy = "MotifMatrix",
+    name = TF, 
+    useSeqnames='z',
+    pal = rev (palette_deviation),    
+    embedding = "UMAP_H",
+    imputeWeights = NULL
+    )
+dev.off()
+
+pdf(file.path('Plots','AP1_deviation_fplot.pdf'),14,14)
+wrap_plots (TF_p)
+dev.off()
+
+
+
+### chromVAR analysis ####
+PBMC_monocytes_names = c('Mye_CD14.Mono','Mye_CD16.Mono','Mye_DC')
+PBMC_monocytes = paste0('../../../../AS_human_lung_scatac/analysis/pbmc_myeloid/PeakCalls/',PBMC_monocytes_names,'-reproduciblePeaks.gr.rds')
+PBMC_monocytes = lapply (PBMC_monocytes, function(x) readRDS (x))
+names (PBMC_monocytes) = PBMC_monocytes_names
+PBMC_monocytes <- GRangesList(PBMC_monocytes)
+
+force = T
+archp = addBgdPeaks (archp, force= force)
+archp = addPeakAnnotations (ArchRProj = archp, 
+     regions = PBMC_monocytes, name = "NSCLC_PBMCs", force=T)
+
+archp = addDeviationsMatrix (
+  ArchRProj = archp, 
+  peakAnnotation = "NSCLC_PBMCs",
+  force = T
+)
+
+# if (!exists('mPBMC')) mPBMC = fetch_mat (archp, 'NSCLC_PBMCs')
+# matPBMC = assays (mPBMC)[[1]]
+
+metaGroupName = 'celltype_lv3'
+pbmcMats = getGroupSE(
+  ArchRProj = archp,
+  useMatrix = 'NSCLC_PBMCsMatrix',
+  groupBy = metaGroupName,
+  divideN = TRUE,
+  scaleTo = NULL,
+  threads = getArchRThreads(),
+  verbose = TRUE,
+  logFile = createLogFile("getGroupSE")
+)
+
+pbmc_mat = assays (pbmcMats)[[1]]
+pbmc_mat = pbmc_mat[1:3,]
+rownames(pbmc_mat) = rowData(pbmcMats)$name[1:3]
+
+pdf (file.path ('Plots','pbmc_deviations_heatmap.pdf'), height=3, width=6)
+Heatmap (scale(pbmc_mat), col = rev(palette_deviation), column_names_rot = 45,
+  border = T)
+dev.off()
+
+
+
+
+pdf()
+ p1 <- plotGroups(
+    ArchRProj  = archp,
+    groupBy    = "celltype_lv3",
+    colorBy    = "cellColData",
+    name       = "nFrags",
+    plotAs     = "violin",
+    alpha      = 0.4,
+    addBoxPlot = TRUE
+  )
+ p2 <- plotGroups(
+    ArchRProj  = archp,
+    groupBy    = "celltype_lv3",
+    colorBy    = "cellColData",
+    name       = "TSSEnrichment",
+    plotAs     = "violin",
+    alpha      = 0.4,
+    addBoxPlot = TRUE
+  )
+dev.off()
+
+pdf(file.path('Plots', 'celltype_lv3_QC_plots.pdf'))
+print (wrap_plots(p1, p2))
+dev.off()
+
+
+
+### chromVAR analysis ####
+PBMC_monocytes_names = c("Mye_CD14.Mono_1","Mye_moDC.like","Mye_CD16.Mono","Mye_CD14.Mono_2","Mye_Intermed.Mono","Mye_CD14.Mono_1_mixed","Mye_Basophil")
+PBMC_monocytes = paste0('../../../../AS_human_lung_scatac/analysis/pbmc_myeloid/PeakCalls/',PBMC_monocytes_names,'-reproduciblePeaks.gr.rds')
+PBMC_monocytes = lapply (PBMC_monocytes, function(x) readRDS (x))
+names (PBMC_monocytes) = PBMC_monocytes_names
+PBMC_monocytes <- GRangesList(PBMC_monocytes)
+PBMC_monocytes = PBMC_monocytes[names(PBMC_monocytes) != 'Mye_Basophil']
+
+force = T
+archp = addBgdPeaks (archp, force= force)
+archp = addPeakAnnotations (ArchRProj = archp, 
+     regions = PBMC_monocytes, name = "NSCLC_PBMCs_2", force=T)
+
+archp = addDeviationsMatrix (
+  ArchRProj = archp, 
+  peakAnnotation = "NSCLC_PBMCs_2",
+  force = T
+)
+
+# if (!exists('mPBMC')) mPBMC = fetch_mat (archp, 'NSCLC_PBMCs')
+# matPBMC = assays (mPBMC)[[1]]
+
+metaGroupName = 'celltype_lv3'
+pbmcMats = getGroupSE(
+  ArchRProj = archp,
+  useMatrix = 'NSCLC_PBMCs_2Matrix',
+  groupBy = metaGroupName,
+  divideN = TRUE,
+  scaleTo = NULL,
+  threads = getArchRThreads(),
+  verbose = TRUE,
+  logFile = createLogFile("getGroupSE")
+)
+
+pbmc_mat = assays (pbmcMats)[[1]]
+pbmc_mat = pbmc_mat[1:7,]
+rownames(pbmc_mat) = rowData(pbmcMats)$name[1:7]
+pbmc_mat = pbmc_mat[rownames(pbmc_mat) != 'Mye_Basophil',]
+
+pdf (file.path ('Plots','pbmc_2_deviations_heatmap.pdf'), height=3, width=6)
+Heatmap (scale(pbmc_mat), col = rev(palette_deviation), column_names_rot = 45,
+  border = T)
+dev.off()
