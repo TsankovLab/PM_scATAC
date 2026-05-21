@@ -43,7 +43,7 @@ hubs_finder <- function(
   max_dist        = 12500L,
   min_dist_tss    = 2000L,
   min_peaks       = 5L,
-  remove_chr      = "chrX",
+  remove_chr      = c("chrX", "chrY"),
   cores           = 1L
 ) {
   message(sprintf(
