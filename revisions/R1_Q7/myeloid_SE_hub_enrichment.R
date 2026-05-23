@@ -40,7 +40,7 @@ addArchRThreads(threads = 1)
 source("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/Hubs_finder.R")
 
 # ---- paths ------------------------------------------------------------------
-script_dir  <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude"
+script_dir  <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q7"
 main_dir    <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR"
 peakcalls   <- file.path(main_dir, "PeakCalls")
 se_rds      <- file.path(main_dir, "SE_regions_SE_database.rds")
@@ -50,10 +50,10 @@ mat_cache   <- file.path(script_dir, "hub_cell_matrices_v2")
 dir.create(mat_cache, showWarnings=FALSE)
 
 # ---- parameters -------------------------------------------------------------
-COR_CUTOFFS  <- c(0.2, 0.3, 0.4, 0.5, 0.6)
-MAX_DIST     <- 12500L
-MIN_PEAKS    <- 5L
-MIN_DIST_TSS <- 2000L
+COR_CUTOFFS       <- c(0.2, 0.3, 0.4, 0.5, 0.6)
+MAX_DIST          <- 12500L
+MIN_PEAKS_VALUES  <- c(3L, 4L, 5L)
+MIN_DIST_TSS      <- 0L
 REMOVE_CHR   <- c("chrX", "chrY")
 META_GROUP   <- "celltype_lv1"
 FDR_CUT      <- 0.05
@@ -169,12 +169,12 @@ n_frags  <- proj$nFrags   # total fragments per cell for CPM scaling
 # hubs_finder() is sourced from git_repo/utils/Hubs_finder.R
 
 # Derive stitching hub GRanges (uses TSS-filtered distal peaks)
-.stitching_hubs <- function() {
+.stitching_hubs <- function(min_peaks) {
   peaks    <- peaks_distal   # already TSS-filtered + chrX-removed
   stitched <- reduce(peaks, min.gapwidth=MAX_DIST, ignore.strand=TRUE)
   hits     <- findOverlaps(peaks, stitched)
   npeak    <- tabulate(subjectHits(hits), nbins=length(stitched))
-  stitched <- stitched[npeak >= MIN_PEAKS]
+  stitched <- stitched[npeak >= min_peaks]
   hub_ids  <- paste0("ST_HUB", seq_along(stitched))
   message(sprintf("    -> %d stitching hubs", length(stitched)))
   list(hub_gr=stitched, hub_ids=hub_ids)
@@ -193,30 +193,35 @@ cA_precomputed <- as.data.frame(
   row.names=NULL)
 message(sprintf("  %d pairs fetched", nrow(cA_precomputed)))
 
-for (r in COR_CUTOFFS) {
-  lbl <- sprintf("CoAccess_r%.1f", r)
-  message(sprintf("  %s...", lbl))
-  hub_info   <- hubs_finder(proj,
-                             coAccessibility = cA_precomputed,
-                             cor_cutoff      = r,
-                             max_dist        = MAX_DIST,
-                             min_dist_tss    = MIN_DIST_TSS,
-                             min_peaks       = MIN_PEAKS,
-                             remove_chr      = REMOVE_CHR)
-  if (is.null(hub_info)) next
-  hub_gr  <- hub_info$hubsCollapsed
-  hub_ids <- names(hub_gr)
-  cache_path <- file.path(mat_cache, paste0("hub_cell_mat_", lbl, ".rds"))
-  mat        <- .hub_cell_mat(hub_gr, hub_ids, cache_path)
-  conditions[[lbl]] <- list(hub_gr=hub_gr, hub_ids=hub_ids, mat=mat)
-}
+for (mp in MIN_PEAKS_VALUES) {
+  message(sprintf("\n  --- min_peaks = %d ---", mp))
 
-# Stitching: derive hubs, compute/load matrix
-message("  Stitching...")
-st_info    <- .stitching_hubs()
-cache_path <- file.path(mat_cache, "hub_cell_mat_Stitching.rds")
-mat_st     <- .hub_cell_mat(st_info$hub_gr, st_info$hub_ids, cache_path)
-conditions[["Stitching"]] <- list(hub_gr=st_info$hub_gr, hub_ids=st_info$hub_ids, mat=mat_st)
+  for (r in COR_CUTOFFS) {
+    lbl <- sprintf("CoAccess_r%.1f_mp%d", r, mp)
+    message(sprintf("  %s...", lbl))
+    hub_info   <- hubs_finder(proj,
+                               coAccessibility = cA_precomputed,
+                               cor_cutoff      = r,
+                               max_dist        = MAX_DIST,
+                               min_dist_tss    = MIN_DIST_TSS,
+                               min_peaks       = mp,
+                               remove_chr      = REMOVE_CHR)
+    if (is.null(hub_info)) next
+    hub_gr  <- hub_info$hubsCollapsed
+    hub_ids <- names(hub_gr)
+    cache_path <- file.path(mat_cache, paste0("hub_cell_mat_", lbl, ".rds"))
+    mat        <- .hub_cell_mat(hub_gr, hub_ids, cache_path)
+    conditions[[lbl]] <- list(hub_gr=hub_gr, hub_ids=hub_ids, mat=mat)
+  }
+
+  # Stitching with this min_peaks
+  lbl <- sprintf("Stitching_mp%d", mp)
+  message(sprintf("  %s...", lbl))
+  st_info    <- .stitching_hubs(min_peaks = mp)
+  cache_path <- file.path(mat_cache, paste0("hub_cell_mat_", lbl, ".rds"))
+  mat_st     <- .hub_cell_mat(st_info$hub_gr, st_info$hub_ids, cache_path)
+  conditions[[lbl]] <- list(hub_gr=st_info$hub_gr, hub_ids=st_info$hub_ids, mat=mat_st)
+}
 
 
 # ---- per-celltype SE enrichment loop ----------------------------------------

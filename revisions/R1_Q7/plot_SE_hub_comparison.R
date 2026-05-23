@@ -14,7 +14,7 @@ suppressPackageStartupMessages({
   library(grid)
 })
 
-script_dir <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude"
+script_dir <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q7"
 
 results <- read.csv(file.path(script_dir, "myeloid_SE_hub_enrichment.csv"),
                     stringsAsFactors = FALSE)
@@ -86,24 +86,21 @@ col_fun    <- colorRamp2(c(0, global_max / 2, global_max),
   mat
 }
 
-# ---- build 7 heatmaps --------------------------------------------------------
-all_conds   <- c("CoAccess_r0.2","CoAccess_r0.3","CoAccess_r0.4",
-                 "CoAccess_r0.5","CoAccess_r0.6","Stitching","Stitching_CT")
-all_labels  <- c("CoAcc r=0.2","CoAcc r=0.3","CoAcc r=0.4",
-                 "CoAcc r=0.5","CoAcc r=0.6","Stitch (union)","Stitch (CT)")
-cond_order  <- intersect(all_conds, unique(results$condition))
-cond_labels <- all_labels[match(cond_order, all_conds)]
+# ---- detect parameter sweep structure ----------------------------------------
+avail_conds <- unique(results$condition)
+mp_values   <- sort(unique(as.integer(sub(".*_mp(\\d+)$", "\\1", avail_conds[grepl("_mp\\d+$", avail_conds)]))))
+has_sweep   <- length(mp_values) > 0
 
-row_labels_short <- ifelse(se_order %in% names(se_short),
-                           se_short[se_order], se_order)
+cor_base    <- c("CoAccess_r0.2","CoAccess_r0.3","CoAccess_r0.4","CoAccess_r0.5","CoAccess_r0.6","Stitching","Stitching_CT")
+cor_labels  <- c("CoAcc r=0.2","CoAcc r=0.3","CoAcc r=0.4","CoAcc r=0.5","CoAcc r=0.6","Stitch","Stitch CT")
 
-sig_thresh <- -log10(0.05)   # dotted significance line (for colour, not drawn)
+row_labels_short <- ifelse(se_order %in% names(se_short), se_short[se_order], se_order)
 
 make_ht <- function(cond, label, show_row = FALSE, show_legend = FALSE, idx = 1) {
   mat <- .make_mat(cond)
   Heatmap(
     mat,
-    name                 = paste0("h", idx),   # unique internal name per panel
+    name                 = paste0("h", idx),
     col                  = col_fun,
     cluster_rows         = FALSE,
     cluster_columns      = FALSE,
@@ -131,22 +128,57 @@ make_ht <- function(cond, label, show_row = FALSE, show_legend = FALSE, idx = 1)
   )
 }
 
-ht_list <- NULL
-for (k in seq_along(cond_order)) {
-  ht <- make_ht(cond_order[k], cond_labels[k],
-                show_row    = (k == 1),
-                show_legend = (k == length(cond_order)),
-                idx         = k)
-  ht_list <- if (is.null(ht_list)) ht else ht_list + ht
-}
+# ---- build heatmap rows (one per min_peaks value if sweep, else single row) --
+if (has_sweep) {
+  ht_rows <- lapply(mp_values, function(mp) {
+    conds  <- paste0(c(paste0("CoAccess_r", c("0.2","0.3","0.4","0.5","0.6")),
+                       "Stitching", "Stitching_CT"), sprintf("_mp%d", mp))
+    labels <- paste0(cor_labels, sprintf(" mp%d", mp))
+    conds  <- intersect(conds, avail_conds)
+    labels <- labels[seq_along(conds)]
+    idx_base <- (match(mp, mp_values) - 1) * length(cor_base)
+    ht_row <- NULL
+    for (k in seq_along(conds)) {
+      ht <- make_ht(conds[k], labels[k],
+                    show_row    = (k == 1),
+                    show_legend = (k == length(conds) && mp == max(mp_values)),
+                    idx         = idx_base + k)
+      ht_row <- if (is.null(ht_row)) ht else ht_row + ht
+    }
+    ht_row
+  })
 
-# ---- save --------------------------------------------------------------------
-pdf(file.path(script_dir, "plot_SE_hub_comparison.pdf"), width = 16, height = 5)
-draw(ht_list,
-     column_title     = "SE enrichment in DA cHub regions  |  FDR-based score  |  rows/cols ordered by r=0.3 reference",
-     column_title_gp  = gpar(fontsize = 10, fontface = "bold"),
-     ht_gap           = unit(3, "mm"),
-     padding          = unit(c(3, 3, 6, 3), "mm"))
-dev.off()
+  pdf(file.path(script_dir, "plot_SE_hub_comparison.pdf"),
+      width = 19, height = 5 * length(mp_values))
+  for (i in seq_along(ht_rows)) {
+    draw(ht_rows[[i]],
+         column_title     = sprintf("SE enrichment | min_peaks = %d | dist_TSS = 0", mp_values[i]),
+         column_title_gp  = gpar(fontsize = 10, fontface = "bold"),
+         ht_gap           = unit(3, "mm"),
+         padding          = unit(c(3, 3, 6, 3), "mm"),
+         newpage          = (i > 1))
+  }
+  dev.off()
+
+} else {
+  # Legacy: no min_peaks sweep in condition labels
+  cond_order  <- intersect(c(cor_base, "Stitching_CT"), avail_conds)
+  cond_labels <- c(cor_labels, "Stitch (CT)")[match(cond_order, c(cor_base, "Stitching_CT"))]
+  ht_list <- NULL
+  for (k in seq_along(cond_order)) {
+    ht <- make_ht(cond_order[k], cond_labels[k],
+                  show_row    = (k == 1),
+                  show_legend = (k == length(cond_order)),
+                  idx         = k)
+    ht_list <- if (is.null(ht_list)) ht else ht_list + ht
+  }
+  pdf(file.path(script_dir, "plot_SE_hub_comparison.pdf"), width = 16, height = 5)
+  draw(ht_list,
+       column_title     = "SE enrichment in DA cHub regions  |  FDR-based score",
+       column_title_gp  = gpar(fontsize = 10, fontface = "bold"),
+       ht_gap           = unit(3, "mm"),
+       padding          = unit(c(3, 3, 6, 3), "mm"))
+  dev.off()
+}
 
 message("Saved plot_SE_hub_comparison.pdf")

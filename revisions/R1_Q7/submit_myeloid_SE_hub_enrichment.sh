@@ -13,4 +13,4 @@ mkdir -p /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git
 module purge
 
 /sc/arion/work/giottb01/conda/envs/meso_scatac/bin/Rscript \
-  /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/myeloid_SE_hub_enrichment.R
+  /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q7/myeloid_SE_hub_enrichment.R
