@@ -1,24 +1,15 @@
 # myeloid_SE_hub_enrichment.R
 #
-# Compares Super Enhancer enrichment in cHub regions across:
-#   - Co-accessibility hubs at r = 0.2, 0.3, 0.4, 0.5, 0.6
-#   - Proximity stitching hubs (gap <= 12,500bp, >= 5 peaks)
+# Computes Super Enhancer enrichment in hub regions across three hub types:
+#   1. Co-accessibility hubs (r = 0.2–0.6, min_peaks = 3/4/5)
+#      DA hubs per cell type via Wilcoxon (presto); hypergeometric SE test
+#   2. Stitching hubs — consensus peak set reduced at 12.5 kb gap
+#      Same DA + hypergeometric pipeline
+#   3. Stitching_CT hubs — per-cell-type PeakCalls reduced at 12.5 kb gap
+#      No DA needed; hypergeometric SE test directly
 #
-# Exactly replicates scatac_main_hub_analysis.R logic for each condition:
-#   1. Build hub regions (hubsCollapsed GRanges)
-#   2. Count fragments per cell overlapping each hub → hub x cell matrix
-#      (using sparse Matrix for efficiency; same result as cell-by-cell loop)
-#   3. Scale by total fragments per cell (CPM)
-#   4. Wilcoxon DA test per cell type (presto)  →  DA hubs (padj<0.05, logFC>1)
-#   5. Hypergeometric test: DA hubs vs PeakCalls/{celltype} background per SE set
-#
-# Hub x cell matrices are cached in git_repo_claude/hub_cell_matrices/ so they
-# are not recomputed on reruns.
-#
-# Outputs (git_repo_claude/):
-#   myeloid_SE_hub_enrichment.csv
-#   plot_myeloid_SE_hub_enrichment.pdf   — heatmap per condition (SE x celltype)
-#   plot_myeloid_SE_hub_summary.pdf      — bar + scatter summary
+# Output: myeloid_SE_hub_enrichment.csv
+# Plot:   run plot_SE_hub_comparison.R after this script completes
 #
 # Submit: bsub < submit_myeloid_SE_hub_enrichment.sh
 
@@ -30,9 +21,6 @@ suppressPackageStartupMessages({
   library(igraph)
   library(presto)
   library(dplyr)
-  library(ggplot2)
-  library(ComplexHeatmap)
-  library(circlize)
 })
 addArchRGenome("hg38")
 addArchRThreads(threads = 1)
@@ -263,112 +251,72 @@ for (cond in names(conditions)) {
   }
 }
 
-results <- do.call(rbind, all_results)
-rownames(results) <- NULL
-
-results <- results %>%
+da_results <- do.call(rbind, all_results)
+rownames(da_results) <- NULL
+da_results <- da_results %>%
   group_by(condition, celltype) %>%
   mutate(fdr           = p.adjust(pval, "BH"),
          neg_log10_fdr = -log10(pmax(fdr, 1e-300)),
          enriched      = fdr < FDR_CUT) %>%
   ungroup()
 
+
+# ---- Stitching_CT: per-cell-type PeakCalls, no DA step ----------------------
+message("\nRunning Stitching_CT enrichment per cell type...")
+
+ct_rows <- list()
+for (mp in MIN_PEAKS_VALUES) {
+  cond_label <- sprintf("Stitching_CT_mp%d", mp)
+  message(sprintf("  %s...", cond_label))
+
+  for (ct in ct_levels) {
+    pk_file <- file.path(peakcalls, paste0(ct, "-reproduciblePeaks.gr.rds"))
+    if (!file.exists(pk_file)) next
+
+    peaks_ct <- .filter_bg(readRDS(pk_file))
+    stitched <- reduce(peaks_ct, min.gapwidth = MAX_DIST, ignore.strand = TRUE)
+    hits     <- findOverlaps(peaks_ct, stitched)
+    npeak    <- tabulate(subjectHits(hits), nbins = length(stitched))
+    stitched <- stitched[npeak >= mp]
+    if (length(stitched) == 0) next
+
+    hubs_h19 <- .liftover(stitched)
+    bg_h19   <- .liftover(peaks_ct)
+    if (length(hubs_h19) == 0) next
+
+    message(sprintf("    %s / %s: %d peaks -> %d hubs -> %d after liftover",
+                    cond_label, ct, length(peaks_ct), length(stitched), length(hubs_h19)))
+
+    rows <- lapply(names(SE_all), function(se_name) {
+      r <- .phyper_enrich(hubs_h19, bg_h19, SE_all[[se_name]])
+      data.frame(condition=cond_label, celltype=ct, se_db=se_name,
+                 n_da_hubs=r$k, q_overlap=r$q,
+                 frac_hub_SE=r$frac_hub, frac_bg_SE=r$frac_bg,
+                 pval=r$pval, stringsAsFactors=FALSE)
+    })
+    ct_rows <- c(ct_rows, rows)
+  }
+}
+
+ct_results <- do.call(rbind, ct_rows)
+ct_results <- ct_results %>%
+  group_by(condition, celltype) %>%
+  mutate(fdr           = p.adjust(pval, "BH"),
+         neg_log10_fdr = -log10(pmax(fdr, 1e-300)),
+         enriched      = fdr < FDR_CUT) %>%
+  ungroup()
+
+
+# ---- write combined results --------------------------------------------------
+results <- bind_rows(da_results, ct_results)
 write.csv(results, file.path(script_dir, "myeloid_SE_hub_enrichment.csv"),
-          row.names=FALSE, quote=FALSE)
+          row.names = FALSE, quote = FALSE)
 
 sig_summary <- results %>%
   filter(enriched) %>%
-  count(condition, celltype, name="n_sig_SE")
+  count(condition, celltype, name = "n_sig_SE")
 message("\nSignificant SE sets (FDR < 0.05) per condition x celltype:")
-print(as.data.frame(sig_summary[order(sig_summary$celltype, sig_summary$condition),]),
-      row.names=FALSE)
+print(as.data.frame(sig_summary[order(sig_summary$celltype, sig_summary$condition), ]),
+      row.names = FALSE)
 
-
-# ---- Plot 1: heatmap per condition (SE x celltype) --------------------------
-message("\nGenerating plots...")
-
-cond_order <- c(sprintf("CoAccess_r%.1f", COR_CUTOFFS), "Stitching")
-cond_order <- cond_order[cond_order %in% unique(results$condition)]
-ct_order   <- c("Malignant","Mesothelium","Alveolar","Fibroblasts","SmoothMuscle",
-                "Endothelial","Myeloid","T_cells","NK","B_cells","Plasma","pDCs")
-ct_order   <- ct_order[ct_order %in% unique(results$celltype)]
-fdr_thresh <- -log10(FDR_CUT)
-
-pdf(file.path(script_dir, "plot_myeloid_SE_hub_enrichment.pdf"), width=7, height=5)
-for (cond in cond_order) {
-  sub_df <- results[results$condition == cond, ]
-  mat <- tapply(sub_df$neg_log10_fdr,
-                list(sub_df$se_db, sub_df$celltype), mean)
-  mat[is.na(mat)] <- 0
-  mat <- mat[, intersect(ct_order, colnames(mat)), drop=FALSE]
-  mat[mat < fdr_thresh] <- 0
-  col_fun <- colorRamp2(c(0, fdr_thresh, max(mat, fdr_thresh+0.01)),
-                        c("white","#fee8c8","#e34a33"))
-  draw(Heatmap(mat,
-    name            = "-log10(FDR)",
-    col             = col_fun,
-    cluster_columns = FALSE,
-    cluster_rows    = TRUE,
-    show_row_dend   = FALSE,
-    row_names_gp    = gpar(fontsize=6),
-    column_names_gp = gpar(fontsize=9),
-    column_names_rot= 45,
-    border          = TRUE,
-    column_title    = cond,
-    column_title_gp = gpar(fontsize=10, fontface="bold")
-  ))
-}
-dev.off()
-
-
-# ---- Plot 2 & 3: summary (bar + scatter) ------------------------------------
-cond_colours <- setNames(
-  c(colorRampPalette(c("#1a9850","#d73027"))(length(COR_CUTOFFS)), "#4575b4"),
-  cond_order
-)
-
-bar_df <- results %>%
-  count(condition, celltype, wt=as.integer(enriched)) %>%
-  rename(n_sig=n) %>%
-  mutate(condition=factor(condition, levels=cond_order),
-         celltype =factor(celltype,  levels=ct_order))
-
-hub_counts <- data.frame(
-  condition = names(conditions),
-  n_hubs    = sapply(names(conditions), function(x) length(conditions[[x]]$hub_ids)),
-  stringsAsFactors=FALSE
-)
-
-line_df <- sig_summary %>%
-  left_join(hub_counts, by="condition") %>%
-  mutate(condition=factor(condition, levels=cond_order),
-         celltype =factor(celltype,  levels=ct_order))
-
-p_bar <- ggplot(bar_df, aes(x=condition, y=n_sig, fill=condition)) +
-  geom_col(width=0.7) +
-  geom_text(aes(label=n_sig), vjust=-0.3, size=2.5) +
-  facet_wrap(~celltype, nrow=2) +
-  scale_fill_manual(values=cond_colours, guide="none") +
-  labs(title="Significant SE sets per hub method (FDR < 0.05)",
-       x=NULL, y="# significant SE sets") +
-  theme_bw(base_size=9) +
-  theme(axis.text.x=element_text(angle=45, hjust=1, size=7),
-        strip.text=element_text(size=8))
-
-p_line <- ggplot(line_df, aes(x=n_hubs, y=n_sig_SE, colour=condition)) +
-  geom_point(size=2.5) +
-  ggrepel::geom_text_repel(aes(label=condition), size=2.3,
-                             colour="black", max.overlaps=20) +
-  scale_colour_manual(values=cond_colours, guide="none") +
-  facet_wrap(~celltype, nrow=2) +
-  labs(title="Hub count vs SE enrichment per cell type",
-       x="Number of hubs", y="# significant SE sets (FDR < 0.05)") +
-  theme_bw(base_size=9) +
-  theme(strip.text=element_text(size=8))
-
-pdf(file.path(script_dir, "plot_myeloid_SE_hub_summary.pdf"), width=10, height=6)
-print(p_bar)
-print(p_line)
-dev.off()
-
-message("Done.")
+message("\nDone. Run plot_SE_hub_comparison.R to generate the figure.")
