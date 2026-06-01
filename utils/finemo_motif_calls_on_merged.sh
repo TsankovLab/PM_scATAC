@@ -52,7 +52,7 @@ finemo report \
     -r motif_calls_${model_head}.npz \
     -H finemo_out_${model_head}/hits.tsv \
     -p ../${celltype}_peakset_all_no_blacklist.bed \
-    -m /modisco_merged_${model_head}/compiled/modisco_compiled.h5 \
+    -m ${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.h5 \
     -o finemo_out_${model_head}/report -W 2000
 
 else

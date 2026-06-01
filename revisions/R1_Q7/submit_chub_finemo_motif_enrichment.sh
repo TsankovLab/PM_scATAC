@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#BSUB -J chub_finemo_enrich
+#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -q premium
+#BSUB -n 4
+#BSUB -R "rusage[mem=128000]"
+#BSUB -W 24:00
+#BSUB -o /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/logs/chub_finemo_enrich_%J.out
+#BSUB -e /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/logs/chub_finemo_enrich_%J.err
+
+mkdir -p /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/logs
+
+module purge
+
+/sc/arion/work/giottb01/conda/envs/meso_scatac/bin/Rscript \
+  /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q7/chub_finemo_motif_enrichment.R
