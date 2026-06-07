@@ -1,3 +1,4 @@
+ml anaconda3
 conda activate meso_scatac
 R
 

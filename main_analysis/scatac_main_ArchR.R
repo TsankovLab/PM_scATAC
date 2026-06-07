@@ -500,15 +500,22 @@ archp_meta = as.data.frame (archp@cellColData)
 archp_meta$celltype_lv1 = factor (archp_meta$celltype_lv1, levels = names(palette_celltype_lv1))
 archp_meta$Sample2 = archp_meta$Sample
 archp_meta$Sample2 = factor (archp_meta$Sample2, levels= rev(c('P1','P3','P4','P5','P8','P10','P11','P12','P13','P14','P23')))
-bp = cellComp(
+bp1 = cellComp(
   seurat_obj = archp_meta,
   metaGroups = c('Sample2','celltype_lv1'),
   plot_as = 'bar',
   pal = palette_celltype_lv1
   ) + gtheme + coord_flip()
-
-pdf (file.path('Plots',paste0('celltype_barplots.pdf')), height=6, width=5)
-bp
+bp2 = cellComp(
+  seurat_obj = archp_meta,
+  metaGroups = c('Sample2','celltype_lv1'),
+  plot_as = 'bar',
+  prop = F,
+  pal = palette_celltype_lv1
+  ) + gtheme + coord_flip()
+#bp2$data$Freq = log2(bp2$data$Freq)
+pdf (file.path('Plots',paste0('celltype_barplots.pdf')), height=6, width=9)
+wrap_plots (bp1, bp2)
 dev.off()
 
 

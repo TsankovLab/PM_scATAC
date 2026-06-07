@@ -314,17 +314,22 @@ rownames (mMat) = rowData (mSE)$name
 #mMat = scale(as.matrix(mMat))#[selected_TF,])
 
 # # Filter by RNA expression ####
-metaGroupName = 'celltype_lv2'
-min_exp = .1
-active_TFs = exp_genes (srt, rownames(mMat), min_exp = min_exp, metaGroupName)
-mMat = t(scale (mMat[active_TFs, ]))
-mMat_cor = cor (as.matrix(mMat), method = 'spearman')
-
-set.seed(123)
-centers=2
-km = kmeans (mMat_cor, centers=centers)
-if (!file.exists ('TF_activity_modules.rds')) saveRDS (km, 'TF_activity_modules.rds')
-write.csv (patchvecs (split (names(km$cluster),km$cluster)), 'regMye_modules.csv')
+if (!file.exists ('TF_activity_modules.rds')) 
+  {
+  metaGroupName = 'celltype_lv2'
+  min_exp = .1
+  active_TFs = exp_genes (srt, rownames(mMat), min_exp = min_exp, metaGroupName)
+  mMat = t(scale (mMat[active_TFs, ]))
+  mMat_cor = cor (as.matrix(mMat), method = 'spearman')
+  
+  set.seed(123)
+  centers=2
+  km = kmeans (mMat_cor, centers=centers)
+  write.csv (patchvecs (split (names(km$cluster),km$cluster)), 'regMye_modules.csv')
+  saveRDS (km, 'TF_activity_modules.rds')
+  } else{
+  km = readRDS ('TF_activity_modules.rds')
+  }
 
 
 genes_highlight2 = c(
@@ -385,14 +390,13 @@ active_TFs = exp_genes (srt, rownames(mMat), min_exp = min_exp, metaGroupName)
 mMat = t(scale (mMat[active_TFs, ]))
 
 tf_modules = lapply (unique(km$cluster), function(x) colMeans (t((mMat))[rownames(t(mMat)) %in% names(km$cluster[km$cluster == x]),]))
-tf_modules = c(tf_modules, 
-  list(AP1NFKB1 = colMeans (t((mMat))[rownames(t(mMat)) %in% genes_highlight,]),
-  AP1 = colMeans (t((mMat))[rownames(t(mMat)) %in% genes_highlight2,])))
+names (tf_modules) = paste0('mod_',unique(km$cluster))
+# tf_modules = c(tf_modules, 
+#   list(AP1NFKB1 = colMeans (t((mMat))[rownames(t(mMat)) %in% genes_highlight,]),
+#   AP1 = colMeans (t((mMat))[rownames(t(mMat)) %in% genes_highlight2,])))
 # tf_modules = c(tf_modules, list(AP1 = colMeans (t(scale(mMat))[rownames(t(mMat)) %in% c('JUN','FOSB','FOS','BACH1','SMARCC1','FOSL2','JUND','JDP2','BATF'),])))
 #tf_module_infl = colMeans (t)
 
-
-names (tf_modules)[1:2] = paste0('mod_',unique(km$cluster))
 tf_modules = do.call (cbind, tf_modules)
 archp@cellColData = archp@cellColData[!colnames(archp@cellColData) %in% colnames(tf_modules)]
 archp@cellColData = cbind (archp@cellColData, tf_modules) 
@@ -2271,11 +2275,6 @@ table (finemo_res$V6)[order(table (finemo_res$V6))]
 head (finemo_res$V4[finemo_res$V6 == 'pos_patterns.pattern_33'],1)
 
 
-
-
-
-
-
 #### Compare PC1 MDM - TRM with TF activity of blood monocytes (Hegde data) ####
 blood_tf = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/NTP_multiome/average_TF_activity_PBMC2.csv')
 blood_tf = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/pbmc_myeloid/average_TF_activity_PBMC.csv')
@@ -2612,4 +2611,15 @@ pbmc_mat = pbmc_mat[rownames(pbmc_mat) != 'Mye_Basophil',]
 pdf (file.path ('Plots','pbmc_2_deviations_heatmap.pdf'), height=3, width=6)
 Heatmap (scale(pbmc_mat), col = rev(palette_deviation), column_names_rot = 45,
   border = T)
+dev.off()
+
+
+
+### Call peaks on celltypes ####
+pdf(file.path('Plots','peakcalls.pdf'))
+metaGroupName = 'celltype_lv3'
+force=TRUE
+peak_reproducibility=2
+if(!all(file.exists(file.path('PeakCalls', unique(archp@cellColData[,metaGroupName]), '-reproduciblePeaks.gr.rds'))) | force) 
+source (file.path('..','..','git_repo','utils','callPeaks.R'))
 dev.off()
