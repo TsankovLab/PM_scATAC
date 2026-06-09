@@ -2,9 +2,9 @@
 #BSUB -J myeloid_SE_hub_enrich
 #BSUB -P acc_Tsankov_Normal_Lung
 #BSUB -q premium
-#BSUB -n 4
-#BSUB -R "rusage[mem=128000]"
-#BSUB -W 8:00
+#BSUB -n 8
+#BSUB -R "rusage[mem=128000] span[hosts=1]"
+#BSUB -W 12:00
 #BSUB -o /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/logs/myeloid_SE_hub_enrich_%J.out
 #BSUB -e /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/logs/myeloid_SE_hub_enrich_%J.err
 

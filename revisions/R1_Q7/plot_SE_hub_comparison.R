@@ -1,9 +1,12 @@
 # plot_SE_hub_comparison.R
 #
-# Six side-by-side heatmaps (one per hub condition: CoAcc r0.2-0.6 + Stitching).
-# Rows = SE databases, columns = cell types.
-# Row + column order fixed from r=0.3 reference (hclust, diagonal arrangement).
-# Same colour scale across all panels.
+# Heatmaps of SE enrichment across the parameter sweep:
+#   CoAcc r=0.2-0.6, Stitching (consensus), Stitching_CT (per-CT peaks)
+#   min_peaks = 3/4/5, TSS_dist = 0 / 2000 bp
+#
+# One PDF page per (tss_dist, min_peaks) combination, 7 heatmaps per row.
+# Condition labels use the form: CoAccess_r0.3_mp3_tss0, Stitching_mp4_tss2000, etc.
+# Also handles legacy condition labels without _tss suffix.
 #
 # Output: plot_SE_hub_comparison.pdf
 
@@ -43,16 +46,15 @@ se_short <- c(
   "ENCODE_Umbilical_vein_primary_cell_endothelial-cell-of-umbilical-vein"  = "HUVEC",
   "Endothelial"                                                            = "Endothelial",
   "NK"                                                                     = "NK",
-  "Smoothmuscle"                                                           = "Smooth Muscle*",
+  "Smoothmuscle"                                                           = "Smooth Muscle",
   "Tcell"                                                                  = "T cell"
 )
 
-# ---- ordering from r=0.3 reference -------------------------------------------
-# fixed column order (ct1) and row order (ct2) as specified
-ct_order <- c("Malignant","Mesothelium","Alveolar",
-               "Fibroblasts","SmoothMuscle","Endothelial",
-               "Myeloid","T_cells",
-               "B_cells","Plasma","pDCs")
+# ---- fixed row/column ordering (from r=0.3 reference) -----------------------
+ct_order <- c("Malignant", "Mesothelium", "Alveolar",
+               "Fibroblasts", "SmoothMuscle", "Endothelial",
+               "Myeloid", "T_cells",
+               "B_cells", "Plasma", "pDCs")
 
 se_order <- c(
   "ENCODE_Mammary_gland_primary_cell_mammary-epithelial-cell",
@@ -69,12 +71,12 @@ se_order <- c(
 ct_order <- intersect(ct_order, unique(results$celltype))
 se_order <- intersect(se_order, unique(results$se_db))
 
-# ---- shared colour scale (global max across all conditions) ------------------
+# ---- shared colour scale (99th-percentile global max) -----------------------
 global_max <- quantile(results$neg_log10_fdr, 0.99, na.rm = TRUE)
 col_fun    <- colorRamp2(c(0, global_max / 2, global_max),
                          c("#440154", "#31688e", "#fde725"))
 
-# ---- helper: build matrix in fixed order ------------------------------------
+# ---- helper: build score matrix in fixed order ------------------------------
 .make_mat <- function(cond) {
   df  <- results[results$condition == cond &
                    results$se_db %in% se_order &
@@ -86,21 +88,35 @@ col_fun    <- colorRamp2(c(0, global_max / 2, global_max),
   mat
 }
 
-# ---- detect parameter sweep structure ----------------------------------------
-avail_conds <- unique(results$condition)
-mp_values   <- sort(unique(as.integer(sub(".*_mp(\\d+)$", "\\1", avail_conds[grepl("_mp\\d+$", avail_conds)]))))
-has_sweep   <- length(mp_values) > 0
-
-cor_base    <- c("CoAccess_r0.2","CoAccess_r0.3","CoAccess_r0.4","CoAccess_r0.5","CoAccess_r0.6","Stitching","Stitching_CT")
-cor_labels  <- c("CoAcc r=0.2","CoAcc r=0.3","CoAcc r=0.4","CoAcc r=0.5","CoAcc r=0.6","Stitch","Stitch CT")
-
 row_labels_short <- ifelse(se_order %in% names(se_short), se_short[se_order], se_order)
 
-make_ht <- function(cond, label, show_row = FALSE, show_legend = FALSE, idx = 1) {
+# ---- detect parameter sweep structure ----------------------------------------
+avail_conds <- unique(results$condition)
+
+has_tss   <- any(grepl("_tss\\d+$", avail_conds))
+tss_vals  <- if (has_tss)
+               sort(unique(as.integer(sub(".*_tss(\\d+)$", "\\1",
+                 avail_conds[grepl("_tss\\d+$", avail_conds)])))) else 0L
+
+has_mp    <- any(grepl("_mp\\d+", avail_conds))
+mp_values <- if (has_mp)
+               sort(unique(as.integer(sub(".*_mp(\\d+).*", "\\1",
+                 avail_conds[grepl("_mp\\d+", avail_conds)])))) else integer(0)
+
+cor_base   <- c(paste0("CoAccess_r", c("0.2", "0.3", "0.4", "0.5", "0.6")),
+                "Stitching", "Stitching_CT")
+cor_labels <- c("CoAcc r=0.2", "CoAcc r=0.3", "CoAcc r=0.4",
+                "CoAcc r=0.5", "CoAcc r=0.6", "Stitch", "Stitch CT")
+
+# ---- heatmap factory (global idx ensures unique ComplexHeatmap names) --------
+ht_idx <- 0L
+
+make_ht <- function(cond, label, show_row = FALSE, show_legend = FALSE) {
+  ht_idx <<- ht_idx + 1L
   mat <- .make_mat(cond)
   Heatmap(
     mat,
-    name                 = paste0("h", idx),
+    name                 = paste0("h", ht_idx),
     col                  = col_fun,
     cluster_rows         = FALSE,
     cluster_columns      = FALSE,
@@ -128,48 +144,57 @@ make_ht <- function(cond, label, show_row = FALSE, show_legend = FALSE, idx = 1)
   )
 }
 
-# ---- build heatmap rows (one per min_peaks value if sweep, else single row) --
-if (has_sweep) {
-  ht_rows <- lapply(mp_values, function(mp) {
-    conds  <- paste0(c(paste0("CoAccess_r", c("0.2","0.3","0.4","0.5","0.6")),
-                       "Stitching", "Stitching_CT"), sprintf("_mp%d", mp))
-    labels <- paste0(cor_labels, sprintf(" mp%d", mp))
-    conds  <- intersect(conds, avail_conds)
-    labels <- labels[seq_along(conds)]
-    idx_base <- (match(mp, mp_values) - 1) * length(cor_base)
-    ht_row <- NULL
-    for (k in seq_along(conds)) {
-      ht <- make_ht(conds[k], labels[k],
-                    show_row    = (k == 1),
-                    show_legend = (k == length(conds) && mp == max(mp_values)),
-                    idx         = idx_base + k)
-      ht_row <- if (is.null(ht_row)) ht else ht_row + ht
-    }
-    ht_row
-  })
+# ---- main: one page per (tss_dist, min_peaks) --------------------------------
+if (has_mp) {
 
-  pdf(file.path(script_dir, "plot_SE_hub_comparison.pdf"),
-      width = 19, height = 5 * length(mp_values))
-  for (i in seq_along(ht_rows)) {
-    draw(ht_rows[[i]],
-         column_title     = sprintf("SE enrichment | min_peaks = %d | dist_TSS = 0", mp_values[i]),
-         column_title_gp  = gpar(fontsize = 10, fontface = "bold"),
-         ht_gap           = unit(3, "mm"),
-         padding          = unit(c(3, 3, 6, 3), "mm"),
-         newpage          = (i > 1))
+  pdf(file.path(script_dir, "plot_SE_hub_comparison.pdf"), width = 19, height = 5)
+
+  page_i <- 0L
+
+  for (tss_dist in tss_vals) {
+    tss_label <- if (tss_dist == 0) "no TSS filter" else
+                   sprintf("TSS_dist >= %d bp", tss_dist)
+
+    for (mp in mp_values) {
+      page_i <- page_i + 1L
+
+      if (has_tss) {
+        conds_all <- paste0(cor_base, sprintf("_mp%d_tss%d", mp, tss_dist))
+      } else {
+        conds_all <- paste0(cor_base, sprintf("_mp%d", mp))
+      }
+      if (length(intersect(conds_all, avail_conds)) == 0) next
+
+      ht_row <- NULL
+      for (k in seq_along(conds_all)) {
+        ht <- make_ht(conds_all[k], cor_labels[k],
+                      show_row    = (k == 1),
+                      show_legend = (k == length(conds_all)))
+        ht_row <- if (is.null(ht_row)) ht else ht_row + ht
+      }
+
+      draw(ht_row,
+           column_title     = sprintf("SE enrichment  |  %s  |  min_peaks = %d",
+                                      tss_label, mp),
+           column_title_gp  = gpar(fontsize = 10, fontface = "bold"),
+           ht_gap           = unit(3, "mm"),
+           padding          = unit(c(3, 3, 6, 3), "mm"),
+           newpage          = (page_i > 1))
+    }
   }
+
   dev.off()
 
 } else {
-  # Legacy: no min_peaks sweep in condition labels
+  # Legacy: no min_peaks sweep in CSV
   cond_order  <- intersect(c(cor_base, "Stitching_CT"), avail_conds)
-  cond_labels <- c(cor_labels, "Stitch (CT)")[match(cond_order, c(cor_base, "Stitching_CT"))]
+  cond_labels <- c(cor_labels, "Stitch (CT)")[match(cond_order,
+                   c(cor_base, "Stitching_CT"))]
   ht_list <- NULL
   for (k in seq_along(cond_order)) {
     ht <- make_ht(cond_order[k], cond_labels[k],
                   show_row    = (k == 1),
-                  show_legend = (k == length(cond_order)),
-                  idx         = k)
+                  show_legend = (k == length(cond_order)))
     ht_list <- if (is.null(ht_list)) ht else ht_list + ht
   }
   pdf(file.path(script_dir, "plot_SE_hub_comparison.pdf"), width = 16, height = 5)
