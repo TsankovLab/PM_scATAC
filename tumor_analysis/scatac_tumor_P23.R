@@ -251,6 +251,39 @@ dev.off()
 
 
 
+# Check footprint of RUNX and NR4A2 across celltypes ####
+metaGroupName='Clusters2'
+archp_P23 <- addGroupCoverages (ArchRProj = archp_P23, groupBy = metaGroupName)
+motifPositions <- getPositions (archp_P23)
+
+motifs <- c('SOX9','SOX6','RUNX2','SNAI2')
+markerMotifs <- unlist(lapply(motifs, function(x) grep(x, names(motifPositions), value = TRUE)))
+
+seFoot <- getFootprints(
+  ArchRProj = archp_P23, 
+  #positions = motifPositions_sample[markerMotifs], 
+  positions = motifPositions[markerMotifs], 
+  groupBy = metaGroupName
+)
+
+pdf (file.path ('Plots','SOX9_RUNX_footprints.pdf'))  
+plotFootprints(
+seFoot = seFoot[,grepl ('C4', colnames(seFoot)) | grepl ('C9', colnames(seFoot))] ,
+ArchRProj = archp_P23[archp_P23$Clusters2 %in% c('C4','C9')], 
+normMethod = "Subtract",
+plotName = "Footprints-Subtract-Bias_",
+addDOC = FALSE, height=7.5, width=5,
+#pal = palette_tnk_cells,
+smoothWindow = 25)
+
+dev.off()
+  
+
+
+
+
+
+
 # Import chromBPnet finemo motifs ####
 #archp_P1 = archp[archp$Clusters %in% c('C2') & archp$Sample == 'P1']
 library ('universalmotif')
