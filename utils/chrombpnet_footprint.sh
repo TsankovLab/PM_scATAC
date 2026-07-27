@@ -46,9 +46,11 @@ motif_file=motif_footprints_SOX9.txt
 #chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet
 #chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
 chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
+chromBPdir=/sc/arion/scratch/giottb01/Xmen/meso
 #celltype=inflamed
 #celltype=NK_KLRC1
 celltype=SOX9_high_P23_v2
+celltype=CD8_exhausted
 grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
 OUTPUT_PREFIX=${chromBPdir}/${celltype}/footprints
 
