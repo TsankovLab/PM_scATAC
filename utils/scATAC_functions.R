@@ -1495,14 +1495,70 @@ if (filter_by_scRNA)
   } else {
   DAM_list2 = DAM_list  
   }
-  DAM_top_list = lapply (names(DAM_list2), function(x) 
+  DAM_top_list = lapply (names(DAM_list2), function(x)
     {
-     res = DAM_list2[[x]] 
+     res = DAM_list2[[x]]
      res$comparison = x
     head (res, top_genes)
     })
     DAM_top_list = DAM_top_list[unlist(sapply (  DAM_top_list, function(x) !is.null (dim(x))))]
   DAM_df = Reduce (rbind ,DAM_top_list)
 return (DAM_df)
-}  
+}
+
+
+# Plot ArchR gene score feature plots with minimal styling (gene name only).
+# ArchR's plotEmbedding sets the title to a verbose string like
+# "UMAP_H of Harmony colored by\nGeneScoreMatrix : CD3D"; this function
+# extracts just the gene name and strips all other text and the legend.
+#
+# Usage:
+#   archp <- addImputeWeights(archp)
+#   plots <- plotFeaturePlots(archp, genes = c("CD3D","MS4A1"), embedding = "UMAP_H")
+#   pdf("out.pdf", width=25, height=25); patchwork::wrap_plots(plots); dev.off()
+plotFeaturePlots = function(
+  ArchRProj,
+  genes,
+  embedding     = "UMAP_H",
+  pal           = viridis::plasma(100),
+  imputeWeights = getImputeWeights(ArchRProj)
+) {
+  genes <- genes[genes %in% getFeatures(ArchRProj, "GeneScoreMatrix")]
+
+  clean_theme <- ggplot2::theme(
+    axis.title      = ggplot2::element_blank(),
+    axis.text       = ggplot2::element_blank(),
+    axis.ticks      = ggplot2::element_blank(),
+    axis.line       = ggplot2::element_blank(),
+    plot.subtitle   = ggplot2::element_blank(),
+    plot.caption    = ggplot2::element_blank(),
+    legend.position = "none",
+    panel.grid      = ggplot2::element_blank(),
+    panel.border    = ggplot2::element_blank()
+  )
+
+  pdf(NULL)
+  plots <- plotEmbedding(
+    ArchRProj     = ArchRProj,
+    colorBy       = "GeneScoreMatrix",
+    name          = genes,
+    embedding     = embedding,
+    pal           = pal,
+    imputeWeights = imputeWeights
+  )
+  dev.off()
+
+  lapply(plots, function(p) {
+    # ArchR title: "UMAP_H of Harmony colored by\nGeneScoreMatrix : GENE"
+    p$labels$title    <- sub(".*: ", "", p$labels$title)
+    p$labels$subtitle <- NULL
+    p$labels$x        <- NULL
+    p$labels$y        <- NULL
+    p$labels$fill     <- NULL
+    p$labels$colour   <- NULL
+    p$labels$color    <- NULL
+    p$labels$z        <- NULL
+    p + clean_theme + ggplot2::guides(colour = "none", fill = "none", color = "none")
+  })
+}
 
