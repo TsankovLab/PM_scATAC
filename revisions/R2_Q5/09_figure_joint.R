@@ -27,8 +27,9 @@
 #         joint_centroid_distance.csv, joint_dispersion.csv
 # Output: Plots/R2Q5_joint_embedding.pdf and the panels separately
 ###############################################################################
+suppressMessages({ library(ggplot2); library(patchwork); library (RColorBrewer) })
 source("00_common.R")
-suppressMessages({ library(ggplot2); library(patchwork) })
+source('../../utils/palettes.R')
 
 th <- theme_bw(base_size = 8) +
   theme(panel.grid = element_blank(), strip.background = element_blank(),
@@ -44,6 +45,7 @@ lv <- CELLTYPES[CELLTYPES %in% E$celltype]
 set.seed(1); E <- E[sample(nrow(E)), ]
 
 MODCOL <- c(scATAC = "#3b6ea5", scRNA = "#e08214")
+SAMCOL <- palette_sample
 
 pA <- ggplot(E, aes(UMAP1, UMAP2, colour = modality)) +
   geom_point(size = .05, stroke = 0, alpha = .5) +
@@ -52,6 +54,15 @@ pA <- ggplot(E, aes(UMAP1, UMAP2, colour = modality)) +
   labs(title = sprintf("joint CCA embedding: %s scATAC + %s scRNA cells",
                        format(sum(E$modality == "scATAC"), big.mark = ","),
                        format(sum(E$modality == "scRNA"), big.mark = ","))) + thu
+
+pG <- ggplot(E, aes(UMAP1, UMAP2, colour = sample)) +
+  geom_point(size = .05, stroke = 0, alpha = .5) +
+  scale_colour_manual(values = SAMCOL, name = NULL) +
+  guides(colour = guide_legend(override.aes = list(size = 1.8, alpha = 1)))+ thu
+  # labs(title = sprintf("joint CCA embedding: %s scATAC + %s scRNA cells",
+  #                      format(sum(E$modality == "scATAC"), big.mark = ","),
+  #                      format(sum(E$modality == "scRNA"), big.mark = ","))) + thu
+
 
 pB <- ggplot(E, aes(UMAP1, UMAP2, colour = factor(celltype, lv))) +
   geom_point(size = .05, stroke = 0, alpha = .5) +
@@ -104,7 +115,8 @@ fig <- (pA | pB) / pC / (pD | pE) / (pF | plot_spacer()) +
                   plot.subtitle = element_text(size = 7.5, colour = "grey30")))
 ggsave("Plots/R2Q5_joint_embedding.pdf", fig, width = 11, height = 16,
        device = cairo_pdf, limitsize = FALSE)
-for (n in c("pA","pB","pC","pD","pE","pF"))
+
+for (n in c("pA","pB","pC","pD","pE","pF","pG"))
   ggsave(sprintf("Plots/R2Q5_joint_panel_%s.pdf", sub("^p", "", n)), get(n),
          width = 5.5, height = 4.5, device = cairo_pdf)
 cat("wrote Plots/R2Q5_joint_embedding.pdf and 6 panels\nDONE\n")
