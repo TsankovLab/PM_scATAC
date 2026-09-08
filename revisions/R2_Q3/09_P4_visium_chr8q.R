@@ -1,5 +1,5 @@
 ###############################################################################
-# STEP 9 -- the P4 chr8q clone in space (Visium, slides C1 and D1).
+# STEP 9 -- the P4 chr8q clone in space (Visium, all four slides).
 #
 # The spatial half of the P4 argument. epiAneufinder says P4 carries a chr8q-amplified
 # subclone (steps 3-6); if that clone is real tissue, its spots must form contiguous
@@ -16,6 +16,12 @@
 #      permutations of the values over fixed positions. I ~ 0 = salt-and-pepper,
 #      I -> 1 = contiguous territories.
 #
+# All four slides in the object are the SAME patient, PT811 = P4 (the cellranger runs are
+# 37_ST_meso_PT811_Fresh_A1, 38_..._fresh_B1, 39_..._snapFrozen_C1, 40_..._snapFrozen_D1),
+# so A1/B1 and C1/D1 are two fresh and two snap-frozen sections of one tumour. Running all
+# four turns the two-slide result into a four-section replication that also crosses the
+# preservation method.
+#
 # This script depends only on the Visium object -- it is an independent test of the
 # chr8q clone, not a re-use of the scATAC calls.
 #
@@ -24,7 +30,8 @@
 suppressMessages({ library(Seurat); library(EnsDb.Hsapiens.v86); library(ggplot2)
                    library(ggforce); library(patchwork) })
 source("00_common.R")
-slides  <- c("C1", "D1")
+slides  <- c("A1", "B1", "C1", "D1")            # every slide in the object; all are P4
+PREP    <- c(A1 = "fresh", B1 = "fresh", C1 = "snap-frozen", D1 = "snap-frozen")
 CEN8_BP <- 44905425          # hg38 chr8 centromere, exact bp (gene-level assignment)
 
 ## ---- STEP 1: the chr8q gene set ---------------------------------------------
@@ -115,7 +122,8 @@ for (sl in slides){
   cls <- rep("non-malignant", length(s8)); cls[mi] <- clone_mal
   ## 3e. is the split spatially organised?
   xy <- get_spot_coords(obj); mI <- moran(s8[mi], xy[mi, ])
-  tab[[sl]] <- data.frame(slide = sl, n_spots = length(s8), n_malignant = length(mi),
+  tab[[sl]] <- data.frame(slide = sl, prep = unname(PREP[sl]),
+    n_spots = length(s8), n_malignant = length(mi),
     frac_amp = round(mean(clone_mal == "chr8q-amp"), 2),
     chr8q_amp = round(mean(s8[mi][clone_mal == "chr8q-amp"]), 3),
     chr8q_low = round(mean(s8[mi][clone_mal == "chr8q-low"]), 3),
@@ -123,7 +131,8 @@ for (sl in slides){
   ## 3f. figures; blank the normal spots so the score panel shows tumour only
   s8p <- s8; s8p[is_ref] <- NA
   plots[[paste0(sl, "_score")]] <- feat_gg(obj, s8p,
-    paste0(sl, " chr8q score (malignant spots)"), c("#2166ac", "#f7f7f7", "#b2182b"))
+    paste0(sl, " (", PREP[sl], ") chr8q score, malignant spots"),
+    c("#2166ac", "#f7f7f7", "#b2182b"))
   plots[[paste0(sl, "_clone")]] <- class_gg(obj, cls,
     paste0(sl, " chr8q clone (Moran I=", round(mI["I"], 2), ", p=", signif(mI["p"], 2), ")"),
     c(`chr8q-amp` = "#d62728", `chr8q-low` = "#1f77b4", `non-malignant` = "#e5e5e5"))
@@ -133,10 +142,17 @@ for (sl in slides){
 TAB <- do.call(rbind, tab); rownames(TAB) <- NULL
 write.csv(TAB, "P4_visium_chr8q_spatial.csv", row.names = FALSE)
 cat("=== P4 Visium chr8q clone spatial summary ===\n"); print(TAB, row.names = FALSE)
+cat(sprintf("\nMoran's I across the %d sections: %.3f - %.3f (median %.3f)\n",
+            nrow(TAB), min(TAB$moranI), max(TAB$moranI), median(TAB$moranI)))
 
-fig <- (plots[["C1_score"]] | plots[["C1_clone"]]) /
-       (plots[["D1_score"]] | plots[["D1_clone"]]) +
-  plot_annotation(title = "P4 Visium: chr8q-amplified clone spatial map (slides C1, D1)",
-                  theme = theme(plot.title = element_text(face = "bold", size = 13)))
-ggsave("Plots/R2_Q3_P4_visium_chr8q.pdf", fig, width = 13, height = 11)
+## one row per slide: chr8q score | chr8q clone
+rows <- lapply(slides, function(sl) plots[[paste0(sl, "_score")]] | plots[[paste0(sl, "_clone")]])
+fig  <- Reduce(`/`, rows) +
+  plot_annotation(title = sprintf("P4 Visium: chr8q-amplified clone spatial map (%s)",
+                                  paste(slides, collapse = ", ")),
+                  subtitle = "A1/B1 fresh, C1/D1 snap-frozen -- four sections of the same tumour",
+                  theme = theme(plot.title = element_text(face = "bold", size = 13),
+                                plot.subtitle = element_text(size = 10, colour = "grey35")))
+ggsave("Plots/R2_Q3_P4_visium_chr8q.pdf", fig, width = 13, height = 5.5 * length(slides),
+       limitsize = FALSE)
 cat("\nDONE\n")

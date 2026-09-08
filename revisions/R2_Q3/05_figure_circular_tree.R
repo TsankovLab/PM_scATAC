@@ -1,7 +1,8 @@
 ###############################################################################
-# STEP 5 -- one circular tree over all 18 subclones.
+# STEP 5 -- one circular tree over every clone the ARM_MIN criterion calls.
 #
-# Leaf   = one subclone.  Distance = 1 - Pearson between clone CNV profiles over the
+# Leaf   = one clone. A tumour whose primary split fell below ARM_MIN contributes a
+#          single leaf, labelled "unsplit".  Distance = 1 - Pearson between clone CNV profiles over the
 #          shared 5 Mb bins; ward.D2.  Clones of the same tumour normally sit together,
 #          so a leaf that does NOT is a clone whose CNV profile is genuinely distinct.
 # Label  = sample / clone / the arm change that separates it from its sibling.
@@ -16,7 +17,8 @@ P <- readRDS("epi_clone_profiles.rds")
 Z <- P$Z; meta <- P$meta
 
 D <- as.dist(1 - cor(t(Z))); phy <- as.phylo(hclust(D, "ward.D2"))
-dat <- data.frame(label = meta$leaf, sample = meta$sample, n_cells = meta$n_cells,
+dat <- data.frame(label = meta$leaf, n_cells = meta$n_cells,
+                  sample = factor(meta$sample, levels = SAMPLES),   # legend in row order
                   tip = sprintf("%s  %s", meta$leaf, meta$driver), stringsAsFactors = FALSE)
 
 p <- ggtree(phy, layout = "fan", open.angle = 14, size = 0.5, colour = "grey35") %<+% dat +
@@ -26,8 +28,9 @@ p <- ggtree(phy, layout = "fan", open.angle = 14, size = 0.5, colour = "grey35")
   scale_colour_manual(values = SAMPCOL, name = NULL) +
   scale_size_continuous(range = c(1.2, 4), trans = "sqrt", name = NULL,
                         breaks = c(100, 1000, 10000)) +
-  labs(title = sprintf("epiAneufinder subclones, all scATAC tumours (%g Mb windows)", WINDOW/1e6),
-       subtitle = paste0("leaf = sample / clone / dominant arm change | 1 - Pearson over ",
+  labs(title = sprintf("epiAneufinder clones, all scATAC tumours (%g Mb windows, arm-level separation >= %.2f)",
+                       WINDOW/1e6, ARM_MIN),
+       subtitle = paste0("leaf = sample / clone / dominant arm change (\"unsplit\" = one clone) | 1 - Pearson over ",
                          ncol(Z), " shared ", WINDOW/1e6, " Mb bins | green ring = P4 chr8q-amplified clone")) +
   theme_tree() +
   theme(plot.title = element_text(face = "bold", size = 10.5),
