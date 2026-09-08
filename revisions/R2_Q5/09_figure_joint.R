@@ -120,3 +120,91 @@ for (n in c("pA","pB","pC","pD","pE","pF","pG"))
   ggsave(sprintf("Plots/R2Q5_joint_panel_%s.pdf", sub("^p", "", n)), get(n),
          width = 5.5, height = 4.5, device = cairo_pdf)
 cat("wrote Plots/R2Q5_joint_embedding.pdf and 6 panels\nDONE\n")
+
+
+library(FNN)
+library(dplyr)
+library(ggplot2)
+library(scales)
+
+# Split modalities
+rna  <- E %>% filter(modality == "scRNA")
+atac <- E %>% filter(modality == "scATAC")
+
+# Find nearest scRNA cell for each scATAC cell based on UMAP1/UMAP2
+nn <- get.knnx(
+  data  = as.matrix(rna[, c("UMAP1", "UMAP2")]),
+  query = as.matrix(atac[, c("UMAP1", "UMAP2")]),
+  k = 1
+)
+
+# Assign nearest scRNA cell type
+atac$closest_scRNA_celltype <- rna$celltype[nn$nn.index[, 1]]
+
+# Composition
+plot_df <- atac %>%
+  count(celltype, closest_scRNA_celltype) %>%
+  group_by(celltype) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup()
+
+# Order bars by purity
+purity_order <- plot_df %>%
+  group_by(celltype) %>%
+  summarise(purity = max(prop), .groups = "drop") %>%
+  arrange(desc(purity)) %>%
+  pull(celltype)
+
+plot_df <- plot_df %>%
+  mutate(celltype = factor(celltype, levels = purity_order)) %>%
+  
+  # Within EACH bar: largest -> smallest
+  group_by(celltype) %>%
+  arrange(desc(prop), .by_group = TRUE) %>%
+  mutate(
+    ymax = cumsum(prop),
+    ymin = lag(ymax, default = 0)
+  ) %>%
+  ungroup() %>%
+  
+  # Numeric x position for geom_rect
+  mutate(x = as.numeric(celltype))
+
+# Plot
+sp = ggplot(plot_df) +
+  geom_rect(
+    aes(
+      xmin = x - 0.4,
+      xmax = x + 0.4,
+      ymin = ymin,
+      ymax = ymax,
+      fill = closest_scRNA_celltype
+    )
+  ) +
+  scale_fill_manual(values = palette_celltype_lv1) +
+  scale_x_continuous(
+    breaks = seq_along(purity_order),
+    labels = purity_order
+  ) +
+  scale_y_continuous(
+    labels = scales::percent_format(),
+    limits = c(0, 1),
+    expand = c(0, 0)
+  ) +
+  labs(
+    x = "scATAC cell type",
+    y = "Proportion",
+    fill = "Closest scRNA cell type"
+  ) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+pdf (file.path ('Plots','scatac_celltype_comp_in_scrna.pdf'), height=3)
+sp
+dev.off()
+
+
+
+
