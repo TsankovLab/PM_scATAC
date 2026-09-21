@@ -1562,3 +1562,326 @@ plotFeaturePlots = function(
   })
 }
 
+
+
+###############################################################################
+# plotTracksSideBySide
+#
+# Browser tracks for several genomic regions drawn as panels in ONE row, so that loci can be
+# compared across cell types at a glance. Wraps ArchR::plotBrowserTrack and then rebuilds the
+# layout, because stacking ArchR panels as-is spends most of the page on labels that repeat
+# once per region (y-axis title, facet strip, coordinate axis).
+#
+# What it changes relative to a plain plotBrowserTrack:
+#   - cell-type names drawn INSIDE each coverage facet (top left), not as a strip per panel,
+#     and by default only on the left-most panel of each row
+#   - gene bodies coloured by strand with the symbol centred above each gene
+#   - coverage profiles optionally outlined
+#   - panel frames and coordinate axes optionally removed; the region is named in the header
+#   - whitespace between the stacked tracks collapsed
+#   - loop-track colour key kept on the right-most panel only
+#
+# All of the above is done by temporarily rewriting ArchR internals (.bulkTracks, .geneTracks,
+# .loopTracks, theme_ArchR). They are ALWAYS restored on exit, including on error, so nothing
+# leaks into the calling session.
+#
+# ARGUMENTS
+#  ArchRProj    ArchR project.
+#  regions      GRanges to plot, or a character vector of hub ids (then `hubs` is required).
+#               An `mcols(regions)$label` column, if present, is used for the panel header.
+#  hubs         Optional list with `hubs_id`, `hubsMerged`, `hubsCollapsed`, `peakLinks`
+#               (i.e. a global_hubs_obj.rds). Used to resolve hub ids to regions and, unless
+#               overridden, to supply the peak feature track and the pairwise link track.
+#  hub_bed      Optional data.frame/path of hub_regions.bed (chr,start,end,id,strand,genes),
+#               used to resolve hub ids when `hubs` has no hubsCollapsed names.
+#  groupBy      cellColData column defining the tracks (default 'celltype_lv1').
+#  groups       character vector giving which groups to show AND their top-to-bottom order.
+#  pal          named colour vector for the groups.
+#  features     GRanges/GRangesList for the feature track; defaults to the hubs' own peaks.
+#  loops        GRanges/GRangesList for the loop track; defaults to the hubs' pairwise links.
+#  file         output PDF path. If NULL the assembled gtable(s) are returned invisibly.
+#  perRow       wrap panels over several rows (NULL = a single row).
+#  header       function(i, regions) returning the panel header, or NULL for id + coordinates.
+#
+# VALUE  the assembled gtable (one row) or a list of gtables (wrapped), invisibly.
+#
+# EXAMPLE
+#   hubs = readRDS('hubs_obj_cor_0.3.../global_hubs_obj.rds')
+#   bed  = read.table('hubs_obj_cor_0.3.../hub_regions.bed', sep='\t')
+#   plotTracksSideBySide(archp, c('HUB9','HUB32','HUB85'), hubs = hubs, hub_bed = bed,
+#                        groups = c('Malignant','Myeloid','T_cells','NK'),
+#                        pal = palette_celltype_lv1, file = 'tracks.pdf')
+###############################################################################
+plotTracksSideBySide = function(
+  ArchRProj,
+  regions,
+  hubs            = NULL,
+  hub_bed         = NULL,
+  groupBy         = 'celltype_lv1',
+  groups          = NULL,
+  pal             = NULL,
+  features        = NULL,
+  loops           = NULL,
+  file            = NULL,
+  perRow          = NULL,
+  padding         = 0.05,
+  plotSummary     = c('bulkTrack', 'featureTrack', 'loopTrack', 'geneTrack'),
+  sizes           = c(10, 0.45, 1, 1.9),
+  tileSize        = 200,
+  minCells        = 25,
+  panelWidth      = 2.1,
+  panelHeight     = 8.1,
+  labelWidth      = 2.6,
+  genePlusColor   = 'brown',
+  geneMinusColor  = 'black',
+  geneLabelSize   = 3,
+  geneLabelNudge  = 0.18,
+  groupLabelSize  = 3.4,
+  labelFirstOnly  = TRUE,
+  loopPal         = NULL,
+  outlineProfiles = TRUE,
+  outlineWidth    = 0.05,
+  panelBorders    = FALSE,
+  showXaxis       = FALSE,
+  baseSize        = 11,
+  facetSize       = 11,
+  headerSize      = 9.2,
+  header          = NULL,
+  caption         = NULL,
+  verbose         = TRUE
+){
+  for (pkg in c('ArchR','GenomicRanges','ggplot2','ggrepel','grid','gtable'))
+    if (!requireNamespace(pkg, quietly = TRUE)) stop('plotTracksSideBySide needs package: ', pkg)
+  requireNamespace('ggrepel', quietly = TRUE)   # drawn lazily by the gene track
+
+  ## ---- 1. resolve regions ---------------------------------------------------------------
+  if (is.character(regions)) {
+    if (is.null(hubs) && is.null(hub_bed)) stop('hub ids given but neither `hubs` nor `hub_bed` supplied')
+    if (!is.null(hub_bed)) {
+      bed = if (is.character(hub_bed)) utils::read.table(hub_bed, sep = '\t', stringsAsFactors = FALSE) else hub_bed
+      colnames(bed)[1:6] = c('chr','start','end','id','strand','genes')
+      miss = setdiff(regions, bed$id)
+      if (length(miss)) warning('not found in hub_bed, skipped: ', paste(miss, collapse = ', '))
+      regions = regions[regions %in% bed$id]
+      b  = bed[match(regions, bed$id), ]
+      gr = GenomicRanges::GRanges(b$chr, IRanges::IRanges(b$start, b$end))
+      GenomicRanges::mcols(gr)$label = b$id
+      GenomicRanges::mcols(gr)$genes = b$genes
+    } else {
+      idx = match(regions, hubs$hubs_id)
+      if (anyNA(idx)) { warning('hub ids not in `hubs`, skipped: ',
+                                paste(regions[is.na(idx)], collapse = ', ')); idx = idx[!is.na(idx)] }
+      gr = hubs$hubsCollapsed[idx]
+      GenomicRanges::mcols(gr) = NULL
+      GenomicRanges::mcols(gr)$label = hubs$hubs_id[idx]
+    }
+    hub_ids = GenomicRanges::mcols(gr)$label
+  } else {
+    gr = regions
+    if (is.null(GenomicRanges::mcols(gr)$label))
+      GenomicRanges::mcols(gr)$label = sprintf('%s:%s-%s', as.character(GenomicRanges::seqnames(gr)),
+                                               GenomicRanges::start(gr), GenomicRanges::end(gr))
+    hub_ids = NULL
+  }
+  if (!length(gr)) stop('no regions left to plot')
+  w  = GenomicRanges::width(gr)
+  gr = GenomicRanges::resize(gr, w + 2 * round(padding * w), fix = 'center')
+  n  = length(gr)
+
+  ## ---- 2. feature and loop tracks from the hub object, unless supplied -------------------
+  if (is.null(features) && !is.null(hubs) && !is.null(hub_ids)) {
+    k = match(hub_ids, hubs$hubs_id)
+    pk = do.call(c, lapply(k, function(j) {
+      d = hubs$hubsMerged[[j]]
+      GenomicRanges::GRanges(as.character(d$seqnames), IRanges::IRanges(d$start, d$end))
+    }))
+    features = GenomicRanges::GRangesList(`cHub peaks` = pk)
+  }
+  if (is.null(loops) && !is.null(hubs) && !is.null(hubs$peakLinks)) {
+    lk = hubs$peakLinks[[1]]
+    loops = GenomicRanges::GRangesList(`cHub links` = IRanges::subsetByOverlaps(lk, gr, type = 'within'))
+  }
+  if (!'looptrack'    %in% tolower(plotSummary)) loops = NULL
+  if (!'featuretrack' %in% tolower(plotSummary)) features = NULL
+  if (length(sizes) != length(plotSummary)) stop('`sizes` must have one value per `plotSummary` entry')
+
+  ## ---- 3. groups and palette --------------------------------------------------------------
+  cd = ArchR::getCellColData(ArchRProj)
+  if (!groupBy %in% colnames(cd)) stop('groupBy not in cellColData: ', groupBy)
+  if (is.null(groups)) groups = sort(unique(as.character(cd[[groupBy]])))
+  groups = groups[groups %in% unique(as.character(cd[[groupBy]]))]
+  if (!length(groups)) stop('none of `groups` present in ', groupBy)
+  if (!is.null(pal)) {
+    if (!all(groups %in% names(pal))) stop('`pal` is missing: ', paste(setdiff(groups, names(pal)), collapse = ', '))
+    pal = pal[groups]
+  }
+  ArchRProj = ArchRProj[as.character(cd[[groupBy]]) %in% groups, ]
+
+  ## ---- 4. temporarily rewrite the ArchR track builders ------------------------------------
+  ## deparse() wraps at width.cutoff, so sources are rejoined with newlines and every pattern
+  ## tolerates a line break inside the expression.
+  ns = asNamespace('ArchR')
+  orig = list(bulk  = ArchR:::.bulkTracks, gene = ArchR:::.geneTracks,
+              loop  = ArchR:::.loopTracks, theme = ArchR::theme_ArchR)
+  on.exit({
+    assignInNamespace('.bulkTracks', orig$bulk,  ns = 'ArchR')
+    assignInNamespace('.geneTracks', orig$gene,  ns = 'ArchR')
+    assignInNamespace('.loopTracks', orig$loop,  ns = 'ArchR')
+    assignInNamespace('theme_ArchR', orig$theme, ns = 'ArchR')
+  }, add = TRUE)
+
+  rewrite = function(fun, subs) {
+    txt = paste(deparse(fun), collapse = '\n')
+    for (u in subs) {
+      if (!grepl(u[1], txt)) stop('plotTracksSideBySide: ArchR source pattern not found -> ', u[1],
+                                  '\n(ArchR version may have changed; the styling patch needs updating)')
+      txt = sub(u[1], u[2], txt)
+    }
+    f = eval(parse(text = txt)); environment(f) = ns; f
+  }
+
+  ## gene track: strand colours, symbol centred above its own gene body
+  gt = rewrite(orig$gene, list(
+    c('x\\s*=\\s*start,\\s*y\\s*=\\s*cluster,\\s*label\\s*=\\s*symbol',
+      'x = (start + end)/2, y = cluster, label = symbol'),
+    c('x\\s*=\\s*end,\\s*y\\s*=\\s*cluster,\\s*label\\s*=\\s*symbol',
+      'x = (start + end)/2, y = cluster, label = symbol'),
+    c('nudge_x\\s*=\\s*-0\\.01\\s*\\*\\s*\\(end\\(region\\)\\s*-\\s*start\\(region\\)\\)', 'nudge_x = 0'),
+    c('nudge_x\\s*=\\s*\\+0\\.01\\s*\\*\\s*\\(end\\(region\\)\\s*-\\s*start\\(region\\)\\)', 'nudge_x = 0'),
+    c('nudge_y\\s*=\\s*-0\\.25', paste0('nudge_y = ', geneLabelNudge)),
+    c('nudge_y\\s*=\\s*0\\.25',  paste0('nudge_y = ', geneLabelNudge)),
+    c('ggrepel::geom_label_repel', 'ggrepel::geom_text_repel')))
+  formals(gt)$colorPlus = genePlusColor
+  formals(gt)$colorMinus = geneMinusColor
+  formals(gt)$labelSize = geneLabelSize
+  assignInNamespace('.geneTracks', gt, ns = 'ArchR')
+
+  ## loop track: plotBrowserTrack never passes `pal` down, so set the formal default
+  if (is.null(loopPal))
+    loopPal = grDevices::colorRampPalette(c('#F7F5FA', '#B9A7D4', '#6A51A3', '#3F007D'))(100)
+  lt = orig$loop; formals(lt)$pal = loopPal
+  assignInNamespace('.loopTracks', lt, ns = 'ArchR')
+
+  ## panel frames come from theme_ArchR, not from plotBrowserTrack(borderWidth = )
+  if (!panelBorders)
+    assignInNamespace('theme_ArchR', function(...)
+      orig$theme(...) + ggplot2::theme(panel.border = ggplot2::element_blank()), ns = 'ArchR')
+
+  ## bulk track: optional outline, and the group name inside each facet
+  bulk_variant = function(labelled) {
+    subs = list()
+    if (outlineProfiles)
+      subs = c(subs, list(c('geom_area\\(stat\\s*=\\s*"identity"\\)',
+        sprintf('geom_area(stat = "identity", colour = "black", linewidth = %s)', outlineWidth))))
+    if (labelled)
+      subs = c(subs, list(c('facet_wrap\\(facets\\s*=\\s*~group,\\s*strip\\.position\\s*=\\s*"right",\\s*ncol\\s*=\\s*1\\)',
+        paste0('facet_wrap(facets = ~group, strip.position = "right", ncol = 1) + ',
+               'geom_text(data = data.frame(group = unique(df$group)), ',
+               'mapping = aes(x = -Inf, y = Inf, label = group), hjust = -0.07, vjust = 1.45, size = ',
+               groupLabelSize, ', inherit.aes = FALSE, colour = "black")'))))
+    if (!length(subs)) orig$bulk else rewrite(orig$bulk, subs)
+  }
+
+  ## ---- 5. render ----------------------------------------------------------------------------
+  render = function(labelled) {
+    assignInNamespace('.bulkTracks', bulk_variant(labelled), ns = 'ArchR')
+    p = ArchR::plotBrowserTrack(ArchRProj, region = gr, groupBy = groupBy, useGroups = groups,
+                                features = features, loops = loops, plotSummary = plotSummary,
+                                sizes = sizes, tileSize = tileSize, minCells = minCells,
+                                baseSize = baseSize, facetbaseSize = facetSize, pal = pal, title = '')
+    ## a gtable IS a list, so is.list() cannot distinguish 'one region' from 'many':
+    ## with a single region plotBrowserTrack returns the gtable itself
+    if (inherits(p, 'gtable')) p = list(p)
+    p
+  }
+  if (verbose) message('rendering ', n, ' regions x ', length(groups), ' groups',
+                       if (labelFirstOnly) ' (x2 label variants)' else '')
+  plain = render(FALSE)
+  lab   = if (labelFirstOnly) render(TRUE) else plain
+
+  ## ---- 6. trim and assemble ------------------------------------------------------------------
+  ## column 5 = y-axis title, 6 = feature-row label, 8 = facet strip in ArchR's panel gtable
+  COL = c(ylab = 5, axis_l = 6, strip = 8)
+  blank_cols = function(g, cols) {
+    cols = cols[!is.na(cols)]
+    if (!length(cols)) return(g)
+    for (i in which(g$layout$l %in% cols)) g$grobs[[i]] = grid::nullGrob()
+    g$widths[cols] = grid::unit(0, 'cm'); g
+  }
+  blank_named = function(g, rx, drop = c('width','height')) {
+    i = grep(rx, g$layout$name)
+    if (length(i)) {
+      for (k in i) g$grobs[[k]] = grid::nullGrob()
+      if ('width'  %in% drop) g$widths[unique(g$layout$l[i])]  = grid::unit(0, 'cm')
+      if ('height' %in% drop) g$heights[unique(g$layout$t[i])] = grid::unit(0, 'cm')
+    }
+    g
+  }
+  compact_rows = function(g, keep = grid::unit(0.02, 'cm')) {
+    last = suppressWarnings(max(g$layout$b[grepl('^panel-1-', g$layout$name)]))
+    if (!is.finite(last)) return(g)
+    for (r in seq_len(nrow(g))) {
+      if (r <= last) next
+      occ = unique(g$layout$name[g$layout$t <= r & g$layout$b >= r])
+      if (!length(setdiff(occ, 'background'))) g$heights[r] = keep
+    }
+    g
+  }
+  default_header = function(i) {
+    lab_i = GenomicRanges::mcols(gr)$label[i]
+    sprintf('%s\n%s:%s-%s', sub('^HUB', 'cHub', lab_i), as.character(GenomicRanges::seqnames(gr))[i],
+            format(GenomicRanges::start(gr)[i], big.mark = ','),
+            format(GenomicRanges::end(gr)[i], big.mark = ','))
+  }
+  retitle = function(g, txt) {
+    i = which(g$layout$name == 'title')
+    if (length(i)) {
+      g$grobs[[i[1]]] = grid::textGrob(txt, gp = grid::gpar(fontsize = headerSize, lineheight = 1.2))
+      g$heights[g$layout$t[i[1]]] = grid::unit(2.2, 'lines')
+    }
+    g
+  }
+  prep = function(g, k, m, idx) {
+    g = retitle(g, if (is.null(header)) default_header(idx) else header(idx, gr))
+    g = blank_named(g, '^guide-box-bottom$', drop = 'height')       # stray strand key
+    if (k < m) g = blank_named(g, '^guide-box-right$', drop = 'width')  # loop key: last panel only
+    if (!showXaxis) g = blank_named(g, '^(axis-b|xlab-b)', drop = 'height')
+    g = compact_rows(g)
+    g = blank_cols(g, c(COL[['ylab']], COL[['strip']], if (k > 1) COL[['axis_l']]))
+    g$widths[c(1, ncol(g))] = grid::unit(0.13, 'cm')               # gutter between panels
+    g
+  }
+  row_of = function(idx) {
+    m = length(idx)
+    tr = lapply(seq_along(idx), function(k)
+      prep(if (k == 1) lab[[idx[k]]] else plain[[idx[k]]], k, m, idx[k]))
+    ## cbind() on a single gtable falls through to the matrix method and returns a matrix,
+    ## so the one-region case is returned directly
+    if (length(tr) == 1) tr[[1]] else do.call(cbind, c(tr, list(size = 'max')))
+  }
+
+  chunks = if (is.null(perRow)) list(seq_len(n)) else split(seq_len(n), ceiling(seq_len(n) / perRow))
+  rows   = lapply(chunks, row_of)
+
+  ## ---- 7. draw ---------------------------------------------------------------------------------
+  if (!is.null(file)) {
+    wdt = panelWidth * max(lengths(chunks)) + labelWidth
+    grDevices::pdf(file, width = wdt, height = panelHeight * length(rows) + 0.3)
+    grid::grid.newpage()
+    if (length(rows) == 1) grid::grid.draw(rows[[1]]) else {
+      grid::pushViewport(grid::viewport(layout = grid::grid.layout(length(rows), 1)))
+      for (k in seq_along(rows)) {
+        grid::pushViewport(grid::viewport(layout.pos.row = k, layout.pos.col = 1))
+        grid::grid.draw(rows[[k]]); grid::popViewport()
+      }
+      grid::popViewport()
+    }
+    if (!is.null(caption))
+      grid::grid.text(caption, x = grid::unit(6, 'mm'), y = grid::unit(3, 'mm'),
+                      just = c('left','bottom'), gp = grid::gpar(fontsize = 8.5, col = 'grey25'))
+    grDevices::dev.off()
+    if (verbose) message('wrote ', file, '  (', round(wdt, 1), ' x ',
+                         round(panelHeight * length(rows) + 0.3, 1), ' in)')
+  }
+  invisible(if (length(rows) == 1) rows[[1]] else rows)
+}
