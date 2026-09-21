@@ -1,7 +1,7 @@
 suppressMessages({ library(Seurat) })
 set.seed(1234)
 PROC <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed"
-OUT  <- file.path(PROC, "de/perturbation_panel/figs_repro")
+OUT <- Sys.getenv("CROP_OUT", unset = "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/de/perturbation_panel/figs_repro")
 
 counts <- read.delim(file.path(PROC, "counts/gene_counts_matrix_stranded_reverse.tsv"), row.names = 1, check.names = FALSE)
 sym <- read.delim(file.path(PROC, "counts/gene_id_to_symbol.tsv"), header = FALSE, col.names = c("gene_id", "symbol"))

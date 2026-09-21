@@ -1,6 +1,6 @@
 suppressMessages({ library(Seurat) })
 set.seed(1234)
-OUT <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/de/perturbation_panel/figs_repro"
+OUT <- Sys.getenv("CROP_OUT", unset = "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/de/perturbation_panel/figs_repro")
 dir.create(OUT, showWarnings = FALSE, recursive = TRUE)
 
 srt <- readRDS("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CRISPR_cropseq_analysis/_cellranger_raw_Filter_400_800_25/no_harmony/srt_filtered.rds")
