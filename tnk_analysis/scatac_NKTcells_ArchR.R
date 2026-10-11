@@ -328,12 +328,24 @@ DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
 rownames(DAP_res) = as.character(DAP_res_regions)
 
 pdf(file.path('Plots','Exhausted_peaks_MA_plot.pdf'), width=5,height=5)
-pma <- markerPlot(seMarker = DAP_list, name = 'CD8_exhausted', cutOff = "FDR <= 0.01", plotAs = "MA")
+# Revision (R2_Q21): cut-off relaxed from FDR <= 0.01 to FDR <= 0.05, see below
+pma <- markerPlot(seMarker = DAP_list, name = 'CD8_exhausted', cutOff = "FDR <= 0.05", plotAs = "MA")
 pma
 dev.off()
 
 # Take only significant regions ####
-DAP_res_sig = DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]
+# Revision (R2_Q21): the cut-off was FDR < 0.01 (418 peaks). It is now FDR < 0.05 (884 peaks), so that the exported
+# table, the TF module enrichments and the coverage plots below use the same peak set as the gene-labelled
+# heatmap of the CD8 exhausted peaks. The 418 peaks are a subset and are flagged in the table (FDR_below_0.01).
+EXH_FDR = 0.05
+DAP_res_sig = DAP_res[DAP_res$FDR < EXH_FDR & DAP_res$Log2FC > 0, ]
+# Revision (R2_Q21): add the peak annotation (nearest gene, distance to its TSS, peak type) to the exported table.
+# The Peak2Gene-based gene of each peak, as used for the heatmap labels, is added in revisions/R2_Q21.
+ps_gr = getPeakSet (archp); names (ps_gr) = NULL
+ps_ann = as.data.frame (mcols(ps_gr)[, c('nearestGene','distToTSS','peakType')])
+rownames (ps_ann) = as.character (ps_gr)
+DAP_res_sig = cbind (ps_ann[rownames(DAP_res_sig), ], DAP_res_sig)
+DAP_res_sig$FDR_below_0.01 = DAP_res_sig$FDR < .01
 write.csv (DAP_res_sig, 'DAP_CD8_Ex.csv')
 saveRDS (GRanges(rownames(DAP_res_sig)), 'T_cell_exhaustion_peaks.rds')
 
@@ -581,7 +593,8 @@ DAP_res = do.call (cbind, (assays(DAP_list)))
 colnames (DAP_res) = names(assays(DAP_list))
 DAP_res_regions = makeGRangesFromDataFrame(rowData(DAP_list)[,c(1,3,4)])
 rownames(DAP_res) = as.character(DAP_res_regions)
-ext_ps_gr = GRanges (rownames(DAP_res[DAP_res$FDR < .01 & DAP_res$Log2FC > 0, ]))
+# Revision (R2_Q21): same cut-off as above (was FDR < .01)
+ext_ps_gr = GRanges (rownames(DAP_res[DAP_res$FDR < EXH_FDR & DAP_res$Log2FC > 0, ]))
 ext_ps_gr = extendGR (gr = ext_ps_gr, upstream = 3000, downstream = 3000)
 peak_windows = slidingWindows (x = ext_ps_gr, width = 50, step = 25)
 
@@ -591,7 +604,9 @@ force = FALSE
 ext_l = list()
 
 pb =progress::progress_bar$new(total = length (unique (as.character(archp@cellColData[,metaGroupName]))))
-if (!file.exists(paste0('ext_peaks_',metaGroupName,'.rds')) | force)
+# Revision (R2_Q21): the cache name carries the cut-off (ext_peaks_celltype_lv2.rds is the FDR < 0.01 version)
+ext_cache = paste0('ext_peaks_',metaGroupName,'_FDR',EXH_FDR,'.rds')
+if (!file.exists(ext_cache) | force)
   {
   for (metagroup in unique (as.character(archp@cellColData[,metaGroupName])))
     {
@@ -605,9 +620,9 @@ if (!file.exists(paste0('ext_peaks_',metaGroupName,'.rds')) | force)
     # write.table (fragments_metagroup_counts_df, file.path(paste0('riegel_ext_peaks_windows_',metagroup,'.tsv')), sep='\t')
     ext_l[[metagroup]] = fragments_metagroup_counts_df
     }
-  saveRDS (ext_l, paste0('ext_peaks_',metaGroupName,'.rds'))
+  saveRDS (ext_l, ext_cache)
   } else {
-  ext_l = readRDS (paste0('ext_peaks_',metaGroupName,'.rds'))
+  ext_l = readRDS (ext_cache)
   }
 
 #ext_df_long = gather (ext_df, coverage, celltype, 1:(ncol(ext_df)-1))

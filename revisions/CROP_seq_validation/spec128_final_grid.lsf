@@ -1,0 +1,18 @@
+#!/bin/bash
+# Spec 128: final combination grid (build + run). Submit: bsub < spec128_final_grid.lsf   (about 40 min on 8 cores; also runs interactively: NCORE=8 Rscript spec128_final_grid_run.R)
+#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -J final_grid
+#BSUB -q premium
+#BSUB -n 16
+#BSUB -R "rusage[mem=6000] span[hosts=1]"
+#BSUB -W 3:00
+#BSUB -o /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/final_grid.%J.out
+#BSUB -e /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/final_grid.%J.err
+#BSUB -L /bin/bash
+set -euo pipefail
+ml R/4.2.0
+export CROP_OUT=${CROP_OUT:-/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/de/perturbation_panel/figs_repro_R}
+cd "$(dirname "$0")" 2>/dev/null || cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/CROP_seq_validation
+[ -f "$CROP_OUT/spec128_inputs.rds" ] || Rscript spec128_final_grid_build.R
+NCORE=16 N_PERM=2000 Rscript spec128_final_grid_run.R
+Rscript spec129_final_grid_figures.R

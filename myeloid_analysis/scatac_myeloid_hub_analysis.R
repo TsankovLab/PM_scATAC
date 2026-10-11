@@ -99,19 +99,19 @@ if (run_coax)
 force=FALSE
 if (!file.exists (file.path(hubs_dir,'global_hubs_obj.rds')) | force)
   {
+  # Revision: call updated to the arguments of utils/Hubs_finder.R (the old arguments group_by, cor_FDR, cor_var,
+  # macs_score and dgs no longer exist). min_dist_tss is set explicitly: its default is 2000 bp, whereas these
+  # analyses use dgs = 0, i.e. NO exclusion of peaks around the TSS. hubs_id is restored for the code below.
   hubs_obj = hubs_finder (
-    ArchRProj = archp, 
-    group_by = NULL,
+    ArchRProj = archp,
     cor_cutoff = cor_cutoff,
-    #select_group = metaGroup_df$metaGroup,
-    cor_FDR = 1, 
-    cor_var = 0,
+    max_dist = max_dist,
+    min_dist_tss = dgs, # dgs = 0: promoter-proximal peaks are kept
     min_peaks = min_peaks,
-    macs_score = 1,
-    dgs = dgs,
-    cores=1,
+    cores = 1,
     remove_chr = c('chrX')
-    ) 
+    )
+  hubs_obj$hubs_id = names (hubs_obj$hubsCollapsed)
   saveRDS (hubs_obj, file.path(hubs_dir,'global_hubs_obj.rds'))
   hubs_regions = as.data.frame (hubs_obj$hubsCollapsed)
   hubs_regions$width = hubs_obj$hubs_id

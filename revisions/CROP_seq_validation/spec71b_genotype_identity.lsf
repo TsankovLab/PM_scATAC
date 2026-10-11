@@ -1,0 +1,34 @@
+#!/bin/bash
+# Spec 71b (step 2 of 3): SNP calls for the cell-line identity check. Indexes every BAM of bam_list.txt (index written next to the BAM), then one joint
+# bcftools mpileup/call per chromosome over regions.bed (uniquely mapped reads only: STAR MAPQ 255), and a per-site table of GT / AD / DP.
+# needs: spec71b_genotype_regions.R (regions.bed, bam_list.txt). Submit: bsub < spec71b_genotype_identity.lsf
+# env: GENO_DIR (work folder), MAXDP (max reads per sample and position, default 1000; a lighter run, e.g. a 3 Mb subset of regions.bed with MAXDP=200, is enough for identity)
+# outputs (in GENO_DIR): calls.vcf.gz, calls_GT_AD_DP.tsv.gz, calls_samples.txt
+#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -J geno_identity
+#BSUB -q premium
+#BSUB -n 24
+#BSUB -R "rusage[mem=3000] span[hosts=1]"
+#BSUB -W 6:00
+#BSUB -o /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/geno_identity.%J.out
+#BSUB -e /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/geno_identity.%J.err
+#BSUB -L /bin/bash
+set -euo pipefail
+ml samtools/1.21 bcftools/1.22
+
+GENO_DIR=${GENO_DIR:-/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/work/genotype}
+FA=/sc/arion/projects/Tsankov_Normal_Lung/genome_assemblies/human/hg38.fa
+cd "$GENO_DIR"
+
+# index (skipped when the index is already there and newer than the BAM)
+xargs -a bam_list.txt -P 24 -I{} bash -c '[[ -s {}.bai && {}.bai -nt {} ]] || samtools index {}'
+
+mkdir -p by_chr
+for c in $(cut -f1 regions.bed | sort -u); do
+  echo "awk -v c=$c '\$1==c' regions.bed > by_chr/$c.bed && bcftools mpileup -f $FA -b bam_list.txt -R by_chr/$c.bed -q 255 -Q 20 -d ${MAXDP:-1000} -a AD,DP -Ou | bcftools call -mv -Ou | bcftools view -v snps -m2 -M2 -i 'QUAL>=30' -Oz -o by_chr/$c.vcf.gz"
+done | xargs -d '\n' -P 22 -I{} bash -c "{}"
+
+bcftools concat -Oz -o calls.vcf.gz $(ls by_chr/chr*.vcf.gz | sort -V)
+bcftools query -l calls.vcf.gz | sed 's#.*/##; s#_Aligned.sortedByCoord.out.bam##' > calls_samples.txt
+bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT:%AD:%DP]\n' calls.vcf.gz | gzip > calls_GT_AD_DP.tsv.gz
+echo "sites: $(zcat calls_GT_AD_DP.tsv.gz | wc -l)  samples: $(wc -l < calls_samples.txt)"

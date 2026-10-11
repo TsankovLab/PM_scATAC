@@ -6,7 +6,7 @@ ORDER <- c("TCF3", "TEAD4", "TWIST1", "PITX1", "SOX9", "TEAD2", "BPTF", "HMGA1")
 EXTRA <- c("MEF2A", "MEF2D")                                                        # screen-only KOs
 
 # returns, for the two feature sets ("mod" = 20 Cm modules, "gen" = screen's top variable genes present in bulk):
-#   $avg[[dataset]] features x KO  (replicate-averaged KO - NTC;  dataset = "CROP-seq" or a cell line)
+#   $avg[[dataset]] features x KO  (KO - NTC; modules: median over replicates/cells, as CRISPR_cropseq.R; genes: log2(mean CP10K+1);  dataset = "CROP-seq" or a cell line)
 #   $rep[[cell line]] named list sample -> feature vector (single-replicate KO - NTC)
 #   $meta  bulk sample metadata
 load_profiles <- function(lines) {
@@ -29,7 +29,7 @@ load_profiles <- function(lines) {
     kos <- sort(setdiff(unique(m$Gene_Control), "NTC"), method = "radix")
     # modules
     ntc_m <- apply(sc[ntc_s, , drop = FALSE], 2, median)
-    out$mod$avg[[cl]] <- sapply(setNames(kos, kos), function(g) colMeans(sc[rownames(m)[m$Gene_Control == g], , drop = FALSE]) - ntc_m)
+    out$mod$avg[[cl]] <- sapply(setNames(kos, kos), function(g) apply(sc[rownames(m)[m$Gene_Control == g], , drop = FALSE], 2, median) - ntc_m)   # median over replicates, as the screen (median over cells)
     out$mod$rep[[cl]] <- setNames(lapply(ko_s, function(s) sc[s, ] - ntc_m), ko_s)
     # variable genes
     g_avg <- group_log2avg(cp10k, meta, cl)[genes, , drop = FALSE]
