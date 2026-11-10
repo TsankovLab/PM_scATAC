@@ -1,0 +1,40 @@
+#!/bin/bash
+#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -J manifest_fastqc
+#BSUB -q premium
+#BSUB -n 16
+#BSUB -R "rusage[mem=2000] span[hosts=1]"
+#BSUB -W 4:00
+#BSUB -o /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/manifest_fastqc.%J.out
+#BSUB -e /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/manifest_fastqc.%J.err
+#BSUB -L /bin/bash
+
+ml fastqc/0.12.1
+
+FASTQ_DIR=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/fastq_raw
+SAMPLESHEET=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/sample_sheet/SampleSheet.csv
+MANIFEST=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/scripts/fastq_manifest.tsv
+QC_DIR=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/qc
+
+mkdir -p "$QC_DIR"
+
+# build manifest: Sample_ID <TAB> R1 path <TAB> R2 path, matching by fastq filename prefix
+awk -F',' '/^\[BCLConvert_Data\]/{f=1; next} f && $2!="Sample_ID" && $2!=""{print $2}' "$SAMPLESHEET" > /tmp/sample_ids.$$.txt
+
+> "$MANIFEST"
+while read -r sid; do
+  r1=$(find "$FASTQ_DIR" -maxdepth 1 -name "${sid}_S*_L001_R1_001.fastq.gz" | head -1)
+  r2=$(find "$FASTQ_DIR" -maxdepth 1 -name "${sid}_S*_L001_R2_001.fastq.gz" | head -1)
+  if [[ -z "$r1" || -z "$r2" ]]; then
+    echo "WARNING: missing fastq for $sid (r1=$r1 r2=$r2)" >&2
+    continue
+  fi
+  echo -e "${sid}\t${r1}\t${r2}" >> "$MANIFEST"
+done < /tmp/sample_ids.$$.txt
+rm -f /tmp/sample_ids.$$.txt
+
+n=$(wc -l < "$MANIFEST")
+echo "Manifest has $n samples with both R1 and R2 found"
+
+# FastQC on everything, 16 threads in parallel
+fastqc -t 16 -o "$QC_DIR" "$FASTQ_DIR"/*_R1_001.fastq.gz "$FASTQ_DIR"/*_R2_001.fastq.gz

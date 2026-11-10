@@ -35,25 +35,22 @@ cnaMat_obj_avg = cnaMat_obj_avg[,sample_names]
 row_chr = sapply (rownames (cnaMat_obj_avg), function(x) unlist (strsplit (x, ':'))[1])
 row_chr = factor (row_chr, levels = unique (row_chr))
 
-for (v in c('new', 'old'))
-  {
-  ha = rowAnnotation (sample = colnames(cnaMat_obj_avg), col = list(sample = list (new = palette_sample, old = palette_sample_old)[[v]][colnames(cnaMat_obj_avg)]))
-  pdf (file.path (outdir, paste0('main_GL_method_',mat_type,'_CNV_heatmap2', ifelse (v == 'old', '_old_palette', ''), '.pdf')), width=6,height=3)
-      print (Heatmap (t(cnaMat_obj_avg),
-      cluster_rows=F,
-      cluster_columns=F,
-      left_annotation = ha,
-      row_names_side = 'left',
-      column_title_side = 'bottom',
-      border=T,
-      row_names_gp = gpar (fontsize = 8),
-      column_names_gp = gpar(fontsize = 0),
-      column_title_gp = gpar(fontsize = 7),
-      column_split = row_chr,
-      row_split = ifelse ('normal1' == colnames(cnaMat_obj_avg),'normal','tumor'),
-      column_gap = unit(.5, "mm"),
-      cluster_column_slices = F,
-      row_title_gp = gpar(fontsize = 1),
-      column_title_rot=45))
-  dev.off()
-  }
+ha = rowAnnotation (sample = colnames(cnaMat_obj_avg), col = list(sample = palette_sample[colnames(cnaMat_obj_avg)]))
+pdf (file.path (outdir, paste0('main_GL_method_',mat_type,'_CNV_heatmap2.pdf')), width=6,height=3)
+    print (Heatmap (t(cnaMat_obj_avg),
+    cluster_rows=F,
+    cluster_columns=F,
+    left_annotation = ha,
+    row_names_side = 'left',
+    column_title_side = 'bottom',
+    border=T,
+    row_names_gp = gpar (fontsize = 8),
+    column_names_gp = gpar(fontsize = 0),
+    column_title_gp = gpar(fontsize = 7),
+    column_split = row_chr,
+    row_split = ifelse ('normal1' == colnames(cnaMat_obj_avg),'normal','tumor'),
+    column_gap = unit(.5, "mm"),
+    cluster_column_slices = F,
+    row_title_gp = gpar(fontsize = 1),
+    column_title_rot=45))
+dev.off()

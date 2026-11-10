@@ -1,6 +1,6 @@
 #!/bin/bash
 ###############################################################################
-# Reproduce everything downstream of the epiAneufinder runs (steps 3-9).
+# Reproduce every figure downstream of the epiAneufinder runs (steps 3, 4, 9, 10, 11).
 #
 # Steps 1 and 2 are the expensive ones and are NOT run here -- they only need to be
 # run once, and out_5Mb/ already holds their output. To redo them from scratch:
@@ -11,23 +11,25 @@
 #            "$PWD/run_step.sh 02_run_epianeufinder.R $S"
 #     done
 #
-# Steps 3-9 take ~7 min in total on a single interactive core. Step 3 is the memory
-# hungry one (an 11331 x 11331 distance matrix for P23) -- run on a node with >=8 GB,
-# not on a login node.
+# Step 3 is the memory hungry one (an 11331 x 11331 distance matrix for P23) -- run on a
+# node with >=8 GB, not on a login node. Step 11 pulls the chromVAR z matrix out of the
+# ArchR project on its first run (cached to chromvar_z_cache.rds).
 ###############################################################################
 set -euo pipefail
 cd "$(dirname "$0")"
 mkdir -p logs
-for s in 03_clone_calls.R \
-         04_figure_subclones_overview.R \
-         05_figure_circular_tree.R \
-         06_P4_chr8q_validation.R \
-         07_chromvar_tf_variability.R \
-         08_figure_tf_variability.R \
-         09_P4_visium_chr8q.R ; do
+run() {  # run <log name> <script> ; environment variables set by the caller are passed on
   echo "=================================================================="
-  echo ">>> $s   $(date '+%H:%M:%S')"
+  echo ">>> $1   $(date '+%H:%M:%S')"
   echo "=================================================================="
-  ./run_step.sh "$s" 2>&1 | tee "logs/${s%.R}.log"
-done
+  ./run_step.sh "$2" 2>&1 | tee "logs/$1.log"
+}
+run 03_clone_calls                 03_clone_calls.R
+run 04_figure_subclones_overview   04_figure_subclones_overview.R
+run 09_P4_visium_chr8q             09_P4_visium_chr8q.R
+MAL_CALL=label run 09_P4_visium_chr8q_label 09_P4_visium_chr8q.R
+MAL_CALL=label SCORE=relative run 09_P4_visium_chr8q_label_relative 09_P4_visium_chr8q.R
+run 10_P4_visium_chr8q_clustering  10_P4_visium_chr8q_clustering.R
+MAL_CALL=label run 10_P4_visium_chr8q_clustering_label 10_P4_visium_chr8q_clustering.R
+run 11_tf_subclone_wilcoxon        11_tf_subclone_wilcoxon.R
 echo; echo "ALL DONE  $(date '+%H:%M:%S')"

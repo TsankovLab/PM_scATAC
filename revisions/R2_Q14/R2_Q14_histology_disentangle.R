@@ -24,7 +24,7 @@ OUTDIR  <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/
 setwd(OUTDIR)
 dir.create(file.path(OUTDIR, "Plots"), showWarnings = FALSE)
 
-suppressMessages({ library(ggplot2); library(ggpubr); library(patchwork) })
+suppressMessages({ library(ggplot2); library(ggpubr) })
 source(file.path(GITROOT, "utils", "ggplot_aestetics.R"))
 
 bl   <- readRDS(file.path(BULKDIR, "bulk_RNA_studies.rds"))
@@ -32,9 +32,6 @@ meta <- readRDS(file.path(BULKDIR, "bulk_RNA_studies_metadata.rds"))
 studies    <- c("bueno", "tcga", "mesomics")
 runx_genes <- c("RUNX1", "RUNX2", "RUNX3")
 tf_genes   <- c(runx_genes, "CBFB")
-subtype_cols <- c(Epithelioid = "#2471a3", `Biphasic-E` = "#5dade2",
-                  Biphasic = "#f5b041", `Biphasic-S` = "#e59866",
-                  Sarcomatoid = "#c0392b")
 
 # partial Spearman (rho of x,y controlling z): Pearson corr of rank residuals
 partial_spearman <- function(x, y, z) {
@@ -186,66 +183,7 @@ cat("\nscATAC RUNX activity ~ BAP1 gene score, raw vs partial(|sarc):\n"); print
 ###############################################################
 # PLOTS
 ###############################################################
-cohort_titles <- c(bueno = "Bueno", tcga = "TCGA", mesomics = "MESOMICS")
-
-## P1a: BAP1 mRNA by subtype (does BAP1 track histology) ----
-long_b <- do.call(rbind, lapply(studies, function(s) {
-  df <- tabs[[s]]; data.frame(cohort = cohort_titles[s], subtype = df$subtype, BAP1 = df$BAP1) }))
-long_b <- long_b[!is.na(long_b$subtype), ]
-long_b$subtype <- factor(long_b$subtype,
-  levels = c("Epithelioid","Biphasic-E","Biphasic","Biphasic-S","Sarcomatoid"))
-p_bap1_sub <- ggplot(long_b, aes(subtype, BAP1, fill = subtype)) +
-  geom_boxplot(outlier.shape = NA, alpha = .6, linewidth = .2) +
-  geom_jitter(width = .15, size = .4, alpha = .4) +
-  facet_wrap(~ cohort, scales = "free", nrow = 1) +
-  scale_fill_manual(values = subtype_cols, guide = "none") +
-  gtheme_no_rot + xlab("") + ylab("BAP1 expression (log2)") +
-  ggtitle("Does BAP1 expression track histology?") +
-  theme(axis.text.x = element_text(angle = 35, hjust = 1))
-pdf(file.path("Plots", "BAP1_by_subtype_bulk.pdf"), width = 9, height = 3.4)
-print(p_bap1_sub); dev.off()
-
-## P2a: RUNX~BAP1 within EPITHELIOID only ----
-long_e <- do.call(rbind, lapply(studies, function(s) {
-  df <- tabs[[s]]; df <- df[df$subtype == "Epithelioid", ]
-  do.call(rbind, lapply(runx_genes, function(g) data.frame(
-    cohort = cohort_titles[s], gene = g, BAP1 = df$BAP1, TF = df[[g]]))) }))
-long_e$cohort <- factor(long_e$cohort, levels = cohort_titles[studies])
-long_e$gene   <- factor(long_e$gene, levels = runx_genes)
-long_e <- long_e[is.finite(long_e$BAP1) & is.finite(long_e$TF), ]
-p_epi <- ggplot(long_e, aes(BAP1, TF)) +
-  geom_point(size = .7, alpha = .6, color = "#2471a3") +
-  geom_smooth(method = "lm", se = FALSE, color = "grey25", linewidth = .4) +
-  stat_cor(method = "spearman", size = 2.3) +
-  facet_grid(gene ~ cohort, scales = "free") +
-  gtheme_no_rot + xlab("BAP1 expression (log2)") + ylab("RUNX expression (log2)") +
-  ggtitle("RUNX vs BAP1 within EPITHELIOID tumors only")
-pdf(file.path("Plots", "RUNX_vs_BAP1_epithelioid_only.pdf"), width = 8.5, height = 7)
-print(p_epi); dev.off()
-
-## P2b: heatmap overall vs epithelioid vs partial(|sarc) rho ----
-hm <- rbind(
-  data.frame(gene = p2$gene, cohort = p2$cohort, kind = "overall",        rho = p2$rho_overall,       p = p2$p_overall),
-  data.frame(gene = p2$gene, cohort = p2$cohort, kind = "epithelioid",    rho = p2$rho_epithelioid,   p = p2$p_epithelioid),
-  data.frame(gene = p2$gene, cohort = p2$cohort, kind = "partial|sarc",   rho = p2$partial_rho_sarc,  p = p2$partial_p_sarc))
-hm$sig <- ifelse(is.na(hm$p), "", ifelse(hm$p < 0.001, "***",
-           ifelse(hm$p < 0.01, "**", ifelse(hm$p < 0.05, "*", ""))))
-hm$cohort <- factor(cohort_titles[hm$cohort], levels = cohort_titles[studies])
-hm$gene   <- factor(hm$gene, levels = rev(tf_genes))
-hm$kind   <- factor(hm$kind, levels = c("overall","epithelioid","partial|sarc"))
-p_hm <- ggplot(hm, aes(cohort, gene, fill = rho)) +
-  geom_tile(color = "white", linewidth = .5) +
-  geom_text(aes(label = ifelse(is.na(rho), "NA", sprintf("%.2f%s", rho, sig))), size = 2.6) +
-  facet_wrap(~ kind, nrow = 1) +
-  scale_fill_gradient2(low = "#2166ac", mid = "white", high = "#b2182b",
-                       midpoint = 0, limits = c(-1,1), name = "rho\n(RUNX~BAP1)") +
-  gtheme_no_rot + xlab("") + ylab("") +
-  ggtitle("RUNX~BAP1 correlation: overall vs epithelioid-only vs partial (adjusting sarc score)") +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
-pdf(file.path("Plots", "RUNX_BAP1_histology_adjusted_heatmap.pdf"), width = 9, height = 3.4)
-print(p_hm); dev.off()
-
-## P3a: scATAC - BAP1 gene score vs sarc score, and sarc by BAP1 status ----
+## scATAC - BAP1 gene score vs sarc score ----
 sa_c$BAP1_status <- factor(sa_c$BAP1_status, levels = c("retained","lost"))
 sp1 <- ggplot(sa_c, aes(BAP1_gs, sarc_score)) +
   geom_smooth(method = "lm", se = FALSE, color = "grey55", linewidth = .4, linetype = "dashed") +

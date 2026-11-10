@@ -1,0 +1,52 @@
+#!/bin/bash
+#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -J "star_align[1-106]%20"
+#BSUB -q premium
+#BSUB -n 8
+#BSUB -R "rusage[mem=5000] span[hosts=1]"
+#BSUB -W 4:00
+#BSUB -o /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/star_align.%J.%I.out
+#BSUB -e /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/star_align.%J.%I.err
+#BSUB -L /bin/bash
+
+ml star/2.7.11b
+
+MANIFEST=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/scripts/fastq_manifest.tsv
+INDEX=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/work/star_index_hg38
+BAM_OUT=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/work/bam
+COUNTS_OUT=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/counts
+LOG_OUT=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/logs
+
+mkdir -p "$BAM_OUT" "$COUNTS_OUT" "$LOG_OUT"
+
+LINE=$(sed -n "${LSB_JOBINDEX}p" "$MANIFEST")
+if [[ -z "$LINE" ]]; then
+  echo "No manifest line for index ${LSB_JOBINDEX}, skipping."
+  exit 0
+fi
+
+SID=$(echo "$LINE" | cut -f1)
+R1=$(echo "$LINE" | cut -f2)
+R2=$(echo "$LINE" | cut -f3)
+
+echo "Aligning sample $SID"
+echo "R1=$R1"
+echo "R2=$R2"
+
+mkdir -p "$BAM_OUT/$SID"
+cd "$BAM_OUT/$SID"
+
+STAR \
+  --runThreadN 8 \
+  --genomeDir "$INDEX" \
+  --readFilesIn "$R1" "$R2" \
+  --readFilesCommand zcat \
+  --outSAMtype BAM SortedByCoordinate \
+  --quantMode GeneCounts \
+  --outFileNamePrefix "$BAM_OUT/$SID/${SID}_" \
+  --outSAMunmapped Within
+
+cp "$BAM_OUT/$SID/${SID}_ReadsPerGene.out.tab" "$COUNTS_OUT/"
+cp "$BAM_OUT/$SID/${SID}_Log.final.out" "$LOG_OUT/"
+
+echo "Done: $SID"

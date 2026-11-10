@@ -1,0 +1,28 @@
+#!/bin/bash
+#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -J bclconvert_demux
+#BSUB -q premium
+#BSUB -n 32
+#BSUB -R "rusage[mem=6000] span[hosts=1]"
+#BSUB -W 24:00
+#BSUB -o /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/bclconvert.%J.out
+#BSUB -e /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/bclconvert.%J.err
+#BSUB -L /bin/bash
+
+ml bclconvert/4.4.6
+export APPTAINER_BIND="/sc/arion:/sc/arion"
+
+RUN_DIR=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/260910_lh00972_0166_A237V7KLT4
+SAMPLESHEET=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/sample_sheet/SampleSheet.csv
+OUT_DIR=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/fastq_raw
+
+bcl-convert \
+  --bcl-input-directory "$RUN_DIR" \
+  --output-directory "$OUT_DIR" \
+  --sample-sheet "$SAMPLESHEET" \
+  --bcl-only-lane 1 \
+  --bcl-num-parallel-tiles 4 \
+  --bcl-num-conversion-threads 8 \
+  --bcl-num-compression-threads 8 \
+  --bcl-num-decompression-threads 8 \
+  --force

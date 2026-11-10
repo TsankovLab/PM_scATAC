@@ -27,6 +27,7 @@
 #                     Directly answers "increase/decrease of TF
 #                     activity in relation to low BAP1".
 # A per-cell presto test is also run as a supplement (with caveat).
+# Figure: Plots/BAP1_genescore_by_status.pdf (BAP1 gene score validates the genetic status).
 ###############################################################
 
 set.seed(1234)
@@ -208,67 +209,7 @@ print(master[master$is_runx,
 ###############################################################
 # 7. PLOTS
 ###############################################################
-lab_thr_p   <- 0.05      # label TFs below this (group test)
-lab_top_n   <- 25
-
-## 7a. Volcano-style: group delta vs -log10(p_ttest) --------------
-gp <- group_stats
-gp$neglogp <- -log10(gp$p_ttest)
-gp$sig <- ifelse(gp$p_ttest < lab_thr_p,
-                 ifelse(gp$delta_lost_minus_retained > 0, "up_in_lost", "up_in_retained"),
-                 "ns")
-gp$sig[gp$TF %in% runx] <- "RUNX"
-gp$is_runx <- gp$TF %in% runx
-# label: significant ones (top by p) + RUNX
-lab_set <- unique(c(head(gp$TF[gp$p_ttest < lab_thr_p], lab_top_n), runx))
-gp$lab  <- ifelse(gp$TF %in% lab_set, gp$TF, "")
-
-p_volcano <- ggplot(gp, aes(x = delta_lost_minus_retained, y = neglogp)) +
-  geom_hline(yintercept = -log10(lab_thr_p), linetype = "dashed", color = "grey60", linewidth = .3) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60", linewidth = .3) +
-  geom_point(aes(color = sig, size = is_runx), alpha = .8, stroke = 0) +
-  scale_color_manual(values = c(up_in_lost = "#c0392b", up_in_retained = "#2471a3",
-                                ns = "grey75", RUNX = "black"),
-                     name = NULL) +
-  scale_size_manual(values = c(`FALSE` = 1.1, `TRUE` = 2.6), guide = "none") +
-  ggrepel::geom_text_repel(aes(label = lab), size = 2.4, max.overlaps = 100,
-                           segment.size = .2, min.segment.length = 0) +
-  gtheme_no_rot +
-  xlab("TF activity difference  (BAP1-lost  -  BAP1-retained)") +
-  ylab("-log10  p (t-test, sample-level)") +
-  ggtitle("TF activity: BAP1-lost vs BAP1-retained tumors")
-
-pdf(file.path("Plots", "volcano_group_lost_vs_retained.pdf"), width = 7, height = 5.5)
-print(p_volcano); dev.off()
-
-## 7b. Correlation with BAP1 gene score: rho vs -log10(p) ----------
-cp <- cor_stats
-cp$neglogp <- -log10(cp$p_spearman)
-cp$sig <- ifelse(cp$p_spearman < lab_thr_p,
-                 ifelse(cp$rho_bap1 < 0, "up_as_BAP1_down", "down_as_BAP1_down"), "ns")
-cp$sig[cp$TF %in% runx] <- "RUNX"
-cp$is_runx <- cp$TF %in% runx
-lab_set2 <- unique(c(head(cp$TF[cp$p_spearman < lab_thr_p], lab_top_n), runx))
-cp$lab   <- ifelse(cp$TF %in% lab_set2, cp$TF, "")
-
-p_cor <- ggplot(cp, aes(x = rho_bap1, y = neglogp)) +
-  geom_hline(yintercept = -log10(lab_thr_p), linetype = "dashed", color = "grey60", linewidth = .3) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60", linewidth = .3) +
-  geom_point(aes(color = sig, size = is_runx), alpha = .8, stroke = 0) +
-  scale_color_manual(values = c(up_as_BAP1_down = "#c0392b", down_as_BAP1_down = "#2471a3",
-                                ns = "grey75", RUNX = "black"), name = NULL) +
-  scale_size_manual(values = c(`FALSE` = 1.1, `TRUE` = 2.6), guide = "none") +
-  ggrepel::geom_text_repel(aes(label = lab), size = 2.4, max.overlaps = 100,
-                           segment.size = .2, min.segment.length = 0) +
-  gtheme_no_rot +
-  xlab("Spearman rho: TF activity vs BAP1 gene score (across tumor samples)") +
-  ylab("-log10  p (Spearman)") +
-  ggtitle("TF activity in relation to BAP1 accessibility\n(rho < 0: activity up as BAP1 down)")
-
-pdf(file.path("Plots", "correlation_TFactivity_vs_BAP1.pdf"), width = 7, height = 5.5)
-print(p_cor); dev.off()
-
-## 7c. BAP1 gene score by status (validation) ---------------------
+## BAP1 gene score by status (validation) ---------------------
 bdf <- data.frame(Sample = names(bap1_gs_samp),
                   BAP1_genescore = as.numeric(bap1_gs_samp),
                   status = factor(ifelse(names(bap1_gs_samp) %in% bap1_lost,
@@ -285,44 +226,5 @@ p_bap1 <- ggplot(bdf, aes(status, BAP1_genescore, fill = status)) +
 
 pdf(file.path("Plots", "BAP1_genescore_by_status.pdf"), width = 4.2, height = 4)
 print(p_bap1); dev.off()
-
-## 7d. RUNX focused panels ---------------------------------------
-# per-sample activity by status
-runx_present <- intersect(runx, rownames(act_by_samp))
-rdf <- do.call(rbind, lapply(runx_present, function(tf) {
-  data.frame(TF = tf, Sample = colnames(act_by_samp),
-             activity = as.numeric(act_by_samp[tf, ]),
-             bap1_gs  = as.numeric(bap1_gs_samp[colnames(act_by_samp)]),
-             status = ifelse(colnames(act_by_samp) %in% bap1_lost, "BAP1-lost", "BAP1-retained"),
-             stringsAsFactors = FALSE)
-}))
-rdf$status <- factor(rdf$status, levels = c("BAP1-retained","BAP1-lost"))
-
-p_runx_box <- ggplot(rdf, aes(status, activity, fill = status)) +
-  geom_boxplot(width = .55, outlier.shape = NA, alpha = .5) +
-  geom_jitter(width = .12, size = 1.8) +
-  facet_wrap(~ TF, nrow = 1, scales = "free_y") +
-  scale_fill_manual(values = c(`BAP1-retained` = "#2471a3", `BAP1-lost` = "#c0392b"),
-                    guide = "none") +
-  gtheme_no_rot + xlab("") + ylab("TF activity (mean chromVAR deviation per sample)") +
-  ggtitle("RUNX TF activity by BAP1 status") +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
-
-pdf(file.path("Plots", "RUNX_activity_by_status.pdf"), width = 7, height = 3.6)
-print(p_runx_box); dev.off()
-
-p_runx_scatter <- ggplot(rdf, aes(bap1_gs, activity, color = status)) +
-  geom_smooth(aes(group = 1), method = "lm", se = FALSE,
-              color = "grey55", linewidth = .4, linetype = "dashed") +
-  geom_point(size = 2.2) +
-  ggrepel::geom_text_repel(aes(label = Sample), size = 2.3, max.overlaps = 100, show.legend = FALSE) +
-  facet_wrap(~ TF, nrow = 1, scales = "free") +
-  scale_color_manual(values = c(`BAP1-retained` = "#2471a3", `BAP1-lost` = "#c0392b"), name = NULL) +
-  gtheme_no_rot + xlab("BAP1 gene score (per sample)") +
-  ylab("TF activity (chromVAR deviation)") +
-  ggtitle("RUNX activity vs BAP1 accessibility across tumors")
-
-pdf(file.path("Plots", "RUNX_activity_vs_BAP1genescore.pdf"), width = 8.5, height = 3.6)
-print(p_runx_scatter); dev.off()
 
 cat("\nDONE\n")

@@ -1,27 +1,15 @@
 #!/bin/bash
 ###############################################################################
-# Reproduce R2_Q5.
+# Reproduce the R2_Q5 figures (joint scATAC + scRNA embedding).
 #
-# Step 2 is the expensive one (cross-modality label transfer, ~1-3 h, ~120 GB);
-# submit it to LSF and wait for atac_label_transfer.csv before running steps 3-6:
-#     ./submit_02_label_transfer.sh
-#
-# Steps 1 and 4 read the ArchR project and the Seurat object and need a few GB;
-# steps 3, 5 and 6 are seconds and read only the CSVs in this folder.
+# Step 1 reads the ArchR project and the Seurat object and needs a few GB.
+# Step 8 is the expensive one (CCA co-embedding, ~1-2 h, 40 GB): run it on a compute
+# node, e.g. with ./submit_08_joint_embedding.sh, then run step 9 (seconds).
 ###############################################################################
 set -euo pipefail
 cd "$(dirname "$0")"
 mkdir -p logs
-for s in 01_annotations.R \
-         03_concordance.R \
-         04_pseudobulk_concordance.R \
-         05_composition.R \
-         07_malignant_disagreement.R \
-         09_figure_joint.R \
-         06_figures.R ; do
-  echo "=================================================================="
-  echo ">>> $s   $(date '+%H:%M:%S')"
-  echo "=================================================================="
-  ./run_step.sh "$s" 2>&1 | tee "logs/${s%.R}.log"
-done
+./run_step.sh 01_annotations.R 2>&1 | tee logs/01_annotations.log
+./run_step.sh 08_joint_embedding.R 2>&1 | tee logs/08_joint_embedding.log   # ~1-2 h; or submit_08_joint_embedding.sh
+./run_step.sh 09_figure_joint.R 2>&1 | tee logs/09_figure_joint.log
 echo; echo "ALL DONE  $(date '+%H:%M:%S')"

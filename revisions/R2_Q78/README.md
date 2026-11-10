@@ -1,26 +1,15 @@
-# R2_Q78 — browser tracks of cHub2711, cHub3722 and cHub3728
+# R2_Q78 — peak-to-gene links of cHub2711 (HAND2) and cHub3727 / cHub3728 (MEF2C)
 
-Reviewer 2, Q78 asks for track plots of three cHubs: 2711 (near HAND2) and 3722 / 3728 (near MEF2C).
+Run in this order (`run_step.sh <script>` runs a script in the `meso_scatac` environment):
 
-- `R2_Q78_cHub_tracks.R` — loads the main ArchR project (`main/scatac_ArchR`) and the hub set of the main analysis
-  (`hubs_obj_cor_0.3_md_12500_dgs_0_min_peaks_5`, 6,719 hubs), checks where each hub lies relative to the gene it is
-  expected to be near, and draws the regions side by side with `plotTracksSideBySide()` (`git_repo/utils/scATAC_functions.R`).
-- `run_step.sh` — runs a script of this folder in the `meso_scatac` environment.
+1. `R2_Q78_peak2gene.R` — ArchR `addPeak2GeneLinks` on `main/scatac_ArchR` (GeneScoreMatrix, IterativeLSI) with maxDist
+   500 kb instead of the manuscript's 250 kb, because the MEF2C hubs lie 363-387 kb from the MEF2C TSS. The project's output
+   directory is redirected to scratch (not modified); the links are cached to
+   `/sc/arion/scratch/giottb01/R2_Q78_peak2gene/peak2gene_links_500kb.rds`. Tables of every hub peak vs the expected gene:
+   `R2_Q78_peak2gene_hub_peaks.csv`, `R2_Q78_peak2gene_all_genes_for_hub_peaks.csv`, `R2_Q78_peak2gene_summary.csv`.
+2. `R2_Q78_p2g_links_tracks.R` — browser tracks of the two loci side by side: coverage per cell type, all cHubs in the window
+   (labelled), peak-to-gene links within 400 kb (correlation >= 0.2, FDR < 1e-4 recomputed over the 400 kb set), genes.
+   Output: `Plots/R2_Q78_cHubs_p2g_links.pdf`, `R2_Q78_p2g400_hub_peak_links.csv`, `R2_Q78_p2g400_links_to_HAND2_MEF2C.csv`.
 
-## Hub positions (hg38)
-
-| hub | region | annotated gene | distance to expected gene |
-|---|---|---|---|
-| HUB2711 | chr4:173,411,073-173,419,134 | SCRG1 | HAND2, 106 kb |
-| HUB3722 | chr5:74,250,424-74,258,705 | LINC01335 | MEF2C, 14.5 Mb (not near MEF2C) |
-| HUB3727 | chr5:89,267,692-89,279,891 | MEF2C | MEF2C, 363 kb |
-| HUB3728 | chr5:89,290,877-89,303,441 | MEF2C | MEF2C, 387 kb |
-
-HUB3722 is not near MEF2C in this hub set; the second MEF2C hub next to HUB3728 is HUB3727. Both versions are plotted.
-
-## Outputs (`Plots/`)
-
-- `R2_Q78_cHubs_2711_3722_3728.pdf` — the three ids as requested
-- `R2_Q78_cHubs_2711_3727_3728.pdf` — with the two MEF2C hubs
-- `R2_Q78_cHubs_gene_context.pdf` — wide windows showing each hub together with HAND2 / MEF2C
-- `R2_Q78_hub_positions.csv` — coordinates, number of peaks, nearest gene, distance to HAND2 / MEF2C
+Hub set: `main/scatac_ArchR/hubs_obj_cor_0.3_md_12500_dgs_0_min_peaks_5`. HUB3722 (requested) is 14.5 Mb from MEF2C; the
+second MEF2C hub next to HUB3728 is HUB3727, which is the one plotted.

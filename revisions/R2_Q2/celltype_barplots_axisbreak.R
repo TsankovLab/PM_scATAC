@@ -20,7 +20,7 @@
 # be re-styled without reloading the ArchR project.
 #
 # Output: celltype_barplots_axisbreak.pdf  (width FIG_W in, height FIG_W/2)
-# Run via submit_celltype_barplots.sh (edit the script name) or ./run_break.sh
+# Run via submit_celltype_barplots.sh
 
 suppressPackageStartupMessages({
   library(ggplot2)

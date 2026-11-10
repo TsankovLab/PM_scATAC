@@ -1,7 +1,7 @@
 # R2_Q9 -- UMAPs coloured by sample, all compartments, with the improved palette.
 # Original calls: scatac_main_ArchR.R (umap_p2), scatac_NKTcells_ArchR.R (umap_p3), scatac_myeloid_ArchR.R (umap_p1),
-# scatac_tumor_SOX9.R (umap_p1), scatac_Bcells_ArchR.R (umap_p3), scatac_stroma_ArchR.R (umap_p3),
-# scatac_endothelial_ArchR.R (umap_p3). Page 1 of each pdf = new palette, page 2 = old palette.
+# scatac_tumor_SOX9.R (umap_p1), scatac_Bcells_ArchR.R (umap_p3), scatac_stroma_ArchR.R (umap_p3).
+# Page 1 of each pdf = new palette, page 2 = old palette.
 source ('R2_Q9_common.R')
 
 comps = list (
@@ -10,8 +10,7 @@ comps = list (
   myeloid     = list (dir = 'myeloid_cells/scatac_ArchR',     name = 'Sample',  embedding = 'UMAP_H', labelMeans = FALSE),
   tumor       = list (dir = 'tumor_compartment/scatac_ArchR', name = 'Sample3', embedding = 'UMAP',   labelMeans = FALSE),
   Bcells      = list (dir = 'B_cells/scatac_ArchR',           name = 'Sample',  embedding = 'UMAP_H', labelMeans = FALSE),
-  stroma      = list (dir = 'stroma/scatac_ArchR',            name = 'Sample',  embedding = 'UMAP_H', labelMeans = FALSE),
-  endothelial = list (dir = 'Endothelial/scatac_ArchR',       name = 'Sample',  embedding = 'UMAP_H', labelMeans = FALSE))
+  stroma      = list (dir = 'stroma/scatac_ArchR',            name = 'Sample',  embedding = 'UMAP_H', labelMeans = FALSE))
 
 for (cp in names (comps))
   {

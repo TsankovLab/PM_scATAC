@@ -1,0 +1,13 @@
+# Spec 155a: reads of the non-targeting guides in every bulk sample (same counting as spec119: protospacer + GTTT of the scaffold, either orientation, among the unmapped reads of the BAM)
+#   NTC_sheet_g1-3  the three non-targeting sequences listed in "Oligos NR4A2+CROPseq.xlsx" (never found in any sample)
+#   NTC_found_g1-3  the three non-targeting guides actually present in the control samples (identified from the guide-vector reads of the NTC samples; not in the sheet)
+# needs: samtools on the PATH, BAMs in BAM_DIR     output: spec155a_NTC_guide_reads.csv
+here <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])))
+source(file.path(here, "repro_common.R")); BAM_DIR <- Sys.getenv("BAM_DIR", unset = "/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/work/bam"); NCORE <- as.integer(Sys.getenv("NCORE", unset = "8"))
+g <- data.frame(guide = c(paste0("NTC_sheet_g", 1:3), paste0("NTC_found_g", 1:3)), seq = c("AAGAAGAATTGGGGATGATG", "AAGAAGGGCCGTACCCGAAA", "AAGCCATTGTATAACTCCAG", "AAAATTATCGGAAACGGTAG", "AAAATCGATGGGCTGAATCT", "AAAAAGCTTCCGCCTGATGG"), stringsAsFactors = FALSE)
+rc <- function(x) chartr("ACGT", "TGCA", sapply(lapply(strsplit(x, ""), rev), paste, collapse = "")); pat <- c(setNames(g$guide, paste0(g$seq, "GTTT")), setNames(g$guide, rc(paste0(g$seq, "GTTT")))); pf <- tempfile(fileext = ".txt"); writeLines(names(pat), pf)
+ids <- list.dirs(BAM_DIR, full.names = FALSE, recursive = FALSE); bam <- setNames(file.path(BAM_DIR, ids, paste0(ids, "_Aligned.sortedByCoord.out.bam")), ids); bam <- bam[file.exists(bam) & file.exists(paste0(bam, ".bai"))]; cat("BAMs:", length(bam), "\n")
+one <- function(s) { x <- system2("bash", c("-c", shQuote(sprintf("samtools view %s '*' | cut -f10 | grep -oFf %s | sort | uniq -c", shQuote(bam[[s]]), pf))), stdout = TRUE); n <- as.numeric(system2("samtools", c("view", "-c", shQuote(bam[[s]]), "'*'"), stdout = TRUE)); v <- setNames(numeric(nrow(g)), g$guide)
+  if (length(x)) { cn <- as.numeric(sub("^\\s*([0-9]+)\\s+.*", "\\1", x)); sq <- sub("^\\s*[0-9]+\\s+", "", x); a <- tapply(cn, pat[sq], sum); v[names(a)] <- a }; data.frame(sample = s, unmapped_reads = n, guide = g$guide, seq = g$seq, reads = as.numeric(v)) }
+R <- do.call(rbind, parallel::mclapply(names(bam), one, mc.cores = NCORE)); R$rpm <- 1e6 * R$reads / pmax(1, R$unmapped_reads); write.csv(R, file.path(OUT, "spec155a_NTC_guide_reads.csv"), row.names = FALSE)
+cat("samples with >= 20 reads per guide:\n"); print(tapply(R$reads >= 20, R$guide, sum)); x <- aggregate(reads ~ sample, R[grepl("found", R$guide), ], sum); print(x[order(-x$reads), ][1:25, ], row.names = FALSE)

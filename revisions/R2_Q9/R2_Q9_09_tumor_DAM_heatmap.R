@@ -48,26 +48,23 @@ unique_levels <- unique(split_raw[order(p_nums)])
 split_factor <- factor(split_raw, levels = unique_levels)
 print (table (split_raw))
 
-for (v in c('new', 'old'))
-  {
-  ha2 = HeatmapAnnotation (sample = split_raw, col= list(sample = list (new = palette_sample, old = palette_sample_old)[[v]][unique_levels]))
-  DAM_hm = Heatmap (t(scale(mMat_mg)),
-          top_annotation = ha2,
-          column_split = split_factor,
-          right_annotation = ha,
-          row_labels = colnames (mMat_mg),
-          column_title = paste('top',top_genes),
-          clustering_distance_columns = 'euclidean',
-          clustering_distance_rows = 'euclidean',
-          cluster_rows = F,
-          cluster_columns=F,
-          row_names_gp = gpar(fontsize = 0, fontface = 'italic'),
-          column_names_gp = gpar(fontsize = 8),
-          column_names_rot = 45,
-          name = 'TF activity',
-          border=TRUE,
-          col = palette_deviation_fun(scale(mMat_mg)))
-  pdf (file.path (outdir, paste0('tumor_DAM_clusters_',metaGroupName,'_heatmaps', ifelse (v == 'old', '_old_palette', ''), '.pdf')), width = 6.5, height = 3.5)
-  print(DAM_hm)
-  dev.off()
-  }
+ha2 = HeatmapAnnotation (sample = split_raw, col= list(sample = palette_sample[unique_levels]))
+DAM_hm = Heatmap (t(scale(mMat_mg)),
+        top_annotation = ha2,
+        column_split = split_factor,
+        right_annotation = ha,
+        row_labels = colnames (mMat_mg),
+        column_title = paste('top',top_genes),
+        clustering_distance_columns = 'euclidean',
+        clustering_distance_rows = 'euclidean',
+        cluster_rows = F,
+        cluster_columns=F,
+        row_names_gp = gpar(fontsize = 0, fontface = 'italic'),
+        column_names_gp = gpar(fontsize = 8),
+        column_names_rot = 45,
+        name = 'TF activity',
+        border=TRUE,
+        col = palette_deviation_fun(scale(mMat_mg)))
+pdf (file.path (outdir, paste0('tumor_DAM_clusters_',metaGroupName,'_heatmaps.pdf')), width = 6.5, height = 3.5)
+print(DAM_hm)
+dev.off()

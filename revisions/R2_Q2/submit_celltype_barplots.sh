@@ -14,3 +14,6 @@ module purge
 
 /sc/arion/work/giottb01/conda/envs/meso_scatac/bin/Rscript \
   /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R2_Q2/celltype_barplots.R
+
+/sc/arion/work/giottb01/conda/envs/meso_scatac/bin/Rscript \
+  /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R2_Q2/celltype_barplots_axisbreak.R

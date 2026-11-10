@@ -17,19 +17,17 @@
 # peak-gene pairs genome-wide at a comparable distance. HUB3722 is kept as a negative example: it is
 # 14.5 Mb from MEF2C and cannot be tested against it.
 #
-# Output: R2_Q78_peak2gene_hub_peaks.csv, R2_Q78_peak2gene_all_genes_for_hub_peaks.csv,
-#         R2_Q78_peak2gene_summary.csv, Plots/R2_Q78_cHubs_peak2gene.pdf
+# Output: peak2gene_links_500kb.rds in scratch (input of R2_Q78_p2g_links_tracks.R), R2_Q78_peak2gene_hub_peaks.csv,
+#         R2_Q78_peak2gene_all_genes_for_hub_peaks.csv, R2_Q78_peak2gene_summary.csv
 ###############################################################################
-suppressPackageStartupMessages({ library(ArchR); library(GenomicRanges); library(ggplot2); library(ggrepel); library(grid); library(gtable)
-                                 library(RColorBrewer); library(paletteer); library(circlize) })
+suppressPackageStartupMessages({ library(ArchR); library(GenomicRanges) })
 addArchRThreads(8); addArchRGenome("hg38"); set.seed(1)
 ROOT   <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM"
 OUT    <- file.path(ROOT, "git_repo_claude", "R2_Q78")
 SCR    <- "/sc/arion/scratch/giottb01/R2_Q78_peak2gene"
 HUBDIR <- file.path(ROOT, "main", "scatac_ArchR", "hubs_obj_cor_0.3_md_12500_dgs_0_min_peaks_5")
 MAXDIST <- 500000
-setwd(OUT); dir.create("Plots", showWarnings = FALSE); dir.create(SCR, showWarnings = FALSE, recursive = TRUE)
-source(file.path(ROOT, "git_repo", "utils", "scATAC_functions.R")); source(file.path(ROOT, "git_repo", "utils", "palettes.R"))
+setwd(OUT); dir.create(SCR, showWarnings = FALSE, recursive = TRUE)
 EXPECT <- c(HUB2711 = "HAND2", HUB3722 = "MEF2C", HUB3727 = "MEF2C", HUB3728 = "MEF2C")
 hubs <- readRDS(file.path(HUBDIR, "global_hubs_obj.rds"))
 proj <- loadArchRProject(file.path(ROOT, "main", "scatac_ArchR"), showLogo = FALSE)
@@ -64,14 +62,4 @@ cat("\n=== strongest gene links of each hub (any gene; correlation >= 0.2, FDR <
 for (h in names(EXPECT)) { a <- A[A$hub == h & A$Correlation >= 0.2 & A$FDR < 1e-4 & !is.na(A$Correlation), ]; tb <- sort(table(a$gene), decreasing = TRUE)
   cat(sprintf("%s: %s\n", h, if (length(tb)) paste(sprintf("%s (%d peaks, max r %.2f)", names(tb), as.integer(tb), sapply(names(tb), function(g) max(a$Correlation[a$gene == g]))), collapse = "; ") else "none")) }
 
-## figure: gene-context windows with the peak2gene links of the hub peaks drawn as loops
-genes <- getGenes(proj); celltype_order <- c('Malignant','Mesothelium','Alveolar','Fibroblasts','SmoothMuscle','Endothelial','Myeloid','T_cells','NK','B_cells','Plasma','pDCs')
-CT_PAL <- palette_celltype_lv1; names(CT_PAL)[names(CT_PAL) == "Smooth Muscle"] <- "SmoothMuscle"; CT_PAL <- CT_PAL[celltype_order]
-show <- c("HUB2711", "HUB3727", "HUB3728"); a <- A[A$hub %in% show & A$Correlation >= 0.2 & A$FDR < 1e-4 & !is.na(A$Correlation), ]
-loopGR <- GRanges(as.character(seqnames(pk))[a$idxATAC], IRanges(pmin((start(pk)[a$idxATAC] + end(pk)[a$idxATAC]) %/% 2, start(gn)[a$idxRNA]), pmax((start(pk)[a$idxATAC] + end(pk)[a$idxATAC]) %/% 2, start(gn)[a$idxRNA])), value = a$Correlation)
-ctx <- do.call(c, lapply(c("HAND2", "MEF2C"), function(g0) { h <- intersect(names(EXPECT)[EXPECT == g0], show); b <- hp[hp$hub %in% h, ]; g <- genes[which(genes$symbol == g0)][1]; lr <- loopGR[as.character(seqnames(loopGR)) == b$chr[1]]
-  r <- GRanges(b$chr[1], IRanges(min(c(b$start, start(g), start(lr))), max(c(b$end, end(g), end(lr))))); r$label <- sprintf("%s: peak-to-gene links", paste(sub("HUB", "cHub", h), collapse = " / ")); r }))
-hub_pk <- GRanges(hp$chr[hp$hub %in% show], IRanges(hp$start[hp$hub %in% show], hp$end[hp$hub %in% show]))
-plotTracksSideBySide(proj, ctx, groupBy = "celltype_lv1", groups = celltype_order, pal = CT_PAL, features = GRangesList(`cHub peaks` = hub_pk), loops = GRangesList(`peak2gene` = loopGR),
-                     file = "Plots/R2_Q78_cHubs_peak2gene.pdf", padding = 0.05, panelWidth = 4.4, tileSize = 500, outlineProfiles = FALSE)
 cat("\nDONE\n")

@@ -1,0 +1,16 @@
+#!/bin/bash
+#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -J multiqc_merge
+#BSUB -q express
+#BSUB -n 4
+#BSUB -R "rusage[mem=8000] span[hosts=1]"
+#BSUB -W 2:00
+#BSUB -o /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/multiqc_merge.%J.out
+#BSUB -e /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/multiqc_merge.%J.err
+#BSUB -L /bin/bash
+
+PROC=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed
+
+python3 /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/scripts/merge_counts.py
+
+python3 -m multiqc "$PROC/qc" "$PROC/logs" -o "$PROC/qc" -n multiqc_report --force

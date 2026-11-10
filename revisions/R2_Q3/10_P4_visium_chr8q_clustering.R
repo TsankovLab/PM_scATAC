@@ -29,9 +29,9 @@
 #
 # Output: P4_visium_chr8q_clustering.csv        (one row per slide)
 #         P4_visium_arm_clustering.csv          (every arm, every slide)
-#         Plots/R2_Q3_P4_visium_chr8q_clustering.pdf           compact: observed vs shuffled, per section
-#         Plots/R2_Q3_P4_visium_chr8q_clustering_relative.pdf  same, genome-relative chr8q score
-#         Plots/R2_Q3_P4_visium_chr8q_clustering_full.pdf      all panels incl. the controls
+#         Plots/R2_Q3_P4_visium_chr8q_clustering.pdf/.png      observed vs shuffled, per section
+# The controls (other arms, purity-adjusted and genome-relative scores) are reported in the tables only; they are
+# computed in the same loop as the main test, so they are kept to leave the random draws of the figure unchanged.
 ###############################################################################
 suppressMessages({ library(Seurat); library(EnsDb.Hsapiens.v86); library(ggplot2)
                    library(patchwork); library(Matrix) })
@@ -186,43 +186,7 @@ write.csv(ARM, paste0("P4_visium_arm_clustering", SUF, ".csv"), row.names = FALS
 cat("=== chr8q clone clustering among malignant spots ===\n"); print(t(TAB))
 
 ## ---- STEP 4: figure ----------------------------------------------------------------
-hist_panel <- function(nl, obs, expd, title){
-  NUL <- do.call(rbind, nl); NUL$slide <- factor(NUL$slide, slides)
-  lab <- data.frame(slide = factor(TAB$slide, slides), obs = obs,
-    txt = sprintf("observed %.2f\nexpected %.2f", obs, expd))
-  ggplot(NUL, aes(null)) + geom_histogram(binwidth = .01, fill = "grey70", colour = NA) +
-    geom_vline(data = lab, aes(xintercept = obs), colour = "#d62728", linewidth = .7) +
-    geom_text(data = lab, aes(x = obs, y = Inf, label = txt), hjust = 1.08, vjust = 1.2, size = 2.6, colour = "#d62728") +
-    facet_wrap(~ slide, nrow = 1) + coord_cartesian(xlim = c(0, 1)) +
-    labs(x = "fraction of malignant neighbours of a chr8q-amp spot that are chr8q-amp",
-         y = sprintf("label shuffles (n = %d)", N_PERM), title = title) +
-    theme_classic(base_size = 9) + theme(strip.background = element_blank(), strip.text = element_text(face = "bold"))
-}
-pA  <- hist_panel(nulls, TAB$same_clone_nb_amp, TAB$expected_amp, "A  chr8q score as in step 9 (raw): chr8q-amp spots neighbour each other, among malignant spots")
-pA2 <- hist_panel(nulls_rel, TAB$rel_same_clone_nb_amp, TAB$rel_expected_amp, "B  chr8q relative to the rest of the genome of the same spot")
-kinds <- c(assortativity = "raw score", assortativity_purity_adj = "malignant fraction regressed out", assortativity_rel = "relative to rest of genome")
-AL <- do.call(rbind, lapply(names(kinds), function(k) data.frame(ARM[, c("slide", "arm")], value = ARM[[k]], kind = kinds[[k]])))
-AL$kind <- factor(AL$kind, kinds); AL$slide <- factor(AL$slide, slides)
-AL$is8q <- AL$arm == "8q"
-pB <- ggplot(AL, aes(slide, value)) +
-  geom_jitter(data = AL[!AL$is8q, ], width = .15, height = 0, size = .9, colour = "grey60", alpha = .8) +
-  geom_point(data = AL[AL$is8q, ], size = 2.6, colour = "#d62728") +
-  geom_text(data = AL[AL$is8q, ], aes(label = "8q"), colour = "#d62728", size = 2.8, hjust = -0.6) +
-  geom_hline(yintercept = 0, linetype = 2, linewidth = .3) + facet_wrap(~ kind, nrow = 1) +
-  labs(x = NULL, y = "assortativity of the two-way split\n(0 = intermixed, 1 = segregated)",
-       title = "C  chr8q against every other chromosome arm (grey), same pipeline") +
-  theme_classic(base_size = 9) + theme(strip.background = element_blank(), strip.text = element_text(face = "bold"))
-PL <- rbind(data.frame(slide = TAB$slide, what = "observed", value = TAB$largest_patch),
-            data.frame(slide = TAB$slide, what = "shuffled labels", value = TAB$largest_patch_null))
-pC <- ggplot(PL, aes(slide, value, fill = what)) + geom_col(position = position_dodge(.7), width = .65) +
-  scale_fill_manual(values = c(observed = "#d62728", `shuffled labels` = "grey70"), name = NULL) +
-  labs(x = NULL, y = "spots in the largest\nconnected chr8q-amp patch", title = "D  largest patch (raw score)") +
-  theme_classic(base_size = 9) + theme(legend.position = "bottom")
-fig <- pA / pA2 / (pB + pC + plot_layout(widths = c(3, 1)))
-ggsave(paste0("Plots/R2_Q3_P4_visium_chr8q_clustering", SUF, "_full.pdf"), fig, width = 10, height = 9)
-
-## compact version of the test: per section, the shuffled-label distribution as a box and the observed value as a
-## point. Main file = chr8q score as in step 9; _relative = chr8q relative to the rest of the genome of the spot.
+## per section, the shuffled-label distribution as a box and the observed value as a point (chr8q score as in step 9)
 compact <- function(nl, obs, p){
   NUL <- do.call(rbind, nl); NUL$slide <- factor(NUL$slide, slides)
   O <- data.frame(slide = factor(TAB$slide, slides), obs = obs)
@@ -236,9 +200,4 @@ compact <- function(nl, obs, p){
 }
 ggsave(paste0("Plots/R2_Q3_P4_visium_chr8q_clustering", SUF, ".pdf"), compact(nulls, TAB$same_clone_nb_amp, TAB$p_same_amp), width = 1.7, height = 1.5)
 ggsave(paste0("Plots/R2_Q3_P4_visium_chr8q_clustering", SUF, ".png"), compact(nulls, TAB$same_clone_nb_amp, TAB$p_same_amp), width = 1.7, height = 1.5, dpi = 300)
-## the relative-score version is drawn tall and narrow
-pr <- compact(nulls_rel, TAB$rel_same_clone_nb_amp, TAB$rel_p_same_amp) + scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, .25)) +
-  labs(subtitle = sprintf("red = observed\nbox = shuffled labels\np <= %s, all sections", signif(max(TAB$rel_p_same_amp), 1)))
-ggsave(paste0("Plots/R2_Q3_P4_visium_chr8q_clustering", SUF, "_relative.pdf"), pr, width = 1.6, height = 3.2)
-ggsave(paste0("Plots/R2_Q3_P4_visium_chr8q_clustering", SUF, "_relative.png"), pr, width = 1.6, height = 3.2, dpi = 300)
 cat("\nDONE\n")

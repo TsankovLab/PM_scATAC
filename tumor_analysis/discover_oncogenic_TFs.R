@@ -94,6 +94,12 @@ TF_diff_rna$dev_diff <- TF_diff_rna$tumor_dev - TF_diff_rna$normal_dev
 TF_diff_rna$gs_diff  <- TF_diff_rna$tumor_gs  - TF_diff_rna$normal_gs
 TF_diff_rna$rna_diff <- TF_diff_rna$tumor_rna - TF_diff_rna$normal_rna
 
+# Error bars: SEM across tumour samples (normal is a single sample, so
+# subtracting it shifts the mean but not the spread)
+sem <- function(x) { x <- x[is.finite(x)]; if (length(x) < 2) return(NA_real_); sd(x) / sqrt(length(x)) }
+TF_diff_rna$dev_sem <- apply(mMat_agg[rownames(TF_diff_rna), tumor_sams], 1, sem)
+TF_diff_rna$rna_sem <- apply(ps[rownames(TF_diff_rna), tumor_sams_rna], 1, sem)
+
 
 ###############################################################
 # 5. Wilcoxon Test on chromVAR Deviations (presto)
@@ -189,9 +195,17 @@ selected_TF <- intersect(selected_TF, tf_tumor_pos)
 tf_order <- rownames(TF_diff_rna)[order(-rowMeans(TF_diff_rna[, c("dev_diff", "rna_diff")]))]
 selected_TF_ordered <- tf_order[tf_order %in% selected_TF]
 
-# Predefined guide genes
-guides <- c('PITX1','TCF3','TEAD4','MEF2A','MEF2D','HMGA1','SOX9','TWIST1','BPTF')
-TF_labels <- unique(c(head(selected_TF_ordered, 30), guides))
+# Freeze the selection to the published 68 TFs (Supplementary Table 4).
+# A rerun on the current MotifMatrix selects 69 TFs (66 shared): borderline
+# Wilcoxon calls shift slightly, so the plot uses the published set.
+if (!exists('published_TF_table')) published_TF_table <- 'selected_TF_table.csv'
+if (file.exists(published_TF_table)) {
+  selected_TF <- rownames(read.csv(published_TF_table, row.names = 1))
+  selected_TF_ordered <- tf_order[tf_order %in% selected_TF]
+}
+
+# Label only the selected TFs (no forced guide labels)
+TF_labels <- selected_TF_ordered
 
 
 ###############################################################
@@ -207,8 +221,6 @@ TF_diff_rna$label_top[match(TF_labels, rownames(TF_diff_rna))] <- TF_labels
 TF_diff_rna$color <- TF_diff_rna$label != ''
 TF_diff_rna$alpha <- 0.6
 TF_diff_rna$alpha[match(selected_TF, rownames(TF_diff_rna))] <- 0.8
-
-TF_diff_rna$label_guides <- ifelse(rownames(TF_diff_rna) %in% guides, 'guides', 'rest')
 
 
 # Direction categories (tumor-high vs normal-high)
@@ -235,37 +247,48 @@ TF_diff_rna$alpha[TF_diff_rna$direction != "both_high"] <- 0.6
 
 diff_line <- 0
 
+TF_diff_rna <- TF_diff_rna[order(TF_diff_rna$color), ]  # selected TFs drawn on top
+
 tf_diff_p <- ggplot(
   TF_diff_rna,
   aes(
     x = dev_diff,
     y = rna_diff,
-    size = highest_rna,
-    fill = direction,
     label = label_top
   )
 ) +
-  geom_point(aes(color = color, alpha = alpha), shape = 21, stroke = 0.1) +
-  scale_color_manual(values = c('FALSE' = "grey", 'TRUE' = "black")) +
-  scale_fill_manual(values = c(
-    both_low = "grey20",
-    rna_low  = "grey20",
-    dev_low  = "grey20",
-    both_high = "darkred"
-  )) +
+  # +/- SEM across tumour samples, selected TFs only
+  geom_errorbar(data = TF_diff_rna[TF_diff_rna$color, ], inherit.aes = FALSE,
+                aes(x = dev_diff, ymin = rna_diff - rna_sem, ymax = rna_diff + rna_sem),
+                width = 0, linewidth = .2, color = "grey55", alpha = .8) +
+  geom_errorbarh(data = TF_diff_rna[TF_diff_rna$color, ], inherit.aes = FALSE,
+                 aes(y = rna_diff, xmin = dev_diff - dev_sem, xmax = dev_diff + dev_sem),
+                 height = 0, linewidth = .2, color = "grey55", alpha = .8) +
+  geom_point(data = TF_diff_rna[!TF_diff_rna$color, ], fill = "grey70", color = "grey50",
+             shape = 21, stroke = 0.1, size = 0.8, alpha = 0.5) +
+  geom_point(data = TF_diff_rna[TF_diff_rna$color, ], fill = "darkred", color = "black",
+             shape = 21, stroke = 0.1, size = 1.4, alpha = 0.9) +  # red = selected TFs only
   geom_vline(xintercept = diff_line, linetype = "dashed", color = "grey44", linewidth = .3) +
   geom_hline(yintercept = diff_line, linetype = "dashed", color = "grey44", linewidth = .3) +
   gtheme_no_rot +
   geom_text_repel(
-    aes(color = label_guides, fill = label_guides),
-    segment.size = .05,
-    size = 1.8,
-    max.overlaps = 100
+    color = "black",
+    segment.size = .1,
+    segment.color = "grey40",
+    size = 1.6,
+    min.segment.length = 0,
+    box.padding = 0.15,
+    max.overlaps = Inf,
+    seed = 1
   ) +
+  theme(legend.position = "none") +
   xlab("activity difference") +
   ylab("RNA difference") +
-  xlim(c(-0.2, 0.2)) +
-  ylim(c(-0.6, 0.6))
+  # limits widened if needed so that every selected TF is shown
+  coord_cartesian(
+    xlim = range(c(-0.2, 0.2, TF_diff_rna[selected_TF, "dev_diff"])) * 1.05,
+    ylim = range(c(-0.6, 0.6, TF_diff_rna[selected_TF, "rna_diff"])) * 1.05
+  )
 
 pdf("Plots/Diff_normal_tumor_deviation_and_rna_scatterplot5.pdf", width = 5, height = 4)
 print(tf_diff_p)

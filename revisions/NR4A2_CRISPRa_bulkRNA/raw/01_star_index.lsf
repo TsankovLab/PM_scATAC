@@ -1,0 +1,24 @@
+#!/bin/bash
+#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -J star_index_hg38
+#BSUB -q express
+#BSUB -n 32
+#BSUB -R "rusage[mem=4000] span[hosts=1]"
+#BSUB -W 12:00
+#BSUB -o /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/star_index.%J.out
+#BSUB -e /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/star_index.%J.err
+#BSUB -L /bin/bash
+
+ml star/2.7.11b
+
+GENOME_FA=/sc/arion/projects/Tsankov_Normal_Lung/genome_assemblies/human/hg38.fa
+GTF=/sc/arion/projects/Tsankov_Normal_Lung/genome_assemblies/human/gencode.v46.annotation.gtf
+OUT=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/work/star_index_hg38
+
+STAR \
+  --runMode genomeGenerate \
+  --runThreadN 32 \
+  --genomeDir "$OUT" \
+  --genomeFastaFiles "$GENOME_FA" \
+  --sjdbGTFfile "$GTF" \
+  --sjdbOverhang 150

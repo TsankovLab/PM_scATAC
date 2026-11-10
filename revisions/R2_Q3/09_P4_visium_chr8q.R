@@ -63,6 +63,7 @@ feat_gg <- function(srt, vals, title, cols, psf = 0.5){
   io <- srt@images[[Images(srt)[1]]]; img <- io@image; ih <- nrow(img); iw <- ncol(img)
   r <- io@spot.radius * max(ih, iw) * psf; xy <- get_spot_coords(srt)
   df <- data.frame(x0 = xy$x, y0 = xy$y, value = as.numeric(vals)); df <- df[order(df$value), ]
+  if (ONLY_MAL) df <- df[!is.na(df$value), ]
   spatial_base(img, ih, iw) +
     geom_circle(data = df, aes(x0 = x0, y0 = y0, r = r, fill = value), color = NA, alpha = .9) +
     scale_fill_gradientn(colours = cols, name = "chr8q") + ggtitle(title) +
@@ -75,6 +76,7 @@ class_gg <- function(srt, cls, title, pal, psf = 0.5){
   r <- io@spot.radius * max(ih, iw) * psf; xy <- get_spot_coords(srt); lev <- rev(names(pal))
   df <- data.frame(x0 = xy$x, y0 = xy$y, class = factor(cls, levels = lev))
   df <- df[order(match(df$class, lev)), ]
+  if (ONLY_MAL) { df <- df[df$class != "non-malignant", ]; pal <- pal[names(pal) != "non-malignant"] }
   spatial_base(img, ih, iw) +
     geom_circle(data = df, aes(x0 = x0, y0 = y0, r = r, fill = class), color = NA, alpha = .9) +
     scale_fill_manual(values = pal, name = NULL) + ggtitle(title) +
@@ -95,6 +97,18 @@ moran <- function(x, xy){
 
 ## ---- STEP 3: per slide, score chr8q and split the malignant spots -----------
 spa <- readRDS(SPATIAL)[slides]
+## Options (defaults reproduce the original figure):
+##   MAL_CALL = sum    malignant when the tumour fractions outweigh the normal ones (original rule)
+##            = label  malignant when the spot's label-transfer annotation (highest prediction score) is Malignant,
+##                     from the label transfer of the P4 scRNA with the study's cell types (spa_all_rna_int_1123.rds);
+##                     in this mode ONLY the malignant spots are drawn, on the H&E image
+##   SCORE    = raw       chr8q score as described above
+##            = relative  chr8q score minus the score of all other autosomal genes of the same spot (see step 10:
+##                        the raw score is largely genome-wide on the fresh sections)
+MAL_CALL <- Sys.getenv("MAL_CALL", "sum"); SCORE <- Sys.getenv("SCORE", "raw"); ONLY_MAL <- MAL_CALL == "label"
+SUF <- paste0(if (MAL_CALL == "sum") "" else paste0("_", MAL_CALL), if (SCORE == "raw") "" else paste0("_", SCORE))
+if (MAL_CALL == "label") LT <- readRDS(file.path(dirname(SPATIAL), "spa_all_rna_int_1123.rds"))[slides]
+auto_genes <- unique(genes(edb, columns = "gene_name", filter = SeqNameFilter(as.character(1:22)), return.type = "data.frame")$gene_name)
 tab <- list(); plots <- list()
 for (sl in slides){
   obj <- spa[[sl]]
@@ -106,7 +120,10 @@ for (sl in slides){
   nor <- as.numeric(pred["Fibroblasts", ]) + as.numeric(pred["Tcells", ]) +
          as.numeric(pred["Myeloid", ]) + as.numeric(pred["Endothelial", ]) +
          as.numeric(pred["Bcells", ])
-  is_mal <- mal > nor; is_ref <- !is_mal
+  is_mal <- mal > nor
+  if (MAL_CALL == "label") { pl <- GetAssayData(LT[[sl]], assay = "predictions", layer = "data"); pl <- pl[rownames(pl) != "max", colnames(obj)]
+    is_mal <- rownames(pl)[apply(pl, 2, which.max)] == "Malignant" }
+  is_ref <- !is_mal
   ## 3b. CP10K log-normalise (Seurat 5 renamed slot= to layer=, so try both)
   cnt <- tryCatch(GetAssayData(obj, assay = "Spatial", layer = "counts"),
                   error = function(e) GetAssayData(obj, assay = "Spatial", slot = "counts"))
@@ -114,6 +131,8 @@ for (sl in slides){
   ## 3c. chr8q score, referenced to the normal spots of the same slide
   g8 <- intersect(chr8q_genes, rownames(ln))
   s8 <- colMeans(as.matrix(ln[g8, , drop = FALSE]))
+  if (SCORE == "relative") { au <- intersect(auto_genes, rownames(ln)); tot <- colSums(ln[au, , drop = FALSE]); s8sum <- s8 * length(g8)
+    s8 <- s8 - (tot - s8sum) / (length(au) - length(g8)) }
   s8 <- s8 - mean(s8[is_ref])
   ## 3d. targeted k = 2 split of the malignant spots on the chr8q score alone
   mi <- which(is_mal); km <- kmeans(scale(s8[mi]), 2, nstart = 25)$cluster
@@ -140,7 +159,7 @@ for (sl in slides){
 
 ## ---- STEP 4: summary table + 2x2 figure (score | clone, one row per slide) --
 TAB <- do.call(rbind, tab); rownames(TAB) <- NULL
-write.csv(TAB, "P4_visium_chr8q_spatial.csv", row.names = FALSE)
+write.csv(TAB, paste0("P4_visium_chr8q_spatial", SUF, ".csv"), row.names = FALSE)
 cat("=== P4 Visium chr8q clone spatial summary ===\n"); print(TAB, row.names = FALSE)
 cat(sprintf("\nMoran's I across the %d sections: %.3f - %.3f (median %.3f)\n",
             nrow(TAB), min(TAB$moranI), max(TAB$moranI), median(TAB$moranI)))
@@ -153,6 +172,6 @@ fig  <- Reduce(`/`, rows) +
                   subtitle = "A1/B1 fresh, C1/D1 snap-frozen -- four sections of the same tumour",
                   theme = theme(plot.title = element_text(face = "bold", size = 13),
                                 plot.subtitle = element_text(size = 10, colour = "grey35")))
-ggsave("Plots/R2_Q3_P4_visium_chr8q.pdf", fig, width = 13, height = 5.5 * length(slides),
+ggsave(paste0("Plots/R2_Q3_P4_visium_chr8q", SUF, ".pdf"), fig, width = 13, height = 5.5 * length(slides),
        limitsize = FALSE)
 cat("\nDONE\n")
