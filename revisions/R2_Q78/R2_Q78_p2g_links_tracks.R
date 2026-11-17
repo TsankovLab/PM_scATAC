@@ -25,7 +25,7 @@ ROOT   <- DATA_DIR
 OUT    <- file.path(ROOT, "git_repo_claude", "R2_Q78"); SCR <- paste0(SCRATCH_DIR, "/R2_Q78_peak2gene")
 HUBDIR <- file.path(ROOT, "main", "scatac_ArchR", "hubs_obj_cor_0.3_md_12500_dgs_0_min_peaks_5")
 MAXDIST <- 400000; FLANK <- 250000; COR <- 0.2; FDRC <- 1e-4; NAGG <- 500
-setwd(OUT); source(file.path(ROOT, "git_repo", "utils", "scATAC_functions.R")); source(file.path(ROOT, "git_repo", "utils", "palettes.R"))
+setwd(OUT); source(file.path(ROOT, "git_repo", "utils", "scATAC_functions.R")); source(file.path(ROOT, "git_repo", "utils", "hubs_track.R")); source(file.path(ROOT, "git_repo", "utils", "palettes.R"))
 EXPECT <- c(HUB2711 = "HAND2", HUB3727 = "MEF2C", HUB3728 = "MEF2C"); HUBS <- names(EXPECT); GOI <- unique(EXPECT)
 hubs <- readRDS(file.path(HUBDIR, "global_hubs_obj.rds")); bed <- read.table(file.path(HUBDIR, "hub_regions.bed"), sep = "\t", stringsAsFactors = FALSE); colnames(bed)[1:6] <- c("chr", "start", "end", "id", "strand", "genes")
 p2g <- readRDS(file.path(SCR, "peak2gene_links_500kb.rds")); pk <- metadata(p2g)$peakSet; gn <- metadata(p2g)$geneSet; L <- as.data.frame(p2g)
