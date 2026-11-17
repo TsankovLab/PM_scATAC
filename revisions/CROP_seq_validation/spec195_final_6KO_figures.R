@@ -1,28 +1,28 @@
 # Spec 195: final bulk validation figures, built end to end on ONE cohort: the 6 CROP-seq KOs TEAD4, TWIST1, PITX1, SOX9, TEAD2, BPTF + non-targeting controls,
-# cell lines MSTO-211H, NCI-H2452, NCI-H28 (8 NTC + 35 KO samples). TCF3, HMGA1, RUNX1/2, SNAI2, NCI-H2052 and every other sample are removed before any computation.
+# cell lines MSTO-211H, NCI-H2452, NCI-H28 (8 NTC + 35 KO samples: COHORT in repro_common.R).
 #
 #   processing (all on the cohort only)
 #     bulk     gene counts -> per line filterByExpr (genes kept in all 3 lines) -> TMM log-CPM (edgeR) -> cell-cycle score S.Score + G2M.Score (Seurat, on TMM log-CPM)
 #              -> regressed out over the line's samples (cc) -> KO profiles = mean of the 6 KO means - KO mean; module scores (AddModuleScore, top-50 Cm genes) on the regressed values
 #     screen   NCI-H2052 CROP-seq cells with a unique guide of NTC or the 6 KOs -> Seurat CellCycleScoring on these cells -> genes detected in >= 1% of them
 #              -> S/G2M regressed out of the KO means -> KO profiles as in bulk; vst variable genes on these cells; module scores and their cell-cycle regression on these cells
-#     per-sample annotations that do not depend on the other samples are read from earlier tables: genotype line and corrected KO label (spec128 SA), indel % and
-#     guide reads per sample (spec121, spec155a, spec156; read pile-ups and guide counts from each BAM)
+#     per-sample annotations: genotype line and KO (COHORT), indel % and guide reads per sample (spec121, spec155a, spec156; read pile-ups and guide counts from each BAM)
 #
 #   pages (one PDF, final6KO_all.pdf; every page also saved as png and pdf)
-#     1  summary (as fig85_summary_TMM_noTCF3_HMGA1_noH2052): A replicates  B KO target rings  C proliferation (TMM; KO = median over lines of the replicate means,
+#     1  summary: A replicates  B KO target rings  C proliferation (TMM; KO = median over lines of the replicate means,
 #        one-sided rank-sum vs the NTC scores)  D match to the screen  E-G Cm20-TEAD4, Cm8-TWIST1, Cm1-TEAD2 (screen cells as violins)
 #     cell-line colours: MSTO-211H #1BAF7A, NCI-H2452 #E87BA4, NCI-H28 #B5AE67
-#     2  per line match to the screen (as fig58 panel A, all samples): per KO the same-KO correlation in each line vs the other-KO correlations; KOs ordered by median, no pooled group
+#     2  per line match to the screen: per KO the same-KO correlation in each line vs the other-KO correlations; KOs ordered by median, no pooled group
 #     3  proliferation per KO: the samples of each KO vs the NTC samples (TMM scores of page 1 C), one-sided rank-sum per KO; KOs ordered by median
-#     4  sample identity (as fig66): guide reads of the 6 target genes and of the non-targeting guides found in the controls (square cells)
+#     4  sample identity: guide reads of the 6 target genes and of the non-targeting guides found in the controls (square cells)
 #     5  read coverage: reads assigned to genes per sample
 #     NORM=tpm reruns every bulk panel on log2(TPM + 1) (A: genes with mean TPM >= 1); outputs tagged _TPM
-#     6  cell-line identity (as CNA_correlation_heatmap_used_samples): expression-based copy-number profile (10 Mb windows) of each sample vs CCLE
-# needs: STAR counts (load_bulk_S91), screen object (load_screen), scRNA_PM_modules.rds, spec72_profiles_S70.rds (sample list), spec128_inputs.rds (SA annotation only),
-#        spec121_indel_matrix.csv, spec121_guide_reads_matrix.csv, spec155a_NTC_guide_reads.csv, spec156_NTC_indel_per_sample.csv, CCLE RNA-seq (RSEM TPM), GENCODE v46 GTF
-# outputs ($CROP_OUT): final6KO_p1_summary, final6KO_p2_per_line_match, final6KO_p3_proliferation_per_KO, final6KO_p4_sample_identity, final6KO_p5_CNA_vs_CCLE (.png/.pdf),
-#        final6KO_all.pdf, final6KO_stats.csv
+#     6  cell-line identity: expression-based copy-number profile (10 Mb windows) of each sample vs CCLE
+# needs: STAR counts (load_counts), screen object (load_screen), scRNA_PM_modules.rds, spec121_indel_matrix.csv, spec121_guide_reads_matrix.csv, spec155a_NTC_guide_reads.csv, spec156_NTC_indel_per_sample.csv, CCLE RNA-seq (RSEM TPM), GENCODE v46 GTF
+# outputs ($CROP_OUT): final6KO_p1_summary, final6KO_p2_per_line_match, final6KO_p3_proliferation_per_KO, final6KO_p3b_proliferation_per_KO_line_means, final6KO_p4_sample_identity,
+#        final6KO_p5_read_coverage, final6KO_p6_CNA_vs_CCLE (.png/.pdf),
+#        final6KO_all.pdf, final6KO_stats.csv (NORM=tpm also needs spec177_gene_lengths.csv in $CROP_OUT: gene lengths in bp)
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 here <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])))
 source(file.path(here, "repro_common.R")); source(file.path(here, "spec_common.R")); source(file.path(here, "profiles.R")); source(file.path(here, "agree_common.R"))
 suppressPackageStartupMessages({ library(Seurat); library(limma); library(edgeR); library(data.table) }); options(Seurat.object.assay.version = "v3", width = 200); set.seed(5)
@@ -32,13 +32,13 @@ SH <- function(l) sub("NCI-|-211H", "", l); kcol <- function(k) ifelse(k %in% na
 PAIRS <- list(c(Cm = "Cm20", KO = "TEAD4"), c(Cm = "Cm8", KO = "TWIST1"), c(Cm = "Cm1", KO = "TEAD2")); MINEXP <- 0.1; TOPN <- 500
 NORM <- Sys.getenv("NORM", "tmm"); NTAG <- if (NORM == "tpm") "_TPM" else ""; NLAB <- if (NORM == "tpm") "log2(TPM + 1)" else "TMM log-CPM"   # NORM=tpm: every bulk panel on log2(TPM + 1) (gene lengths of spec177) instead of TMM log-CPM; outputs tagged _TPM
 AFLAB <- if (NORM == "tpm") "Mean TPM >= 1" else "Mean CP10K >= 0.1"
-GTF <- "/sc/arion/projects/Tsankov_Normal_Lung/genome_assemblies/human/gencode.v46.annotation.gtf"; CRDS <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/CCLE/CCLE_RNAseq_rsem_genes_tpm.rds"
+GTF <- paste0(GENOME_DIR, "/human/gencode.v46.annotation.gtf"); CRDS <- paste0(REF_DIR, "/Public_data/CCLE/CCLE_RNAseq_rsem_genes_tpm.rds")
 
 ## =============================================================== 1. samples and counts (cohort only)
-SA <- readRDS(file.path(OUT, "spec128_inputs.rds"))$SA; SA <- SA[SA$line %in% LN & SA$KO %in% GR, c("sample", "line", "KO", "indel_best")]; SA <- SA[order(match(SA$line, LN), match(SA$KO, GR), SA$sample), ]; rownames(SA) <- SA$sample
+SA <- data.frame(sample = COHORT$library, line = COHORT$line, KO = COHORT$KO, stringsAsFactors = FALSE); SA <- SA[SA$line %in% LN & SA$KO %in% GR, ]; SA <- SA[order(match(SA$line, LN), match(SA$KO, GR), SA$sample), ]; rownames(SA) <- SA$sample
 stopifnot(nrow(SA) == 43, all(table(SA$KO)[KOS] > 0)); cat("cohort:", nrow(SA), "samples\n"); print(table(factor(SA$KO, GR), factor(SA$line, LN)))
-pr <- readRDS(file.path(OUT, sprintf("spec72_profiles_S70%s.rds", DSUF))); CS <- load_bulk_S91(pr$samples, drop_bad_ntc = TRUE, drop_kos = "RUNX1")$cs[, SA$sample]; CS <- CS[rowSums(CS) > 0, ]
-SA$label <- paste0(SH(SA$line), "_", sub("^[^_]+_", "", SA$sample)); SA$relabelled <- sub("_.*", "", SA$sample) != SH(SA$line)
+CS <- load_counts(SA$sample); CS <- CS[rowSums(CS) > 0, ]
+SA$label <- paste0(SH(SA$line), "_", sub("^[^_]+_", "", SA$sample))
 lines_of <- function(cl, set = GR) SA$sample[SA$line == cl & SA$KO %in% set]
 
 ## =============================================================== 2. bulk processing
@@ -185,21 +185,20 @@ RD <- colSums(CS) / 1e6; CSZ <- 0.3; NR <- max(table(SA$line)); nc <- nrow(GUx);
 save_fig(paste0("final6KO", NTAG, "_p4_sample_identity"), 3 * WH + WL + 0.3, HH + 1, function() { layout(matrix(1:4, 1), widths = lcm(2.54 * c(rep(WH, 3), WL)), heights = lcm(2.54 * HH)); par(family = "sans", omi = c(0, 0, 0.8, 0))
   for (cl in LN) { s <- SA$sample[SA$line == cl]; n <- length(s); par(mai = c(MB, 1.75, MT, 0.05)); plot(NA, xlim = c(0.5, nc + 0.5), ylim = c(NR + 0.5, 0.5), axes = FALSE, xlab = "", ylab = "", xaxs = "i", yaxs = "i")
     for (i in seq_len(n)) { rect(seq_len(nc) - 0.5, i - 0.5, seq_len(nc) + 0.5, i + 0.5, col = gcol(GUx[, s[i]]), border = "white", lwd = 0.5); j <- if (SA[s[i], "KO"] == "NTC") nc else match(SA[s[i], "KO"], KOS); rect(j - 0.5, i - 0.5, j + 0.5, i + 0.5, border = "black", lwd = 1.2) }
-    text(0.35, seq_len(n), paste0(SA[s, "label"], ifelse(SA[s, "relabelled"], " *", "")), adj = 1, xpd = NA, cex = 0.8, font = 2, col = kcol(SA[s, "KO"])); text(seq_len(nc), 0.25, rownames(GUx), srt = 90, adj = 0, xpd = NA, cex = 0.75); mtext(sprintf("%s (%d samples)", cl, n), side = 3, adj = 0, line = 5.6, font = 2, cex = 0.82, col = LC[cl], at = -2.5)
+    text(0.35, seq_len(n), SA[s, "label"], adj = 1, xpd = NA, cex = 0.8, font = 2, col = kcol(SA[s, "KO"])); text(seq_len(nc), 0.25, rownames(GUx), srt = 90, adj = 0, xpd = NA, cex = 0.75); mtext(sprintf("%s (%d samples)", cl, n), side = 3, adj = 0, line = 5.6, font = 2, cex = 0.82, col = LC[cl], at = -2.5)
   }
   par(mai = c(MB, 0.15, MT, 0.1)); plot(NA, xlim = c(0, 1), ylim = c(0, 1), axes = FALSE, xlab = "", ylab = ""); ys <- seq(0.35, 0.85, length.out = 101); rect(0.05, ys[-101], 0.25, ys[-1], col = gpal, border = NA); text(0.32, 0.35 + 0.5 * c(0, 1, 2, 3) / 3.2, c("0", "10", "100", "1,000"), adj = 0, cex = 0.8); text(0.05, 0.92, "guide reads per million\nunmapped reads", adj = 0, cex = 0.72, font = 2)
-  mtext("Sample identity: guide reads per sample (6 KOs + NTC; black frame = the label of the sample)", outer = TRUE, side = 3, adj = 0.01, line = 2.2, font = 2, cex = 1); mtext("NTC (found) = the 3 non-targeting guides present in the controls; * library labelled H2052_NTC, H28 by genotype", outer = TRUE, side = 3, adj = 0.01, line = 1, cex = 0.7, col = INK2) })
+  mtext("Sample identity: guide reads per sample (6 KOs + NTC; black frame = the label of the sample)", outer = TRUE, side = 3, adj = 0.01, line = 2.2, font = 2, cex = 1); mtext("NTC (found) = the 3 non-targeting guides present in the controls", outer = TRUE, side = 3, adj = 0.01, line = 1, cex = 0.7, col = INK2) })
 save_fig(paste0("final6KO", NTAG, "_p5_read_coverage"), 9.6, 4.6, function() { par(mar = c(7.4, 4, 3.4, 0.6), mgp = c(2.6, 0.6, 0), tcl = -0.3, family = "sans"); x <- seq_len(nrow(SA)) + cumsum(c(0, SA$line[-1] != SA$line[-nrow(SA)])) * 0.8
   plot(NA, xlim = c(0.3, max(x) + 0.7), ylim = c(0, max(RD) * 1.12), xaxs = "i", yaxs = "i", xaxt = "n", bty = "n", las = 1, cex.axis = 0.8, xlab = "", ylab = "reads assigned to genes (millions)"); abline(h = median(RD), lty = 2, col = INK2, lwd = 0.7)
-  rect(x - 0.4, 0, x + 0.4, RD[SA$sample], col = LC[SA$line], border = NA); text(x, RD[SA$sample], sprintf("%.0f", RD[SA$sample]), pos = 3, cex = 0.5, offset = 0.2, xpd = NA); text(x, -max(RD) * 0.03, paste0(SA$label, ifelse(SA$relabelled, " *", "")), srt = 90, adj = 1, xpd = NA, cex = 0.62, font = 2, col = kcol(SA$KO))
+  rect(x - 0.4, 0, x + 0.4, RD[SA$sample], col = LC[SA$line], border = NA); text(x, RD[SA$sample], sprintf("%.0f", RD[SA$sample]), pos = 3, cex = 0.5, offset = 0.2, xpd = NA); text(x, -max(RD) * 0.03, SA$label, srt = 90, adj = 1, xpd = NA, cex = 0.62, font = 2, col = kcol(SA$KO))
   for (cl in LN) text(mean(x[SA$line == cl]), max(RD) * 1.08, cl, font = 2, cex = 0.8, col = LC[cl]); mtext(sprintf("Read coverage per sample (%d samples: %d NTC + %d KO)", nrow(SA), sum(SA$KO == "NTC"), sum(SA$KO != "NTC")), side = 3, adj = 0, line = 1.6, font = 2, cex = 0.9)
-  mtext(sprintf("reads assigned to genes (STAR gene counts); dashed line = median %.1f M; range %.1f-%.1f M; * library labelled H2052_NTC, H28 by genotype", median(RD), min(RD), max(RD)), side = 3, adj = 0, line = 0.5, cex = 0.62, col = INK2) })
+  mtext(sprintf("reads assigned to genes (STAR gene counts); dashed line = median %.1f M; range %.1f-%.1f M", median(RD), min(RD), max(RD)), side = 3, adj = 0, line = 0.5, cex = 0.62, col = INK2) })
 RPAL <- colorRampPalette(rev(c("#67001f", "#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#f7f7f7", "#d1e5f0", "#92c5de", "#4393c3", "#2166ac", "#053061")))(101); rcol <- function(v, lo, hi) RPAL[pmin(101, pmax(1, round((v - lo) / (hi - lo) * 100) + 1))]
 save_fig(paste0("final6KO", NTAG, "_p6_CNA_vs_CCLE"), 6.6, 1.7 + 0.2 * nrow(SA), function() { R <- RC[SA$sample, REF]; n <- nrow(R); lo <- floor(min(R) * 10) / 10; par(mar = c(3.6, 9.8, 4.2, 9.6), family = "sans"); plot(NA, xlim = c(0.5, 4.5), ylim = c(n + 0.5, 0.5), axes = FALSE, xlab = "", ylab = "", xaxs = "i", yaxs = "i")
   rect(col(R) - 0.5, row(R) - 0.5, col(R) + 0.5, row(R) + 0.5, col = rcol(R, lo, 1), border = NA); text(col(R), row(R), sprintf("%.2f", R), cex = 0.55, col = ifelse(R > 0.85, "white", INK)); j <- apply(R, 1, which.max); rect(j - 0.5, seq_len(n) - 0.5, j + 0.5, seq_len(n) + 0.5, border = "black", lwd = 1.2); abline(h = which(SA$line[-1] != SA$line[-n]) + 0.5, lwd = 1.2); box(lwd = 1)
-  text(0.4, seq_len(n), paste0(SA$label, ifelse(SA$relabelled, " *", "")), adj = 1, xpd = NA, cex = 0.62, font = 2, col = kcol(SA$KO)); text(1:4, n + 0.9, SH(REF), srt = 30, adj = 1, xpd = NA, cex = 0.8); for (cl in LN) { i <- range(which(SA$line == cl)); text(4.75, mean(i), cl, srt = -90, xpd = NA, font = 2, cex = 0.75, col = LC[cl]) }
+  text(0.4, seq_len(n), SA$label, adj = 1, xpd = NA, cex = 0.62, font = 2, col = kcol(SA$KO)); text(1:4, n + 0.9, SH(REF), srt = 30, adj = 1, xpd = NA, cex = 0.8); for (cl in LN) { i <- range(which(SA$line == cl)); text(4.75, mean(i), cl, srt = -90, xpd = NA, font = 2, cex = 0.75, col = LC[cl]) }
   mtext(sprintf("Cell-line identity vs CCLE (%d samples)", n), side = 3, adj = 0, line = 2.4, font = 2, cex = 0.9); mtext(sprintf("CNA-proxy profile r (%d genes, %d 10 Mb windows)\nbox = best match", length(GC), length(gw)), side = 3, adj = 0, line = 0.6, cex = 0.58, col = INK2)
-  mtext("* library labelled H2052_NTC, H28 by genotype", side = 1, adj = 0, line = 2.2, cex = 0.58, col = INK2, at = -1.4)
   x0 <- 5.25; x1 <- 5.5; ys <- seq(n * 0.65, n * 0.25, length.out = 102); rect(x0, ys[-102], x1, ys[-1], col = RPAL, border = NA, xpd = NA); rect(x0, ys[1], x1, ys[102], border = INK2, lwd = 0.5, xpd = NA)
   tk <- pretty(c(lo, 1), 4); tk <- tk[tk >= lo & tk <= 1]; ty <- ys[1] + (tk - lo) / (1 - lo) * (ys[102] - ys[1]); segments(x1, ty, x1 + 0.08, ty, xpd = NA, lwd = 0.5); text(x1 + 0.13, ty, sprintf("%.1f", tk), adj = 0, cex = 0.62, xpd = NA)
   text(x0, ys[102] - n * 0.02, "Pearson r", adj = c(0, 0), cex = 0.68, font = 2, xpd = NA); rect(x0, n * 0.75, x1, n * 0.75 + 0.8, border = "black", lwd = 1.2, xpd = NA); text(x1 + 0.13, n * 0.75 + 0.4, "best match", adj = 0, cex = 0.62, xpd = NA) })

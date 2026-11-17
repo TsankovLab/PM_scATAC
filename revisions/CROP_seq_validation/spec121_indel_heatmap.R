@@ -1,18 +1,17 @@
 # Spec 121: heatmap of the fraction of read pairs with an indel at the gRNA cut sites, target gene x bulk sample.
 # value = % of read pairs covering the Cas9 cut site (+/- 10 bp) that carry an insertion or deletion there (spec118), best guide of the gene (guides with >= MINP pairs in the sample; grey = no guide with enough pairs)
-# rows = the 16 target genes with guides in "Oligos NR4A2+CROPseq.xlsx"; columns = bulk samples, split by genotyped cell line (name-derived for samples outside the spec71 audit), ordered by KO label
+# rows = the 6 KO genes; columns = the bulk KO cohort (COHORT in repro_common.R), split by genotyped cell line, ordered by KO label
 # black frame = the gene is the sample's KO label; top annotation = KO label and the gene whose guides were detected in the sample's reads (spec119, >= 300 guide + scaffold reads)
-# needs: spec118 (site counts), spec119 (guide calls), spec71 audit
+# needs: spec118 (site counts), spec119 (guide calls)
 # outputs: spec121_indel_matrix.csv, fig37_indel_heatmap_gene_x_sample.{png,pdf}
 here <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])))
 source(file.path(here, "repro_common.R")); source(file.path(here, "profiles.R")); source(file.path(here, "agree_common.R"))
 suppressPackageStartupMessages({ library(ComplexHeatmap); library(circlize); library(grid) }); MINP <- 10; MIN_GUIDE_READS <- 300
 C <- read.csv(file.path(OUT, "spec118_site_counts.csv"), stringsAsFactors = FALSE); St <- read.csv(file.path(OUT, "spec118_gRNA_sites.csv")); St <- St[!is.na(St$chr), ]; C <- C[paste(C$guide, C$site) %in% paste(St$guide, sprintf("%s:%d", St$chr, St$cut)), ]
-C$gene <- sub("_g.*", "", C$guide); C <- C[!C$gene %in% c("NTC", "NR4A2enh"), ]; q <- load_audit(); PFX <- c(H2052 = "NCI-H2052", MSTO = "MSTO-211H", H2452 = "NCI-H2452", H28 = "NCI-H28")
-ids <- grep("^(H2052|MSTO|H2452|H28)_[A-Za-z0-9]+_R[0-9]+$", unique(C$sample), value = TRUE); SM <- data.frame(sample = ids, line = PFX[sub("_.*", "", ids)], KO = sub("^[^_]+_([^_]+)_.*", "\\1", ids), stringsAsFactors = FALSE)
-i <- match(SM$sample, q$sample); SM$line[!is.na(i)] <- q$line[i[!is.na(i)]]; SM$KO[!is.na(i)] <- q$KO[i[!is.na(i)]]; gc <- read.csv(file.path(OUT, "spec119_guide_calls.csv"), stringsAsFactors = FALSE)
+C$gene <- sub("_g.*", "", C$guide); C <- C[C$gene %in% KOS, ]
+SM <- data.frame(sample = COHORT$library, line = COHORT$line, KO = COHORT$KO, stringsAsFactors = FALSE); gc <- read.csv(file.path(OUT, "spec119_guide_calls.csv"), stringsAsFactors = FALSE)
 j <- match(SM$sample, gc$sample); SM$guides_detected <- ifelse(!is.na(j) & gc$guide_reads[j] >= MIN_GUIDE_READS & gc$top_share[j] >= 0.8, gc$top_target[j], "none")
-GENES <- c(KOS, "RUNX1", "RUNX2", "SNAI2", "MEF2A", "MEF2D", "TEAD1", "TEAD3", "TFAP2A"); KOL <- c("NTC", KOS, "RUNX1", "RUNX2", "SNAI2"); SM <- SM[order(match(SM$line, LINES), match(SM$KO, KOL), SM$sample), ]
+GENES <- KOS; KOL <- c("NTC", KOS); SM <- SM[order(match(SM$line, LINES), match(SM$KO, KOL), SM$sample), ]
 M <- sapply(SM$sample, function(s) sapply(GENES, function(g) { x <- C[C$sample == s & C$gene == g & C$n_cover >= MINP, ]; if (!nrow(x)) NA else max(100 * x$n_indel / x$n_cover) })); write.csv(M, file.path(OUT, "spec121_indel_matrix.csv"))
 own <- outer(GENES, SM$KO, "=="); cat("own-target cells: median", round(median(M[own], na.rm = TRUE), 1), "% | all other cells: median", round(median(M[!own], na.rm = TRUE), 2), "%, 99th percentile", round(quantile(M[!own], 0.99, na.rm = TRUE), 1), "%\n")
 off <- which(!own & !is.na(M) & M >= 5, arr.ind = TRUE); cat("cells >= 5% where the gene is not the sample label:\n"); print(data.frame(gene = GENES[off[, 1]], sample = SM$sample[off[, 2]], label = SM$KO[off[, 2]], guides_detected = SM$guides_detected[off[, 2]], indel_pct = round(M[off], 1)), row.names = FALSE)

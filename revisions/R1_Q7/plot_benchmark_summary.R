@@ -9,8 +9,9 @@
 #               SE sets (each -log10 FDR capped at the 99th percentile)
 # Run myeloid_SE_hub_enrichment.R, max_dist_sweep_SE.R and max_dist_sweep_summary.R first.
 # Output: plot_benchmark_summary.pdf/.png
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({ library(ggplot2); library(patchwork) })
-script_dir <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q7"
+script_dir <- paste0(RESULTS_DIR, "/R1_Q7")
 methods <- c("r 0.2", "r 0.3", "r 0.4", "r 0.5", "r 0.6", "Stitch-AP", "Stitch CT")
 mcol <- c(setNames(viridisLite::viridis(5, end = 0.85), methods[1:5]), `Stitch-AP` = "#d7301f", `Stitch CT` = "#fd8d3c")
 th <- theme_classic(base_size = 7) + theme(plot.title = element_text(size = 7.5, face = "bold"), legend.key.size = unit(3, "mm"),

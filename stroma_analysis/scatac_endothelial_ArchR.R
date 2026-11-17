@@ -1,3 +1,4 @@
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 conda activate meso_scatac
 #use UGER
 R
@@ -5,7 +6,7 @@ R
 
 set.seed(1234)
 
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/Endothelial/scatac_ArchR'
+projdir = paste0(DATA_DIR, '/Endothelial/scatac_ArchR')
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
@@ -34,7 +35,7 @@ srt = readRDS (file.path('..','..','Endothelial','scrna','srt.rds'))
 
 #sarc_order = read.csv ('../scrna/cnmf20_sarcomatoid_sample_order.csv', row.names=1)
 archp = loadArchRProject (projdir)
-#devtools::load_all('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/ArchR_fixed_branch/ArchR/')
+#devtools::load_all('$DATA_DIR/ArchR_fixed_branch/ArchR/')
 
   #archp = archp[!is.na(archp$celltype)]
 
@@ -877,7 +878,7 @@ library ('universalmotif')
 top_n <- 5
 ps = getPeakSet (archp)
 
-chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/Endothelial/scatac_ArchR/chromBPnet'
+chromBPdir = paste0(DATA_DIR, '/Endothelial/scatac_ArchR/chromBPnet')
 
 chrombpnet_counts = list()
 celltypes = c('low','high')

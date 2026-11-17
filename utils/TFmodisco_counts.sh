@@ -1,6 +1,6 @@
 #!/bin/bash
 #BSUB -J tfmodisco
-#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -P <LSF_ACCOUNT>
 #BSUB -q premium
 #BSUB -n 1
 #BSUB -R rusage[mem=32000]
@@ -10,6 +10,7 @@
 #BSUB -eo tfmodisco.stderr
 #BSUB -L /bin/bash
 
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
 ml anaconda3/2022.10
 ml cuda/11.7.0
 ml cudnn/8.9.5-11
@@ -35,7 +36,7 @@ cd ${chromBPdir}/${celltype}/no_bias_model/modisco_counts/
 if [ ! -f "modisco_results_counts.h5" ]; then
     echo "modisco_results_counts.h5 file not found. Running TFmodisco on contribution score counts ..."
 modisco motifs -i ../${celltype}_averaged_contribution_scores_counts.h5 -n 1000000 -o modisco_results_counts.h5 -w 400
-modisco report -i modisco_results_counts.h5 -o ${celltype}_report/ -s report/ -m /sc/arion/work/giottb01/conda/envs/chrombpnet/lib/python3.8/site-packages/chrombpnet/data/motifs.meme.txt #/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
+modisco report -i modisco_results_counts.h5 -o ${celltype}_report/ -s report/ -m ${CONDA_ENVS}/chrombpnet/lib/python3.8/site-packages/chrombpnet/data/motifs.meme.txt #${REF_DIR}/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
 else
     echo "modisco_results_counts file found!"
 fi

@@ -22,6 +22,7 @@
 # Output: celltype_barplots_axisbreak.pdf  (width FIG_W in, height FIG_W/2)
 # Run via submit_celltype_barplots.sh
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({
   library(ggplot2)
   library(patchwork)
@@ -30,9 +31,9 @@ suppressPackageStartupMessages({
   library(RColorBrewer)
 })
 
-script_dir <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R2_Q2"
-utils_dir  <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils"
-main_dir   <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR"
+script_dir <- paste0(RESULTS_DIR, "/R2_Q2")
+utils_dir  <- paste0(REPO_DIR, "/utils")
+main_dir   <- paste0(DATA_DIR, "/main/scatac_ArchR")
 setwd(script_dir)
 
 source(file.path(utils_dir, "ggplot_aestetics.R"))

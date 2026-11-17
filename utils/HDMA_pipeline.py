@@ -1,10 +1,11 @@
+source "${MESO_CONFIG:-$(d=$PWD; while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; echo "$d/config.sh")}"   # data / results / reference roots: see config.sh at the repo root
 conda activate chrombpnet
 
-cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA
-#output_dir=/sc/arion/scratch/giottb01/chromBPnet
-chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
-chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet
-#chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
+cd ${DATA_DIR}/HDMA
+#output_dir=${SCRATCH_DIR}/chromBPnet
+chromBPdir=${DATA_DIR}/main/scatac_ArchR/chromBPnet
+chromBPdir=${DATA_DIR}/myeloid_cells/scatac_ArchR/chromBPnet
+#chromBPdir=${SCRATCH_DIR}/chromBPnet
 
 model_head=profile
 
@@ -57,7 +58,7 @@ gimme cluster \
   -t 0.8 \
   -N 8
 
-#output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_counts
+#output_dir=${DATA_DIR}/main/scatac_ArchR/chromBPnet/modisco_merged_counts
 
 
 
@@ -92,7 +93,7 @@ chmod +x ../git_repo/utils/modisco_merge_job.sh
 for batch in ${batches[@]}; do
 
 bsub -J modisco_merge \
--P acc_Tsankov_Normal_Lung \
+-P ${LSF_ACCOUNT} \
 -q premium \
 -n 8 \
 -W 12:00 \
@@ -120,8 +121,8 @@ python ../git_repo/utils/04a-compile_modisco_obj.py \
 conda activate chrombpnet
 
 compiled_h5=${chromBPdir}/modisco_merged_${model_head}/compiled/modisco_compiled.h5
-#motif_db=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
-motif_db=/sc/arion/work/giottb01/conda/envs/chrombpnet/lib/python3.8/site-packages/chrombpnet/data/motifs.meme.txt
+#motif_db=${REF_DIR}/DBs/HOCOMOCO_db/HOCOMOCOv11_full_HUMAN_mono_meme_format.meme
+motif_db=${CONDA_ENVS}/chrombpnet/lib/python3.8/site-packages/chrombpnet/data/motifs.meme.txt
 tomtom_dir=${chromBPdir}/modisco_merged_${model_head}/compiled_tomtom
 mkdir $tomtom_dir
 python -u code/03-chrombpnet/02-compendium/04b-get_tomtom_matches.py --modisco-h5 $compiled_h5 \
@@ -133,8 +134,8 @@ python -u code/03-chrombpnet/02-compendium/04b-get_tomtom_matches.py --modisco-h
 
 ### Run Fi-Nemo on averaged motifs 
 chmod +x ../git_repo/utils/finemo_motif_calls_on_merged.sh
-#chromBPdir=/sc/arion/scratch/giottb01/chromBPnet
-#output_dir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/finemo_on_merged_${model_head}
+#chromBPdir=${SCRATCH_DIR}/chromBPnet
+#output_dir=${DATA_DIR}/main/scatac_ArchR/chromBPnet/finemo_on_merged_${model_head}
 #finemo_counts_file=no_bias_model/finemo_out_counts/hits.bed
 #if [ -f "${modisco_counts_file}" ] && [ -f "${modisco_profile_file}" ] && [ ! -f "$finemo_counts_file" ]; then
 echo $types
@@ -146,7 +147,7 @@ for celltype in ${types[@]}; do
 
     echo "=== Submit finemo job ==="
     bsub -J ${celltype}_finemo \
-        -P acc_Tsankov_Normal_Lung \
+        -P ${LSF_ACCOUNT} \
         -q gpu \
         -n 1 \
         -W 24:00 \
@@ -177,7 +178,7 @@ done
 echo "R script execution completed."
 
 ### Copy chromBPnet results files (Excluding large files !!) 
-chromBPdir_dest=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet
+chromBPdir_dest=${DATA_DIR}/main/scatac_ArchR/chromBPnet
 cd $chromBPdir
 for celltype in ${celltypes[@]}; do
     mkdir -p "${chromBPdir_dest}/${celltype}/no_bias_model"

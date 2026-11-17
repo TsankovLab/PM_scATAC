@@ -6,7 +6,8 @@
 #   spec     = SE specificity, score_on minus the mean of the same cell types' non-matching benchmark SE sets
 # Output: plot_max_dist_sweep_table.csv (input of plot_benchmark_summary.R, panel B)
 
-script_dir <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q7"
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
+script_dir <- paste0(RESULTS_DIR, "/R1_Q7")
 rd <- function(f) { p <- file.path(script_dir, f); if (!file.exists(p)) return(NULL); x <- read.csv(p, stringsAsFactors = FALSE); x[!duplicated(x[, c("condition", "celltype", "se_db")]), c("condition", "celltype", "se_db", "neg_log10_fdr")] }
 base <- rd("myeloid_SE_hub_enrichment.csv"); cap <- unname(quantile(base$neg_log10_fdr, 0.99, na.rm = TRUE))
 base$condition <- ifelse(grepl("_tss\\d+$", base$condition), base$condition, paste0(base$condition, "_tss0")); base$condition <- paste0(base$condition, "_d12.5")

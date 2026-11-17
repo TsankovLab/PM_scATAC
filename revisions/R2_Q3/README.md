@@ -16,7 +16,7 @@ because `out_5Mb/` holds the epiAneufinder output; to redo steps 1-2:
 ```bash
 ./run_step.sh 01_extract_fragments.R          # ~10 min, writes ~11 GB into frags/
 for S in P1 P4 P5 P8 P10 P11 P12 P14 P23; do
-  bsub -P acc_Tsankov_Normal_Lung -q premium -n 8 -R "rusage[mem=8000] span[hosts=1]" \
+  bsub -P <LSF_ACCOUNT> -q premium -n 8 -R "rusage[mem=8000] span[hosts=1]" \
        -W 6:00 -J epi_$S -o logs/epi_$S.out -e logs/epi_$S.err \
        "$PWD/run_step.sh 02_run_epianeufinder.R $S"
 done

@@ -1,6 +1,6 @@
 #!/bin/bash
 #BSUB -J chrBP_model
-#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -P <LSF_ACCOUNT>
 #BSUB -q gpu
 #BSUB -n 8
 #BSUB -W 48:00

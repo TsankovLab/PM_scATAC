@@ -1,5 +1,6 @@
 
 #### Reproduce tutorial ####
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
 conda activate chrombpnet
 ml cuda
 ml cudnn/8.2.0
@@ -7,8 +8,8 @@ ml proxies
 
 
 
-mkdir /sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet/tutorial/data/download
-cd /sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet/tutorial/
+mkdir ${REF_DIR}/chromBPnet/tutorial/data/download
+cd ${REF_DIR}/chromBPnet/tutorial/
 
 # Download bam files
 wget https://www.encodeproject.org/files/ENCFF077FBI/@@download/ENCFF077FBI.bam -O data/download/rep1.bam
@@ -66,7 +67,7 @@ chrombpnet bias pipeline \
         -fp k562
 
 ### Run it as a job
-chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/chrombpnet_tutorial_job.sh
-#bsub -P acc_Tsankov_Normal_Lung -W 24:00 /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/chrombpnet_tutorial_job.sh
-bsub </sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/chrombpnet_tutorial_job.sh
+chmod +x ${REPO_DIR}/utils/chrombpnet_tutorial_job.sh
+#bsub -P ${LSF_ACCOUNT} -W 24:00 ${REPO_DIR}/utils/chrombpnet_tutorial_job.sh
+bsub <${REPO_DIR}/utils/chrombpnet_tutorial_job.sh
 

@@ -1,3 +1,4 @@
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 gmt_annotations = c(
 #'c2.cp.kegg.v7.1.symbol.gmt',
 'fetal_sigs.gmt'
@@ -14,7 +15,7 @@ pvalAdjTrheshold = 0.05
 		{
 		if (!file.exists (paste0('fGSEA_annotation_',ann,'.rds')) | force)
 			{
-			gmt.file = paste0 ('/ahg/regevdata/projects/ICA_Lung/Bruno/DBs/GSEA_gs/',org,'/',ann)
+			gmt.file = paste0 (paste0(REF_DIR, '/DBs/GSEA_gs/'),org,'/',ann)
 			pathways = gmtPathways (gmt.file)
 			pathways = lapply (pathways, function(x) x[!is.na(x)])
 			pathways = lapply (pathways, function(x) x[!x == 'NA'])

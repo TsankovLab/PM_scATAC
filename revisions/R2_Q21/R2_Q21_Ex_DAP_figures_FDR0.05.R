@@ -12,11 +12,12 @@
 # (test result, motif matches, TF modules, coverage cache); the project is not modified.
 # The GSEA plot (DAP_exhaustion_enrichment_plot) ranks all peaks and does not depend on the cut-off.
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({
   library(ArchR); library(SummarizedExperiment); library(ComplexHeatmap)
   library(ggplot2); library(patchwork); library(paletteer)
 })
-root    = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM'
+root    = DATA_DIR
 tnk_dir = file.path (root, 'NKT_cells', 'scatac_ArchR')
 source (file.path (root, 'git_repo', 'utils', 'ggplot_aestetics.R'))
 palette_fragments = paletteer_c("ggthemes::Classic Orange-White-Blue",40)   # as in git_repo/utils/palettes.R

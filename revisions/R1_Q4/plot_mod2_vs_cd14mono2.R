@@ -10,6 +10,7 @@
 #
 # Output: R1_Q4/output/pbmc_projection/scatter_mod2_cd14mono2.pdf
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({
   library(ArchR)
   library(ggplot2)
@@ -20,7 +21,7 @@ suppressPackageStartupMessages({
 addArchRThreads(1)
 addArchRGenome("hg19")
 
-utils_dir <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils"
+utils_dir <- paste0(REPO_DIR, "/utils")
 source(file.path(utils_dir, "ggplot_aestetics.R"))
 
 palette_myeloid <- rev(paletteer::paletteer_d("MoMAColors::VanGogh"))
@@ -28,9 +29,9 @@ palette_myeloid <- setNames(as.character(palette_myeloid),
   c("Mono_CD14","TAM_CXCLs","TAM_MARCO","TAM_TREM2","cDCs","Mono_CD16","TAM_interstitial"))
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-proj_dir  <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR"
-score_csv <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q4/output/pbmc_projection/per_label_scores.csv"
-out_file  <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q4/output/pbmc_projection/scatter_mod2_cd14mono2.pdf"
+proj_dir  <- paste0(DATA_DIR, "/myeloid_cells/scatac_ArchR")
+score_csv <- paste0(RESULTS_DIR, "/R1_Q4/output/pbmc_projection/per_label_scores.csv")
+out_file  <- paste0(RESULTS_DIR, "/R1_Q4/output/pbmc_projection/scatter_mod2_cd14mono2.pdf")
 
 ct_map <- c(
   cnmf_cluster_1 = "Mono_CD16",   cnmf_cluster_2 = "TAM_MARCO",

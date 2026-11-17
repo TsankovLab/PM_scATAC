@@ -1,10 +1,11 @@
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 conda activate meso_scatac
 R
 
 set.seed(1234)
 
 ####### ANALYSIS of NKT compartment #######
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR'
+projdir = paste0(DATA_DIR, '/NKT_cells/scatac_ArchR')
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 
@@ -38,14 +39,14 @@ metaGroupName = 'NKT_cells'
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
 # Note: you need to have a bias model for each of the fold used in the no bias model
-chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet'
-repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
-grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
+chromBPdir = paste0(DATA_DIR, '/NKT_cells/scatac_ArchR/chromBPnet')
+repodir = REPO_DIR
+grefdir = paste0(REF_DIR, '/chromBPnet')
 #celltype = 'TNK_cells'
 celltype = 'NKT_cells'
 
 command <- paste ("bsub -J", paste0(celltype,'_cBP_bias'), 
-	"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",
+	paste0("-P ", LSF_ACCOUNT, " -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o"),
 	file.path(chromBPdir,paste0('cBP_master_bias_',celltype,'.out')), "-e" ,
 	file.path(chromBPdir,paste0('cBP_master_bias_',celltype,'.err')),
 	file.path(repodir,'utils','chromBPnet_bias_master.sh'))
@@ -62,17 +63,17 @@ system (paste(command, args))
 metaGroupName = 'celltype2'
 source ('../../git_repo/utils/chromBPnet_call_peaks.R')
 
-chromBPdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet'
-repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
-grefdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet'
-biasdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model'
+chromBPdir = paste0(DATA_DIR, '/NKT_cells/scatac_ArchR/chromBPnet')
+repodir = REPO_DIR
+grefdir = paste0(REF_DIR, '/chromBPnet')
+biasdir = paste0(DATA_DIR, '/NKT_cells/scatac_ArchR/chromBPnet/NKT_cells/bias_model')
 
 celltypes = unique (as.character(archp@cellColData[, metaGroupName]))
 
 for (celltype in celltypes)
 	{
 	command <- paste ("bsub -J", paste0(celltype,'_cBPnet'), 
-		"-P acc_Tsankov_Normal_Lung -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o",
+		paste0("-P ", LSF_ACCOUNT, " -q premium -n 8 -W 96:00 -R rusage[mem=32000] -R span[hosts=1] -o"),
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.out')), "-e" ,
 		file.path(chromBPdir,paste0('cBP_master_',celltype,'.err')),
 		file.path(repodir,'utils','chromBPnet_master.sh'))

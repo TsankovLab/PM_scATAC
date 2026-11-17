@@ -1,7 +1,8 @@
 # Helpers for the specificity analysis: screen loading, per-KO statistics. Sourced after repro_common.R. Used by spec1_prepare_stats.R.
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({ library(Matrix) })
 
-SCREEN_RDS <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CRISPR_cropseq_analysis/_cellranger_raw_Filter_400_800_25/no_harmony/srt_filtered.rds"
+SCREEN_RDS <- paste0(DATA_DIR, "/CRISPR_cropseq_analysis/_cellranger_raw_Filter_400_800_25/no_harmony/srt_filtered.rds")
 SCREEN_LINE <- "NCI-H2052"     # the screen's cell line: CRISPR_cropseq.R reads DepMap ACH-000153 (= NCI-H2052) for its viability panel
 
 # screen object filtered exactly as in CRISPR_cropseq.R: unique guide, guides with >9 cells, guides merged per gene, no combinations

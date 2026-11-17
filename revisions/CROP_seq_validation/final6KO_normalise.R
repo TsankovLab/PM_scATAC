@@ -1,12 +1,12 @@
 # final6KO_normalise.R: the expression processing of spec195 (sections 1-3, default TMM log-CPM), from the counts to every normalised matrix, written as tables. Same cohort
 # (TEAD4, TWIST1, PITX1, SOX9, TEAD2, BPTF + NTC; MSTO-211H, NCI-H2452, NCI-H28; 43 samples) and the same code, so the tables are what the final6KO figures use.
-#   bulk    STAR gene counts (load_bulk_S91) -> genes passing filterByExpr in every line -> per line: TMM log-CPM (edgeR)
+#   bulk    STAR gene counts (load_counts) -> genes passing filterByExpr in every line -> per line: TMM log-CPM (edgeR)
 #           -> cell-cycle score S.Score + G2M.Score (Seurat CellCycleScoring on the line's samples) -> regressed out within the line -> module scores
 #           (AddModuleScore, top-50 genes of the 20 Cm programs) on the regressed values -> KO profiles = mean of the 6 KO means - KO mean (positive = lower in the KO)
 #           -> proliferation z per line = (cc - mean NTC cc) / SD
 #   screen  NCI-H2052 CROP-seq cells of NTC + the 6 KOs (unique guide) -> CellCycleScoring -> genes detected in >= 1% of the cells and kept in bulk
 #           -> KO means with S/G2M regressed out -> KO profiles as in bulk; vst variable genes; per-cell module scores, cell cycle regressed
-# needs ($CROP_OUT): spec128_inputs.rds (SA), spec72_profiles_S70.rds (sample list); STAR counts, the screen object, scRNA_PM_modules.rds
+# needs: COHORT (repro_common.R), STAR counts, the screen object, scRNA_PM_modules.rds
 # outputs ($CROP_OUT/final6KO_normalised/): samples.csv (annotation + cc and proliferation z), counts.csv.gz (cohort counts, all genes),
 #   genes_kept.txt; tmm_logcpm.csv.gz and tmm_logcpm_ccregressed.csv.gz (genes x samples, each line normalised on its own samples);
 #   tmm_logcpm_module_scores.csv (Cm x samples); tmm_logcpm_KO_profiles_<line>.csv and tmm_logcpm_KO_profiles_pooled.csv (genes x KO, lines averaged);
@@ -20,9 +20,9 @@ ND <- file.path(OUT, "final6KO_normalised"); dir.create(ND, showWarnings = FALSE
 wt <- function(M, f) fwrite(data.table(gene = rownames(M), as.data.frame(M, check.names = FALSE)), file.path(ND, f))
 
 ## =============================================================== 1. samples and counts (cohort only) -- as spec195
-SA <- readRDS(file.path(OUT, "spec128_inputs.rds"))$SA; SA <- SA[SA$line %in% LN & SA$KO %in% GR, c("sample", "line", "KO", "indel_best")]; SA <- SA[order(match(SA$line, LN), match(SA$KO, GR), SA$sample), ]; rownames(SA) <- SA$sample
+SA <- data.frame(sample = COHORT$library, line = COHORT$line, KO = COHORT$KO, stringsAsFactors = FALSE); SA <- SA[SA$line %in% LN & SA$KO %in% GR, ]; SA <- SA[order(match(SA$line, LN), match(SA$KO, GR), SA$sample), ]; rownames(SA) <- SA$sample
 stopifnot(nrow(SA) == 43, all(table(SA$KO)[KOS] > 0)); cat("cohort:", nrow(SA), "samples\n"); print(table(factor(SA$KO, GR), factor(SA$line, LN)))
-pr <- readRDS(file.path(OUT, sprintf("spec72_profiles_S70%s.rds", DSUF))); CS <- load_bulk_S91(pr$samples, drop_bad_ntc = TRUE, drop_kos = "RUNX1")$cs[, SA$sample]; CS <- CS[rowSums(CS) > 0, ]
+CS <- load_counts(SA$sample); CS <- CS[rowSums(CS) > 0, ]
 lines_of <- function(cl, set = GR) SA$sample[SA$line == cl & SA$KO %in% set]
 wt(CS, "counts.csv.gz")
 

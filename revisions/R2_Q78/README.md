@@ -5,7 +5,7 @@ Run in this order (`run_step.sh <script>` runs a script in the `meso_scatac` env
 1. `R2_Q78_peak2gene.R` — ArchR `addPeak2GeneLinks` on `main/scatac_ArchR` (GeneScoreMatrix, IterativeLSI) with maxDist
    500 kb instead of the manuscript's 250 kb, because the MEF2C hubs lie 363-387 kb from the MEF2C TSS. The project's output
    directory is redirected to scratch (not modified); the links are cached to
-   `/sc/arion/scratch/giottb01/R2_Q78_peak2gene/peak2gene_links_500kb.rds`. Tables of every hub peak vs the expected gene:
+   `$SCRATCH_DIR/R2_Q78_peak2gene/peak2gene_links_500kb.rds`. Tables of every hub peak vs the expected gene:
    `R2_Q78_peak2gene_hub_peaks.csv`, `R2_Q78_peak2gene_all_genes_for_hub_peaks.csv`, `R2_Q78_peak2gene_summary.csv`.
 2. `R2_Q78_p2g_links_tracks.R` — browser tracks of the two loci side by side: coverage per cell type, all cHubs in the window
    (labelled), peak-to-gene links within 400 kb (correlation >= 0.2, FDR < 1e-4 recomputed over the 400 kb set), genes.

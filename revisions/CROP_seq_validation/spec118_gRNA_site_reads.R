@@ -1,5 +1,5 @@
 # Spec 118: read distribution at the gRNA target sites in the bulk RNA-seq BAMs -- is there evidence of editing at the site of each guide in the samples that received it?
-# guides: "Oligos NR4A2+CROPseq.xlsx" (sheet gRNA; 3 guides per target, 3 non-targeting, 3 for the NR4A2 enhancer), mapped to hg38 by exact match on both strands (BSgenome), PAM (NGG) and
+# guides: "Oligos NR4A2+CROPseq.xlsx" (sheet gRNA; the 3 guides of each of the 6 KO genes, 3 non-targeting, 3 for the NR4A2 enhancer), mapped to hg38 by exact match on both strands (BSgenome), PAM (NGG) and
 #         Cas9 cut position (3 bp 5' of the PAM) recorded; hits inside the target gene (GENCODE v46 gene body) are kept, otherwise all hits
 # per sample x site, from the STAR alignments (primary alignments, window = cut +/- W bp, W = 10):
 #   n_cover  = read pairs with aligned bases (or a deletion) in the window
@@ -7,20 +7,22 @@
 #   n_junc   = pairs with a splice junction (N) boundary in the window (large deletions align as N; annotated junctions next to the site also count -> read against the controls)
 #   indel = n_indel / n_cover is the primary editing metric (soft clips are frequent away from any guide: adapter read-through, exon boundaries); edit = (indel or clip) / n_cover; edit_all also counts junction boundaries
 #   per-base profiles (cut +/- FLANK bp): depth, deleted bases, read ends -- the "read distribution" around the cut
+# samples: the bulk KO cohort (COHORT in repro_common.R: 35 KO + 8 NTC samples, genotyped line) and the NR4A2 CRISPRa samples (enhancer guides only)
 # comparison: samples whose KO is the guide's target vs all other samples of the same (genotyped) cell line; per guide Fisher test on pooled pairs
 # NR4A2 enhancer guides (CRISPRa, no cut expected): the same counts plus coverage (reads per million uniquely mapped) in +/- 1 kb, NR4A2_1-3 vs SCRAMBLE_1-3
-# needs: BAMs in BAM_DIR (STAR, coordinate sorted, indexed), spec71 audit (genotyped line and KO of each sample)
+# needs: BAMs in BAM_DIR (STAR, coordinate sorted, indexed), OLIGO_XLSX (default: next to the scripts)
 # outputs: spec118_gRNA_sites.csv, spec118_site_counts.csv, spec118_guide_summary.csv, spec118_profiles.rds, fig33_gRNA_site_editing.{png,pdf}, fig34_gRNA_site_read_profiles.{png,pdf}, fig35_NR4A2_enhancer_guides.{png,pdf}
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 here <- dirname(normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1])))
 source(file.path(here, "repro_common.R")); source(file.path(here, "profiles.R")); source(file.path(here, "agree_common.R"))
 suppressPackageStartupMessages({ library(GenomicAlignments); library(Rsamtools); library(Biostrings); library(BSgenome.Hsapiens.UCSC.hg38) }); options(width = 220)
-XLSX <- file.path(here, "Oligos NR4A2+CROPseq.xlsx"); BAM_DIR <- Sys.getenv("BAM_DIR", unset = "/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/work/bam")
-GTF <- "/sc/arion/projects/Tsankov_Normal_Lung/genome_assemblies/human/gencode.v46.annotation.gtf"; W <- 10L; FLANK <- 60L; ENH_FLANK <- 1000L
+XLSX <- Sys.getenv("OLIGO_XLSX", file.path(here, "Oligos NR4A2+CROPseq.xlsx")); BAM_DIR <- Sys.getenv("BAM_DIR", unset = paste0(SCRATCH_DIR, "/CROPseq_validation_bulkRNA/work/bam"))
+GTF <- paste0(GENOME_DIR, "/human/gencode.v46.annotation.gtf"); W <- 10L; FLANK <- 60L; ENH_FLANK <- 1000L
 fp <- function(p) ifelse(is.na(p), "n/a", ifelse(p < 0.001, formatC(p, format = "e", digits = 0), formatC(p, format = "g", digits = 2))); SH <- function(l) sub("NCI-|-211H", "", l)
 
 ## ---------------------------------------------------------------- guides -> genome
 g <- as.data.frame(readxl::read_excel(XLSX, sheet = "gRNA")); colnames(g) <- c("target", "n", "seq"); g <- g[!is.na(g$seq), ]; g$target <- trimws(g$target); g$seq <- toupper(trimws(g$seq))
-g$target[g$target == "NR4A2 Enhancer"] <- "NR4A2enh"; g$target[g$target == "Non Targeting Guide"] <- "NTC"; g$guide <- sprintf("%s_g%d", g$target, as.integer(g$n))
+g$target[g$target == "NR4A2 Enhancer"] <- "NR4A2enh"; g$target[g$target == "Non Targeting Guide"] <- "NTC"; g$guide <- sprintf("%s_g%d", g$target, as.integer(g$n)); g <- g[g$target %in% c(KOS, "NTC", "NR4A2enh"), ]
 f_sites <- file.path(OUT, "spec118_gRNA_sites.csv")
 if (!file.exists(f_sites) || Sys.getenv("REMAP", "0") == "1") {
   fw <- DNAStringSet(setNames(g$seq, g$guide)); rc <- reverseComplement(fw); chrs <- paste0("chr", c(1:22, "X", "Y")); H <- list()
@@ -34,15 +36,12 @@ if (!file.exists(f_sites) || Sys.getenv("REMAP", "0") == "1") {
   gl <- read.delim(pipe(sprintf("awk -F'\\t' '$3==\"gene\"' %s | grep -E 'gene_name \"(%s)\";' | cut -f1,4,5,7,9", GTF, paste(tg, collapse = "|"))), header = FALSE, quote = "", col.names = c("chr", "gs", "ge", "gstrand", "attr"))
   gl$gene <- sub('.*gene_name "([^"]+)".*', "\\1", gl$attr); i <- match(S$target, gl$gene); S$in_target_gene <- !is.na(i) & S$chr == gl$chr[i] & S$start >= gl$gs[i] & S$end <= gl$ge[i]; S$gene_strand <- gl$gstrand[i]
   S$n_hits <- as.integer(table(S$guide)[S$guide]); S <- S[S$in_target_gene | !S$guide %in% S$guide[S$in_target_gene], ]; S <- merge(g[, c("guide", "seq")], S, by = "guide", all.x = TRUE); write.csv(S, f_sites, row.names = FALSE) }
-S <- read.csv(f_sites, stringsAsFactors = FALSE); cat("guides:", nrow(g), "| mapped exactly:", sum(!is.na(S$chr[!duplicated(S$guide)])), "| not found:", paste(S$guide[is.na(S$chr)], collapse = " "), "\n")
+S <- read.csv(f_sites, stringsAsFactors = FALSE); S <- S[S$guide %in% g$guide, ]; cat("guides:", nrow(g), "| mapped exactly:", sum(!is.na(S$chr[!duplicated(S$guide)])), "| not found:", paste(S$guide[is.na(S$chr)], collapse = " "), "\n")
 print(S[!is.na(S$chr), c("guide", "chr", "start", "end", "strand", "PAM", "cut", "in_target_gene", "n_hits")], row.names = FALSE); S <- S[!is.na(S$chr), ]; S$site <- sprintf("%s:%d", S$chr, S$cut)
 
 ## ---------------------------------------------------------------- samples
-ids <- list.dirs(BAM_DIR, full.names = FALSE, recursive = FALSE); bam <- file.path(BAM_DIR, ids, paste0(ids, "_Aligned.sortedByCoord.out.bam")); ok <- file.exists(bam) & file.exists(paste0(bam, ".bai")); ids <- ids[ok]; bam <- setNames(bam[ok], ids)
-q <- load_audit(); PFX <- c(H2052 = "NCI-H2052", MSTO = "MSTO-211H", H2452 = "NCI-H2452", H28 = "NCI-H28"); pm <- regmatches(ids, regexec("^(H2052|MSTO|H2452|H28)_([A-Za-z0-9]+)_R([0-9]+)$", ids))
-SM <- data.frame(sample = ids, line = sapply(pm, function(m) if (length(m) == 4) PFX[[m[2]]] else NA), KO = sapply(pm, function(m) if (length(m) == 4) m[3] else NA), stringsAsFactors = FALSE)
-i <- match(SM$sample, q$sample); SM$line[!is.na(i)] <- q$line[i[!is.na(i)]]; SM$KO[!is.na(i)] <- q$KO[i[!is.na(i)]]                         # genotyped line / KO where audited (NTC reassignment included)
-SM$line[grepl("^(NR4A2|SCRAMBLE)_", SM$sample)] <- "NR4A2 CRISPRa"; SM$KO[grepl("^NR4A2_", SM$sample)] <- "NR4A2enh"; SM$KO[grepl("^SCRAMBLE_", SM$sample)] <- "NTC"; SM <- SM[!is.na(SM$line) & !grepl("^MIXED", SM$sample), ]
+CR <- c("NR4A2_1", "NR4A2_2", "NR4A2_3", "SCRAMBLE_1", "SCRAMBLE_2", "SCRAMBLE_3"); ids <- c(COHORT$library, CR); bam <- setNames(file.path(BAM_DIR, ids, paste0(ids, "_Aligned.sortedByCoord.out.bam")), ids); stopifnot(all(file.exists(bam), file.exists(paste0(bam, ".bai"))))
+SM <- data.frame(sample = ids, line = c(COHORT$line, rep("NR4A2 CRISPRa", length(CR))), KO = c(COHORT$KO, ifelse(grepl("^NR4A2_", CR), "NR4A2enh", "NTC")), stringsAsFactors = FALSE)
 SM$uniq_M <- sapply(SM$sample, function(s) { l <- readLines(file.path(BAM_DIR, s, paste0(s, "_Log.final.out"))); as.numeric(sub(".*\\|\\s*", "", grep("Uniquely mapped reads number", l, value = TRUE))) / 1e6 })
 cat("\nsamples with BAM:", nrow(SM), "\n"); print(table(SM$line, SM$KO))
 
@@ -76,11 +75,11 @@ G <- do.call(rbind, lapply(split(BULK, list(BULK$guide, BULK$line), drop = TRUE)
   data.frame(target = d$target[1], guide = d$guide[1], line = d$line[1], n_KO_samples = nrow(o), KO_pairs = sum(o$n_cover), KO_indel_pct = pc(o, "n_indel"), other_pairs = sum(b$n_cover), other_indel_pct = pc(b, "n_indel"), p = ft("n_indel"),
              KO_indel_per_sample = paste(ifelse(o$n_cover > 0, sprintf("%.0f", 100 * o$indel), "-"), collapse = "/"), KO_clip_pct = pc(o, "n_clip"), other_clip_pct = pc(b, "n_clip"), KO_edit_pct = pc(o, "n_edit"), other_edit_pct = pc(b, "n_edit"), p_edit = ft("n_edit"),
              KO_junc_pct = pc(o, "n_junc"), other_junc_pct = pc(b, "n_junc")) }))
-G <- G[order(match(G$target, c(KOS, "RUNX1", "RUNX2", "SNAI2")), G$guide, match(G$line, LINES)), ]; write.csv(G, file.path(OUT, "spec118_guide_summary.csv"), row.names = FALSE)
+G <- G[order(match(G$target, KOS), G$guide, match(G$line, LINES)), ]; write.csv(G, file.path(OUT, "spec118_guide_summary.csv"), row.names = FALSE)
 cat("\n=== indels at the gRNA sites: own-KO samples vs the other samples of the same line (% of read pairs covering the cut +/-", W, "bp with an insertion or deletion there) ===\n")
 print(G[, c("target", "guide", "line", "n_KO_samples", "KO_pairs", "KO_indel_pct", "other_pairs", "other_indel_pct", "p", "KO_indel_per_sample", "KO_clip_pct", "other_clip_pct")], digits = 2, row.names = FALSE)
-MINP <- 10; Gk <- G[G$KO_pairs >= MINP, ]; best <- do.call(rbind, lapply(split(Gk, list(Gk$target, Gk$line), drop = TRUE), function(d) d[which.max(d$KO_indel_pct), ])); TGS <- intersect(c(KOS, "RUNX1", "RUNX2", "SNAI2"), G$target)
-mat <- function(v) { M <- matrix(NA, length(TGS), 4, dimnames = list(TGS, LINES)); M[cbind(match(best$target, TGS), match(best$line, LINES))] <- v; M }; BM <- mat(best$KO_indel_pct)
+MINP <- 10; Gk <- G[G$KO_pairs >= MINP, ]; best <- do.call(rbind, lapply(split(Gk, list(Gk$target, Gk$line), drop = TRUE), function(d) d[which.max(d$KO_indel_pct), ])); TGS <- intersect(KOS, G$target)
+mat <- function(v) { M <- matrix(NA, length(TGS), length(LINES), dimnames = list(TGS, LINES)); M[cbind(match(best$target, TGS), match(best$line, LINES))] <- v; M }; BM <- mat(best$KO_indel_pct)
 cat(sprintf("\n-- best guide per KO x line (>= %d pairs at the site): %% of read pairs with an indel in the KO samples\n", MINP)); print(round(BM, 1)); cat("-- guide giving it\n"); print(noquote(mat(sub(".*_", "", best$guide))))
 SUMG <- tapply(Gk$KO_indel_pct, list(Gk$target, Gk$line), sum)[TGS, LINES]; cat("-- sum over the guides of the target (upper bound if the guides were pooled)\n"); print(round(SUMG, 1))
 bg <- C[C$line %in% LINES & !C$own & C$target %in% TGS & C$n_cover >= 20, ]; cat(sprintf("\nbackground (samples without the guide, >= 20 pairs): indel median %.2f%%, 99th percentile %.2f%%; indel or clip median %.2f%%, 95th percentile %.2f%%\n", 100 * median(bg$indel), 100 * quantile(bg$indel, 0.99), 100 * median(bg$edit), 100 * quantile(bg$edit, 0.95)))
@@ -92,7 +91,7 @@ f102 <- file.path(OUT, "spec102_agreement_vs_baseline.csv"); if (file.exists(f10
   cat("mean indel % (best guide) per line:", paste(SH(LINES), round(colMeans(BM[KOS, ], na.rm = TRUE), 1), collapse = ", "), "\n"); write.csv(a, file.path(OUT, "spec118_indel_vs_agreement.csv"), row.names = FALSE) }
 
 ## ---------------------------------------------------------------- figures
-TG <- TGS; PCH <- setNames(c(21, 22, 24, 23), LINES)
+TG <- TGS; PCH <- setNames(c(22, 24, 23), LINES)
 save_fig("fig33_gRNA_site_editing", 16, 9.6, function() {
   layout(matrix(1:12, nrow = 2, byrow = TRUE)); par(oma = c(0, 0, 3.2, 0.4), family = "sans")
   for (t in TG) { d <- BULK[BULK$target == t & BULK$n_cover >= 5, ]; gs <- sort(unique(BULK$guide[BULK$target == t])); par(mar = c(3.6, 4.2, 3, 0.6))
@@ -102,10 +101,10 @@ save_fig("fig33_gRNA_site_editing", 16, 9.6, function() {
       x <- S[S$guide == gs[k], ][1, ]; mtext(sprintf("g%s\n%s", sub(".*_g", "", gs[k]), ifelse(is.na(x$PAM), "", x$PAM)), side = 1, at = k, line = 1.6, cex = 0.6); mtext(sprintf("n=%.0f", median(e$n_cover)), side = 1, at = k, line = 2.5, cex = 0.5, col = MUTED) }
     mtext(t, side = 3, adj = 0, line = 1.2, font = 2, cex = 0.9, col = if (t %in% names(KO_COL)) KO_COL[[t]] else INK); mtext("colour = samples with this KO; grey = all other samples", side = 3, adj = 0, line = 0.2, cex = 0.5, col = INK2) }
   par(mar = c(4.6, 5.6, 3, 4.6)); zl <- max(BM, na.rm = TRUE); pal <- colorRampPalette(c("#f7f6f2", "#f3c4bf", "#c8322b"))(100); nr <- nrow(BM)
-  image(1:4, 1:nr, t(BM[nr:1, , drop = FALSE]), col = pal, zlim = c(0, zl), axes = FALSE, xlab = "", ylab = ""); text(rep(1:4, each = nr), rep(nr:1, 4), ifelse(is.na(BM), "n/a", sprintf("%.0f", BM)), cex = 0.8, col = ifelse(is.na(BM), MUTED, INK))
-  axis(1, at = 1:4, labels = SH(LINES), tick = FALSE, cex.axis = 0.8); axis(2, at = nr:1, labels = rownames(BM), tick = FALSE, las = 1, cex.axis = 0.8); mtext("best guide: % indel, KO samples", side = 3, adj = 0, line = 1, font = 2, cex = 0.72)
+  nl <- length(LINES); image(1:nl, 1:nr, t(BM[nr:1, , drop = FALSE]), col = pal, zlim = c(0, zl), axes = FALSE, xlab = "", ylab = ""); text(rep(1:nl, each = nr), rep(nr:1, nl), ifelse(is.na(BM), "n/a", sprintf("%.0f", BM)), cex = 0.8, col = ifelse(is.na(BM), MUTED, INK))
+  axis(1, at = 1:nl, labels = SH(LINES), tick = FALSE, cex.axis = 0.8); axis(2, at = nr:1, labels = rownames(BM), tick = FALSE, las = 1, cex.axis = 0.8); mtext("best guide: % indel, KO samples", side = 3, adj = 0, line = 1, font = 2, cex = 0.72)
   mtext("Evidence of editing at the gRNA target sites in the bulk RNA-seq reads", outer = TRUE, side = 3, adj = 0, line = 1.7, font = 2, cex = 1)
-  mtext(sprintf("read pairs covering the Cas9 cut site (+/- %d bp) that carry an insertion or deletion there; one point per sample (>= 5 pairs); n = median pairs at the site; symbols = cell line (H2052 circle, MSTO square, H2452 triangle, H28 diamond)", W), outer = TRUE, side = 3, adj = 0, line = 0.5, cex = 0.62, col = INK2)
+  mtext(sprintf("read pairs covering the Cas9 cut site (+/- %d bp) that carry an insertion or deletion there; one point per sample (>= 5 pairs); n = median pairs at the site; symbols = cell line (MSTO square, H2452 triangle, H28 diamond)", W), outer = TRUE, side = 3, adj = 0, line = 0.5, cex = 0.62, col = INK2)
 })
 mean_prof <- function(samples, guide, row, norm = TRUE) { P <- lapply(samples, function(s) PROF[[paste(s, guide)]]); P <- P[!sapply(P, is.null)]; if (!length(P)) return(NULL); M <- sapply(P, function(p) { v <- p[row, ]; if (!norm) return(v); d <- p["depth", ] + p["deleted", ]; if (row == "depth") v / max(1, max(d)) else v / pmax(1, d) }); rowMeans(M) }
 save_fig("fig34_gRNA_site_read_profiles", 16, 8.4, function() {
@@ -115,7 +114,7 @@ save_fig("fig34_gRNA_site_read_profiles", 16, 8.4, function() {
       plot(NA, xlim = range(x), ylim = yl, bty = "n", las = 1, xlab = "", ylab = if (rw == "depth") "relative depth" else "fraction of reads with the base deleted", cex.axis = 0.75, cex.lab = 0.8); abline(v = 0.5, lty = 2, col = MUTED)
       if (!is.null(yb)) lines(x, yb, col = "grey45", lwd = 1.6); if (!is.null(yo)) lines(x, yo, col = if (t %in% names(KO_COL)) KO_COL[[t]] else INK, lwd = 1.8); mtext("position relative to the cut (bp)", side = 1, line = 2.2, cex = 0.55)
       if (rw == "depth") { mtext(sprintf("%s (%s)", t, sub(".*_", "", gb)), side = 3, adj = 0, line = 1, font = 2, cex = 0.85, col = if (t %in% names(KO_COL)) KO_COL[[t]] else INK); mtext(sprintf("KO n=%d, NTC n=%d", length(o), length(b)), side = 3, adj = 0, line = 0.1, cex = 0.5, col = INK2) } } }
-  mtext("Read distribution around the cut site of the best guide per target: samples with the KO (colour) vs NTC samples (grey), 4 cell lines pooled", outer = TRUE, side = 3, adj = 0, line = 1.7, font = 2, cex = 0.95)
+  mtext("Read distribution around the cut site of the best guide per target: samples with the KO (colour) vs NTC samples (grey), 3 cell lines pooled", outer = TRUE, side = 3, adj = 0, line = 1.7, font = 2, cex = 0.95)
   mtext("top: depth along the site, each sample scaled to its maximum; bottom: fraction of reads in which the base is deleted; dashed = Cas9 cut", outer = TRUE, side = 3, adj = 0, line = 0.5, cex = 0.62, col = INK2)
 })
 ## NR4A2 enhancer guides

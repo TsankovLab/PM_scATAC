@@ -187,7 +187,7 @@ library (dplyr)
 # infercnv_result = readRDS ('infercnv/all_samples_subsampled_Inf_ref_broad_meso/infercnv.results.obj.Rds')
 # icnf_exp = infercnv_result@expr.data
 
-#source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scATAC_functions.R')
+#source ('$REF_DIR/scripts/scATAC_functions.R')
 
 makeWindows <- function(genome, blacklist, windowSize = 10e6, slidingSize = 2e6,
   gene_level_annotation = TxDb.Hsapiens.UCSC.hg38.knownGene){

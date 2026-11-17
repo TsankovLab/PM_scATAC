@@ -19,31 +19,32 @@
 # Requires: ~64 GB RAM, 4 cores, ~2 h
 # Submit  : bsub < project_myeloid_on_pbmc.sh
 #BSUB -J myeloid_pbmc_proj_R1Q4
-#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -P <LSF_ACCOUNT>
 #BSUB -q premium
 #BSUB -n 4
 #BSUB -R "rusage[mem=16000]"
 #BSUB -W 12:00
-#BSUB -o /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/logs/myeloid_pbmc_proj_R1Q4_%J.out
-#BSUB -e /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/logs/myeloid_pbmc_proj_R1Q4_%J.err
+#BSUB -o logs/myeloid_pbmc_proj_R1Q4_%J.out
+#BSUB -e logs/myeloid_pbmc_proj_R1Q4_%J.err
 
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
 set -euo pipefail
 
 # ── Rscript from meso_scatac conda env ───────────────────────────────────────
-export PATH=/sc/arion/work/giottb01/conda/envs/meso_scatac/bin:${PATH}
+export PATH=${CONDA_ENVS}/meso_scatac/bin:${PATH}
 export OPENBLAS_NUM_THREADS=1
 
 # ── Scratch tempdir (uwot::load_uwot untars a large model) ───────────────────
-export TMPDIR=/sc/arion/scratch/giottb01/tmp
+export TMPDIR=${SCRATCH_DIR}/tmp
 mkdir -p "${TMPDIR}"
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-PROJECTION_WRAPPER=/sc/arion/scratch/leew17/MesoRNA/ProjectionCode/run_projection_default.sh
+PROJECTION_WRAPPER=${SCRATCH_DIR}/MesoRNA/ProjectionCode/run_projection_default.sh
 
-QUERY_DIR=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR
-REF_DIR=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Xmen/greenleaf_PBMC_BM
+QUERY_DIR=${DATA_DIR}/myeloid_cells/scatac_ArchR
+REF_DIR=${REF_DIR}/Xmen/greenleaf_PBMC_BM
 
-OUTPUT_DIR=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q4/output/pbmc_projection
+OUTPUT_DIR=${RESULTS_DIR}/R1_Q4/output/pbmc_projection
 mkdir -p "${OUTPUT_DIR}"
 
 # ── Project all myeloid cells in one call ────────────────────────────────────

@@ -11,7 +11,7 @@ import os
 import pandas as pd
 import gseapy as gp
 
-DE_DIR = os.environ.get("DE_DIR", "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/de/NR4A2_1_2_vs_SCRAMBLE")
+DE_DIR = os.environ.get("DE_DIR", os.path.join(os.environ["DATA_DIR"], "CROPseq_validation_bulkRNA/processed/de/NR4A2_1_2_vs_SCRAMBLE"))   # DATA_DIR: config.sh at the repo root
 os.makedirs(os.path.join(DE_DIR, "gsea"), exist_ok=True)
 de = pd.read_csv(os.path.join(DE_DIR, "DESeq2_results_full.csv")).dropna(subset=["stat", "symbol"])
 de = de[de.symbol != ""]

@@ -1,3 +1,4 @@
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 conda activate meso_scatac
 use UGER # Add this before running R to be able to run cNMF scripts using UGER 
 
@@ -17,7 +18,7 @@ library (tidyverse)
 set.seed(1234)
 
 # Set project dir
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/stroma/scrna'
+projdir = paste0(DATA_DIR, '/stroma/scrna')
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
 source ('../../git_repo/utils/useful_functions.R')
@@ -41,10 +42,10 @@ sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14')
 # Load scRNA ####
 if (!file.exists ('srt.rds'))
 	{
-	#srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/reproduction2/scRNA/GSE190597_srt_tumor.rds')
-	srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scATAC_PM/srt.rds')
+	#srt = readRDS ('$REF_DIR/mesothelioma/reproduction2/scRNA/GSE190597_srt_tumor.rds')
+	srt = readRDS (paste0(DATA_DIR, '/srt.rds'))
 	# Import P14
-	srt_p14 = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/MPM_naive_p14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds')
+	srt_p14 = readRDS (paste0(REF_DIR, '/mesothelioma/MPM_naive_p14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds'))
 	srt_p14$celltype_simplified = srt_p14$celltype
 	srt = merge (srt, srt_p14)
 	srt$sampleID[srt$sampleID == 'MPM_naive_p14'] = 'P14'
@@ -52,7 +53,7 @@ if (!file.exists ('srt.rds'))
 	srt = srt[, srt$sampleID %in% sample_names]
 	
 	# Import normal mesothelium RNA
-	projdir_ref = '/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/scRNA_meso/'
+	projdir_ref = paste0(REF_DIR, '/mesothelioma/scRNA_meso/')
 	ref = readRDS (paste0(projdir_ref, 'ref.rds'))	
 	#subsample_ct = 1000
 	#ref_bc = lapply (unique(ref$celltype), function(x) sample(colnames(ref)[ref$celltype == x], subsample_ct, replace=T))

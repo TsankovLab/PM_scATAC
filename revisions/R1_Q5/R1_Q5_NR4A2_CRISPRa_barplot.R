@@ -24,11 +24,12 @@
 #
 # Output: Plots/NR4A2_CRISPRa_barplot.pdf, NR4A2_CRISPRa_barplot_values.csv
 ###############################################################################
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({
   library(readxl); library(ggplot2); library(dplyr); library(RColorBrewer)
   library(paletteer); library(circlize)
 })
-ROOT <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM"
+ROOT <- DATA_DIR
 setwd(file.path(ROOT, "git_repo_claude", "R1_Q5")); dir.create("Plots", showWarnings = FALSE)
 source(file.path(ROOT, "git_repo", "utils", "ggplot_aestetics.R"))
 XLSX <- file.path(ROOT, "NR4A2_CRISPRa_Lillian", "7_15_26_qPCR_JK_CRISPRa.xlsx")

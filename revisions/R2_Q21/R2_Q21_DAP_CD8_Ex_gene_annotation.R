@@ -8,12 +8,13 @@
 # peak gets a gene by the rule of the labelled heatmap (Peak2Gene link, else nearest gene) plus the ArchR
 # peak-set annotation (nearest gene, distance to its TSS, peak type).
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({
   library(ArchR)
   library(SummarizedExperiment)
 })
 
-tnk_dir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR'
+tnk_dir = paste0(DATA_DIR, '/NKT_cells/scatac_ArchR')
 
 # Same steps as the original script ####
 DAP_list = readRDS (file.path (tnk_dir, 'DAP_CD8_CD8_ext_pairwise.rds'))
@@ -41,7 +42,7 @@ stopifnot (all (rownames(DAP_res_sig) %in% rownames(ps_ann)))
 #   gene = heatmap label if the peak is labelled in the heatmap,
 #          else the Peak2Gene-linked gene with the highest correlation (>= 0.35),
 #          else the nearest gene.
-hm_dir  = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/tnk_exhaustion_annotation'
+hm_dir  = paste0(RESULTS_DIR, '/tnk_exhaustion_annotation')
 COR_CUT = 0.35   # as in annotate_CD8ext_heatmap.R
 
 # Peak2Gene links stored in the T/NK project by scatac_NKTcells_ArchR.R (addPeak2GeneLinks, GeneScoreMatrix,

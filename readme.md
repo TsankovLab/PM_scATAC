@@ -158,9 +158,25 @@ See `software_used.csv` for full version details of every package in every envir
 
 ---
 
+## Configuration: data and output locations
+
+No script contains machine-specific paths. Every script reads its folders from a few roots defined in `config.R` (R) and `config.sh` (shell / job scripts) at the repository root:
+
+| Root          | Contents |
+|---------------|----------|
+| `DATA_DIR`    | project data: ArchR projects, Seurat objects, fragment files, bulk RNA-seq counts (subfolders as named in the scripts, e.g. `main/`, `tumor_compartment/`, `NKT_cells/`, `myeloid_cells/`, `CROPseq_validation_bulkRNA/`) |
+| `RESULTS_DIR` | outputs of the revision analyses, one subfolder per analysis as in `revisions/` |
+| `REF_DIR`     | reference data: `DBs/` (gene sets, motif databases), `Public_data/` (published cohorts), `chromBPnet/` (ChromBPNet reference files), `Xmen/greenleaf_PBMC_BM` (Granja et al. 2019 hematopoiesis reference, GEO GSE139369), `TCGA/`, ... |
+| `GENOME_DIR`  | `human/hg38.fa`, `human/gencode.v46.annotation.gtf` |
+| `SCRATCH_DIR` | large intermediate files |
+| `CONDA_ENVS`, `CONDA_INIT` | conda environments folder and conda's `etc/profile.d/conda.sh` |
+| `LSF_ACCOUNT` | LSF account for scripts that submit jobs (`#BSUB` headers carry the placeholder `<LSF_ACCOUNT>`) |
+
+Set them once, in any of three ways: edit the placeholders in `config.R` / `config.sh`; export `MESO_DATA_DIR`, `MESO_RESULTS_DIR`, `MESO_REF_DIR`, `MESO_GENOME_DIR`, `MESO_SCRATCH_DIR`, `MESO_CONDA_ENVS`, `MESO_CONDA_INIT`, `MESO_LSF_ACCOUNT`; or write the assignments in `config.local.R` / `config.local.sh` (git-ignored, read last). Scripts find the config by searching upward from their own location and from the working directory, so run them from inside the repository (or set `MESO_CONFIG` to the config file). Job scripts write their LSF logs to `logs/` relative to the submission directory.
+
 ## Running the analysis
 
-All analysis scripts expect to be run from the project directory (one level above `git_repo/`). Each script sources shared utilities from `git_repo/utils/` using relative paths.
+Run scripts from inside the repository; each one loads `config.R` / `config.sh` and builds every path from the roots above. Shared utilities are sourced from `utils/`.
 
 ### scATAC-seq (ArchR)
 
@@ -168,14 +184,14 @@ All analysis scripts expect to be run from the project directory (one level abov
 conda activate meso_scatac
 R
 # Main cohort
-source('git_repo/main_analysis/scatac_main_ArchR.R')
+source('main_analysis/scatac_main_ArchR.R')
 
 # Cell-type-specific subclustering (run independently)
-source('git_repo/tumor_analysis/scatac_tumor_SOX9.R')
-source('git_repo/tnk_analysis/scatac_NKTcells_ArchR.R')
-source('git_repo/myeloid_analysis/scatac_myeloid_ArchR.R')
-source('git_repo/stroma_analysis/scatac_stroma_ArchR.R')
-source('git_repo/B_cells_analysis/scatac_Bcells_ArchR.R')
+source('tumor_analysis/scatac_tumor_SOX9.R')
+source('tnk_analysis/scatac_NKTcells_ArchR.R')
+source('myeloid_analysis/scatac_myeloid_ArchR.R')
+source('stroma_analysis/scatac_stroma_ArchR.R')
+source('B_cells_analysis/scatac_Bcells_ArchR.R')
 ```
 
 ### scRNA-seq
@@ -183,9 +199,9 @@ source('git_repo/B_cells_analysis/scatac_Bcells_ArchR.R')
 ```r
 conda activate meso_scatac
 R
-source('git_repo/tnk_analysis/scrna_tnk.R')
-source('git_repo/stroma_analysis/scrna_stroma.R')
-source('git_repo/B_cells_analysis/scrna_BCells.R')
+source('tnk_analysis/scrna_tnk.R')
+source('stroma_analysis/scrna_stroma.R')
+source('B_cells_analysis/scrna_BCells.R')
 ```
 
 ---
@@ -213,4 +229,5 @@ The table below lists the main R packages. For complete version pinning see `sof
 ## Notes
 
 - Scripts with `[UNDER CONSTRUCTION]` in the tree above (ChromBPNet, TF-MoDISco, FiNeMo pipeline) are incomplete and should not be run as-is.
-- HPC job submission uses LSF (`bsub`). All batch scripts assume the Minerva cluster.
+- HPC job submission uses LSF (`bsub`); headers keep the resources used (cores, memory, run time, GPU type) as a guide. Replace `<LSF_ACCOUNT>` and the queue names with those of your cluster, or run the commands without the scheduler.
+- `revisions/R1_Q4/project_myeloid_on_pbmc.sh` calls an external LSI-projection script (`$SCRATCH_DIR/MesoRNA/ProjectionCode/run_projection_default.sh`) that is not part of this repository.

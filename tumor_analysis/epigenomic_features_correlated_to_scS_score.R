@@ -3,6 +3,7 @@
 #  using TF Deviations (mMat) and GeneScores (gsMat)
 ###############################################
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 library(dplyr)
 library(zoo)
 library(ggplot2)
@@ -197,7 +198,7 @@ dev.off()
 
 
 ### Import H3K27Ac data from primary cells from ENCODE ####
-encode_h3k27ac_path = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/ENCODE/H3K27Ac'
+encode_h3k27ac_path = paste0(REF_DIR, '/Public_data/ENCODE/H3K27Ac')
 encode_h3k27ac_files = file.path(encode_h3k27ac_path, list.files(encode_h3k27ac_path,pattern = '.bed'))
 if (!file.exists(file.path (encode_h3k27ac_path,'encode_h3k27ac.rds')))
   {

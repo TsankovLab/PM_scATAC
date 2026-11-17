@@ -43,7 +43,7 @@ ArrowFiles = createArrowFiles (inputFiles = inputFiles,
   subThreading= FALSE
 )
 
-#projdir = '/ahg/regevdata/projects/ICA_Lung/Bruno/combined_data/normal_all_meso/'
+#projdir = '$REF_DIR/combined_data/normal_all_meso/'
 #archp = ArchRProject (
 
 projdir = 'normal_distal_lung'

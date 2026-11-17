@@ -9,13 +9,14 @@
 # Output: max_dist_sweep_SE.csv        Submit: bsub < submit_max_dist_sweep_SE.sh
 # env: MAX_DISTS (5000,10000,15000,20000), N_CORES_MAT (3)
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({ library(ArchR); library(GenomicRanges); library(Matrix); library(rtracklayer); library(igraph); library(presto); library(dplyr); library(parallel) })
 addArchRGenome("hg38"); addArchRThreads(threads = 1)
-source("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/Hubs_finder.R")
-script_dir <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q7"
-main_dir   <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR"; peakcalls <- file.path(main_dir, "PeakCalls")
-se_rds     <- file.path(main_dir, "SE_regions_SE_database.rds"); se_path2 <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/SE_db2_from_Wooseung"
-chain_file <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/liftover/hg38ToHg19.over.chain"; mat_cache <- file.path(script_dir, "hub_cell_matrices_v2")
+source(paste0(REPO_DIR, "/utils/Hubs_finder.R"))
+script_dir <- paste0(RESULTS_DIR, "/R1_Q7")
+main_dir   <- paste0(DATA_DIR, "/main/scatac_ArchR"); peakcalls <- file.path(main_dir, "PeakCalls")
+se_rds     <- file.path(main_dir, "SE_regions_SE_database.rds"); se_path2 <- paste0(REF_DIR, "/DBs/SE_db2_from_Wooseung")
+chain_file <- paste0(REF_DIR, "/DBs/liftover/hg38ToHg19.over.chain"); mat_cache <- file.path(script_dir, "hub_cell_matrices_v2")
 MAX_DISTS <- as.integer(strsplit(Sys.getenv("MAX_DISTS", "5000,10000,15000,20000"), ",")[[1]]); COR_CUTOFFS <- c(0.2, 0.3, 0.4, 0.5, 0.6); MIN_PEAKS_VALUES <- c(3L, 4L, 5L); MIN_DIST_TSS_VALUES <- c(0L, 2000L)
 REMOVE_CHR <- c("chrX", "chrY"); META_GROUP <- "celltype_lv1"; FDR_CUT <- 0.05; LFC_CUT <- 1
 N_CORES <- min(as.integer(Sys.getenv("LSB_DJOB_NUMPROC", "4")), 8L); N_CORES_MAT <- as.integer(Sys.getenv("N_CORES_MAT", "3"))

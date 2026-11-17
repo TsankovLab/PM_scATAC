@@ -1,6 +1,6 @@
 #!/bin/bash
 #BSUB -J chrBP_model
-#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -P <LSF_ACCOUNT>
 #BSUB -q gpu
 #BSUB -n 8
 #BSUB -W 48:00
@@ -27,6 +27,7 @@
 
 
 #ml anaconda3 #/2020.11
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
 ml anaconda3/2022.10
 source activate chrombpnet
 
@@ -105,7 +106,7 @@ for fold_number in 0 1 2 3 4; do
         echo "[Fold ${fold_number}] Training job needed."
         rm -rf no_bias_model/fold_${fold_number}
         train_job_id=$(bsub -J ${celltype}_CBPtrain_f${fold_number} \
-             -P acc_Tsankov_Normal_Lung \
+             -P ${LSF_ACCOUNT} \
              -q gpu \
              -n 1 \
              -W 24:00 \
@@ -131,7 +132,7 @@ for fold_number in 0 1 2 3 4; do
         if [ ! -f "${count_scores_file}" ] || [ ! -f "${profile_scores_file}" ]; then
             echo "[Fold ${fold_number}] Contribution job needed."
             contrib_job_id=$(bsub -J ${celltype}_CBPcontrib_f${fold_number} \
-                 -P acc_Tsankov_Normal_Lung \
+                 -P ${LSF_ACCOUNT} \
                  -q gpu \
                  -n 1 \
                  -W 48:00 \
@@ -182,13 +183,13 @@ if [ "$all_exist_counts" = true ] && [ "$all_exist_profile" = true ]; then
     echo "=== Combine contribution scores ==="
     
     source activate h5py
-    export PATH=/sc/arion/work/giottb01/conda/envs/h5py/bin:$PATH
+    export PATH=${CONDA_ENVS}/h5py/bin:$PATH
     unset PYTHONPATH
-    export LD_LIBRARY_PATH=/sc/arion/work/giottb01/conda/envs/h5py/lib:$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=${CONDA_ENVS}/h5py/lib:$LD_LIBRARY_PATH
     
     # Combine HDF5 scores
     export HDF5_PLUGIN_PATH=""
-    /sc/arion/work/giottb01/conda/envs/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores2.py $chromBPct_dir $celltype
+    ${CONDA_ENVS}/h5py/bin/python $repodir/utils/chromBPnet_average_CNT_scores2.py $chromBPct_dir $celltype
     
     # Average bigwig files
     wiggletools mean no_bias_model/fold_{0..4}/contribution_scores.counts_scores.bw \
@@ -217,7 +218,7 @@ modisco_counts_file=no_bias_model/modisco_counts/modisco_results_counts.h5
 if [ ! -f "${modisco_counts_file}" ] && [ -f "${avg_contribution_counts_file}" ]; then
 echo "=== Run TF-MoDISco on averaged contributions ==="
 TFmd_c_id=$(bsub -J ${celltype}_TFmd_c \
-    -P acc_Tsankov_Normal_Lung \
+    -P ${LSF_ACCOUNT} \
     -q premium \
     -n 8 \
     -W 72:00 \
@@ -230,7 +231,7 @@ fi
 
 if [ ! -f "${modisco_profile_file}" ] && [ -f "${avg_contribution_profile_file}" ]; then
 TFmd_p_id=$(bsub -J ${celltype}_TFmd_p \
-    -P acc_Tsankov_Normal_Lung \
+    -P ${LSF_ACCOUNT} \
     -q premium \
     -n 8 \
     -W 72:00 \
@@ -245,7 +246,7 @@ finemo_counts_file=no_bias_model/finemo_out_counts/hits.bed
 if [ -f "${modisco_counts_file}" ] && [ -f "${modisco_profile_file}" ] && [ ! -f "$finemo_counts_file" ]; then
     echo "=== Submit finemo job ==="
     finemo_job_id=$(bsub -J ${celltype}_finemo \
-        -P acc_Tsankov_Normal_Lung \
+        -P ${LSF_ACCOUNT} \
         -q gpu \
         -n 1 \
         -W 24:00 \
@@ -270,7 +271,7 @@ Rscript $repodir/utils/chromBPnet_finemo_motif_labels.R $chromBPdir $celltype
 echo "R script execution completed."
 
 # bsub -J ${celltype}_combS \
-#      -P acc_Tsankov_Normal_Lung \
+#      -P ${LSF_ACCOUNT} \
 #      -o ${chromBPdir}/${celltype}_combine_scores.out \
 #      -e ${chromBPdir}/${celltype}_combine_scores.err \
 #      -R rusage[mem=64000] \

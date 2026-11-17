@@ -1,0 +1,29 @@
+#!/bin/bash
+#BSUB -P <LSF_ACCOUNT>
+#BSUB -J bclconvert_demux
+#BSUB -q premium
+#BSUB -n 32
+#BSUB -R "rusage[mem=6000] span[hosts=1]"
+#BSUB -W 24:00
+#BSUB -o logs/bclconvert.%J.out
+#BSUB -e logs/bclconvert.%J.err
+#BSUB -L /bin/bash
+
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
+ml bclconvert/4.4.6
+export APPTAINER_BIND="${DATA_DIR},${SCRATCH_DIR},${REF_DIR}"   # folders visible inside the bcl-convert container
+
+RUN_DIR=${SCRATCH_DIR}/CROPseq_validation_bulkRNA/260910_lh00972_0166_A237V7KLT4
+SAMPLESHEET=${DATA_DIR}/CROPseq_validation_bulkRNA/01_raw_data/SampleSheet.csv
+OUT_DIR=${SCRATCH_DIR}/CROPseq_validation_bulkRNA/fastq_raw
+
+bcl-convert \
+  --bcl-input-directory "$RUN_DIR" \
+  --output-directory "$OUT_DIR" \
+  --sample-sheet "$SAMPLESHEET" \
+  --bcl-only-lane 1 \
+  --bcl-num-parallel-tiles 4 \
+  --bcl-num-conversion-threads 8 \
+  --bcl-num-compression-threads 8 \
+  --bcl-num-decompression-threads 8 \
+  --force

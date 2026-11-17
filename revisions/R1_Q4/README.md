@@ -6,7 +6,7 @@ Run in this order (each R script has a matching LSF submit script):
    ArchR project so that all cells can be projected in one call (saves the project).
 2. `project_myeloid_on_pbmc.sh` — projects all myeloid cells onto the IterativeLSI space of the Greenleaf PBMC/BM reference
    (`Xmen/greenleaf_PBMC_BM`, label column `BioClassification`) with the projection wrapper
-   `/sc/arion/scratch/leew17/MesoRNA/ProjectionCode/run_projection_default.sh`; writes `output/pbmc_projection/myeloid_all_lsi_projection.rds`.
+   `$SCRATCH_DIR/MesoRNA/ProjectionCode/run_projection_default.sh` (external projection code, not part of this repository); writes `output/pbmc_projection/myeloid_all_lsi_projection.rds`.
 3. `compute_per_label_scores.R` (`submit_compute_per_label_scores.sh`) — per cell, the fraction of its 25 nearest reference
    cells (LSI space) carrying each reference label; writes `output/pbmc_projection/per_label_scores.csv`.
 4. Figures (read `per_label_scores.csv`):

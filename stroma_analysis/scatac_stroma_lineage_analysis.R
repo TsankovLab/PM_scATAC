@@ -1,10 +1,11 @@
 
-# cd /ahg/regevdata/projects/ICA_Lung/Bruno/Public_data/
+# cd $REF_DIR/Public_data/
 # wget -r http://catlas.org/catlas_downloads/humanbrain/cCREs/
 # wget -r http://catlas.org/catlas_downloads/humantissues/Peaks/
 
 # Read ENCODE collection for peak annotation
-H3K4me3_primary_filepath = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/ENCODE/H3K4me3_ChIP-seq/primary_cells/'
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
+H3K4me3_primary_filepath = paste0(REF_DIR, '/Public_data/ENCODE/H3K4me3_ChIP-seq/primary_cells/')
 encode_H3K4me3_primary = readRDS (paste0(H3K4me3_primary_filepath, 'H3K4me3_primary_cells_bed_list.rds'))
 
 # Read in peak files from scATAC studies ####

@@ -1,20 +1,21 @@
 #!/bin/bash
-#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -P <LSF_ACCOUNT>
 #BSUB -J bclconvert_demux
 #BSUB -q premium
 #BSUB -n 32
 #BSUB -R "rusage[mem=6000] span[hosts=1]"
 #BSUB -W 24:00
-#BSUB -o /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/bclconvert.%J.out
-#BSUB -e /sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/logs/bclconvert.%J.err
+#BSUB -o logs/bclconvert.%J.out
+#BSUB -e logs/bclconvert.%J.err
 #BSUB -L /bin/bash
 
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
 ml bclconvert/4.4.6
-export APPTAINER_BIND="/sc/arion:/sc/arion"
+export APPTAINER_BIND="${DATA_DIR},${SCRATCH_DIR},${REF_DIR}"   # folders visible inside the bcl-convert container
 
-RUN_DIR=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/260910_lh00972_0166_A237V7KLT4
-SAMPLESHEET=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/sample_sheet/SampleSheet.csv
-OUT_DIR=/sc/arion/scratch/giottb01/CROPseq_validation_bulkRNA/fastq_raw
+RUN_DIR=${SCRATCH_DIR}/CROPseq_validation_bulkRNA/260910_lh00972_0166_A237V7KLT4
+SAMPLESHEET=${DATA_DIR}/CROPseq_validation_bulkRNA/processed/sample_sheet/SampleSheet.csv
+OUT_DIR=${SCRATCH_DIR}/CROPseq_validation_bulkRNA/fastq_raw
 
 bcl-convert \
   --bcl-input-directory "$RUN_DIR" \

@@ -1,6 +1,6 @@
 #!/bin/bash
 #BSUB -J chrBP_model
-#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -P <LSF_ACCOUNT>
 #BSUB -q gpu
 #BSUB -n 8
 #BSUB -W 48:00
@@ -13,6 +13,7 @@
 #BSUB -L /bin/bash
 
 # ml anaconda3/2022.10
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
 ml cuda/11.7.0
 ml cudnn/8.9.5-11
 ml proxies
@@ -33,25 +34,25 @@ echo $celltype
 MODEL_H5=${5}
 echo $MODEL_H5
 #mkdir $chromBPdir
-#chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
+#chromBPdir=${DATA_DIR}/tumor_compartment/scatac_ArchR/chromBPnet
 #celltype=low_P23
-#MODEL_H5=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet/${celltype}/no_bias_model/fold_0/models/chrombpnet_nobias.h5
-#/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
-grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
-repodir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo
+#MODEL_H5=${DATA_DIR}/tumor_compartment/scatac_ArchR/chromBPnet/${celltype}/no_bias_model/fold_0/models/chrombpnet_nobias.h5
+#${DATA_DIR}/tumor_compartment/scatac_ArchR/chromBPnet
+grefdir=${REF_DIR}/chromBPnet
+repodir=${REPO_DIR}
 #motif_file=motif_footprints2.txt
 #motif_file=motif_footprints_IRF.txt
 motif_file=motif_footprints_SOX9.txt
 
-#chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR/chromBPnet
-#chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scatac_ArchR/chromBPnet
-chromBPdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment/scatac_ArchR/chromBPnet
-chromBPdir=/sc/arion/scratch/giottb01/Xmen/meso
+#chromBPdir=${DATA_DIR}/myeloid_cells/scatac_ArchR/chromBPnet
+#chromBPdir=${DATA_DIR}/NKT_cells/scatac_ArchR/chromBPnet
+chromBPdir=${DATA_DIR}/tumor_compartment/scatac_ArchR/chromBPnet
+chromBPdir=${SCRATCH_DIR}/Xmen/meso
 #celltype=inflamed
 #celltype=NK_KLRC1
 celltype=SOX9_high_P23_v2
 celltype=CD8_exhausted
-grefdir=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/chromBPnet
+grefdir=${REF_DIR}/chromBPnet
 OUTPUT_PREFIX=${chromBPdir}/${celltype}/footprints
 
 cd $chromBPdir/$celltype

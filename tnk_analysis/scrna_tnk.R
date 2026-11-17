@@ -1,3 +1,4 @@
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 conda activate meso_scatac
 # use UGER # Add this before running R to be able to run cNMF scripts using UGER 
 
@@ -17,7 +18,7 @@ library (tidyverse)
 set.seed(1234)
 
 # Set project dir
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
+projdir = paste0(DATA_DIR, '/NKT_cells/scrna')
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
 
@@ -45,11 +46,11 @@ sarc_order = c('P1','P13','P3','P12','P5','P11','P4','P8','P14')
 # Load scRNA ####
 if (!file.exists ('srt.rds'))
 	{
-	#srt = readRDS ('/ahg/regevdata/projects/ICA_Lung/Bruno/mesothelioma/reproduction2/scRNA/GSE190597_srt_tumor.rds')
-	srt = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/srt.rds')
+	#srt = readRDS ('$REF_DIR/mesothelioma/reproduction2/scRNA/GSE190597_srt_tumor.rds')
+	srt = readRDS (paste0(DATA_DIR, '/srt.rds'))
 	
 	# Import P14
-	srt_p14 = readRDS ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/MPM_naive_p14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds')
+	srt_p14 = readRDS (paste0(REF_DIR, '/mesothelioma/MPM_naive_p14_analysis/_cellranger_raw_Filter_400_1000_25/no_harmony/srt.rds'))
 	srt_p14$celltype_simplified = srt_p14$celltype
 	srt = merge (srt, srt_p14)
 	srt$sampleID[srt$sampleID == 'MPM_naive_p14'] = 'P14'
@@ -366,7 +367,7 @@ saveRDS (srt, 'srt.rds')
 # cnmf_name = 'TNK'
 # cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
 # dir.create (file.path(cnmf_out,'Plots'), recursive=T)
-# repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+# repodir = '$REPO_DIR'
 
 # ### RUN consensus NMF ####
 # source (file.path ('..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
@@ -470,7 +471,7 @@ saveRDS (srt, 'srt.rds')
 # srt_orig = srt
 # #### Run cNMF on NK KLRC1+ and CD8 exhausted ####
 # srt = srt_orig[, srt_orig$celltype2 == 'NK_KLRC1' & srt_orig$sampleID %in% 'P1']
-# projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
+# projdir = '$DATA_DIR/NKT_cells/scrna'
 # setwd (projdir)
 # dir.create (file.path('NK_KLRC1','Plots'), recursive=TRUE)
 # setwd ('NK_KLRC1')
@@ -485,7 +486,7 @@ saveRDS (srt, 'srt.rds')
 # cnmf_name = 'NK_KLRC1'
 
 
-# repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+# repodir = '$REPO_DIR'
 
 # ### RUN consensus NMF ####
 # source (file.path ('..','..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
@@ -500,7 +501,7 @@ saveRDS (srt, 'srt.rds')
 # srt = srt2
 # srt2 = srt
 # srt = srt2[, srt$celltype2 == 'CD8_exhausted' & srt$sampleID %in% 'P1']
-# projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
+# projdir = '$DATA_DIR/NKT_cells/scrna'
 # setwd (projdir)
 # projdir = file.path (projdir,'CD8_exhausted')
 # dir.create (file.path('CD8_exhausted','Plots'), recursive=TRUE)
@@ -515,7 +516,7 @@ saveRDS (srt, 'srt.rds')
 # cnmf_name = 'CD8_exhausted'
 # cnmf_out = paste0('cNMF/cNMF_',cnmf_name,'_',paste0(k_list[1],'_',k_list[length(k_list)]),'_vf',nfeat)
 # dir.create (file.path(cnmf_out,'Plots'), recursive=T)
-# repodir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+# repodir = '$REPO_DIR'
 
 # ### RUN consensus NMF ####
 # source (file.path ('..','..','..','git_repo','utils','cnmf_prepare_inputs.R')) 
@@ -529,10 +530,10 @@ saveRDS (srt, 'srt.rds')
 
 # # Compare cNMFs ####
 # k_selection = 10
-# cnmf_nk = readRDS (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/NK_KLRC1/cnmf_genelist_',k_selection,'_nfeat_5000.rds'))
+# cnmf_nk = readRDS (paste0('$DATA_DIR/NKT_cells/scrna/NK_KLRC1/cnmf_genelist_',k_selection,'_nfeat_5000.rds'))
 # names (cnmf_nk) = paste0('nk_',names(cnmf_nk))
 # sapply (cnmf_nk, function(x) 'NR4A2' %in% x)
-# cnmf_cd8ext = readRDS (paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna/CD8_exhausted/cnmf_genelist_',k_selection,'_nfeat_5000.rds'))
+# cnmf_cd8ext = readRDS (paste0('$DATA_DIR/NKT_cells/scrna/CD8_exhausted/cnmf_genelist_',k_selection,'_nfeat_5000.rds'))
 # names (cnmf_cd8ext) = paste0('cd8ext_',names(cnmf_cd8ext))
 # sapply (cnmf_cd8ext, function(x) 'NR4A2' %in% x)
 
@@ -541,7 +542,7 @@ saveRDS (srt, 'srt.rds')
 # cnmf_cd8ext[[6]][cnmf_cd8ext[[6]] %in% cnmf_nk[[4]]]
 # ov_mat = ovmat (c(cnmf_nk, cnmf_cd8ext), compare_lists = list(names(cnmf_nk),names(cnmf_cd8ext)))
 
-# projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/NKT_cells/scrna'
+# projdir = '$DATA_DIR/NKT_cells/scrna'
 # setwd (projdir)
 # pdf (file.path ('Plots','compare_cnmfs_NK_KLRC1_CD8exhausted.pdf'),5,5)
 # ov_mat

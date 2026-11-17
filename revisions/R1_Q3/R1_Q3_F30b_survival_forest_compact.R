@@ -11,11 +11,12 @@
 # Bueno survival is recorded in years and converted to months (does not affect HRs).
 # Outputs: Plots/F30b_survival_forest_compact.pdf, F30b_survival_forest_table.csv
 ###############################################################################
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 set.seed(1234)
 suppressMessages({ library(survival); library(ggplot2); library(dplyr)
                    library(RColorBrewer); library(paletteer); library(circlize) })
 
-projdir  <- '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM'
+projdir  <- DATA_DIR
 bulk_dir <- file.path(projdir, 'bulkRNA_meso')
 outdir   <- file.path(projdir, 'git_repo_claude', 'R1_Q3')
 source(file.path(projdir, 'git_repo', 'utils', 'ggplot_aestetics.R'))

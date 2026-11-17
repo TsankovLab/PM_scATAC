@@ -20,6 +20,7 @@
 # Output: myeloid_SE_hub_enrichment.csv
 # Submit: bsub < submit_myeloid_SE_hub_enrichment.sh
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({
   library(ArchR)
   library(GenomicRanges)
@@ -33,15 +34,15 @@ suppressPackageStartupMessages({
 addArchRGenome("hg38")
 addArchRThreads(threads = 1)
 
-source("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/Hubs_finder.R")
+source(paste0(REPO_DIR, "/utils/Hubs_finder.R"))
 
 # ---- paths ------------------------------------------------------------------
-script_dir  <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q7"
-main_dir    <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR"
+script_dir  <- paste0(RESULTS_DIR, "/R1_Q7")
+main_dir    <- paste0(DATA_DIR, "/main/scatac_ArchR")
 peakcalls   <- file.path(main_dir, "PeakCalls")
 se_rds      <- file.path(main_dir, "SE_regions_SE_database.rds")
-se_path2    <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/SE_db2_from_Wooseung"
-chain_file  <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/liftover/hg38ToHg19.over.chain"
+se_path2    <- paste0(REF_DIR, "/DBs/SE_db2_from_Wooseung")
+chain_file  <- paste0(REF_DIR, "/DBs/liftover/hg38ToHg19.over.chain")
 mat_cache   <- file.path(script_dir, "hub_cell_matrices_v2")
 dir.create(mat_cache, showWarnings = FALSE)
 

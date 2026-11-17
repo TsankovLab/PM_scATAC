@@ -1,0 +1,44 @@
+#!/bin/bash
+# STAR alignment and gene counts of the bulk RNA-seq KO cohort: 35 transcription-factor knockout samples (6 KOs: TEAD4, TWIST1, PITX1, SOX9, TEAD2, BPTF) + 8 non-targeting
+# controls; mesothelioma lines MSTO-211H, NCI-H2452, NCI-H28; sample = library name <line>_<KO>_<replicate>.
+# One array task per sample: FastQC, then STAR 2.7.11b (index of 01_star_index.lsf, hg38 + GENCODE v46) with --quantMode GeneCounts.
+# Output: <COUNTS_OUT>/<sample>_ReadsPerGene.out.tab (input of 00_ko35_count_matrix.R), <LOG_OUT>/<sample>_Log.final.out, BAMs in <BAM_OUT>/<sample>/
+#BSUB -P <LSF_ACCOUNT>
+#BSUB -J "star_align_ko35[1-43]%20"
+#BSUB -q premium
+#BSUB -n 8
+#BSUB -R "rusage[mem=5000] span[hosts=1]"
+#BSUB -W 4:00
+#BSUB -o logs/star_align_ko35.%J.%I.out
+#BSUB -e logs/star_align_ko35.%J.%I.err
+#BSUB -L /bin/bash
+
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
+ml star/2.7.11b fastqc/0.12.1
+
+SAMPLES=(MSTO_TEAD4_R1 MSTO_TEAD4_R2 MSTO_TWIST1_R2 MSTO_TWIST1_R3 MSTO_PITX1_R1 MSTO_PITX1_R3 MSTO_SOX9_R2 MSTO_SOX9_R3 MSTO_TEAD2_R2 MSTO_TEAD2_R3 MSTO_BPTF_R1 MSTO_BPTF_R3 H2452_TEAD4_R1 H2452_TEAD4_R3 H2452_TWIST1_R1 H2452_PITX1_R1 H2452_PITX1_R3 H2452_SOX9_R2 H2452_SOX9_R3 H2452_TEAD2_R1 H2452_TEAD2_R2 H2452_BPTF_R1 H2452_BPTF_R2 H28_TEAD4_R1 H28_TEAD4_R3 H28_TWIST1_R1 H28_TWIST1_R3 H28_PITX1_R1 H28_PITX1_R3 H28_SOX9_R1 H28_SOX9_R2 H28_TEAD2_R1 H28_TEAD2_R2 H28_BPTF_R1 H28_BPTF_R3 MSTO_NTC_R1 MSTO_NTC_R2 MSTO_NTC_R3 H2452_NTC_R1 H2452_NTC_R2 H2452_NTC_R3 H28_NTC_R1 H28_NTC_R2)
+FASTQ_DIR=${SCRATCH_DIR}/CROPseq_validation_bulkRNA/fastq_raw
+INDEX=${SCRATCH_DIR}/CROPseq_validation_bulkRNA/work/star_index_hg38
+BAM_OUT=${SCRATCH_DIR}/CROPseq_validation_bulkRNA/work/bam
+COUNTS_OUT=${DATA_DIR}/CROPseq_validation_bulkRNA/04_processed_counts/star_counts
+LOG_OUT=${DATA_DIR}/CROPseq_validation_bulkRNA/04_processed_counts/star_logs
+QC_DIR=${DATA_DIR}/CROPseq_validation_bulkRNA/04_processed_counts/qc
+
+SID=${SAMPLES[$((LSB_JOBINDEX - 1))]}
+R1=$(ls "$FASTQ_DIR"/${SID}_S*_L001_R1_001.fastq.gz); R2=$(ls "$FASTQ_DIR"/${SID}_S*_L001_R2_001.fastq.gz)
+mkdir -p "$BAM_OUT/$SID" "$COUNTS_OUT" "$LOG_OUT" "$QC_DIR"
+fastqc -t 8 -o "$QC_DIR" "$R1" "$R2"
+
+cd "$BAM_OUT/$SID"
+STAR \
+  --runThreadN 8 \
+  --genomeDir "$INDEX" \
+  --readFilesIn "$R1" "$R2" \
+  --readFilesCommand zcat \
+  --outSAMtype BAM SortedByCoordinate \
+  --quantMode GeneCounts \
+  --outFileNamePrefix "$BAM_OUT/$SID/${SID}_" \
+  --outSAMunmapped Within
+
+cp "$BAM_OUT/$SID/${SID}_ReadsPerGene.out.tab" "$COUNTS_OUT/"
+cp "$BAM_OUT/$SID/${SID}_Log.final.out" "$LOG_OUT/"

@@ -1,3 +1,4 @@
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
 ml anaconda3/2020.11
 source activate chrombpnet
 
@@ -55,7 +56,7 @@ for fold_number in 0 1 2 3 4; do
     echo "run training bias model"
      job_id=$(
         bsub -J ${celltype}_bias \
-         -P acc_Tsankov_Normal_Lung \
+         -P ${LSF_ACCOUNT} \
          -q gpu \
          -n 8 \
          -W 48:00 \

@@ -4,11 +4,12 @@
 # similar motifs from the TOMTOM matching, the family of the best-matching TFs
 # from HOCOMOCO, and the CWM motif logos.
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 proj_dir <- here::here()
 kundaje_dir <- trimws(readr::read_lines("../../AK_PROJ_DIR.txt"))
 doc_id <- "04c"
 figout <- here("figures/03-chrombpnet/02-compendium/", doc_id, "/"); dir.create(figout, recursive = TRUE, showWarnings = FALSE)
-out <- '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/'
+out <- paste0(DATA_DIR, '/main/scatac_ArchR/chromBPnet/')
 
 # setup ------------------------------------------------------------------------
 set.seed(100)
@@ -24,7 +25,7 @@ library(purrr)
 library(stringr)
 library(cowplot)
 
-script_path <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA/code/utils/"
+script_path <- paste0(DATA_DIR, "/HDMA/code/utils/")
 source(file.path(script_path, "plotting_config.R")) #Assumes these files are on same level if in a subdirectory in hdma/utils
 source(file.path(script_path, "hdma_palettes.R"))
 source(file.path(script_path, "sj_scRNAseq_helpers.R"))
@@ -35,7 +36,7 @@ ggplot2::theme_set(theme_BOR())
 # load data --------------------------------------------------------------------
 
 # Cluster metadata
-# cluster_meta <- read_csv("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA/code/05-misc/03/TableS2_cluster_meta_qc.csv")
+# cluster_meta <- read_csv("$DATA_DIR/HDMA/code/05-misc/03/TableS2_cluster_meta_qc.csv")
 
 # chrombpnet_models_keep <- read_tsv("../output/01-models/qc/chrombpnet_models_keep2.tsv",
 #                                    col_names = c("Cluster", "Folds_keep", "Cluster_ID"))
@@ -50,13 +51,13 @@ ggplot2::theme_set(theme_BOR())
 # Load merged modisco patterns
 
 # indiv reports
-# counts_modisco_reports <- read_tsv("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA/code/03-chrombpnet/01-models/modisco_tsv/all_modisco_report.motifs.counts.tsv") %>%
+# counts_modisco_reports <- read_tsv("$DATA_DIR/HDMA/code/03-chrombpnet/01-models/modisco_tsv/all_modisco_report.motifs.counts.tsv") %>%
 #   filter(Cluster %in% chrombpnet_models_keep$Cluster)
 # dim(counts_modisco_reports)
 
 # merged reports
 model_head = 'profile'
-modisco_merged = map_dfr(list.files(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_',model_head,'/merged_motifs'), recursive = TRUE, pattern = "modisco_compiled.tsv", full.names = TRUE),
+modisco_merged = map_dfr(list.files(paste0(paste0(DATA_DIR, '/main/scatac_ArchR/chromBPnet/modisco_merged_'),model_head,'/merged_motifs'), recursive = TRUE, pattern = "modisco_compiled.tsv", full.names = TRUE),
                           ~ read_tsv(.x))
 
 modisco_merged <- modisco_merged %>%
@@ -68,7 +69,7 @@ write_tsv(modisco_merged, file = glue("{out}modisco_merged_reports.tsv"))
 
 
 # compiled reports with tomtom matches againt Vierstra database
-modisco_compiled <- read_tsv(paste0('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/main/scatac_ArchR/chromBPnet/modisco_merged_',model_head,'/compiled/modisco_compiled.tsv')) %>%
+modisco_compiled <- read_tsv(paste0(paste0(DATA_DIR, '/main/scatac_ArchR/chromBPnet/modisco_merged_'),model_head,'/compiled/modisco_compiled.tsv')) %>%
   # fix logo names
   mutate(modisco_cwm_fwd = ifelse(grepl("^pos", pattern), gsub("pos.", "pos_patterns.pos.", modisco_cwm_fwd), gsub("neg.", "neg_patterns.neg.", modisco_cwm_fwd)),
          modisco_cwm_rev = ifelse(grepl("^pos", pattern), gsub("pos.", "pos_patterns.pos.", modisco_cwm_rev), gsub("neg.", "neg_patterns.neg.", modisco_cwm_rev)))
@@ -102,7 +103,7 @@ modisco_compiled2 = cbind (modisco_merged, modisco_compiled[modisco_merged$merge
 # write_tsv(vierstra_metadata, file = glue("{out}/vierstra_metadata_updated.tsv"))
 
 # HOCOMOCO annotations:
-# hocomoco <- read_tsv(here("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/D/H12CORE_annotation.tsv"))
+# hocomoco <- read_tsv(here("$REF_DIR/D/H12CORE_annotation.tsv"))
 # hocomoco_unique <- hocomoco %>%
 #   distinct(masterlist_info.species.HUMAN.gene_symbol, .keep_all = TRUE) %>%
 #   mutate(

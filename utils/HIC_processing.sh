@@ -1,3 +1,4 @@
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
   # - conda-forge::python=3.8.10=h49503c6_1_cpython
   # - conda-forge::scipy=1.7.0=py38h7b17777_1
   # - conda-forge::numpy=1.21.1=py38h9894fe3_0
@@ -55,26 +56,26 @@ conda activate hic
 
 projdir
 cd HiCPro/HiC-Pro
-#~/local/bin/HiC-Pro_3.1.0/bin/HiC-Pro -i /sc/arion/scratch/leew17/HiC/rawdata -o /sc/arion/scratch/giottb01/HiCPro -c /sc/arion/projects/Tsankov_Normal_Lung/Bruno/HiCPro_files/config_file.txt
+#~/local/bin/HiC-Pro_3.1.0/bin/HiC-Pro -i ${SCRATCH_DIR}/HiC/rawdata -o ${SCRATCH_DIR}/HiCPro -c ${REF_DIR}/HiCPro_files/config_file.txt
 
 
 
 
 
 # TRy send it as a job
-chmod +x /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/HiC_Pro.sh
-bsub -J HiC_step1 -P acc_Tsankov_Normal_Lung -q premium -n 8 -W 144:00 -R rusage[mem=16000] -R span[hosts=1] -o HiC.out -e HiC.err /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/HiC_Pro.sh
+chmod +x ${REPO_DIR}/utils/HiC_Pro.sh
+bsub -J HiC_step1 -P ${LSF_ACCOUNT} -q premium -n 8 -W 144:00 -R rusage[mem=16000] -R span[hosts=1] -o HiC.out -e HiC.err ${REPO_DIR}/utils/HiC_Pro.sh
 
 
 ### RE-run with higher resolution contact maps
-~/local/bin/HiC-Pro_3.1.0/bin/HiC-Pro -i /sc/arion/scratch/giottb01/HiCPro2/hic_results/data -o /sc/arion/scratch/giottb01/HiCPro_matrices -c /sc/arion/projects/Tsankov_Normal_Lung/Bruno/HiCPro_files/config_file.txt -s build_contact_maps -s ice_norm
+~/local/bin/HiC-Pro_3.1.0/bin/HiC-Pro -i ${SCRATCH_DIR}/HiCPro2/hic_results/data -o ${SCRATCH_DIR}/HiCPro_matrices -c ${REF_DIR}/HiCPro_files/config_file.txt -s build_contact_maps -s ice_norm
 
 
 
 
-# chmod +x /sc/arion/scratch/giottb01/HiCPro/HiCPro_step1_HiC_HChang.sh
-# cd /sc/arion/scratch/giottb01/HiCPro/
-# bsub -J HiC_step1 -P acc_Tsankov_Normal_Lung -q premium -n 8 -W 12:00 -R rusage[mem=16000] -R span[hosts=1] -o HiC.out -e HiC.err HiCPro_step1_HiC_HChang.sh
+# chmod +x ${SCRATCH_DIR}/HiCPro/HiCPro_step1_HiC_HChang.sh
+# cd ${SCRATCH_DIR}/HiCPro/
+# bsub -J HiC_step1 -P ${LSF_ACCOUNT} -q premium -n 8 -W 12:00 -R rusage[mem=16000] -R span[hosts=1] -o HiC.out -e HiC.err HiCPro_step1_HiC_HChang.sh
 # pip install --upgrade pip setuptools wheel cython
 
 # conda install bx-python=0.8.11 

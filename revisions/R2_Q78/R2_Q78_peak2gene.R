@@ -20,11 +20,12 @@
 # Output: peak2gene_links_500kb.rds in scratch (input of R2_Q78_p2g_links_tracks.R), R2_Q78_peak2gene_hub_peaks.csv,
 #         R2_Q78_peak2gene_all_genes_for_hub_peaks.csv, R2_Q78_peak2gene_summary.csv
 ###############################################################################
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({ library(ArchR); library(GenomicRanges) })
 addArchRThreads(8); addArchRGenome("hg38"); set.seed(1)
-ROOT   <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM"
+ROOT   <- DATA_DIR
 OUT    <- file.path(ROOT, "git_repo_claude", "R2_Q78")
-SCR    <- "/sc/arion/scratch/giottb01/R2_Q78_peak2gene"
+SCR    <- paste0(SCRATCH_DIR, "/R2_Q78_peak2gene")
 HUBDIR <- file.path(ROOT, "main", "scatac_ArchR", "hubs_obj_cor_0.3_md_12500_dgs_0_min_peaks_5")
 MAXDIST <- 500000
 setwd(OUT); dir.create(SCR, showWarnings = FALSE, recursive = TRUE)

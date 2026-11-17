@@ -1,3 +1,4 @@
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 conda activate meso_scatac
 use UGER # Add this before running R to be able to run cNMF scripts using UGER 
 
@@ -17,7 +18,7 @@ library (tidyverse)
 set.seed(1234)
 
 # Set project dir
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/Endothelial/scrna'
+projdir = paste0(DATA_DIR, '/Endothelial/scrna')
 dir.create (file.path(projdir,'Plots'), recursive =T)
 setwd (projdir)
 source ('../../git_repo/utils/useful_functions.R')

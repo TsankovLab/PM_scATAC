@@ -14,6 +14,7 @@
 #
 # Run via: bsub < submit_compute_per_label_scores.sh
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({
   library(ArchR)
   library(FNN)
@@ -25,10 +26,10 @@ addArchRGenome("hg19")
 K <- 25
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-query_proj_dir <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/myeloid_cells/scatac_ArchR"
-ref_proj_dir   <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Xmen/greenleaf_PBMC_BM"
-lsi_rds        <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q4/output/pbmc_projection/myeloid_all_lsi_projection.rds"
-score_csv      <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R1_Q4/output/pbmc_projection/per_label_scores.csv"
+query_proj_dir <- paste0(DATA_DIR, "/myeloid_cells/scatac_ArchR")
+ref_proj_dir   <- paste0(REF_DIR, "/Xmen/greenleaf_PBMC_BM")
+lsi_rds        <- paste0(RESULTS_DIR, "/R1_Q4/output/pbmc_projection/myeloid_all_lsi_projection.rds")
+score_csv      <- paste0(RESULTS_DIR, "/R1_Q4/output/pbmc_projection/per_label_scores.csv")
 
 # ── cnmf_cluster → celltype_lv3 map ───────────────────────────────────────────
 ct_map <- c(

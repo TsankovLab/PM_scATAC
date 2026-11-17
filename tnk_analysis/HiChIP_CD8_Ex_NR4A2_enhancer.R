@@ -9,7 +9,7 @@ hic = list()
 for (sam in samples)
   {
   matrix_files = paste0('HiC_Texhaustion_GSE168881_hg38/hic_results/matrix/',sam,'/raw/10000/',sam,'_10000.matrix') # raw
-  #matrix_files = paste0('/sc/arion/scratch/giottb01/HiCPro_matrices/hic_results/matrix/',sam,'/iced/10000/',sam,'_10000_iced.matrix') # iced normalized
+  #matrix_files = paste0('$SCRATCH_DIR/HiCPro_matrices/hic_results/matrix/',sam,'/iced/10000/',sam,'_10000_iced.matrix') # iced normalized
   bed_files = paste0('HiC_Texhaustion_GSE168881_hg38/hic_results/matrix/',sam,'/raw/10000/',sam,'_10000_abs.bed')
   bed = read.table (bed_files)
   

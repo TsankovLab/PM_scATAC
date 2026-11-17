@@ -1,3 +1,4 @@
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 ml anaconda3
 conda activate meso_scatac
 R
@@ -9,18 +10,18 @@ packages = c('ArchR','rGREAT','igraph','karyoploteR','Seurat','ggpubr','org.Hs.e
 lapply(packages, require, character.only = TRUE)
 
 #devtools::install_github("immunogenomics/presto") #needed for DAA
-#source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/useful_functions.R')
-meso_repo = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo'
+#source ('$REF_DIR/scripts/useful_functions.R')
+meso_repo = REPO_DIR
 source (file.path (meso_repo, 'utils','useful_functions.R'))
 source (file.path (meso_repo, 'utils','scATAC_functions.R'))
 
 # Load functions for hub detection
-# source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/knnGen.R')
-# source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/addCoAx.R')
-# source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/Hubs_finder.R')
-# source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/cooltools/hubs_tools/hubs_track.R')
-# source ('/ahg/regevdata/projects/ICA_Lung/Bruno/scripts/scrna_pipeline/useful_functions.R')
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/pbmc_myeloid'
+# source ('$REF_DIR/scripts/cooltools/hubs_tools/knnGen.R')
+# source ('$REF_DIR/scripts/cooltools/hubs_tools/addCoAx.R')
+# source ('$REF_DIR/scripts/cooltools/hubs_tools/Hubs_finder.R')
+# source ('$REF_DIR/scripts/cooltools/hubs_tools/hubs_track.R')
+# source ('$REF_DIR/scripts/scrna_pipeline/useful_functions.R')
+projdir = paste0(REF_DIR, '/AS_human_lung_scatac/analysis/pbmc_myeloid')
 setwd (projdir)
 
 
@@ -39,7 +40,7 @@ source (file.path('..','..','..','mesothelioma','scATAC_PM','git_repo','utils','
 #meta = meta[meta$ASSAY.Type == 'ATAC',]
 #meta = meta[meta$tissue %in% c('Normal','Tumor'),]
 #meta = meta[meta$Project == 'lung',]
-#fragmentsDir = '/broad/hptmp/bgiotti/AS_human_lung_scATAC/fragment_files/'
+#fragmentsDir = '$SCRATCH_DIR/AS_human_lung_scATAC/fragment_files/'
 #fragment_filenames = list.files (fragmentsDir, pattern = '*gz$')
 #sampleID = sapply (fragment_filenames, function(x) unlist(strsplit(x, '_'))[1])
 
@@ -51,14 +52,14 @@ if (!file.exists('Save-ArchR-Project.rds'))
 #fragment_filenames = fragment_filenames[!grepl('.tbi',fragment_filenames)]
 #fragment_filenames = fragment_filenames[sapply (meta$sample_ID, function(x) grep (x, fragment_filenames))]
 #fragment_filepaths = paste0(fragmentsDir, fragment_filenames)
-meta = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/sample_annots.csv')
+meta = read.csv (paste0(REF_DIR, '/AS_human_lung_scatac/sample_annots.csv'))
 meta = meta[meta$library_chemistry == 'V0_multiome',]
 meta = meta[meta$tissue %in% c('Normal','Tumor','PBMC'), ]
 patient_ID = unique (meta$patient_ID)
 
 # Copy arrows of multiome from NT_myeloid3 and PBMC_myeloid projects
-nt_myeloid_path = '/ahg/regevdata/projects/ICA_Lung/Bruno/AS_human_lung_scatac/analysis/NT_myeloid3/ArrowFiles/'
-pbmc_myeloid_path = '/ahg/regevdata/projects/ICA_Lung/Bruno/AS_human_lung_scatac/analysis/pbmc_myeloid/ArrowFiles/'
+nt_myeloid_path = paste0(REF_DIR, '/AS_human_lung_scatac/analysis/NT_myeloid3/ArrowFiles/')
+pbmc_myeloid_path = paste0(REF_DIR, '/AS_human_lung_scatac/analysis/pbmc_myeloid/ArrowFiles/')
 nt_myeloid_arrows = c(paste0(patient_ID, c('N.arrow')), paste0(patient_ID, c('T.arrow')))
 pbmc_myeloid_arrows = paste0(patient_ID, 'P.arrow')
 if (!all(file.exists(c(paste0(projdir,'/ArrowFiles/',nt_myeloid_arrows),paste0(projdir,'ArrowFiles/',pbmc_myeloid_arrows))))
@@ -70,8 +71,8 @@ lapply (paste0(pbmc_myeloid_path, pbmc_myeloid_arrows), function(x) system (past
 system (paste('mkdir -p',projdir))
 setwd (projdir)
 
-  fragment_filepaths = paste0('/broad/hptmp/bgiotti/samarth_fragment_files/',list.files('/broad/hptmp/bgiotti/samarth_fragment_files/',pattern='gz$'))
-  sample_names = list.files('/broad/hptmp/bgiotti/samarth_fragment_files/',pattern='gz$')
+  fragment_filepaths = paste0(paste0(SCRATCH_DIR, '/samarth_fragment_files/'),list.files(paste0(SCRATCH_DIR, '/samarth_fragment_files/'),pattern='gz$'))
+  sample_names = list.files(paste0(SCRATCH_DIR, '/samarth_fragment_files/'),pattern='gz$')
   ArrowFiles = createArrowFiles (inputFiles = fragment_filepaths,
     sampleNames = sample_names,
     minTSS = 6, #Dont set this too high because you can always increase later

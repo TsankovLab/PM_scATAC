@@ -1,4 +1,5 @@
 # Differential Peaks in SOX9 high vs SOX9 low cells in P23 ####
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 archp = addClusters (input = archp, resolution = 1.5,
   reducedDims = "IterativeLSI", name = 'Clusters2',
   maxClusters = 100,
@@ -158,7 +159,7 @@ dev.off()
 ### Compare DEG SOX9 high vs SOX9 low to list of genes from Yang et al paper ####
 rankby = 'pval_signedLFC'
 
-sox9_gs = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/gene_sets/Sox9_targets_mouse.csv')
+sox9_gs = read.csv (paste0(REF_DIR, '/gene_sets/Sox9_targets_mouse.csv'))
 D0 = head(sox9_gs$symbol[order(-sox9_gs$D0)],500)
 W1 = head(sox9_gs$symbol[order(-sox9_gs$W1)],500)
 W2 = head(sox9_gs$symbol[order(-sox9_gs$W2)],500)

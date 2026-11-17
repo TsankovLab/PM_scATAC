@@ -1,3 +1,4 @@
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 conda activate meso_scatac
 
 R
@@ -2276,8 +2277,8 @@ head (finemo_res$V4[finemo_res$V6 == 'pos_patterns.pattern_33'],1)
 
 
 #### Compare PC1 MDM - TRM with TF activity of blood monocytes (Hegde data) ####
-blood_tf = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/NTP_multiome/average_TF_activity_PBMC2.csv')
-blood_tf = read.csv ('/sc/arion/projects/Tsankov_Normal_Lung/Bruno/AS_human_lung_scatac/analysis/pbmc_myeloid/average_TF_activity_PBMC.csv')
+blood_tf = read.csv (paste0(REF_DIR, '/AS_human_lung_scatac/analysis/NTP_multiome/average_TF_activity_PBMC2.csv'))
+blood_tf = read.csv (paste0(REF_DIR, '/AS_human_lung_scatac/analysis/pbmc_myeloid/average_TF_activity_PBMC.csv'))
 blood_tf = blood_tf[1:870,]
 rownames(blood_tf) = blood_tf[,1]
 blood_tf = blood_tf[,-1]

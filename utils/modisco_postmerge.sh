@@ -8,6 +8,7 @@
 #   4b. TOMTOM matching against known motifs
 #   5.  Re-run FI-NeMo per cell type with compiled merged motifs
 
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
 set -euo pipefail
 
 ml anaconda3/latest
@@ -20,9 +21,9 @@ CELLTYPES=("$@")
 
 MERGED_DIR=${CHROMBPDIR}/modisco_merged_${MODEL_HEAD}
 CLUSTER_KEY=${MERGED_DIR}/cluster_key_combined.txt
-MOTIF_DB=/sc/arion/work/giottb01/conda/envs/chrombpnet/lib/python3.8/site-packages/chrombpnet/data/motifs.meme.txt
-HDMA_UTILS=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA/code/03-chrombpnet
-PYTHON=/sc/arion/work/giottb01/conda/envs/chrombpnet/bin/python
+MOTIF_DB=${CONDA_ENVS}/chrombpnet/lib/python3.8/site-packages/chrombpnet/data/motifs.meme.txt
+HDMA_UTILS=${DATA_DIR}/HDMA/code/03-chrombpnet
+PYTHON=${CONDA_ENVS}/chrombpnet/bin/python
 
 echo "=== Post-merge pipeline: model_head=${MODEL_HEAD} | cell types: ${CELLTYPES[*]} ==="
 

@@ -11,6 +11,7 @@
 
 # deg_dir = paste0(projdir,'Plots/Clusters_markers_',metaGroupName,'_logFC_',logfcThreshold)
 # dir.create (deg_dir)
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 projdir_DEG = paste0('DEG_',metaGroupName,'_logFC_',logfcThreshold,'_padj_',pvalAdjTrheshold)
 dir.create (file.path(projdir_DEG,'Plots'), recursive=T)
 
@@ -125,7 +126,7 @@ if (!file.exists (file.path(projdir_DEG, 'Pathway_Enrichment_clusters.rds')) | f
 	EnrichRResAll = list()
 	for (ann in gmt_annotations)
 		{
-		gmt.file = file.path ('/ahg/regevdata/projects/ICA_Lung/Bruno/DBs/GSEA_gs', org, ann)
+		gmt.file = file.path (paste0(REF_DIR, '/DBs/GSEA_gs'), org, ann)
 		pathways = read.gmt (gmt.file)
 		#pathways = gmtPathways (gmt.file)
 		message (paste('Compute enrichment per cluster using annotation:', ann))

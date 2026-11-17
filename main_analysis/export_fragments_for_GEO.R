@@ -2,12 +2,13 @@
 # Get fragments from each sample
 # library (rtracklayer)
 # fragments_l = getFragmentsFromProject (archp)
-# tmpdir = '/sc/arion/scratch/giottb01/meso_scatac_fragments'
+# tmpdir = '$SCRATCH_DIR/meso_scatac_fragments'
 # for (sam in names (fragments_l))
 #   {
 #     if (!file.exists(file.path(tmpdir,paste0(sam,'_fragments.bed'))))
 #       export(fragments_l[[sam]], file.path(tmpdir, paste0(sam,'_fragments.bed')))
 #   }
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 library(ArchR)
 library(GenomicRanges)
 library(rtracklayer)
@@ -17,13 +18,13 @@ fragments_l <- getFragmentsFromProject(archp)
 # Export normal lung meso
 fragments_l = fragments_l[c('RPL_280_neg_1','RPL_280_neg_2','RPL_Epi_1','RPL_Epi_2')]
 
-tmpdir <- "/sc/arion/scratch/giottb01/meso_scatac_fragments"
+tmpdir <- paste0(SCRATCH_DIR, "/meso_scatac_fragments")
 dir.create(tmpdir, showWarnings = FALSE, recursive = TRUE)
 
 # adjust if you want
 sort_mem <- "20G"
 n_threads <- 4
-sort_tmp <- "/sc/arion/scratch/giottb01"
+sort_tmp <- SCRATCH_DIR
 force = T
 for (sam in names(fragments_l) ) {
   

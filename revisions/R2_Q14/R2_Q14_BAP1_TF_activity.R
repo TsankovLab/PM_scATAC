@@ -30,11 +30,12 @@
 # Figure: Plots/BAP1_genescore_by_status.pdf (BAP1 gene score validates the genetic status).
 ###############################################################
 
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 set.seed(1234)
 
-GITROOT <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo"
-BASE    <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/tumor_compartment"
-OUTDIR  <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo_claude/R2_Q14"
+GITROOT <- REPO_DIR
+BASE    <- paste0(DATA_DIR, "/tumor_compartment")
+OUTDIR  <- paste0(RESULTS_DIR, "/R2_Q14")
 setwd(OUTDIR)
 dir.create(file.path(OUTDIR, "Plots"), showWarnings = FALSE)
 

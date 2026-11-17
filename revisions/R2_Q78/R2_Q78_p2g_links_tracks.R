@@ -17,11 +17,12 @@
 #
 # Output: Plots/R2_Q78_cHubs_p2g_links.pdf, R2_Q78_p2g400_hub_peak_links.csv, R2_Q78_p2g400_links_to_HAND2_MEF2C.csv
 ###############################################################################
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({ library(ArchR); library(GenomicRanges); library(ggplot2); library(ggrepel); library(grid); library(gtable)
                                  library(RColorBrewer); library(paletteer); library(circlize) })
 addArchRThreads(8); addArchRGenome("hg38")
-ROOT   <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM"
-OUT    <- file.path(ROOT, "git_repo_claude", "R2_Q78"); SCR <- "/sc/arion/scratch/giottb01/R2_Q78_peak2gene"
+ROOT   <- DATA_DIR
+OUT    <- file.path(ROOT, "git_repo_claude", "R2_Q78"); SCR <- paste0(SCRATCH_DIR, "/R2_Q78_peak2gene")
 HUBDIR <- file.path(ROOT, "main", "scatac_ArchR", "hubs_obj_cor_0.3_md_12500_dgs_0_min_peaks_5")
 MAXDIST <- 400000; FLANK <- 250000; COR <- 0.2; FDRC <- 1e-4; NAGG <- 500
 setwd(OUT); source(file.path(ROOT, "git_repo", "utils", "scATAC_functions.R")); source(file.path(ROOT, "git_repo", "utils", "palettes.R"))

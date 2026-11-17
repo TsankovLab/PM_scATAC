@@ -8,11 +8,12 @@
 ###############################################################################
 
 ## ---- paths ------------------------------------------------------------------
-SC     <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM"
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
+SC     <- DATA_DIR
 ROOT   <- file.path(SC, "git_repo_claude", "R2_Q3")     # this folder; all outputs land here
 ARCHR  <- file.path(SC, "tumor_compartment", "scatac_ArchR")   # malignant-cell scATAC project
-SPATIAL<- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/meso_spatial/spa_all_magic.rds"
-BLACKLIST <- paste0("/sc/arion/projects/Tsankov_Normal_Lung/Bruno/Public_data/",
+SPATIAL<- paste0(REF_DIR, "/mesothelioma/meso_spatial/P4_visium.rds")
+BLACKLIST <- paste0(paste0(REF_DIR, "/Public_data/"),
                     "blacklisted_regions/ENCODE_blacklist/hg38-blacklist.v2.bed")
 setwd(ROOT)
 dir.create("Plots", showWarnings = FALSE)

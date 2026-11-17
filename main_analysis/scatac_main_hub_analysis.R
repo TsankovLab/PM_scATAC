@@ -1,4 +1,5 @@
 # Load functions for hub detection
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 source (file.path('..','git_repo','utils','knnGen.R'))
 source (file.path('..','git_repo','utils','addCoax.R'))
 source (file.path('..','git_repo','utils','Hubs_finder.R'))
@@ -242,7 +243,7 @@ res_l = lapply (split (res, res$group), function(x){
 SE_regions = readRDS (file.path ('..','..','git_repo','files','SE_regions_SE_database.rds'))
 
 # Read in also SE celltypes from Wooseung ####
-SE_path2 = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/DBs/SE_db2_from_Wooseung'
+SE_path2 = paste0(REF_DIR, '/DBs/SE_db2_from_Wooseung')
 SE_regions2 = lapply (list.files(SE_path2, pattern = '.bed'), function(x) {
   y = read.table (file.path(SE_path2,x), header=T, sep='\t')
   y = y[,c(1:3,6)]

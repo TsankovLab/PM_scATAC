@@ -1,0 +1,3 @@
+# local paths of this installation (see config.R / config.sh)
+config.local.R
+config.local.sh

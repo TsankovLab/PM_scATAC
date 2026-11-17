@@ -1,10 +1,11 @@
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 conda activate meso_scatac
 R
 
 set.seed(1234)
 
 ####### ANALYSIS of B compartment #######
-projdir = '/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/B_cells/scatac_ArchR'
+projdir = paste0(DATA_DIR, '/B_cells/scatac_ArchR')
 dir.create (file.path (projdir,'Plots'), recursive =T)
 setwd (projdir)
 

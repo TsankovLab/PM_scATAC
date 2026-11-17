@@ -5,8 +5,9 @@
 #           pathways with NR4A2 in their leading edge are ringed in black and labelled (sets that only contain NR4A2 are not marked)
 # inputs : <DE_DIR>/DESeq2_results_full.csv, <DE_DIR>/gsea/gsea_MSigDB_Hallmark_2020.csv
 # outputs: <DE_DIR>/05_volcano_top_pathway_and_dotplot.{png,pdf}, 05_top_pathway_genes.csv
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({ library(ggplot2); library(ggrepel); library(patchwork) })
-DE_DIR <- Sys.getenv("DE_DIR", unset = "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/CROPseq_validation_bulkRNA/processed/de/NR4A2_1_2_vs_SCRAMBLE")
+DE_DIR <- Sys.getenv("DE_DIR", unset = paste0(DATA_DIR, "/CROPseq_validation_bulkRNA/processed/de/NR4A2_1_2_vs_SCRAMBLE"))
 N_UP <- as.integer(Sys.getenv("N_UP", unset = "10")); N_DOWN <- as.integer(Sys.getenv("N_DOWN", unset = "7")); N_LAB <- as.integer(Sys.getenv("N_LAB", unset = "18")); RED <- "#c8322b"; BLUE <- "#2f6db5"
 de <- read.csv(file.path(DE_DIR, "DESeq2_results_full.csv"), stringsAsFactors = FALSE); de <- de[!is.na(de$padj) & !is.na(de$symbol) & de$symbol != "", ]; de$mlp <- -log10(pmax(de$padj, 1e-300))
 gs <- read.csv(file.path(DE_DIR, "gsea", "gsea_MSigDB_Hallmark_2020.csv"), check.names = FALSE, stringsAsFactors = FALSE); gs$n_lead <- as.integer(sub("/.*", "", gs$`Tag %`)); gs$FDR <- gs$`FDR q-val`

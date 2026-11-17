@@ -1,6 +1,6 @@
 #!/bin/bash
 #BSUB -J modisco_merge
-#BSUB -P acc_Tsankov_Normal_Lung
+#BSUB -P <LSF_ACCOUNT>
 #BSUB -q gpu
 #BSUB -n 8
 #BSUB -W 48:00
@@ -12,6 +12,7 @@
 #BSUB -eo %J.stderr
 #BSUB -L /bin/bash
 
+source "${MESO_CONFIG:-$(for d in "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" "$PWD"; do while [ ! -f "$d/config.sh" ] && [ "$d" != / ]; do d=$(dirname "$d"); done; [ -f "$d/config.sh" ] && { echo "$d/config.sh"; break; }; done)}"   # data / results / reference roots: see config.sh at the repo root
 ml anaconda3/2022.10
 
 output_dir=${1}
@@ -24,8 +25,8 @@ batch=${6}
 source activate chrombpnet
 mkdir -p ${output_dir}/modisco_merged_${model_head}/merged_motifs
 
-PYTHONPATH=/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/HDMA/code/03-chrombpnet \
-/sc/arion/work/giottb01/conda/envs/chrombpnet/bin/python -u /sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM/git_repo/utils/03-merge_modisco.py \
+PYTHONPATH=${DATA_DIR}/HDMA/code/03-chrombpnet \
+${CONDA_ENVS}/chrombpnet/bin/python -u ${REPO_DIR}/utils/03-merge_modisco.py \
                     --out-dir ${output_dir}/modisco_merged_${model_head}/merged_motifs \
                     --model-head ${model_head} \
                     --cluster-key ${cluster_key} \

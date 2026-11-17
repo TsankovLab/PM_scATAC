@@ -20,9 +20,10 @@
 # Output: R2_Q10_scATAC_scS_per_sample.csv, R2_Q10_scATAC_keratin_stats.csv, R2_Q10_scATAC_keratin_pseudobulk_per_sample.csv,
 #         R2_Q10_keratin_RNA_vs_ATAC.csv, Plots/R2_Q10_keratins_scATAC_genescore.pdf
 ###############################################################################
+source(local({a <- grep("^--file=", commandArgs(FALSE), value = TRUE); for (d in c(if (length(a)) dirname(normalizePath(sub("^--file=", "", a[1]))), getwd())) { while (!file.exists(file.path(d, "config.R")) && d != dirname(d)) d <- dirname(d); if (file.exists(file.path(d, "config.R"))) break }; Sys.getenv("MESO_CONFIG", file.path(d, "config.R"))}))   # data / results / reference roots: see config.R at the repo root
 suppressPackageStartupMessages({ library(ArchR); library(Matrix); library(ggplot2); library(patchwork) })
 addArchRGenome("hg38"); addArchRThreads(4); options(width = 220); set.seed(1)
-ROOT <- "/sc/arion/projects/Tsankov_Normal_Lung/Bruno/mesothelioma/scATAC_PM"; OUT <- file.path(ROOT, "git_repo_claude", "R2_Q10")
+ROOT <- DATA_DIR; OUT <- file.path(ROOT, "git_repo_claude", "R2_Q10")
 setwd(OUT); dir.create("Plots", showWarnings = FALSE); dir.create("archr_scratch", showWarnings = FALSE)
 SARC <- "cNMF20"; TOP_GENES <- 30; NBIN <- 25; NBGD <- 100; MIN_GENES <- 5; MIN_PCT <- 0.05; MIN_CELLS <- 10
 
